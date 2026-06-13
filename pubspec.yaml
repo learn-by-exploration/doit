@@ -32,6 +32,12 @@ dependencies:
   drift: ^2.20.2
   flutter_contacts: ^1.1.9+2
 
+  # `meta` is transitively available via flutter, but the
+  # `depend_on_referenced_packages` lint flags `@immutable` etc.
+  # in lib/habits, lib/missions, lib/people. Pinning it makes
+  # the lint go away without an extra layer of indirection.
+  meta: ^1.15.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
