@@ -1,0 +1,152 @@
+# System Requirements
+
+Status: draft baseline, created 2026-06-13.
+
+This document is the contract. Every SYS- ID maps to a test or a manual
+check via the [traceability matrix](traceability_matrix.md). If a
+requirement cannot be verified, it is not a requirement — it is a wish.
+
+## User Need
+
+A single user wants to build daily habits and maintain important
+relationships on one Android phone, without the app lying to them about
+streaks, without their data leaving the device, and without the
+operating system silently killing the alarms. The product fuses
+habit-tracking, contact-cadence, and Alarmy-style strong enforcement.
+
+## Product Scope
+
+### In scope for v0.1
+
+- Add a habit with name, icon, schedule, proof mode, mission chain,
+  streak policy.
+- Add a person from device contacts with cadence, channel, and (if
+  Strong) mission chain.
+- Schedule a habit to fire at the right time on Android.
+- Fire the reminder, surface as a high-priority notification, and
+  optionally a full-screen intent.
+- Complete the reminder in three modes: Soft (one-tap), Strong
+  (mission chain), Auto (interval window).
+- Track completions, misses, snoozes, and skips honestly in a local log.
+- Compute streaks: per-habit and overall, with a configurable rest-day
+  budget.
+- Show stats: streak, best run, completion rate, time-of-day.
+- Survive device reboot, timezone change, and OEM battery savers
+  (with a user prompt to whitelist).
+- Auto backup to a user-chosen folder, once per day.
+- Restore from a backup file.
+- Permission-first UX: every platform interface is explained and
+  requested with rationale.
+- Local-only data. No network calls with user data.
+- All 4 habit presets (drink water, call person, morning routine,
+  daily todo) work end-to-end.
+- All 5 mission types (Shake, Type, Hold, Math, Memory) work
+  end-to-end.
+- Home screen widget shows next 3 due items.
+
+### Possible later scope (v0.2+)
+
+- iOS port.
+- Quick-settings tile for "I'm up" / "Snooze next".
+- Voice quick-add ("OK, add: call Dad this Sunday").
+- Location-anchored habits (e.g., "At the office, start work routine").
+- Barcode / QR mission (with home-printed codes).
+- Photo mission (with on-device scene match).
+- Encrypted backup (with user passphrase).
+- Multiple home widget layouts.
+- App lock (biometric / passcode) — to keep family from snoozing for you.
+- Theming: dark mode is v0.1; light + custom themes are v0.2.
+- Watch / Wear OS companion for quick-done.
+- Web companion for read-only stats.
+
+### Out of scope unless re-approved
+
+- Multiple named users on one device (no family / partner profiles).
+- Multi-device sync.
+- Cloud backup of any kind (auto or manual).
+- A web app.
+- Any feature that requires a backend.
+- Telemetry, analytics, crash reporting that leaves the device.
+- Storing payment cards, bank data, or any credentials.
+- CALL_PHONE permission. Always dialer pre-fill.
+- Access-card / RFID / NFC emulation. Streak reminds you to take
+  action; it does not pretend to be the thing.
+
+## System Requirements
+
+| ID | Requirement | Verification |
+| --- | --- | --- |
+| **SYS-001** | The app shall allow a user to add a habit with name, schedule type, schedule parameters, proof mode, mission chain (if Strong), streak policy. | Widget test (`test/habits/add_habit_test.dart`) + manual acceptance |
+| **SYS-002** | The app shall allow a user to add a person from device contacts with display name, cadence, channel, mission chain (if Strong). | Widget test (`test/people/add_person_test.dart`) + manual acceptance |
+| **SYS-003** | The app shall schedule a habit's next occurrence to fire within ±60 sec of the target time on a non-Doze device, via AlarmManager exact alarm. | Unit test for `AlarmScheduler.nextOccurrence()` + integration test (`test/reminders/alarm_scheduler_test.dart`) + manual device check |
+| **SYS-004** | The app shall expose four schedule types: Fixed (time-of-day), Interval (every N units), Anchor (relative to a wake-up or other habit), Day-of-X (week / month / year). | Unit test for each schedule type's `nextOccurrence()` + widget test for the schedule picker |
+| **SYS-005** | A reminder shall surface as a high-priority notification with the habit name, due time, and a "Done" / "Open" action. | Widget test + manual device check |
+| **SYS-006** | A reminder shall optionally surface as a full-screen intent when the screen is off, locked, or the user has the app in the background. The full-screen activity must show the proof-mode UI. | Integration test (mock Activity) + manual device check on a locked phone |
+| **SYS-007** | The app shall support three proof modes per habit: Soft (one-tap), Strong (mission chain), Auto (interval window). | Unit test for `HabitProofMode` + widget test for each mode's UI |
+| **SYS-008** | The Shake-N mission shall derive the count from the accelerometer, must require a magnitude threshold AND an inter-shake spacing, and must not advance when the phone is still. | Unit test for `ShakeDetector.isShake(sample)` + manual device check on a desk |
+| **SYS-009** | The Type phrase mission shall require an exact (case-insensitive, trim) match of the user-entered text against the expected phrase. | Unit test for `TypeMission.verify()` |
+| **SYS-010** | The Hold-tap mission shall require a continuous press of 3-5 seconds (configurable). Releasing early shall reset the progress. | Unit test for `HoldMission.tick(progress, dt)` + widget test |
+| **SYS-011** | The Math mission shall present a random math problem and require a correct answer. Difficulty shall scale (Easy: 1-digit × 1-digit; Hard: 2-digit × 2-digit with addition). | Unit test for `MathProblem.next(difficulty)` + widget test |
+| **SYS-012** | The Memory mission shall present a 4×3 grid of card pairs and require all matches within 60 s. Failed attempts shall be logged. | Unit test for `MemoryMission` + widget test |
+| **SYS-013** | Strong-mode habits shall require a chain of one or more missions in declared order. Skipping or reordering shall invalidate the proof. | Unit test for `MissionChain.next(current, completed)` |
+| **SYS-014** | A call reminder, when tapped, shall open the system dialer with the contact's number pre-filled. The app shall not call `ACTION_CALL`. | Unit test (intent inspect) + manual device check; `AndroidManifest.xml` must not declare `CALL_PHONE` |
+| **SYS-015** | The app shall support a wake-up anchor with two detection modes (manual, first-unlock) selectable in settings, plus a "either with confirmation" hybrid. | Unit test for `AnchorDetector` + widget test for the anchor setting |
+| **SYS-016** | The app shall re-schedule all pending reminders on device boot, timezone change, and DST change. | Integration test (`test/reminders/reboot_survival_test.dart`) + manual device check |
+| **SYS-017** | The app shall survive Doze by combining exact-alarm (primary), a foreground-service heartbeat for "I'm up" (best effort), and a user-driven Doze whitelist prompt. | Manual device check with battery-saver + Doze simulation; banner surfaced if not whitelisted |
+| **SYS-018** | The app shall re-schedule a snoozed reminder at the chosen snooze time and track the snooze count per occurrence. | Unit test for `ReminderScheduler.snooze()` + widget test |
+| **SYS-019** | The app shall compute streaks per habit and overall. A streak breaks only on a missed day past the grace window. The completion log is the source of truth; the streak number is derived. | Unit test for `StreakCalculator` across many edge cases (DST, rest day, missed-then-backfilled) |
+| **SYS-020** | The app shall support a configurable rest-day budget per habit (default 2 / month). A rest day preserves the streak. | Unit test for `RestDayBudget.consume()` |
+| **SYS-021** | The app shall display per-habit and overall stats: current streak, best streak, completion rate (30/90/365 days), time-of-day heatmap, missed-day distribution. | Widget test for the stats screen + manual acceptance |
+| **SYS-022** | The app shall store all user data in a local SQLite database. The DB schema shall be versioned; a forward-migration shall run on launch if the schema version is older. | Unit test for migrations (`test/db/migration_test.dart`) + DB inspection on a real device |
+| **SYS-023** | The app shall auto-backup the local DB to a user-chosen folder once per day, in a versioned JSON file. Files older than 30 days shall be pruned. | Integration test (`test/backup/auto_backup_test.dart`) + manual device check |
+| **SYS-024** | The app shall restore from a backup file picked via the system file picker. Restore shall be idempotent (re-importing the same file twice produces no duplicates). | Integration test (`test/backup/restore_test.dart`) |
+| **SYS-025** | The app shall request all platform permissions with a rationale screen that explains the consequence of denial. | Widget test for the onboarding flow + manual acceptance |
+| **SYS-026** | The app shall not perform any network call with user data. Any `http(s)://` or `dart:io` HTTP usage shall be a security defect and shall be removed. | Code search + a CI grep rule that fails on `import 'package:http'` and `Uri.https` outside the dev-only test harness |
+| **SYS-027** | The app shall follow the existing `board_box` 3-gate: `dart format --output=none --set-exit-if-changed .` → `flutter analyze --fatal-infos` → `flutter test`. All three must pass with zero failures. | CI run on every PR |
+| **SYS-028** | The app shall maintain ≥ 80% test coverage on changed files. Coverage report shall be uploaded as a CI artifact. | `flutter test --coverage` + `genhtml` + report check |
+| **SYS-029** | The app shall display a home screen widget that shows the next 3 due items, each with a "Done" button. Tapping "Done" shall mark the item done and refresh the widget. | Widget test + manual device check |
+| **SYS-030** | The app shall provide a permission baseline in `AndroidManifest.xml` that matches the v0.1 scope. No permission shall be added without an ADR. | `AndroidManifest.xml` review + diff in PRs that touch it |
+
+## Platform Constraints
+
+- **Android 9+ (API 28+).** API 28 is the floor; minSdkVersion 28.
+- **Compile/target SDK 34.** Matches `board_box` / `card_box`.
+- **Exact alarm permission on Android 12+** is a user-granted
+  permission. The app must detect denial and fall back gracefully.
+- **Notification permission on Android 13+** is a runtime permission.
+  The app must request it with rationale.
+- **Doze mode** suspends alarms. The app must prompt the user to
+  disable battery optimization and the OEM's auto-start toggle, with
+  a one-tap deep link to the system settings.
+- **OEM battery savers** (Xiaomi, Oppo, Vivo, Honor, Samsung) kill
+  background work even with whitelist. The app must show an OEM-aware
+  guide card.
+- **No `CALL_PHONE` permission.** Call reminders open the dialer via
+  `Intent.ACTION_DIAL` with the number pre-filled in the URI.
+- **No `READ_CALL_LOG` permission.** The app does not read call logs
+  for cadence auto-priority; the user configures cadence manually or
+  per-person.
+- **No `INTERNET` permission** for user data. The app must function
+  fully offline.
+
+## MVP Success Criteria
+
+A v0.1 build is acceptable if, after a 14-day real-device run on the
+user's primary phone, all of the following are true:
+
+1. Streak fired a reminder for each of the 4 active presets within
+   ±60 seconds of its target time, for ≥ 95% of scheduled occurrences.
+2. The user completed at least 70% of the reminders with the
+   configured proof mode.
+3. The completion log matches the user's honest memory.
+4. The app survived at least one device reboot without dropping
+   reminders.
+5. The app survived at least one timezone change without producing
+   duplicate or dropped occurrences.
+6. The backup file was written on at least 13 of the 14 nights.
+7. The backup was successfully restored on a second device (or after
+   uninstall / reinstall).
+8. The 3-gate passed with zero failures on every commit during the
+   14 days.
+
+If any criterion fails, fix it before adding features.
