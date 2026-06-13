@@ -48,9 +48,7 @@ class ScaffoldScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Streak — scaffold'),
-      ),
+      appBar: AppBar(title: const Text('Streak — scaffold')),
       body: const Center(
         child: Text(
           'Streak is loading.',
