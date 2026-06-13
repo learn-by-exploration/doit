@@ -1,0 +1,14 @@
+# Release-signing credentials for Streak.
+# Copy this file to `android/key.properties` and fill in real values.
+# `android/key.properties` is gitignored. Never commit a real keystore.
+#
+# Generate a release keystore with:
+#   keytool -genkey -v -keystore android/streak-release-key.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias streak
+#
+# See AGENTS.md § Common pitfalls and AGENTS.md § "Out of scope".
+
+storePassword=CHANGEME
+keyPassword=CHANGEME
+keyAlias=streak
+storeFile=../streak-release-key.jks

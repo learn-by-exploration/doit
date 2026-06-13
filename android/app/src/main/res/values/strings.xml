@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launcher label. Pinned to "Streak" per AGENTS.md.
+         Any rename is a v0.2+ decision and requires an ADR. -->
+    <string name="app_name">Streak</string>
+</resources>

@@ -18,7 +18,12 @@ For deep-dives, see [`docs/v_model/`](docs/v_model/).
    by Claude Code; covers `lib/habits/`, `lib/people/`, `lib/missions/`,
    `lib/reminders/`, `lib/services/`, `lib/screens/`, `test/`).
 4. Read the relevant `docs/v_model/` file (see "Pointer to docs/" below).
-5. Then plan, then code, then verify (the 3-gate), then commit.
+5. **The docs in `docs/v_model/` are the contract.** Code that
+   contradicts a doc is a defect; fix the doc in the same PR. New
+   behavior with no doc change is incomplete — every new feature must
+   land with the matching SYS- ID, workflow step, and test. See
+   [`AGENTS.md` § Documentation discipline](AGENTS.md#documentation-discipline).
+6. Then plan, then code, then verify (the 3-gate), then commit.
 
 ---
 
@@ -153,11 +158,38 @@ incomplete. Say so in the commit message.
 
 ## Pointer to docs/
 
+### Engineering practice (synced from board_box)
+
 | For… | Read… |
 |---|---|
 | Day-to-day Dart/Flutter style (naming, file org, imports, comments, constants) | [`docs/engineering/coding-guidelines.md`](docs/engineering/coding-guidelines.md) |
 | Style for models, services, widgets, errors, tests, Dart 3 (companion to coding-guidelines) | [`docs/engineering/coding-guidelines-types.md`](docs/engineering/coding-guidelines-types.md) |
 | V-Model lifecycle, phase gates, traceability (lifecycle framing that wraps everything below) | [`docs/engineering/v-model.md`](docs/engineering/v-model.md) |
+| Rationale for each Dart/Flutter lint (the *why*, not the *how*) | [`docs/engineering/flutter-dart-style.md`](docs/engineering/flutter-dart-style.md) |
+| Test layout, AAA, async patterns, coverage policy, regression tests | [`docs/engineering/testing-strategy.md`](docs/engineering/testing-strategy.md) |
+| CI workflow, release pipeline, signing, deploy | [`docs/engineering/ci-cd.md`](docs/engineering/ci-cd.md) |
+| Bug-hunt and regression-test discipline | [`docs/engineering/bug-hunt-process.md`](docs/engineering/bug-hunt-process.md) |
+| Per-PR code review checklist (process) | [`docs/engineering/code-review-checklist.md`](docs/engineering/code-review-checklist.md) |
+| Secrets, signing, privacy, READ_CONTACTS baseline | [`docs/engineering/secrets-and-privacy.md`](docs/engineering/secrets-and-privacy.md) |
+| UI/UX rules, a11y, motion, copy | [`docs/engineering/ui-ux-reference.md`](docs/engineering/ui-ux-reference.md) |
+
+### Design process (synced from board_box)
+
+| For… | Read… |
+|---|---|
+| Step-by-step from idea → PRD → ADR → PR | [`docs/design/01-design-process.md`](docs/design/01-design-process.md) |
+| Layered architecture, the model/service/widget pattern, services | [`docs/design/02-architecture.md`](docs/design/02-architecture.md) |
+| Design tokens, theme, the "no hardcoded colors" rule | [`docs/design/03-design-system.md`](docs/design/03-design-system.md) |
+| UI/UX heuristics, accessibility bar, copy rules | [`docs/design/04-ui-ux-principles.md`](docs/design/04-ui-ux-principles.md) |
+| Component library, state matrix, widgets used across screens | [`docs/design/05-component-library.md`](docs/design/05-component-library.md) |
+| Feature decomposition, PR-shaped work units, scope rules | [`docs/design/06-feature-decomposition.md`](docs/design/06-feature-decomposition.md) |
+| PR review checklist (design/UX/a11y/security angle) | [`docs/design/07-pr-review-checklist.md`](docs/design/07-pr-review-checklist.md) |
+| How an AI assistant should approach this repo | [`docs/design/08-ai-assistant-guide.md`](docs/design/08-ai-assistant-guide.md) |
+
+### V-Model artifacts (streak-native)
+
+| For… | Read… |
+|---|---|
 | V-Model stages, milestones, working assumptions | [`docs/v_model/plan.md`](docs/v_model/plan.md) |
 | Mission, actors, modes, constraints, success | [`docs/v_model/conops.md`](docs/v_model/conops.md) |
 | End-to-end user flows (WF-001..N) | [`docs/v_model/workflows.md`](docs/v_model/workflows.md) |
@@ -173,4 +205,4 @@ incomplete. Say so in the commit message.
 
 ---
 
-*Last updated: 2026-06-13. Keep this file ≤120 lines — bloat kills the rules.*
+*Last updated: 2026-06-13.*

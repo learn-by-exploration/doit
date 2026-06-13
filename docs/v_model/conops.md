@@ -11,6 +11,23 @@ Mom, run the morning routine — and tracks the truth of what you actually
 did. The product is opinionated: it would rather refuse a fudged "done"
 than inflate a streak.
 
+### Brand voice
+
+The product is named *Streak*, but the surface area spans habits,
+todos, call/message cadences, and anchored routines. Notification copy
+should lead with the **thing you do** ("Call Mom", "Drink water",
+"Submit report") and end with the streak number only when it adds
+motivation. The name does the work; the copy does not lean on it.
+
+- **Lead with the action.** "Drink water" beats "Streak: hydrate".
+- **Streak number is the period, not the point.** Append it as a
+  secondary line, not the headline: "Drink water in 5 min — 12 days
+  running".
+- **No shame.** Missed days are facts, not failures. Copy says
+  "missed" or "skipped", never "broke" or "lost".
+- **Tone is calm, slightly stubborn.** Streak is the friend who
+  doesn't let you off the hook, but doesn't yell either.
+
 ## Operational Context
 
 A user carries one Android phone. They want to:

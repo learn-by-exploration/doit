@@ -42,6 +42,31 @@ TL;DR:
 - **Layer boundaries.** One-directional imports: presentation → application
   → domain → data. No back-edges.
 
+## Documentation discipline
+
+The artifacts in [`docs/v_model/`](docs/v_model/) are the **contract**.
+Read them before writing code; treat them as the source of truth; and
+update them **in the same PR** whenever a requirement, design, or
+verification step changes.
+
+- **Code contradicts a doc → the doc wins.** Fix the code first; if the
+  doc is wrong, fix the doc in the same PR. Never ship code that
+  contradicts an unrevised doc.
+- **A new behavior with no doc change is incomplete.** If you add a
+  feature, you must add or update the matching SYS- ID in
+  [`requirements.md`](docs/v_model/requirements.md), the row in
+  [`traceability_matrix.md`](docs/v_model/traceability_matrix.md), the
+  workflow step in [`workflows.md`](docs/v_model/workflows.md), and a
+  test in `test/`. The V is incomplete otherwise.
+- **An ADR is required for any of:** a new package, a new permission
+  in `AndroidManifest.xml`, a new module, a new reliability policy, a
+  new state shape, or any reversal of a previous decision. Append to
+  [`decision_record.md`](docs/v_model/decision_record.md); do not
+  edit history.
+- **The package id is `com.common_games.streak` and the launcher name
+  is "Streak".** This is committed. Any rename is a v0.2+ decision
+  and requires an ADR.
+
 ## The 3-gate
 
 Run, in order, with zero failures. **All three must pass before a task is

@@ -1,0 +1,47 @@
+name: common_games
+description: "Streak: a slightly stubborn habit coach for Android."
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none'
+
+# Streak is a personal-use Android habit app. iOS is v0.2+ scope. The
+# version and build number are overridden by `flutter build` flags.
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # v0.1 baseline dependencies (see
+  # docs/v_model/architecture_options.md § Baseline Tech Stack).
+  # Re-run `flutter pub outdated` before bumping any of these.
+  flutter_local_notifications: ^17.2.4
+  android_alarm_manager_plus: ^4.0.4
+  # workmanager 0.5.x uses the removed v1 Flutter plugin embedding
+  # (io.flutter.plugin.common.PluginRegistry.PluginRegistrantCallback)
+  # and fails to compile against Flutter 3.44. Pin to 0.6.0+ which
+  # migrated to the v2 embedding. See pub.dev/packages/workmanager
+  # changelog for the migration.
+  workmanager: ^0.6.0
+  permission_handler: ^11.3.1
+  drift: ^2.20.2
+  flutter_contacts: ^1.1.9+2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+  # Drift codegen. The first `.drift` file lands in Phase 2; the deps
+  # are added now so the scaffold is ready.
+  drift_dev: ^2.20.3
+  build_runner: ^2.4.13
+
+flutter:
+  uses-material-design: true
