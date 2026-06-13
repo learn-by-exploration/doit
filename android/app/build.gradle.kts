@@ -44,7 +44,10 @@ android {
 
 kotlin {
     compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+        // Matches `sourceCompatibility` / `targetCompatibility` above
+        // (11, for core-library desugaring). Mismatched targets
+        // fail the build with "Inconsistent JVM Target Compatibility".
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
     }
 }
 
