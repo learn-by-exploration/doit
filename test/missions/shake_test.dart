@@ -138,5 +138,23 @@ void main() {
       expect(events.length, 3);
       expect(events.last.countSinceFirst, 3);
     });
+
+    test('emits nothing when stream is empty', () async {
+      final detector = ShakeDetector(
+        samples: const Stream<ShakeSample>.empty(),
+      );
+      final events = await detector.events().toList();
+      expect(events, isEmpty);
+    });
+
+    test('collect() returns a ShakeInput with all samples', () async {
+      final stream = Stream<ShakeSample>.fromIterable([
+        _s(ms: 0, x: 20),
+        _s(ms: 400, y: 20),
+        _s(ms: 800, z: 20),
+      ]);
+      final input = await ShakeDetector.collect(samples: stream);
+      expect(input.samples.length, 3);
+    });
   });
 }
