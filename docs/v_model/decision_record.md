@@ -350,3 +350,107 @@ archive boundary.
 **SYS-IDs affected:** SYS-007, SYS-013.
 
 ---
+
+## ADR-014 — Onboarding permission order: notifications, contacts, exact-alarm, battery, OEM, backup, anchor
+
+**Date:** 2026-06-13.
+**Status:** Accepted.
+
+**Context.** Onboarding has to ask for several platform
+permissions and OEM-specific settings. The order matters for two
+reasons: (a) each step is contingent on the previous one being
+understood by the user, and (b) the user is more likely to grant
+the most important permissions when each request is paired with
+a clear, in-context rationale rather than a wall of requests at
+once.
+
+**Decision.** Streak asks in this order, in this order, and
+with this rationale:
+
+1. **`POST_NOTIFICATIONS` (Android 13+).** Without this,
+   reminders are silent. The app's headline value (a reminder
+   that fires) is broken.
+2. **`READ_CONTACTS`.** Used only to resolve names the user
+   has chosen to add to a cadence. Required for the "Call
+   &lt;person&gt;" preset; without it, that preset is hidden.
+3. **`SCHEDULE_EXACT_ALARM` (Android 12+).** Without this,
+   fixed-time reminders can be 15+ minutes late. Required for
+   the Morning Routine preset.
+4. **Disable battery optimization.** Required for the alarm
+   to fire reliably in Doze. OEM-specific deep link.
+5. **OEM auto-start.** Best-effort detection; shows a card
+   with a screenshot-style guide for the user's OEM. Without
+   this, Xiaomi / Oppo / Vivo / Honor / Samsung may kill
+   background work even with the Doze whitelist.
+6. **Backup folder (SAF).** Optional. The user may skip and
+   enable later from Settings.
+7. **Wake-up anchor preference.** Last, because the user has
+   just understood the app's value and is ready to make
+   configuration choices.
+
+**Consequences.**
+- The onboarding workflow WF-001 follows this order; any
+  change is a breaking change for the onboarding flow and
+  requires updating WF-001 in the same PR.
+- The settings page mirrors this order when re-asking for
+  permissions.
+- A permission that is denied at any step continues the
+  onboarding (graceful degradation) — the user is shown what
+  is broken and how to fix it later.
+
+**SYS-IDs affected:** SYS-025, SYS-026, SYS-027, SYS-030.
+
+**Workflows affected:** WF-001, WF-012, WF-013.
+
+---
+
+## ADR-015 — Three-strikes policy for retry and nudge
+
+**Date:** 2026-06-13.
+**Status:** Accepted.
+
+**Context.** Several places in the app involve a finite
+number of user attempts or system retries: math mission wrong
+answers, snooze taps per occurrence, backup write retries.
+The 3-strike count is a UX default that has been chosen
+independently in each place (Math: 3-wrong nudge; Snooze:
+3-max; Backup: 3 retries with backoff). Without a unifying
+decision, the next "finite attempts" feature will be picked
+arbitrarily.
+
+**Decision.** Streak uses a **3-strikes policy** as the UX
+default for any finite-attempt behavior. Beyond 3 attempts,
+the app either:
+
+- **Surfaces a nudge** (Math: "take a break" + auto-fail) and
+  treats the mission as failed; or
+- **Caps the action** (Snooze: "you've snoozed 3 times —
+  skip or do it") and offers a manual fallback (Skip with a
+  rest day, or accept a streak break); or
+- **Retries silently with backoff** (Backup: 1 s, 5 s, 30 s)
+  and surfaces a banner only when all retries fail.
+
+The 3-strike count is a UX default, not a hard rule. Specific
+policies are pinned in the matching SYS- IDs:
+
+- **SYS-011** (Math): 3 consecutive wrong answers = nudge +
+  auto-fail.
+- **SYS-018** (Snooze): 3 snoozes per occurrence = cap +
+  manual fallback.
+- **SYS-023** (Backup): 3 retries with exponential backoff
+  (1 s, 5 s, 30 s) = silent retry, banner on full failure.
+
+**Consequences.**
+- Any new "finite attempts" feature defaults to 3 unless an
+  ADR overrides it. Examples in v0.2+ that may override: the
+  5-minute chain timeout cap (SYS-031) which is not a
+  3-strike pattern.
+- The 3-strike count is configurable per-feature in code, not
+  in user settings.
+- The unit test for each feature covers the boundary at 3.
+
+**SYS-IDs affected:** SYS-011, SYS-018, SYS-023, SYS-031.
+
+**Workflows affected:** WF-006, WF-009, WF-012.
+
+---
