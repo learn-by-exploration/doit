@@ -34,8 +34,8 @@ mapped to the V-Model stages. Update it as work progresses.
 
 | Slice | Status | Notes |
 | --- | --- | --- |
-| Flutter app scaffold | Not started | `flutter create common_games/streak` with package `com.common_games.streak` |
-| `analysis_options.yaml` (18 lints) | Not started | Copy from `board_box` |
+| Flutter app scaffold | Done (2026-06-13) | `flutter create` with package `com.common_games.streak`; `flutter build apk --debug` succeeds. See commit `e5404ac` plus the workmanager/desugaring fixes in the same commit. |
+| `analysis_options.yaml` (18 lints) | Done (2026-06-13) | Inherited from `board_box`; in commit `e5404ac`. |
 | `lib/habits/` model + schedule engine | Not started | Pure Dart, ≥ 80% coverage |
 | `lib/people/` model + contact resolution | Not started | Pure Dart + thin platform channel |
 | `lib/missions/` 5 types + chain executor | Not started | Pure Dart where possible |
@@ -65,6 +65,21 @@ sliced into the following sub-phases. Each ends with a green
   `android_alarm_manager_plus`, `workmanager`, `permission_handler`,
   `drift`, `flutter_contacts`).
 - Confirm 3-gate passes on the empty app.
+
+**Status: Done (2026-06-13).** `flutter create` ran with
+`--org com.common_games --project-name streak --platforms android`,
+pubspec set to `name: common_games` (monorepo convention), the
+v0.1 permission baseline added to `AndroidManifest.xml`, the
+18-lint analysis options in place, `minSdk = 28`, and core
+library desugaring enabled (required by
+`flutter_local_notifications` 17.x). `workmanager` was bumped
+to `^0.6.0` because 0.5.x uses the removed v1 Flutter plugin
+embedding. 3-gate green (`dart format` clean, `flutter analyze
+--fatal-infos` reports "No issues found!", `flutter test` passes
+the placeholder widget test); `flutter build apk --debug`
+produces `build/app/outputs/flutter-apk/app-debug.apk`. See
+commit `e5404ac` ("docs+chore(playbook): finish streak sync —
+pointer table, doc notices, Phase 0 scaffold").
 
 ### Phase 1 — Models and schedule engine
 
