@@ -13,7 +13,7 @@ not yet a real requirement.
 | Add habits with schedules, proof, and missions | SYS-001, SYS-002, SYS-004, SYS-007 | `lib/habits/`, `lib/screens/add_habit.dart` | `test/habits/add_habit_test.dart`, manual acceptance |
 | Schedule reminders reliably | SYS-003, SYS-016, SYS-017, SYS-018, SYS-030 | `lib/reminders/`, `AlarmScheduler`, `BootReceiver` | `test/reminders/alarm_scheduler_test.dart`, `test/reminders/reboot_survival_test.dart`, manual device check |
 | Surface reminders that interrupt | SYS-005, SYS-006, SYS-029 | `lib/reminders/notification_service.dart`, `lib/reminders/full_screen_intent.dart`, `lib/screens/widget_home.dart` | Widget test, manual device check on locked phone |
-| Three proof modes (Soft / Strong / Auto) | SYS-007, SYS-013 | `lib/habits/proof_mode.dart`, `lib/missions/chain.dart` | `test/habits/proof_mode_test.dart`, `test/missions/chain_test.dart` |
+| Three proof modes (Soft / Strong / Auto) | SYS-007, SYS-013, SYS-031 | `lib/habits/proof_mode.dart`, `lib/missions/chain.dart` | `test/habits/proof_mode_test.dart`, `test/missions/chain_test.dart` (chain-timeout test) |
 | Five mission types | SYS-008, SYS-009, SYS-010, SYS-011, SYS-012 | `lib/missions/shake.dart`, `lib/missions/type.dart`, `lib/missions/hold.dart`, `lib/missions/math.dart`, `lib/missions/memory.dart` | `test/missions/<name>_test.dart` for each |
 | Call reminders open dialer | SYS-014 | `lib/reminders/call_action.dart`, `AndroidManifest.xml` (no `CALL_PHONE`) | Intent inspection test, manual device check, manifest diff in PRs |
 | Wake-up anchor | SYS-015, SYS-016, SYS-017 | `lib/reminders/anchor_detector.dart`, `lib/screens/widget_home.dart` | Unit test, widget test, manual device check on first unlock |
@@ -31,11 +31,11 @@ not yet a real requirement.
 | Workflow | Requirement IDs | Verification |
 | --- | --- | --- |
 | WF-001 First-time onboarding | SYS-022, SYS-025, SYS-027 | Widget test, manual acceptance |
-| WF-002 Add a custom habit | SYS-001, SYS-002, SYS-003, SYS-004, SYS-007, SYS-016, SYS-018, SYS-019 | Widget test, manual acceptance |
+| WF-002 Add a custom habit | SYS-001, SYS-002, SYS-003, SYS-004, SYS-007, SYS-016, SYS-018, SYS-019, SYS-031 | Widget test, manual acceptance |
 | WF-003 Add a person | SYS-001, SYS-002, SYS-004 | Widget test, manual acceptance |
 | WF-004 Reminder fires (general) | SYS-003, SYS-005, SYS-006, SYS-013, SYS-016, SYS-017, SYS-018, SYS-019, SYS-020 | Integration test, manual device check |
 | WF-005 Soft completion | SYS-005, SYS-019, SYS-020 | Widget test |
-| WF-006 Strong completion (mission chain) | SYS-006, SYS-007, SYS-008, SYS-009, SYS-010, SYS-011, SYS-012, SYS-013, SYS-020 | Unit + widget tests for each mission, integration test for the chain |
+| WF-006 Strong completion (mission chain) | SYS-006, SYS-007, SYS-008, SYS-009, SYS-010, SYS-011, SYS-012, SYS-013, SYS-020, SYS-031 | Unit + widget tests for each mission, integration test for the chain |
 | WF-007 Auto completion (interval) | SYS-007, SYS-019, SYS-020 | Unit test, widget test |
 | WF-008 Mark "I'm up" | SYS-015, SYS-016, SYS-017 | Unit test, manual device check on first unlock |
 | WF-009 Snooze | SYS-005, SYS-006, SYS-018, SYS-019 | Unit test, widget test |
