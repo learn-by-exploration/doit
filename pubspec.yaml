@@ -31,6 +31,10 @@ dependencies:
   permission_handler: ^11.3.1
   drift: ^2.20.2
   flutter_contacts: ^1.1.9+2
+  # DB file lives under the OS app-support directory; the path
+  # join itself is a small stdlib-style helper.
+  path: ^1.9.0
+  path_provider: ^2.1.4
 
   # `meta` is transitively available via flutter, but the
   # `depend_on_referenced_packages` lint flags `@immutable` etc.
