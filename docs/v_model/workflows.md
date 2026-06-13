@@ -7,6 +7,15 @@ triple, the failure modes, and the SYS- IDs it exercises. Workflows are
 the contract between ConOps and the system requirements; if a workflow
 cannot be traced to a SYS- ID, the requirement is missing.
 
+**Notification copy follows the brand voice in
+[`conops.md § Brand voice`](conops.md#brand-voice):** lead with the
+action ("Drink water", "Call Mom", "Submit report"), append the
+streak number only as a secondary line, never use "broke"/"lost"
+(missed/skipped instead), and keep the tone calm and slightly
+stubborn. Avoid the prefix "Streak:" — the brand name does the
+work. If a workflow's copy ever drifts from the brand voice, the
+voice wins; the workflow is updated in the same PR.
+
 ---
 
 ## WF-001 — First-time onboarding
@@ -33,8 +42,9 @@ cannot be traced to a SYS- ID, the requirement is missing.
    Framework).
 8. App asks the user to pick a wake-up anchor preference
    (manual only / first-unlock only / either with confirmation).
-9. App shows the home screen with three default presets ready to
-   accept (drink water, call Mom, morning routine).
+9. App shows the home screen with four default presets ready to
+   accept (drink water, call &lt;person&gt;, morning routine, daily
+   todo).
 10. User taps "Enable" on each preset they want.
 
 **Postconditions:**
@@ -217,7 +227,7 @@ SYS-017, SYS-018, SYS-019, SYS-020.
    it animates in.
 3. After the last mission, the completion is logged, streak
    increments, and the next occurrence is scheduled.
-4. A "Done — strong proof" toast is shown.
+4. A confirmation toast is shown ("Mission complete. Logged.").
 
 **Postconditions:**
 - Mission chain result is logged (which missions passed, in what
@@ -248,8 +258,9 @@ SYS-011, SYS-012, SYS-020.
 - The user is inside a confirmation window.
 
 **Main flow:**
-1. A notification fires (low-priority, no sound) saying
-   "Streak window open — drink water".
+1. A notification fires (low-priority, no sound) saying "Drink
+   water — window open" (brand voice: lead with the action; the
+   streak number is omitted from low-priority interval prompts).
 2. The user taps the notification or the home widget's "I drank"
    button.
 3. The completion is logged with the timestamp.
@@ -288,8 +299,9 @@ SYS-011, SYS-012, SYS-020.
 **Main flow (first-unlock with confirmation):**
 1. The OS sends `Intent.ACTION_USER_PRESENT` (or
    `KeyguardManager` callback).
-2. The app shows a heads-up notification: "Did you just wake
-   up? Tap to confirm."
+2. The app shows a heads-up notification: "Wake-up recorded at
+   HH:MM. Anchor morning routine to this?" (canonical wording
+   — see WF-014 for the source).
 3. User taps. The timestamp is recorded.
 4. Anchored habits reschedule.
 
