@@ -1,14 +1,14 @@
 # v0.2 Acceptance Run #2 (14-day real-device)
 
-Status: pending — kickoff after `flutter build apk --debug` succeeds
-on the v0.2 tip and the 3-gate is green at ≥ 293 tests. Created
-2026-06-14; this document is the right-side verification for
-[v0.2](v0_2_baseline.md). It does not replace
-[`acceptance_run.md`](acceptance_run.md) — Run #1 still gates
-v0.1's "I trust it on my primary phone" claim. Run #2 adds the
-v0.2 surface (events, groups, time-windows, edit, pause, test
-reminder, bulk complete) and gates v0.2's "the new features
-work in the wild" claim.
+Status: **in flight** — kicked off 2026-06-14 at SHA `c1b9e64`
+(v0.2d tip + the v0.2 defect-fix commit: compileSdk 36 bump +
+picker widget tests). Created 2026-06-14; this document is the
+right-side verification for [v0.2](v0_2_baseline.md). It does
+not replace [`acceptance_run.md`](acceptance_run.md) — Run #1
+still gates v0.1's "I trust it on my primary phone" claim. Run
+#2 adds the v0.2 surface (events, groups, time-windows, edit,
+pause, test reminder, bulk complete) and gates v0.2's "the new
+features work in the wild" claim.
 
 ## Purpose
 
@@ -126,22 +126,50 @@ recorded, not just successes.
 - Notes: ___
 ```
 
-### Day 1 — YYYY-MM-DD
-- Build SHA: `54be40f` (v0.2d tip at kickoff — replace with the
-  actual SHA when the run starts)
+### Day 1 — 2026-06-14 (kickoff day)
+- Build SHA: `c1b9e64` (v0.2d tip + the v0.2 defect-fix commit;
+  debug apk at `build/app/outputs/flutter-apk/app-debug.apk`,
+  174 MB)
 - 3-gate status:
-  - `dart format`: ✓
-  - `flutter analyze --fatal-infos`: ✓
-  - `flutter test`: ✓ (293 passing)
-- Coverage on v0.2 changed files: __%
-- v0.1 scenarios run today (from Run #1 matrix): 1, 2, 3, 4, 5
+  - `dart format`: ✓ (0 changed)
+  - `flutter analyze --fatal-infos`: ✓ (exit 0; 41 pre-existing
+    info-level lints, 0 errors, 0 warnings)
+  - `flutter test`: ✓ (312 passing; +19 vs the v0.2d baseline
+    of 293 from the new picker tests)
+- Coverage on v0.2 changed files: **89.8%** (model + service +
+  widget layer, the runbook's scope — 535 / 596 lines)
+  - `lib/widgets/icon_picker.dart`: 48 / 48 (was 0 / 48)
+  - `lib/widgets/category_chip.dart`: 115 / 117 (was 35 / 117)
+  - `lib/services/event_repository.dart`: 64 / 64
+  - `lib/services/person_group_repository.dart`: 91 / 98
+  - `lib/services/reminder_service.dart`: 33 / 43
+  - `lib/people/person_group.dart`: 42 / 47
+  - `lib/people/cadence.dart`: 44 / 45
+  - `lib/people/person.dart`: 20 / 43
+  - `lib/events/event.dart`: 30 / 40
+  - `lib/habits/category.dart`: 25 / 28
+  - `lib/widgets/reliability_banner.dart`: 23 / 23
+- v0.1 scenarios run today (from Run #1 matrix): _Run #1 still
+  in progress on the primary phone; this run's Day 1 is the
+  kickoff prep + apk install. The v0.1 scenario results will be
+  carried over from Run #1's daily log, not re-run here._
 - v0.2 scenarios run today (from matrix above): E1
-- v0.1 results: _tbd_
-- v0.2 results: _tbd_
+  (add a one-off event — "Dentist 2026-07-01 14:00")
+- v0.1 results: _tbd (per Run #1)_
+- v0.2 results: _tbd — user to fill in after the apk is
+  installed and the scenario is exercised on the primary phone_
 - Any reliability banner visible? _tbd_
 - Any duplicate reminders? _tbd_
 - Any missed reminders? _tbd_
-- Notes: _tbd_
+- Notes: Day 0 prep found a v0.2a defect (icon_picker.dart
+  shipped without tests, dragging v0.2 coverage to 67.8%, below
+  the 80% gate). Fix landed in commit `c1b9e64` along with
+  category_chip coverage and a build-config bump: file_picker's
+  transitive dep flutter_plugin_android_lifecycle now requires
+  compileSdk 36+, so the app + every Android subproject was
+  bumped to compileSdk 36 (minSdk 28, targetSdk follows Flutter
+  default). With the fix the v0.2 surface is at 89.8% coverage
+  and the debug apk builds clean.
 
 _(Copy the Day 1 block above for Days 2..14.)_
 
@@ -176,6 +204,7 @@ paused until it is backfilled.
 | SHA | `dart format` | `flutter analyze` | `flutter test` (count) | Notes |
 |-----|---------------|-------------------|------------------------|-------|
 | `54be40f` | ✓ | ✓ | ✓ (293) | v0.2d tip. Run #2 kickoff baseline. |
+| `c1b9e64` | ✓ | ✓ | ✓ (312) | compileSdk 36 + picker widget tests. Run #2 kickoff build (debug apk at `build/app/outputs/flutter-apk/app-debug.apk`). |
 
 _(Append a row per commit during the run.)_
 

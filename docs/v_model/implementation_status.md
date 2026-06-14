@@ -179,7 +179,7 @@ primary phone; the run does not require new code.
 | v0.2b — Events | _pending_ | _pending_ | _pending_ | _pending_ |
 | v0.2c — Groups | _pending_ | _pending_ | _pending_ | _pending_ |
 | v0.2d — UX delight | _pending_ | _pending_ | _pending_ | _pending_ |
-| v0.2e — Run #2 runbook | _in flight_ (runbook only) | n/a | n/a | [`acceptance_run_v2.md`](acceptance_run_v2.md) drafted 2026-06-14 |
+| v0.2e — Run #2 runbook | _in flight_ | n/a | n/a | [`acceptance_run_v2.md`](acceptance_run_v2.md) kicked off 2026-06-14 at SHA `c1b9e64`; Day 0 prep passed (3-gate green, debug apk built, v0.2 changed-files coverage 89.8%) |
 
 ## How to update this file
 
