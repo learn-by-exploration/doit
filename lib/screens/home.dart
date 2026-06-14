@@ -2,7 +2,8 @@
 //
 // Per WF-002 (entry) and WF-004..010 / WF-014..016, the home
 // screen:
-//   - Lists every active habit in alphabetical order.
+//   - Lists every active habit in alphabetical order, with the
+//     category color as the tile's accent.
 //   - Shows a "due now" strip at the top (the next
 //     occurrence of each habit that is past-due or due
 //     within the next hour).
@@ -11,6 +12,11 @@
 //   - Has an "I'm up" button that records the wake-up
 //     anchor (manual mode).
 //   - Renders the reliability banner when degraded.
+//
+// v0.2 (WF-022, WF-031, SYS-031): tap a tile to open
+// `AddHabitScreen` in edit mode. The tile shows the
+// habit's category color (8-swatch palette), icon, and
+// pause badge if paused.
 //
 // State: a `FutureBuilder` reads the habit list once and
 // rebuilds when a save / delete is dispatched. v0.1 has no
@@ -23,6 +29,7 @@ import 'package:common_games/habits/habit.dart';
 import 'package:common_games/services/habit_repository.dart';
 import 'package:common_games/services/reminder_service.dart';
 import 'package:common_games/theme/app_theme.dart';
+import 'package:common_games/widgets/category_chip.dart';
 import 'package:common_games/widgets/reliability_banner.dart';
 import 'package:common_games/screens/add_habit.dart';
 import 'package:common_games/screens/add_person.dart';
@@ -164,28 +171,63 @@ class _HabitTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visual = CategoryChipResolver.resolveFor(
+      category: habit.category,
+      colorSeed: habit.colorSeed,
+    );
+    final color = Color(visual.color);
+    final isPaused =
+        habit.pausedUntil != null && habit.pausedUntil!.isAfter(DateTime.now());
     return Semantics(
-      label: 'Habit ${habit.name}',
+      label:
+          'Habit ${habit.name}'
+          '${isPaused ? ', paused' : ''}',
       button: true,
       child: Material(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
+          key: ValueKey('habit_tile.${habit.id}'),
           borderRadius: BorderRadius.circular(12),
-          onTap: () {
-            // Tap-to-edit is a v0.2 surface.
+          onTap: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => AddHabitScreen(habitId: habit.id),
+              ),
+            );
           },
           child: Padding(
             padding: const EdgeInsets.all(Spacing.md),
             child: Row(
               children: [
+                _TileIcon(
+                  category: habit.category,
+                  iconName: habit.iconName,
+                  color: color,
+                ),
+                const SizedBox(width: Spacing.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        habit.name,
-                        style: Theme.of(context).textTheme.titleLarge,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              habit.name,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ),
+                          if (isPaused)
+                            Tooltip(
+                              message: 'Paused',
+                              child: Icon(
+                                Icons.pause_circle,
+                                size: 18,
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: Spacing.xs),
                       Text(
@@ -200,7 +242,6 @@ class _HabitTile extends StatelessWidget {
                   icon: const Icon(Icons.check_circle_outline),
                   iconSize: Sizing.tapHome / 2,
                   onPressed: () {
-                    // v0.2: append to completion log + recompute streak.
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Marked done.')),
                     );
@@ -220,8 +261,103 @@ class _HabitTile extends StatelessWidget {
       HabitInterval() => 'Every ${h.nDays} days',
       HabitAnchor() => 'Anchor',
       HabitDayOfX() => 'Day-of-X',
+      HabitTimeWindow() => 'Window — ${h.start}–${h.end}',
     };
   }
+}
+
+class _TileIcon extends StatelessWidget {
+  const _TileIcon({
+    required this.category,
+    required this.iconName,
+    required this.color,
+  });
+
+  final HabitCategory category;
+  final String? iconName;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.20),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(_iconFor(category, iconName), color: color, size: 24),
+    );
+  }
+
+  IconData _iconFor(HabitCategory c, String? name) {
+    final key = HabitIcons.resolveFor(category: c, iconName: name);
+    return _iconMap[key] ?? Icons.check;
+  }
+
+  static const Map<String, IconData> _iconMap = <String, IconData>{
+    'local_drink': Icons.local_drink,
+    'directions_run': Icons.directions_run,
+    'fitness_center': Icons.fitness_center,
+    'self_improvement': Icons.self_improvement,
+    'bedtime': Icons.bedtime,
+    'wb_sunny': Icons.wb_sunny,
+    'restaurant': Icons.restaurant,
+    'local_fire_department': Icons.local_fire_department,
+    'spa': Icons.spa,
+    'air': Icons.air,
+    'menu_book': Icons.menu_book,
+    'edit_note': Icons.edit_note,
+    'psychology_alt': Icons.psychology_alt,
+    'lightbulb': Icons.lightbulb,
+    'auto_stories': Icons.auto_stories,
+    'call': Icons.call,
+    'chat': Icons.chat,
+    'mail': Icons.mail,
+    'group': Icons.group,
+    'favorite': Icons.favorite,
+    'pets': Icons.pets,
+    'volunteer_activism': Icons.volunteer_activism,
+    'diversity_3': Icons.diversity_3,
+    'check_circle': Icons.check_circle,
+    'task_alt': Icons.task_alt,
+    'pending_actions': Icons.pending_actions,
+    'event': Icons.event,
+    'today': Icons.today,
+    'schedule': Icons.schedule,
+    'work': Icons.work,
+    'school': Icons.school,
+    'home': Icons.home,
+    'cleaning_services': Icons.cleaning_services,
+    'kitchen': Icons.kitchen,
+    'local_laundry_service': Icons.local_laundry_service,
+    'yard': Icons.yard,
+    'shopping_cart': Icons.shopping_cart,
+    'receipt_long': Icons.receipt_long,
+    'savings': Icons.savings,
+    'block': Icons.block,
+    'do_not_disturb': Icons.do_not_disturb,
+    'pause_circle': Icons.pause_circle,
+    'repeat': Icons.repeat,
+    'restore': Icons.restore,
+    'undo': Icons.undo,
+    'check': Icons.check,
+    'restaurant_menu': Icons.restaurant_menu,
+    'lunch_dining': Icons.lunch_dining,
+    'local_pizza': Icons.local_pizza,
+    'cake': Icons.cake,
+    'coffee': Icons.coffee,
+    'liquor': Icons.liquor,
+    'set_meal': Icons.set_meal,
+    'directions_walk': Icons.directions_walk,
+    'directions_bike': Icons.directions_bike,
+    'pool': Icons.pool,
+    'sports_gymnastics': Icons.sports_gymnastics,
+    'sports_tennis': Icons.sports_tennis,
+    'sports_basketball': Icons.sports_basketball,
+    'sports_soccer': Icons.sports_soccer,
+    'hiking': Icons.hiking,
+  };
 }
 
 class _EmptyState extends StatelessWidget {

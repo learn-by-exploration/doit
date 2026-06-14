@@ -65,6 +65,8 @@ class PersonRepository {
       dayOfMonth: _monthlyDay(p.cadence) ?? _yearlyDay(p.cadence),
       monthOfYear: _yearlyMonth(p.cadence),
       anchoredToWakeup: false,
+      missionChainJson: null, // v0.1: not used; v0.2 wires a chain here.
+      pausedUntilMillis: p.pausedUntil?.millisecondsSinceEpoch,
     );
   }
 
@@ -75,6 +77,9 @@ class PersonRepository {
       channel: _parseChannel(r.channel, r.handle),
       cadence: _parseCadence(r),
       createdAt: DateTime.fromMillisecondsSinceEpoch(r.createdAtMillis),
+      pausedUntil: r.pausedUntilMillis == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(r.pausedUntilMillis!),
     );
   }
 

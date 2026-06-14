@@ -11,6 +11,18 @@
 // All `DateTime` columns store millis since epoch (UTC). The
 // domain layer is responsible for converting to local-day for
 // dedupe / display.
+//
+// v0.2 columns (added in migration v2→v3):
+//   - habits.category (TEXT, default 'other')
+//   - habits.color_seed (INTEGER, default 0)
+//   - habits.icon_name (TEXT, nullable)
+//   - habits.paused_until_millis (INTEGER, nullable)
+//   - people.paused_until_millis (INTEGER, nullable)
+//
+// New v0.2 tables (added in migration v2→v3):
+//   - events
+//   - person_groups
+//   - person_group_members
 
 import 'package:drift/drift.dart';
 
@@ -25,6 +37,8 @@ import 'package:drift/drift.dart';
 ///   - `dayOfX`    → `dayOfMonth` (int, nullable),
 ///                   `nth` (int, nullable), `weekday` (int, nullable),
 ///                   `referenceDayOfMonth` (int, nullable)
+///   - `timeWindow`→ `weekdays` (CSV), `hour`, `minute` (start),
+///                   `endHour`, `endMinute` (end)
 @DataClassName('HabitRow')
 class Habits extends Table {
   TextColumn get id => text()();
@@ -33,9 +47,12 @@ class Habits extends Table {
   IntColumn get createdAtMillis => integer()();
   IntColumn get restDaysPerMonth => integer().withDefault(const Constant(2))();
   TextColumn get scheduleType => text()();
-  TextColumn get weekdays => text().nullable()(); // CSV; for `fixed`
-  IntColumn get hour => integer().nullable()(); // 0..23; for `fixed`
-  IntColumn get minute => integer().nullable()(); // 0..59; for `fixed`
+  TextColumn get weekdays =>
+      text().nullable()(); // CSV; for `fixed` / `timeWindow`
+  IntColumn get hour =>
+      integer().nullable()(); // 0..23; for `fixed` / `timeWindow` start
+  IntColumn get minute =>
+      integer().nullable()(); // 0..59; for `fixed` / `timeWindow` start
   IntColumn get nDays => integer().nullable()(); // >= 1; for `interval`
   IntColumn get referenceDateMillis => integer().nullable()();
   TextColumn get targetHabitId => text().nullable()(); // for `anchor`
@@ -44,9 +61,24 @@ class Habits extends Table {
   IntColumn get nth => integer().nullable()(); // 1..5; for `dayOfX`
   IntColumn get weekday => integer().nullable()(); // 1..7; for `dayOfX`
   IntColumn get referenceDayOfMonth => integer().nullable()(); // for `dayOfX`
+  // v0.2: end time for `timeWindow` schedule.
+  IntColumn get endHour => integer().nullable()(); // 0..23; for `timeWindow`
+  IntColumn get endMinute => integer().nullable()(); // 0..59; for `timeWindow`
+  // v0.2: target duration in hours for fasting windows (12, 14, 16, 18, 20).
+  IntColumn get targetHours => integer().nullable()();
   // Mission chain is stored as JSON in [missionChainJson] to keep
   // the schema simple. Strong habits only; Soft/Auto empty.
   TextColumn get missionChainJson => text().nullable()();
+  // v0.2: visual identity. category drives the default color and
+  // icon; colorSeed overrides the color (0..7); iconName overrides
+  // the icon (one of 64 Material Symbols keys; nullable).
+  TextColumn get category => text().withDefault(const Constant('other'))();
+  IntColumn get colorSeed => integer().withDefault(const Constant(0))();
+  TextColumn get iconName => text().nullable()();
+  // v0.2: pause state. When set and in the future, the scheduler
+  // does not fire reminders for this habit. A paused period does
+  // not break the streak.
+  IntColumn get pausedUntilMillis => integer().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -75,9 +107,69 @@ class People extends Table {
   BoolColumn get anchoredToWakeup =>
       boolean().withDefault(const Constant(false))();
   TextColumn get missionChainJson => text().nullable()();
+  // v0.2: pause state (see Habits.pausedUntilMillis).
+  IntColumn get pausedUntilMillis => integer().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
+}
+
+/// A one-off date-specific reminder ("event"). Lives alongside
+/// habits but is not a habit: it has no streak, no rest-day budget,
+/// no proof mode (an optional mission is allowed, but Soft-default).
+///
+/// v0.2 (WF-017). Created in migration v2→v3.
+@DataClassName('EventRow')
+class Events extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  IntColumn get atMillis => integer()(); // event time
+  IntColumn get leadTimeMillis => integer()(); // notify at (at - leadTime)
+  // Optional mission chain (JSON); null = no mission, just a notification.
+  TextColumn get missionChainJson => text().nullable()();
+  // 'none' | 'annually'
+  TextColumn get recurrence => text().withDefault(const Constant('none'))();
+  // When archived. Null = active. Auto-set 24h after fire.
+  IntColumn get archivedAtMillis => integer().nullable()();
+  IntColumn get createdAtMillis => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// A contact group (v0.2 WF-018). Created in migration v2→v3.
+@DataClassName('PersonGroupRow')
+class PersonGroups extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  // 'every_n_days' | 'weekly_on' | 'monthly_on' | 'yearly_on'
+  TextColumn get cadenceType => text()();
+  // 'rotation' | 'any' | 'all'
+  TextColumn get semantic => text()();
+  TextColumn get channel => text()();
+  TextColumn get handle => text()();
+  TextColumn get missionChainJson => text().nullable()();
+  IntColumn get createdAtMillis => integer()();
+  IntColumn get pausedUntilMillis => integer().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Membership of a person in a group, with the
+/// `lastContactedMillis` per member (used by the rotation selector
+/// and the `All` selector).
+///
+/// v0.2 (WF-018). Created in migration v2→v3.
+@DataClassName('PersonGroupMemberRow')
+class PersonGroupMembers extends Table {
+  TextColumn get groupId => text()();
+  TextColumn get personId => text()();
+  IntColumn get addedAtMillis => integer()();
+  IntColumn get lastContactedMillis => integer().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {groupId, personId};
 }
 
 /// One row per (habit, calendar-day, completion-action). The

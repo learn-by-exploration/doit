@@ -7,10 +7,15 @@
 // JSON in `Habits.missionChainJson`; the repository serializes /
 // deserializes via the `Mission` / `MissionChain` types in
 // `lib/missions/`.
+//
+// v0.2 (SYS-042..SYS-047): the repository now maps the
+// `category`, `colorSeed`, `iconName`, and `pausedUntilMillis`
+// columns, and the new `HabitTimeWindow` schedule type.
 
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:common_games/habits/category.dart';
 import 'package:common_games/habits/habit.dart' as domain;
 import 'package:common_games/habits/proof_mode.dart';
 import 'package:common_games/missions/chain.dart';
@@ -69,6 +74,21 @@ class HabitRepository {
     return rows.map(_fromRow).toList(growable: false);
   }
 
+  /// List habits that are NOT currently paused (pausedUntil
+  /// is null OR in the past). v0.2 (SYS-047). The scheduler
+  /// uses this to skip paused habits when computing the
+  /// "next occurrence" across all active habits.
+  Future<List<domain.Habit>> listActive(DateTime now) async {
+    await _ready;
+    final rows = await (_db.select(
+      _db.habits,
+    )..orderBy([(t) => OrderingTerm.asc(t.createdAtMillis)])).get();
+    return rows
+        .map(_fromRow)
+        .where((h) => !h.isPausedAt(now))
+        .toList(growable: false);
+  }
+
   /// Delete a habit by id. The completion log and rest-day
   /// budget rows are cascade-deleted via the foreign-key pragma
   /// in `schema.dart` (the model itself doesn't enforce this;
@@ -88,9 +108,9 @@ class HabitRepository {
       createdAtMillis: h.createdAt.millisecondsSinceEpoch,
       restDaysPerMonth: h.restDaysPerMonth,
       scheduleType: _scheduleTypeTag(h),
-      weekdays: _fixedWeekdaysCsv(h),
-      hour: _fixedHour(h),
-      minute: _fixedMinute(h),
+      weekdays: _weekdaysCsv(h),
+      hour: _startHour(h),
+      minute: _startMinute(h),
       nDays: _intervalNDays(h),
       referenceDateMillis: _intervalReference(h),
       targetHabitId: _anchorTarget(h),
@@ -99,7 +119,14 @@ class HabitRepository {
       nth: _dayOfXNth(h),
       weekday: _dayOfXWeekday(h),
       referenceDayOfMonth: _dayOfXReferenceDom(h),
+      endHour: _endHour(h),
+      endMinute: _endMinute(h),
+      targetHours: _targetHours(h),
       missionChainJson: _missionChainJson(h.missionChain),
+      category: h.category.tag,
+      colorSeed: h.colorSeed,
+      iconName: h.iconName,
+      pausedUntilMillis: h.pausedUntil?.millisecondsSinceEpoch,
     );
   }
 
@@ -111,6 +138,12 @@ class HabitRepository {
       proofMode: proofMode,
       createdAt: DateTime.fromMillisecondsSinceEpoch(r.createdAtMillis),
       restDaysPerMonth: r.restDaysPerMonth,
+      category: HabitCategory.fromTag(r.category),
+      colorSeed: r.colorSeed,
+      iconName: r.iconName,
+      pausedUntil: r.pausedUntilMillis == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(r.pausedUntilMillis!),
     );
     switch (r.scheduleType) {
       case 'fixed':
@@ -122,6 +155,10 @@ class HabitRepository {
           restDaysPerMonth: base.restDaysPerMonth,
           weekdays: _parseWeekdays(r.weekdays),
           time: domain.HabitTime(r.hour ?? 9, r.minute ?? 0),
+          category: base.category,
+          colorSeed: base.colorSeed,
+          iconName: base.iconName,
+          pausedUntil: base.pausedUntil,
         );
       case 'interval':
         return domain.HabitInterval(
@@ -134,6 +171,10 @@ class HabitRepository {
           referenceDate: DateTime.fromMillisecondsSinceEpoch(
             r.referenceDateMillis ?? base.createdAt.millisecondsSinceEpoch,
           ),
+          category: base.category,
+          colorSeed: base.colorSeed,
+          iconName: base.iconName,
+          pausedUntil: base.pausedUntil,
         );
       case 'anchor':
         return domain.HabitAnchor(
@@ -146,6 +187,10 @@ class HabitRepository {
           lastAnchor: r.lastAnchorMillis == null
               ? null
               : DateTime.fromMillisecondsSinceEpoch(r.lastAnchorMillis!),
+          category: base.category,
+          colorSeed: base.colorSeed,
+          iconName: base.iconName,
+          pausedUntil: base.pausedUntil,
         );
       case 'dayOfX':
         return domain.HabitDayOfX(
@@ -158,6 +203,26 @@ class HabitRepository {
           nth: r.nth,
           weekday: r.weekday,
           referenceDayOfMonth: r.referenceDayOfMonth,
+          category: base.category,
+          colorSeed: base.colorSeed,
+          iconName: base.iconName,
+          pausedUntil: base.pausedUntil,
+        );
+      case 'timeWindow':
+        return domain.HabitTimeWindow(
+          id: base.id,
+          name: base.name,
+          proofMode: base.proofMode,
+          createdAt: base.createdAt,
+          restDaysPerMonth: base.restDaysPerMonth,
+          weekdays: _parseWeekdays(r.weekdays),
+          start: domain.HabitTime(r.hour ?? 12, r.minute ?? 0),
+          end: domain.HabitTime(r.endHour ?? 13, r.endMinute ?? 0),
+          targetHours: r.targetHours,
+          category: base.category,
+          colorSeed: base.colorSeed,
+          iconName: base.iconName,
+          pausedUntil: base.pausedUntil,
         );
       default:
         throw StateError('Unknown scheduleType: ${r.scheduleType}');
@@ -189,16 +254,41 @@ class HabitRepository {
     if (h is domain.HabitInterval) return 'interval';
     if (h is domain.HabitAnchor) return 'anchor';
     if (h is domain.HabitDayOfX) return 'dayOfX';
+    if (h is domain.HabitTimeWindow) return 'timeWindow';
     throw ArgumentError('Unknown habit type: $h');
   }
 
-  String? _fixedWeekdaysCsv(domain.Habit h) =>
-      h is domain.HabitFixed ? (h.weekdays.toList()..sort()).join(',') : null;
+  // Unified weekday/hour/minute column writers. Fixed and
+  // TimeWindow share the same set of columns (Habits.weekdays /
+  // hour / minute) so the per-type writer is just an `is` check.
+  String? _weekdaysCsv(domain.Habit h) {
+    if (h is domain.HabitFixed) return (h.weekdays.toList()..sort()).join(',');
+    if (h is domain.HabitTimeWindow) {
+      return (h.weekdays.toList()..sort()).join(',');
+    }
+    return null;
+  }
 
-  int? _fixedHour(domain.Habit h) =>
-      h is domain.HabitFixed ? h.time.hour : null;
-  int? _fixedMinute(domain.Habit h) =>
-      h is domain.HabitFixed ? h.time.minute : null;
+  int? _startHour(domain.Habit h) {
+    if (h is domain.HabitFixed) return h.time.hour;
+    if (h is domain.HabitTimeWindow) return h.start.hour;
+    return null;
+  }
+
+  int? _startMinute(domain.Habit h) {
+    if (h is domain.HabitFixed) return h.time.minute;
+    if (h is domain.HabitTimeWindow) return h.start.minute;
+    return null;
+  }
+
+  int? _endHour(domain.Habit h) =>
+      h is domain.HabitTimeWindow ? h.end.hour : null;
+
+  int? _endMinute(domain.Habit h) =>
+      h is domain.HabitTimeWindow ? h.end.minute : null;
+
+  int? _targetHours(domain.Habit h) =>
+      h is domain.HabitTimeWindow ? h.targetHours : null;
 
   int? _intervalNDays(domain.Habit h) =>
       h is domain.HabitInterval ? h.nDays : null;

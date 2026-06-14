@@ -6,11 +6,23 @@
 //
 // Layer rules (per .claude/rules/lib-habits.md): no Flutter
 // imports. TimeOfDay is `(hour, minute)` for purity.
+//
+// v0.2 adds (SYS-042..SYS-047):
+//   - category (HabitCategory)
+//   - colorSeed (int, 0..7)
+//   - iconName (String?, one of HabitIcons.keys)
+//   - pausedUntil (DateTime?)
+//   - a fifth schedule type, HabitTimeWindow (defined in
+//     habit_time_window.dart), which is the foundation for
+//     WF-019 (v0.2d).
 
+import 'package:common_games/habits/category.dart';
 import 'package:common_games/habits/proof_mode.dart';
 import 'package:common_games/missions/chain.dart';
 import 'package:meta/meta.dart';
 
+export 'package:common_games/habits/category.dart'
+    show HabitCategory, CategoryPalette, HabitIcons;
 export 'package:common_games/missions/mission.dart'
     show
         Mission,
@@ -116,6 +128,23 @@ final class HabitAnchorSelfReference extends HabitValidationException {
     : super('Anchor habits cannot reference themselves.');
 }
 
+final class HabitInvalidColorSeed extends HabitValidationException {
+  const HabitInvalidColorSeed(this.value) : super('colorSeed must be in 0..7.');
+  final int value;
+}
+
+final class HabitInvalidIconName extends HabitValidationException {
+  const HabitInvalidIconName(this.value)
+    : super('iconName is not in the 64-icon set.');
+  final String value;
+}
+
+final class HabitInvalidTargetHours extends HabitValidationException {
+  const HabitInvalidTargetHours(this.value)
+    : super('targetHours must be in 1..23.');
+  final int value;
+}
+
 /// Day-of-week. We use Dart's [DateTime.weekday] convention:
 /// 1 = Monday .. 7 = Sunday. Typed for readability.
 typedef Weekday = int;
@@ -130,6 +159,10 @@ sealed class Habit {
     required this.proofMode,
     required this.createdAt,
     required this.restDaysPerMonth,
+    this.category = HabitCategory.other,
+    this.colorSeed = 0,
+    this.iconName,
+    this.pausedUntil,
   });
 
   final HabitId id;
@@ -141,6 +174,23 @@ sealed class Habit {
   /// budget survives habit moves across devices.
   final int restDaysPerMonth;
 
+  /// v0.2 (SYS-045). Visual category. Drives the default color
+  /// and icon; the user can override both.
+  final HabitCategory category;
+
+  /// v0.2 (SYS-045). 0..7 — the index into `CategoryPalette.swatches`.
+  /// 0 means "use the category default".
+  final int colorSeed;
+
+  /// v0.2 (SYS-046). One of `HabitIcons.keys`, or null (= use
+  /// the category default).
+  final String? iconName;
+
+  /// v0.2 (SYS-047). When set and in the future, the scheduler
+  /// shall not fire reminders for this habit. A paused period
+  /// does not break the streak.
+  final DateTime? pausedUntil;
+
   /// Mission chain — non-empty for Strong, empty for Soft /
   /// Auto. Always reflectable: derived from [proofMode].
   MissionChain get missionChain {
@@ -149,9 +199,30 @@ sealed class Habit {
     return MissionChain.empty;
   }
 
+  /// True iff the habit is currently paused (i.e., [pausedUntil]
+  /// is in the future relative to [now]). Caller passes the
+  /// reference time so the model stays pure.
+  bool isPausedAt(DateTime now) {
+    final p = pausedUntil;
+    return p != null && p.isAfter(now);
+  }
+
   /// Returns a copy with selected fields replaced. Subclasses
-  /// override to add their schedule-specific fields.
-  Habit copyWith();
+  /// override to add their schedule-specific fields, but the
+  /// base v0.2 fields ([pausedUntil], [category], [colorSeed],
+  /// [iconName]) live on every subclass, so the base signature
+  /// includes them and subclasses accept the call via
+  /// super.
+  Habit copyWith({
+    String? name,
+    HabitProofMode? proofMode,
+    int? restDaysPerMonth,
+    HabitCategory? category,
+    int? colorSeed,
+    String? iconName,
+    DateTime? pausedUntil,
+    bool clearPausedUntil = false,
+  });
 
   /// Pure: same input → same output. Returns the next
   /// occurrence strictly after [from]. If no future occurrence
@@ -167,6 +238,13 @@ sealed class Habit {
     }
     if (restDaysPerMonth < 0) {
       throw HabitInvalidRestDays(restDaysPerMonth);
+    }
+    if (colorSeed < 0 || colorSeed > 7) {
+      throw HabitInvalidColorSeed(colorSeed);
+    }
+    final icon = iconName;
+    if (icon != null && !HabitIcons.keys.contains(icon)) {
+      throw HabitInvalidIconName(icon);
     }
     final self = this;
     switch (self) {
@@ -204,6 +282,23 @@ sealed class Habit {
             (referenceDayOfMonth < 1 || referenceDayOfMonth > 31)) {
           throw HabitInvalidDayOfMonth(referenceDayOfMonth);
         }
+      case HabitTimeWindow(
+        :final start,
+        :final end,
+        :final weekdays,
+        :final targetHours,
+      ):
+        _validateTime(start);
+        _validateTime(end);
+        if (weekdays.isEmpty) {
+          throw const HabitNoWeekdaysSelected();
+        }
+        for (final wd in weekdays) {
+          if (wd < 1 || wd > 7) throw HabitInvalidWeekday(wd);
+        }
+        if (targetHours != null && (targetHours < 1 || targetHours > 23)) {
+          throw HabitInvalidTargetHours(targetHours);
+        }
     }
     validateProofMode(proofMode);
   }
@@ -237,6 +332,10 @@ final class HabitFixed extends Habit {
     required super.restDaysPerMonth,
     required this.weekdays,
     required this.time,
+    super.category,
+    super.colorSeed,
+    super.iconName,
+    super.pausedUntil,
   });
 
   /// Set of 1..7 (1 = Monday .. 7 = Sunday). Must be non-empty.
@@ -250,6 +349,11 @@ final class HabitFixed extends Habit {
     int? restDaysPerMonth,
     Set<Weekday>? weekdays,
     HabitTime? time,
+    HabitCategory? category,
+    int? colorSeed,
+    String? iconName,
+    DateTime? pausedUntil,
+    bool clearPausedUntil = false,
   }) {
     return HabitFixed(
       id: id,
@@ -259,6 +363,10 @@ final class HabitFixed extends Habit {
       restDaysPerMonth: restDaysPerMonth ?? this.restDaysPerMonth,
       weekdays: weekdays ?? this.weekdays,
       time: time ?? this.time,
+      category: category ?? this.category,
+      colorSeed: colorSeed ?? this.colorSeed,
+      iconName: iconName ?? this.iconName,
+      pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
     );
   }
 
@@ -305,6 +413,10 @@ final class HabitInterval extends Habit {
     required super.restDaysPerMonth,
     required this.nDays,
     required this.referenceDate,
+    super.category,
+    super.colorSeed,
+    super.iconName,
+    super.pausedUntil,
   });
 
   final int nDays;
@@ -317,6 +429,11 @@ final class HabitInterval extends Habit {
     int? restDaysPerMonth,
     int? nDays,
     DateTime? referenceDate,
+    HabitCategory? category,
+    int? colorSeed,
+    String? iconName,
+    DateTime? pausedUntil,
+    bool clearPausedUntil = false,
   }) {
     return HabitInterval(
       id: id,
@@ -326,6 +443,10 @@ final class HabitInterval extends Habit {
       restDaysPerMonth: restDaysPerMonth ?? this.restDaysPerMonth,
       nDays: nDays ?? this.nDays,
       referenceDate: referenceDate ?? this.referenceDate,
+      category: category ?? this.category,
+      colorSeed: colorSeed ?? this.colorSeed,
+      iconName: iconName ?? this.iconName,
+      pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
     );
   }
 
@@ -371,6 +492,10 @@ final class HabitAnchor extends Habit {
     required super.restDaysPerMonth,
     required this.targetHabitId,
     required this.lastAnchor,
+    super.category,
+    super.colorSeed,
+    super.iconName,
+    super.pausedUntil,
   });
 
   final HabitId targetHabitId;
@@ -384,6 +509,11 @@ final class HabitAnchor extends Habit {
     HabitId? targetHabitId,
     DateTime? lastAnchor,
     bool clearLastAnchor = false,
+    HabitCategory? category,
+    int? colorSeed,
+    String? iconName,
+    DateTime? pausedUntil,
+    bool clearPausedUntil = false,
   }) {
     return HabitAnchor(
       id: id,
@@ -393,6 +523,10 @@ final class HabitAnchor extends Habit {
       restDaysPerMonth: restDaysPerMonth ?? this.restDaysPerMonth,
       targetHabitId: targetHabitId ?? this.targetHabitId,
       lastAnchor: clearLastAnchor ? null : (lastAnchor ?? this.lastAnchor),
+      category: category ?? this.category,
+      colorSeed: colorSeed ?? this.colorSeed,
+      iconName: iconName ?? this.iconName,
+      pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
     );
   }
 
@@ -440,6 +574,10 @@ final class HabitDayOfX extends Habit {
     this.nth,
     this.weekday,
     this.referenceDayOfMonth,
+    super.category,
+    super.colorSeed,
+    super.iconName,
+    super.pausedUntil,
   }) : assert(
          dayOfMonth != null || nth != null,
          'Specify either dayOfMonth or (nth, weekday).',
@@ -459,6 +597,11 @@ final class HabitDayOfX extends Habit {
     int? nth,
     Weekday? weekday,
     int? referenceDayOfMonth,
+    HabitCategory? category,
+    int? colorSeed,
+    String? iconName,
+    DateTime? pausedUntil,
+    bool clearPausedUntil = false,
   }) {
     return HabitDayOfX(
       id: id,
@@ -470,6 +613,10 @@ final class HabitDayOfX extends Habit {
       nth: nth ?? this.nth,
       weekday: weekday ?? this.weekday,
       referenceDayOfMonth: referenceDayOfMonth ?? this.referenceDayOfMonth,
+      category: category ?? this.category,
+      colorSeed: colorSeed ?? this.colorSeed,
+      iconName: iconName ?? this.iconName,
+      pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
     );
   }
 
@@ -536,5 +683,115 @@ final class HabitDayOfX extends Habit {
 
   static int _daysInMonth(int year, int month) {
     return DateTime(year, month + 1, 0).day;
+  }
+}
+
+/// Schedule: the habit is "active" between [start] and [end] on
+/// the listed [weekdays]. For fasting, [targetHours] gives the
+/// goal duration (e.g., 16); for meals, null.
+///
+/// v0.2d (WF-019). Declared now (with the rest of the sealed
+/// `Habit` family) so the hierarchy stays exhaustive; the home
+/// screen and DB migration get the actual UI in v0.2d.
+@immutable
+final class HabitTimeWindow extends Habit {
+  const HabitTimeWindow({
+    required super.id,
+    required super.name,
+    required super.proofMode,
+    required super.createdAt,
+    required super.restDaysPerMonth,
+    required this.weekdays,
+    required this.start,
+    required this.end,
+    this.targetHours,
+    super.category,
+    super.colorSeed,
+    super.iconName,
+    super.pausedUntil,
+  });
+
+  /// Set of 1..7 (1 = Monday .. 7 = Sunday). Must be non-empty.
+  final Set<int> weekdays;
+  final HabitTime start;
+  final HabitTime end;
+
+  /// Optional target duration in hours (12, 14, 16, 18, 20) for
+  /// fasting windows. Null for plain meal windows.
+  final int? targetHours;
+
+  @override
+  HabitTimeWindow copyWith({
+    String? name,
+    HabitProofMode? proofMode,
+    int? restDaysPerMonth,
+    Set<int>? weekdays,
+    HabitTime? start,
+    HabitTime? end,
+    int? targetHours,
+    bool clearTargetHours = false,
+    HabitCategory? category,
+    int? colorSeed,
+    String? iconName,
+    DateTime? pausedUntil,
+    bool clearPausedUntil = false,
+  }) {
+    return HabitTimeWindow(
+      id: id,
+      name: name ?? this.name,
+      proofMode: proofMode ?? this.proofMode,
+      createdAt: createdAt,
+      restDaysPerMonth: restDaysPerMonth ?? this.restDaysPerMonth,
+      weekdays: weekdays ?? this.weekdays,
+      start: start ?? this.start,
+      end: end ?? this.end,
+      targetHours: clearTargetHours ? null : (targetHours ?? this.targetHours),
+      category: category ?? this.category,
+      colorSeed: colorSeed ?? this.colorSeed,
+      iconName: iconName ?? this.iconName,
+      pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
+    );
+  }
+
+  @override
+  DateTime? nextOccurrence(DateTime from) {
+    final fromLocal = from.toLocal();
+    // The "next occurrence" is the next [start] time on a
+    // weekday in [weekdays] strictly after [from]. If [from]
+    // is already inside today's window, return [from] (the
+    // caller will not re-fire until the window closes; this
+    // matches the spec — see WF-019).
+    final startToday = DateTime(
+      fromLocal.year,
+      fromLocal.month,
+      fromLocal.day,
+      start.hour,
+      start.minute,
+    );
+    final endToday = DateTime(
+      fromLocal.year,
+      fromLocal.month,
+      fromLocal.day,
+      end.hour,
+      end.minute,
+    );
+    if (weekdays.contains(fromLocal.weekday) &&
+        !fromLocal.isBefore(startToday) &&
+        fromLocal.isBefore(endToday)) {
+      return fromLocal;
+    }
+    for (var offset = 0; offset <= 7; offset++) {
+      final day = fromLocal.add(Duration(days: offset));
+      if (!weekdays.contains(day.weekday)) continue;
+      final candidate = DateTime(
+        day.year,
+        day.month,
+        day.day,
+        start.hour,
+        start.minute,
+      );
+      if (candidate.isAfter(fromLocal)) return candidate;
+    }
+    return null;
   }
 }

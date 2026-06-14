@@ -1,8 +1,12 @@
-// Stats screen — per-habit + overall streak counts.
+// Stats screen — per-habit + overall streak counts, grouped
+// by category.
 //
-// Per WF-011. Reads the habit list from `HabitRepository` and
-// the per-habit completion log from `CompletionLogService`,
-// then runs `StreakCalculator.compute` once per habit.
+// Per WF-011 (v0.1) + WF-031 (v0.2). Reads the habit list
+// from `HabitRepository` and the per-habit completion log
+// from `CompletionLogService`, then runs
+// `StreakCalculator.compute` once per habit. The result is
+// grouped by `HabitCategory` and rendered with the
+// category's swatch color in the group header.
 //
 // Layer rules (per .claude/rules/lib-screens.md):
 //   - StatefulWidget, FutureBuilder pattern.
@@ -17,6 +21,7 @@ import 'package:common_games/habits/streak_calculator.dart';
 import 'package:common_games/services/completion_log_service.dart';
 import 'package:common_games/services/habit_repository.dart';
 import 'package:common_games/theme/app_theme.dart';
+import 'package:common_games/widgets/category_chip.dart';
 
 /// A pre-baked row. Computed in the screen's `initState` /
 /// `_load()` so the build method is pure.
@@ -24,6 +29,14 @@ class _HabitStats {
   const _HabitStats({required this.habit, required this.snapshot});
   final Habit habit;
   final StreakSnapshot snapshot;
+}
+
+/// A category-bucketed view of `_HabitStats`. The order of
+/// the buckets matches `HabitCategory.values`.
+class _CategoryBucket {
+  const _CategoryBucket({required this.category, required this.stats});
+  final HabitCategory category;
+  final List<_HabitStats> stats;
 }
 
 class StatsScreen extends StatefulWidget {
@@ -34,7 +47,7 @@ class StatsScreen extends StatefulWidget {
 }
 
 class _StatsScreenState extends State<StatsScreen> {
-  Future<List<_HabitStats>>? _future;
+  Future<List<_CategoryBucket>>? _future;
 
   @override
   void initState() {
@@ -42,9 +55,9 @@ class _StatsScreenState extends State<StatsScreen> {
     _future = _load();
   }
 
-  Future<List<_HabitStats>> _load() async {
+  Future<List<_CategoryBucket>> _load() async {
     final habits = await HabitRepository.instance.listAll();
-    final result = <_HabitStats>[];
+    final perHabit = <_HabitStats>[];
     for (final h in habits) {
       final completions = await CompletionLogService.instance.listForHabit(
         h.id,
@@ -68,9 +81,18 @@ class _StatsScreenState extends State<StatsScreen> {
         ),
         asOf: DateTime.now(),
       );
-      result.add(_HabitStats(habit: h, snapshot: snap));
+      perHabit.add(_HabitStats(habit: h, snapshot: snap));
     }
-    return result;
+    // Group by category. Order: HabitCategory.values order.
+    final groups = <HabitCategory, List<_HabitStats>>{};
+    for (final s in perHabit) {
+      groups.putIfAbsent(s.habit.category, () => <_HabitStats>[]).add(s);
+    }
+    return [
+      for (final c in HabitCategory.values)
+        if (groups.containsKey(c))
+          _CategoryBucket(category: c, stats: groups[c]!),
+    ];
   }
 
   @override
@@ -78,7 +100,7 @@ class _StatsScreenState extends State<StatsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Stats')),
       body: SafeArea(
-        child: FutureBuilder<List<_HabitStats>>(
+        child: FutureBuilder<List<_CategoryBucket>>(
           future: _future,
           builder: (context, snap) {
             if (snap.connectionState != ConnectionState.done) {
@@ -91,18 +113,66 @@ class _StatsScreenState extends State<StatsScreen> {
                 },
               );
             }
-            final rows = snap.data ?? <_HabitStats>[];
-            if (rows.isEmpty) {
+            final buckets = snap.data ?? <_CategoryBucket>[];
+            if (buckets.isEmpty) {
               return const _EmptyView();
             }
-            return ListView.separated(
+            return ListView.builder(
               padding: const EdgeInsets.all(Spacing.md),
-              itemCount: rows.length,
-              separatorBuilder: (_, _) => const SizedBox(height: Spacing.sm),
-              itemBuilder: (_, i) => _StatsCard(stats: rows[i]),
+              itemCount: buckets.length,
+              itemBuilder: (context, i) => _CategorySection(bucket: buckets[i]),
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _CategorySection extends StatelessWidget {
+  const _CategorySection({required this.bucket});
+  final _CategoryBucket bucket;
+
+  @override
+  Widget build(BuildContext context) {
+    final visual = CategoryChipResolver.resolveFor(
+      category: bucket.category,
+      colorSeed: 0,
+    );
+    final color = Color(visual.color);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+            child: Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: Spacing.sm),
+                Text(
+                  visual.label,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const Spacer(),
+                Text(
+                  '${bucket.stats.length} '
+                  '${bucket.stats.length == 1 ? 'habit' : 'habits'}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+          for (final s in bucket.stats) _StatsCard(stats: s),
+        ],
       ),
     );
   }
@@ -120,6 +190,7 @@ class _StatsCard extends StatelessWidget {
           '${stats.habit.name}: current streak ${stats.snapshot.currentStreak}, '
           'longest ${stats.snapshot.longestStreak}',
       child: Card(
+        margin: const EdgeInsets.only(bottom: Spacing.sm),
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(
             horizontal: Spacing.md,

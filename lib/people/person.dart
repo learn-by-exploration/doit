@@ -118,6 +118,11 @@ class PersonSnapshot {
 /// value (it can change if the user edits their contact) and
 /// is not stored on [Person] — it lives in the service-layer
 /// cache.
+///
+/// v0.2 (WF-027): a [Person] may be temporarily paused
+/// (vacation, contact-deleted, etc.). The pause state is
+/// stored as a `pausedUntil` timestamp. A paused period does
+/// not break the cadence streak.
 @immutable
 sealed class Person {
   const Person({
@@ -126,6 +131,7 @@ sealed class Person {
     required this.channel,
     required this.cadence,
     required this.createdAt,
+    this.pausedUntil,
   });
 
   /// Stable identifier within Streak. Different from the
@@ -146,8 +152,26 @@ sealed class Person {
   final PersonCadence cadence;
   final DateTime createdAt;
 
-  /// Returns a copy with selected fields replaced.
-  Person copyWith();
+  /// Optional v0.2 pause timestamp. While the wall clock is
+  /// before [pausedUntil], the scheduler does not fire
+  /// reminders for this person and the cadence does not
+  /// consume a missed-period streak break.
+  final DateTime? pausedUntil;
+
+  /// `true` when the person is currently paused (i.e.,
+  /// [pausedUntil] is set and in the future at [now]).
+  bool isPausedAt(DateTime now) =>
+      pausedUntil != null && pausedUntil!.isAfter(now);
+
+  /// Returns a copy with selected fields replaced. Subclasses
+  /// pass through the base args via `super.copyWith` if they
+  /// need to preserve them.
+  Person copyWith({
+    PersonChannel? channel,
+    PersonCadence? cadence,
+    DateTime? pausedUntil,
+    bool clearPausedUntil = false,
+  });
 }
 
 /// A person bound to a single, named contact. The "real"
@@ -161,16 +185,23 @@ final class ContactPerson extends Person {
     required super.channel,
     required super.cadence,
     required super.createdAt,
+    super.pausedUntil,
   });
 
   @override
-  ContactPerson copyWith({PersonChannel? channel, PersonCadence? cadence}) {
+  ContactPerson copyWith({
+    PersonChannel? channel,
+    PersonCadence? cadence,
+    DateTime? pausedUntil,
+    bool clearPausedUntil = false,
+  }) {
     return ContactPerson(
       id: id,
       lookupKey: lookupKey,
       channel: channel ?? this.channel,
       cadence: cadence ?? this.cadence,
       createdAt: createdAt,
+      pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
     );
   }
 

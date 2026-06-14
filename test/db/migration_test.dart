@@ -51,6 +51,8 @@ void main() {
               weekdays: '1,3,5',
               hour: 9,
               minute: 0,
+              category: 'other',
+              colorSeed: 0,
             ),
           );
       await db
@@ -137,6 +139,8 @@ void main() {
               scheduleType: 'fixed',
               weekdays: '2,4',
               hour: 8,
+              category: 'other',
+              colorSeed: 0,
               minute: 0,
             ),
           );
@@ -155,12 +159,12 @@ void main() {
       expect(after, isEmpty);
     });
 
-    test('schemaVersion is 1 for v0.1', () {
+    test('schemaVersion is 2 for v0.2', () {
       // The version pin is a contract — Phase 3+ bump it.
       // Drift exposes it via the database instance.
       final db = AppDatabaseService.instance.db;
       expect(db.schemaVersion, kCurrentSchemaVersion);
-      expect(kCurrentSchemaVersion, 1);
+      expect(kCurrentSchemaVersion, 2);
     });
   });
 }

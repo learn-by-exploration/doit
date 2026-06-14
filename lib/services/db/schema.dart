@@ -2,29 +2,48 @@
 // `tables.dart` and pins the current schema version.
 //
 // The schema version is bumped on every column add / drop / type
-// change. v0.1 ships at version 1. The matching migration file
-// for v1 → v1 (no-op) lives at
-// `lib/services/migrations/v1_initial.dart` per
-// .claude/rules/lib-services.md.
+// change. The matching migration file MUST land in
+// `lib/services/db/migrations/vN_to_vM.dart` and be referenced from
+// [migrations] below.
+//
+// Version history:
+//   1 — initial schema (habits, people, completions, budgets,
+//       settings, event log). 2026-06-13.
+//   2 — v0.2 (committed 2026-06-14):
+//       + habits.category, colorSeed, iconName, pausedUntilMillis
+//       + habits.endHour, endMinute, targetHours (for timeWindow)
+//       + people.pausedUntilMillis
+//       + events table
+//       + person_groups table
+//       + person_group_members table
+//       The migration is in `migrations/v1_to_v2.dart`.
 
 import 'package:drift/drift.dart';
 
+import 'package:common_games/services/db/migrations/v1_to_v2.dart';
 import 'package:common_games/services/db/tables.dart';
 
 part 'schema.g.dart';
 
 /// Current schema version. Bump on every column add / drop / type
 /// change. The matching migration file MUST land in
-/// `lib/services/migrations/vN_to_vM.dart` and be referenced from
+/// `lib/services/db/migrations/vN_to_vM.dart` and be referenced from
 /// [migrations] below.
-///
-/// Version history:
-///   1 — initial schema (habits, people, completions, budgets,
-///       settings, event log). 2026-06-13.
-const int kCurrentSchemaVersion = 1;
+const int kCurrentSchemaVersion = 2;
 
 @DriftDatabase(
-  tables: [Habits, People, Completions, RestDayBudgets, Settings, EventLogs],
+  tables: [
+    Habits,
+    People,
+    Completions,
+    RestDayBudgets,
+    Settings,
+    EventLogs,
+    // v0.2
+    Events,
+    PersonGroups,
+    PersonGroupMembers,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
@@ -36,17 +55,15 @@ class AppDatabase extends _$AppDatabase {
   @override
   int get schemaVersion => kCurrentSchemaVersion;
 
-  // No data migrations for v1. Future versions append to this
-  // list; see .claude/rules/lib-services.md for the migration
-  // file naming convention.
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
       await m.createAll();
     },
     onUpgrade: (m, from, to) async {
-      // Migrations are added here as v2, v3, etc. land. v1
-      // is the initial schema; nothing to do.
+      if (from < 2) {
+        await migrateV1ToV2(m, this);
+      }
     },
     beforeOpen: (details) async {
       // Foreign-key support is on by default in modern Drift,

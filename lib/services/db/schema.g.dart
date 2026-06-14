@@ -182,6 +182,39 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _endHourMeta = const VerificationMeta(
+    'endHour',
+  );
+  @override
+  late final GeneratedColumn<int> endHour = GeneratedColumn<int>(
+    'end_hour',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _endMinuteMeta = const VerificationMeta(
+    'endMinute',
+  );
+  @override
+  late final GeneratedColumn<int> endMinute = GeneratedColumn<int>(
+    'end_minute',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _targetHoursMeta = const VerificationMeta(
+    'targetHours',
+  );
+  @override
+  late final GeneratedColumn<int> targetHours = GeneratedColumn<int>(
+    'target_hours',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _missionChainJsonMeta = const VerificationMeta(
     'missionChainJson',
   );
@@ -191,6 +224,52 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
     aliasedName,
     true,
     type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('other'),
+  );
+  static const VerificationMeta _colorSeedMeta = const VerificationMeta(
+    'colorSeed',
+  );
+  @override
+  late final GeneratedColumn<int> colorSeed = GeneratedColumn<int>(
+    'color_seed',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _iconNameMeta = const VerificationMeta(
+    'iconName',
+  );
+  @override
+  late final GeneratedColumn<String> iconName = GeneratedColumn<String>(
+    'icon_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pausedUntilMillisMeta = const VerificationMeta(
+    'pausedUntilMillis',
+  );
+  @override
+  late final GeneratedColumn<int> pausedUntilMillis = GeneratedColumn<int>(
+    'paused_until_millis',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
   @override
@@ -212,7 +291,14 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
     nth,
     weekday,
     referenceDayOfMonth,
+    endHour,
+    endMinute,
+    targetHours,
     missionChainJson,
+    category,
+    colorSeed,
+    iconName,
+    pausedUntilMillis,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -359,12 +445,60 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
         ),
       );
     }
+    if (data.containsKey('end_hour')) {
+      context.handle(
+        _endHourMeta,
+        endHour.isAcceptableOrUnknown(data['end_hour']!, _endHourMeta),
+      );
+    }
+    if (data.containsKey('end_minute')) {
+      context.handle(
+        _endMinuteMeta,
+        endMinute.isAcceptableOrUnknown(data['end_minute']!, _endMinuteMeta),
+      );
+    }
+    if (data.containsKey('target_hours')) {
+      context.handle(
+        _targetHoursMeta,
+        targetHours.isAcceptableOrUnknown(
+          data['target_hours']!,
+          _targetHoursMeta,
+        ),
+      );
+    }
     if (data.containsKey('mission_chain_json')) {
       context.handle(
         _missionChainJsonMeta,
         missionChainJson.isAcceptableOrUnknown(
           data['mission_chain_json']!,
           _missionChainJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
+    if (data.containsKey('color_seed')) {
+      context.handle(
+        _colorSeedMeta,
+        colorSeed.isAcceptableOrUnknown(data['color_seed']!, _colorSeedMeta),
+      );
+    }
+    if (data.containsKey('icon_name')) {
+      context.handle(
+        _iconNameMeta,
+        iconName.isAcceptableOrUnknown(data['icon_name']!, _iconNameMeta),
+      );
+    }
+    if (data.containsKey('paused_until_millis')) {
+      context.handle(
+        _pausedUntilMillisMeta,
+        pausedUntilMillis.isAcceptableOrUnknown(
+          data['paused_until_millis']!,
+          _pausedUntilMillisMeta,
         ),
       );
     }
@@ -445,9 +579,37 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
         DriftSqlType.int,
         data['${effectivePrefix}reference_day_of_month'],
       ),
+      endHour: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}end_hour'],
+      ),
+      endMinute: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}end_minute'],
+      ),
+      targetHours: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}target_hours'],
+      ),
       missionChainJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}mission_chain_json'],
+      ),
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      colorSeed: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}color_seed'],
+      )!,
+      iconName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon_name'],
+      ),
+      pausedUntilMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}paused_until_millis'],
       ),
     );
   }
@@ -476,7 +638,14 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
   final int? nth;
   final int? weekday;
   final int? referenceDayOfMonth;
+  final int? endHour;
+  final int? endMinute;
+  final int? targetHours;
   final String? missionChainJson;
+  final String category;
+  final int colorSeed;
+  final String? iconName;
+  final int? pausedUntilMillis;
   const HabitRow({
     required this.id,
     required this.name,
@@ -495,7 +664,14 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     this.nth,
     this.weekday,
     this.referenceDayOfMonth,
+    this.endHour,
+    this.endMinute,
+    this.targetHours,
     this.missionChainJson,
+    required this.category,
+    required this.colorSeed,
+    this.iconName,
+    this.pausedUntilMillis,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -539,8 +715,25 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     if (!nullToAbsent || referenceDayOfMonth != null) {
       map['reference_day_of_month'] = Variable<int>(referenceDayOfMonth);
     }
+    if (!nullToAbsent || endHour != null) {
+      map['end_hour'] = Variable<int>(endHour);
+    }
+    if (!nullToAbsent || endMinute != null) {
+      map['end_minute'] = Variable<int>(endMinute);
+    }
+    if (!nullToAbsent || targetHours != null) {
+      map['target_hours'] = Variable<int>(targetHours);
+    }
     if (!nullToAbsent || missionChainJson != null) {
       map['mission_chain_json'] = Variable<String>(missionChainJson);
+    }
+    map['category'] = Variable<String>(category);
+    map['color_seed'] = Variable<int>(colorSeed);
+    if (!nullToAbsent || iconName != null) {
+      map['icon_name'] = Variable<String>(iconName);
+    }
+    if (!nullToAbsent || pausedUntilMillis != null) {
+      map['paused_until_millis'] = Variable<int>(pausedUntilMillis);
     }
     return map;
   }
@@ -582,9 +775,26 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       referenceDayOfMonth: referenceDayOfMonth == null && nullToAbsent
           ? const Value.absent()
           : Value(referenceDayOfMonth),
+      endHour: endHour == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endHour),
+      endMinute: endMinute == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endMinute),
+      targetHours: targetHours == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetHours),
       missionChainJson: missionChainJson == null && nullToAbsent
           ? const Value.absent()
           : Value(missionChainJson),
+      category: Value(category),
+      colorSeed: Value(colorSeed),
+      iconName: iconName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(iconName),
+      pausedUntilMillis: pausedUntilMillis == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pausedUntilMillis),
     );
   }
 
@@ -615,7 +825,14 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       referenceDayOfMonth: serializer.fromJson<int?>(
         json['referenceDayOfMonth'],
       ),
+      endHour: serializer.fromJson<int?>(json['endHour']),
+      endMinute: serializer.fromJson<int?>(json['endMinute']),
+      targetHours: serializer.fromJson<int?>(json['targetHours']),
       missionChainJson: serializer.fromJson<String?>(json['missionChainJson']),
+      category: serializer.fromJson<String>(json['category']),
+      colorSeed: serializer.fromJson<int>(json['colorSeed']),
+      iconName: serializer.fromJson<String?>(json['iconName']),
+      pausedUntilMillis: serializer.fromJson<int?>(json['pausedUntilMillis']),
     );
   }
   @override
@@ -639,7 +856,14 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       'nth': serializer.toJson<int?>(nth),
       'weekday': serializer.toJson<int?>(weekday),
       'referenceDayOfMonth': serializer.toJson<int?>(referenceDayOfMonth),
+      'endHour': serializer.toJson<int?>(endHour),
+      'endMinute': serializer.toJson<int?>(endMinute),
+      'targetHours': serializer.toJson<int?>(targetHours),
       'missionChainJson': serializer.toJson<String?>(missionChainJson),
+      'category': serializer.toJson<String>(category),
+      'colorSeed': serializer.toJson<int>(colorSeed),
+      'iconName': serializer.toJson<String?>(iconName),
+      'pausedUntilMillis': serializer.toJson<int?>(pausedUntilMillis),
     };
   }
 
@@ -661,7 +885,14 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     Value<int?> nth = const Value.absent(),
     Value<int?> weekday = const Value.absent(),
     Value<int?> referenceDayOfMonth = const Value.absent(),
+    Value<int?> endHour = const Value.absent(),
+    Value<int?> endMinute = const Value.absent(),
+    Value<int?> targetHours = const Value.absent(),
     Value<String?> missionChainJson = const Value.absent(),
+    String? category,
+    int? colorSeed,
+    Value<String?> iconName = const Value.absent(),
+    Value<int?> pausedUntilMillis = const Value.absent(),
   }) => HabitRow(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -688,9 +919,18 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     referenceDayOfMonth: referenceDayOfMonth.present
         ? referenceDayOfMonth.value
         : this.referenceDayOfMonth,
+    endHour: endHour.present ? endHour.value : this.endHour,
+    endMinute: endMinute.present ? endMinute.value : this.endMinute,
+    targetHours: targetHours.present ? targetHours.value : this.targetHours,
     missionChainJson: missionChainJson.present
         ? missionChainJson.value
         : this.missionChainJson,
+    category: category ?? this.category,
+    colorSeed: colorSeed ?? this.colorSeed,
+    iconName: iconName.present ? iconName.value : this.iconName,
+    pausedUntilMillis: pausedUntilMillis.present
+        ? pausedUntilMillis.value
+        : this.pausedUntilMillis,
   );
   HabitRow copyWithCompanion(HabitsCompanion data) {
     return HabitRow(
@@ -727,9 +967,20 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       referenceDayOfMonth: data.referenceDayOfMonth.present
           ? data.referenceDayOfMonth.value
           : this.referenceDayOfMonth,
+      endHour: data.endHour.present ? data.endHour.value : this.endHour,
+      endMinute: data.endMinute.present ? data.endMinute.value : this.endMinute,
+      targetHours: data.targetHours.present
+          ? data.targetHours.value
+          : this.targetHours,
       missionChainJson: data.missionChainJson.present
           ? data.missionChainJson.value
           : this.missionChainJson,
+      category: data.category.present ? data.category.value : this.category,
+      colorSeed: data.colorSeed.present ? data.colorSeed.value : this.colorSeed,
+      iconName: data.iconName.present ? data.iconName.value : this.iconName,
+      pausedUntilMillis: data.pausedUntilMillis.present
+          ? data.pausedUntilMillis.value
+          : this.pausedUntilMillis,
     );
   }
 
@@ -753,13 +1004,20 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
           ..write('nth: $nth, ')
           ..write('weekday: $weekday, ')
           ..write('referenceDayOfMonth: $referenceDayOfMonth, ')
-          ..write('missionChainJson: $missionChainJson')
+          ..write('endHour: $endHour, ')
+          ..write('endMinute: $endMinute, ')
+          ..write('targetHours: $targetHours, ')
+          ..write('missionChainJson: $missionChainJson, ')
+          ..write('category: $category, ')
+          ..write('colorSeed: $colorSeed, ')
+          ..write('iconName: $iconName, ')
+          ..write('pausedUntilMillis: $pausedUntilMillis')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     name,
     proofMode,
@@ -777,8 +1035,15 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     nth,
     weekday,
     referenceDayOfMonth,
+    endHour,
+    endMinute,
+    targetHours,
     missionChainJson,
-  );
+    category,
+    colorSeed,
+    iconName,
+    pausedUntilMillis,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -800,7 +1065,14 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
           other.nth == this.nth &&
           other.weekday == this.weekday &&
           other.referenceDayOfMonth == this.referenceDayOfMonth &&
-          other.missionChainJson == this.missionChainJson);
+          other.endHour == this.endHour &&
+          other.endMinute == this.endMinute &&
+          other.targetHours == this.targetHours &&
+          other.missionChainJson == this.missionChainJson &&
+          other.category == this.category &&
+          other.colorSeed == this.colorSeed &&
+          other.iconName == this.iconName &&
+          other.pausedUntilMillis == this.pausedUntilMillis);
 }
 
 class HabitsCompanion extends UpdateCompanion<HabitRow> {
@@ -821,7 +1093,14 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
   final Value<int?> nth;
   final Value<int?> weekday;
   final Value<int?> referenceDayOfMonth;
+  final Value<int?> endHour;
+  final Value<int?> endMinute;
+  final Value<int?> targetHours;
   final Value<String?> missionChainJson;
+  final Value<String> category;
+  final Value<int> colorSeed;
+  final Value<String?> iconName;
+  final Value<int?> pausedUntilMillis;
   final Value<int> rowid;
   const HabitsCompanion({
     this.id = const Value.absent(),
@@ -841,7 +1120,14 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     this.nth = const Value.absent(),
     this.weekday = const Value.absent(),
     this.referenceDayOfMonth = const Value.absent(),
+    this.endHour = const Value.absent(),
+    this.endMinute = const Value.absent(),
+    this.targetHours = const Value.absent(),
     this.missionChainJson = const Value.absent(),
+    this.category = const Value.absent(),
+    this.colorSeed = const Value.absent(),
+    this.iconName = const Value.absent(),
+    this.pausedUntilMillis = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   HabitsCompanion.insert({
@@ -862,7 +1148,14 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     this.nth = const Value.absent(),
     this.weekday = const Value.absent(),
     this.referenceDayOfMonth = const Value.absent(),
+    this.endHour = const Value.absent(),
+    this.endMinute = const Value.absent(),
+    this.targetHours = const Value.absent(),
     this.missionChainJson = const Value.absent(),
+    this.category = const Value.absent(),
+    this.colorSeed = const Value.absent(),
+    this.iconName = const Value.absent(),
+    this.pausedUntilMillis = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -887,7 +1180,14 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     Expression<int>? nth,
     Expression<int>? weekday,
     Expression<int>? referenceDayOfMonth,
+    Expression<int>? endHour,
+    Expression<int>? endMinute,
+    Expression<int>? targetHours,
     Expression<String>? missionChainJson,
+    Expression<String>? category,
+    Expression<int>? colorSeed,
+    Expression<String>? iconName,
+    Expression<int>? pausedUntilMillis,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -910,7 +1210,14 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
       if (weekday != null) 'weekday': weekday,
       if (referenceDayOfMonth != null)
         'reference_day_of_month': referenceDayOfMonth,
+      if (endHour != null) 'end_hour': endHour,
+      if (endMinute != null) 'end_minute': endMinute,
+      if (targetHours != null) 'target_hours': targetHours,
       if (missionChainJson != null) 'mission_chain_json': missionChainJson,
+      if (category != null) 'category': category,
+      if (colorSeed != null) 'color_seed': colorSeed,
+      if (iconName != null) 'icon_name': iconName,
+      if (pausedUntilMillis != null) 'paused_until_millis': pausedUntilMillis,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -933,7 +1240,14 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     Value<int?>? nth,
     Value<int?>? weekday,
     Value<int?>? referenceDayOfMonth,
+    Value<int?>? endHour,
+    Value<int?>? endMinute,
+    Value<int?>? targetHours,
     Value<String?>? missionChainJson,
+    Value<String>? category,
+    Value<int>? colorSeed,
+    Value<String?>? iconName,
+    Value<int?>? pausedUntilMillis,
     Value<int>? rowid,
   }) {
     return HabitsCompanion(
@@ -954,7 +1268,14 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
       nth: nth ?? this.nth,
       weekday: weekday ?? this.weekday,
       referenceDayOfMonth: referenceDayOfMonth ?? this.referenceDayOfMonth,
+      endHour: endHour ?? this.endHour,
+      endMinute: endMinute ?? this.endMinute,
+      targetHours: targetHours ?? this.targetHours,
       missionChainJson: missionChainJson ?? this.missionChainJson,
+      category: category ?? this.category,
+      colorSeed: colorSeed ?? this.colorSeed,
+      iconName: iconName ?? this.iconName,
+      pausedUntilMillis: pausedUntilMillis ?? this.pausedUntilMillis,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1013,8 +1334,29 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     if (referenceDayOfMonth.present) {
       map['reference_day_of_month'] = Variable<int>(referenceDayOfMonth.value);
     }
+    if (endHour.present) {
+      map['end_hour'] = Variable<int>(endHour.value);
+    }
+    if (endMinute.present) {
+      map['end_minute'] = Variable<int>(endMinute.value);
+    }
+    if (targetHours.present) {
+      map['target_hours'] = Variable<int>(targetHours.value);
+    }
     if (missionChainJson.present) {
       map['mission_chain_json'] = Variable<String>(missionChainJson.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (colorSeed.present) {
+      map['color_seed'] = Variable<int>(colorSeed.value);
+    }
+    if (iconName.present) {
+      map['icon_name'] = Variable<String>(iconName.value);
+    }
+    if (pausedUntilMillis.present) {
+      map['paused_until_millis'] = Variable<int>(pausedUntilMillis.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -1042,7 +1384,14 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
           ..write('nth: $nth, ')
           ..write('weekday: $weekday, ')
           ..write('referenceDayOfMonth: $referenceDayOfMonth, ')
+          ..write('endHour: $endHour, ')
+          ..write('endMinute: $endMinute, ')
+          ..write('targetHours: $targetHours, ')
           ..write('missionChainJson: $missionChainJson, ')
+          ..write('category: $category, ')
+          ..write('colorSeed: $colorSeed, ')
+          ..write('iconName: $iconName, ')
+          ..write('pausedUntilMillis: $pausedUntilMillis, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1195,6 +1544,17 @@ class $PeopleTable extends People with TableInfo<$PeopleTable, PersonRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _pausedUntilMillisMeta = const VerificationMeta(
+    'pausedUntilMillis',
+  );
+  @override
+  late final GeneratedColumn<int> pausedUntilMillis = GeneratedColumn<int>(
+    'paused_until_millis',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1210,6 +1570,7 @@ class $PeopleTable extends People with TableInfo<$PeopleTable, PersonRow> {
     monthOfYear,
     anchoredToWakeup,
     missionChainJson,
+    pausedUntilMillis,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1333,6 +1694,15 @@ class $PeopleTable extends People with TableInfo<$PeopleTable, PersonRow> {
         ),
       );
     }
+    if (data.containsKey('paused_until_millis')) {
+      context.handle(
+        _pausedUntilMillisMeta,
+        pausedUntilMillis.isAcceptableOrUnknown(
+          data['paused_until_millis']!,
+          _pausedUntilMillisMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1394,6 +1764,10 @@ class $PeopleTable extends People with TableInfo<$PeopleTable, PersonRow> {
         DriftSqlType.string,
         data['${effectivePrefix}mission_chain_json'],
       ),
+      pausedUntilMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}paused_until_millis'],
+      ),
     );
   }
 
@@ -1417,6 +1791,7 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
   final int? monthOfYear;
   final bool anchoredToWakeup;
   final String? missionChainJson;
+  final int? pausedUntilMillis;
   const PersonRow({
     required this.id,
     required this.lookupKey,
@@ -1431,6 +1806,7 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     this.monthOfYear,
     required this.anchoredToWakeup,
     this.missionChainJson,
+    this.pausedUntilMillis,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1457,6 +1833,9 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     map['anchored_to_wakeup'] = Variable<bool>(anchoredToWakeup);
     if (!nullToAbsent || missionChainJson != null) {
       map['mission_chain_json'] = Variable<String>(missionChainJson);
+    }
+    if (!nullToAbsent || pausedUntilMillis != null) {
+      map['paused_until_millis'] = Variable<int>(pausedUntilMillis);
     }
     return map;
   }
@@ -1486,6 +1865,9 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
       missionChainJson: missionChainJson == null && nullToAbsent
           ? const Value.absent()
           : Value(missionChainJson),
+      pausedUntilMillis: pausedUntilMillis == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pausedUntilMillis),
     );
   }
 
@@ -1508,6 +1890,7 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
       monthOfYear: serializer.fromJson<int?>(json['monthOfYear']),
       anchoredToWakeup: serializer.fromJson<bool>(json['anchoredToWakeup']),
       missionChainJson: serializer.fromJson<String?>(json['missionChainJson']),
+      pausedUntilMillis: serializer.fromJson<int?>(json['pausedUntilMillis']),
     );
   }
   @override
@@ -1527,6 +1910,7 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
       'monthOfYear': serializer.toJson<int?>(monthOfYear),
       'anchoredToWakeup': serializer.toJson<bool>(anchoredToWakeup),
       'missionChainJson': serializer.toJson<String?>(missionChainJson),
+      'pausedUntilMillis': serializer.toJson<int?>(pausedUntilMillis),
     };
   }
 
@@ -1544,6 +1928,7 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     Value<int?> monthOfYear = const Value.absent(),
     bool? anchoredToWakeup,
     Value<String?> missionChainJson = const Value.absent(),
+    Value<int?> pausedUntilMillis = const Value.absent(),
   }) => PersonRow(
     id: id ?? this.id,
     lookupKey: lookupKey ?? this.lookupKey,
@@ -1560,6 +1945,9 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     missionChainJson: missionChainJson.present
         ? missionChainJson.value
         : this.missionChainJson,
+    pausedUntilMillis: pausedUntilMillis.present
+        ? pausedUntilMillis.value
+        : this.pausedUntilMillis,
   );
   PersonRow copyWithCompanion(PeopleCompanion data) {
     return PersonRow(
@@ -1590,6 +1978,9 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
       missionChainJson: data.missionChainJson.present
           ? data.missionChainJson.value
           : this.missionChainJson,
+      pausedUntilMillis: data.pausedUntilMillis.present
+          ? data.pausedUntilMillis.value
+          : this.pausedUntilMillis,
     );
   }
 
@@ -1608,7 +1999,8 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
           ..write('dayOfMonth: $dayOfMonth, ')
           ..write('monthOfYear: $monthOfYear, ')
           ..write('anchoredToWakeup: $anchoredToWakeup, ')
-          ..write('missionChainJson: $missionChainJson')
+          ..write('missionChainJson: $missionChainJson, ')
+          ..write('pausedUntilMillis: $pausedUntilMillis')
           ..write(')'))
         .toString();
   }
@@ -1628,6 +2020,7 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     monthOfYear,
     anchoredToWakeup,
     missionChainJson,
+    pausedUntilMillis,
   );
   @override
   bool operator ==(Object other) =>
@@ -1645,7 +2038,8 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
           other.dayOfMonth == this.dayOfMonth &&
           other.monthOfYear == this.monthOfYear &&
           other.anchoredToWakeup == this.anchoredToWakeup &&
-          other.missionChainJson == this.missionChainJson);
+          other.missionChainJson == this.missionChainJson &&
+          other.pausedUntilMillis == this.pausedUntilMillis);
 }
 
 class PeopleCompanion extends UpdateCompanion<PersonRow> {
@@ -1662,6 +2056,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
   final Value<int?> monthOfYear;
   final Value<bool> anchoredToWakeup;
   final Value<String?> missionChainJson;
+  final Value<int?> pausedUntilMillis;
   final Value<int> rowid;
   const PeopleCompanion({
     this.id = const Value.absent(),
@@ -1677,6 +2072,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     this.monthOfYear = const Value.absent(),
     this.anchoredToWakeup = const Value.absent(),
     this.missionChainJson = const Value.absent(),
+    this.pausedUntilMillis = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PeopleCompanion.insert({
@@ -1693,6 +2089,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     this.monthOfYear = const Value.absent(),
     this.anchoredToWakeup = const Value.absent(),
     this.missionChainJson = const Value.absent(),
+    this.pausedUntilMillis = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        lookupKey = Value(lookupKey),
@@ -1715,6 +2112,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     Expression<int>? monthOfYear,
     Expression<bool>? anchoredToWakeup,
     Expression<String>? missionChainJson,
+    Expression<int>? pausedUntilMillis,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1731,6 +2129,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
       if (monthOfYear != null) 'month_of_year': monthOfYear,
       if (anchoredToWakeup != null) 'anchored_to_wakeup': anchoredToWakeup,
       if (missionChainJson != null) 'mission_chain_json': missionChainJson,
+      if (pausedUntilMillis != null) 'paused_until_millis': pausedUntilMillis,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1749,6 +2148,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     Value<int?>? monthOfYear,
     Value<bool>? anchoredToWakeup,
     Value<String?>? missionChainJson,
+    Value<int?>? pausedUntilMillis,
     Value<int>? rowid,
   }) {
     return PeopleCompanion(
@@ -1765,6 +2165,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
       monthOfYear: monthOfYear ?? this.monthOfYear,
       anchoredToWakeup: anchoredToWakeup ?? this.anchoredToWakeup,
       missionChainJson: missionChainJson ?? this.missionChainJson,
+      pausedUntilMillis: pausedUntilMillis ?? this.pausedUntilMillis,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1811,6 +2212,9 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     if (missionChainJson.present) {
       map['mission_chain_json'] = Variable<String>(missionChainJson.value);
     }
+    if (pausedUntilMillis.present) {
+      map['paused_until_millis'] = Variable<int>(pausedUntilMillis.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1833,6 +2237,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
           ..write('monthOfYear: $monthOfYear, ')
           ..write('anchoredToWakeup: $anchoredToWakeup, ')
           ..write('missionChainJson: $missionChainJson, ')
+          ..write('pausedUntilMillis: $pausedUntilMillis, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3250,6 +3655,1461 @@ class EventLogsCompanion extends UpdateCompanion<EventLogRow> {
   }
 }
 
+class $EventsTable extends Events with TableInfo<$EventsTable, EventRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $EventsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _atMillisMeta = const VerificationMeta(
+    'atMillis',
+  );
+  @override
+  late final GeneratedColumn<int> atMillis = GeneratedColumn<int>(
+    'at_millis',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _leadTimeMillisMeta = const VerificationMeta(
+    'leadTimeMillis',
+  );
+  @override
+  late final GeneratedColumn<int> leadTimeMillis = GeneratedColumn<int>(
+    'lead_time_millis',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _missionChainJsonMeta = const VerificationMeta(
+    'missionChainJson',
+  );
+  @override
+  late final GeneratedColumn<String> missionChainJson = GeneratedColumn<String>(
+    'mission_chain_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _recurrenceMeta = const VerificationMeta(
+    'recurrence',
+  );
+  @override
+  late final GeneratedColumn<String> recurrence = GeneratedColumn<String>(
+    'recurrence',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('none'),
+  );
+  static const VerificationMeta _archivedAtMillisMeta = const VerificationMeta(
+    'archivedAtMillis',
+  );
+  @override
+  late final GeneratedColumn<int> archivedAtMillis = GeneratedColumn<int>(
+    'archived_at_millis',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMillisMeta = const VerificationMeta(
+    'createdAtMillis',
+  );
+  @override
+  late final GeneratedColumn<int> createdAtMillis = GeneratedColumn<int>(
+    'created_at_millis',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    atMillis,
+    leadTimeMillis,
+    missionChainJson,
+    recurrence,
+    archivedAtMillis,
+    createdAtMillis,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'events';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<EventRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('at_millis')) {
+      context.handle(
+        _atMillisMeta,
+        atMillis.isAcceptableOrUnknown(data['at_millis']!, _atMillisMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_atMillisMeta);
+    }
+    if (data.containsKey('lead_time_millis')) {
+      context.handle(
+        _leadTimeMillisMeta,
+        leadTimeMillis.isAcceptableOrUnknown(
+          data['lead_time_millis']!,
+          _leadTimeMillisMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_leadTimeMillisMeta);
+    }
+    if (data.containsKey('mission_chain_json')) {
+      context.handle(
+        _missionChainJsonMeta,
+        missionChainJson.isAcceptableOrUnknown(
+          data['mission_chain_json']!,
+          _missionChainJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('recurrence')) {
+      context.handle(
+        _recurrenceMeta,
+        recurrence.isAcceptableOrUnknown(data['recurrence']!, _recurrenceMeta),
+      );
+    }
+    if (data.containsKey('archived_at_millis')) {
+      context.handle(
+        _archivedAtMillisMeta,
+        archivedAtMillis.isAcceptableOrUnknown(
+          data['archived_at_millis']!,
+          _archivedAtMillisMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at_millis')) {
+      context.handle(
+        _createdAtMillisMeta,
+        createdAtMillis.isAcceptableOrUnknown(
+          data['created_at_millis']!,
+          _createdAtMillisMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMillisMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  EventRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return EventRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      atMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}at_millis'],
+      )!,
+      leadTimeMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}lead_time_millis'],
+      )!,
+      missionChainJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mission_chain_json'],
+      ),
+      recurrence: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}recurrence'],
+      )!,
+      archivedAtMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}archived_at_millis'],
+      ),
+      createdAtMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at_millis'],
+      )!,
+    );
+  }
+
+  @override
+  $EventsTable createAlias(String alias) {
+    return $EventsTable(attachedDatabase, alias);
+  }
+}
+
+class EventRow extends DataClass implements Insertable<EventRow> {
+  final String id;
+  final String name;
+  final int atMillis;
+  final int leadTimeMillis;
+  final String? missionChainJson;
+  final String recurrence;
+  final int? archivedAtMillis;
+  final int createdAtMillis;
+  const EventRow({
+    required this.id,
+    required this.name,
+    required this.atMillis,
+    required this.leadTimeMillis,
+    this.missionChainJson,
+    required this.recurrence,
+    this.archivedAtMillis,
+    required this.createdAtMillis,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['at_millis'] = Variable<int>(atMillis);
+    map['lead_time_millis'] = Variable<int>(leadTimeMillis);
+    if (!nullToAbsent || missionChainJson != null) {
+      map['mission_chain_json'] = Variable<String>(missionChainJson);
+    }
+    map['recurrence'] = Variable<String>(recurrence);
+    if (!nullToAbsent || archivedAtMillis != null) {
+      map['archived_at_millis'] = Variable<int>(archivedAtMillis);
+    }
+    map['created_at_millis'] = Variable<int>(createdAtMillis);
+    return map;
+  }
+
+  EventsCompanion toCompanion(bool nullToAbsent) {
+    return EventsCompanion(
+      id: Value(id),
+      name: Value(name),
+      atMillis: Value(atMillis),
+      leadTimeMillis: Value(leadTimeMillis),
+      missionChainJson: missionChainJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(missionChainJson),
+      recurrence: Value(recurrence),
+      archivedAtMillis: archivedAtMillis == null && nullToAbsent
+          ? const Value.absent()
+          : Value(archivedAtMillis),
+      createdAtMillis: Value(createdAtMillis),
+    );
+  }
+
+  factory EventRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return EventRow(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      atMillis: serializer.fromJson<int>(json['atMillis']),
+      leadTimeMillis: serializer.fromJson<int>(json['leadTimeMillis']),
+      missionChainJson: serializer.fromJson<String?>(json['missionChainJson']),
+      recurrence: serializer.fromJson<String>(json['recurrence']),
+      archivedAtMillis: serializer.fromJson<int?>(json['archivedAtMillis']),
+      createdAtMillis: serializer.fromJson<int>(json['createdAtMillis']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'atMillis': serializer.toJson<int>(atMillis),
+      'leadTimeMillis': serializer.toJson<int>(leadTimeMillis),
+      'missionChainJson': serializer.toJson<String?>(missionChainJson),
+      'recurrence': serializer.toJson<String>(recurrence),
+      'archivedAtMillis': serializer.toJson<int?>(archivedAtMillis),
+      'createdAtMillis': serializer.toJson<int>(createdAtMillis),
+    };
+  }
+
+  EventRow copyWith({
+    String? id,
+    String? name,
+    int? atMillis,
+    int? leadTimeMillis,
+    Value<String?> missionChainJson = const Value.absent(),
+    String? recurrence,
+    Value<int?> archivedAtMillis = const Value.absent(),
+    int? createdAtMillis,
+  }) => EventRow(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    atMillis: atMillis ?? this.atMillis,
+    leadTimeMillis: leadTimeMillis ?? this.leadTimeMillis,
+    missionChainJson: missionChainJson.present
+        ? missionChainJson.value
+        : this.missionChainJson,
+    recurrence: recurrence ?? this.recurrence,
+    archivedAtMillis: archivedAtMillis.present
+        ? archivedAtMillis.value
+        : this.archivedAtMillis,
+    createdAtMillis: createdAtMillis ?? this.createdAtMillis,
+  );
+  EventRow copyWithCompanion(EventsCompanion data) {
+    return EventRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      atMillis: data.atMillis.present ? data.atMillis.value : this.atMillis,
+      leadTimeMillis: data.leadTimeMillis.present
+          ? data.leadTimeMillis.value
+          : this.leadTimeMillis,
+      missionChainJson: data.missionChainJson.present
+          ? data.missionChainJson.value
+          : this.missionChainJson,
+      recurrence: data.recurrence.present
+          ? data.recurrence.value
+          : this.recurrence,
+      archivedAtMillis: data.archivedAtMillis.present
+          ? data.archivedAtMillis.value
+          : this.archivedAtMillis,
+      createdAtMillis: data.createdAtMillis.present
+          ? data.createdAtMillis.value
+          : this.createdAtMillis,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EventRow(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('atMillis: $atMillis, ')
+          ..write('leadTimeMillis: $leadTimeMillis, ')
+          ..write('missionChainJson: $missionChainJson, ')
+          ..write('recurrence: $recurrence, ')
+          ..write('archivedAtMillis: $archivedAtMillis, ')
+          ..write('createdAtMillis: $createdAtMillis')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    atMillis,
+    leadTimeMillis,
+    missionChainJson,
+    recurrence,
+    archivedAtMillis,
+    createdAtMillis,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is EventRow &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.atMillis == this.atMillis &&
+          other.leadTimeMillis == this.leadTimeMillis &&
+          other.missionChainJson == this.missionChainJson &&
+          other.recurrence == this.recurrence &&
+          other.archivedAtMillis == this.archivedAtMillis &&
+          other.createdAtMillis == this.createdAtMillis);
+}
+
+class EventsCompanion extends UpdateCompanion<EventRow> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> atMillis;
+  final Value<int> leadTimeMillis;
+  final Value<String?> missionChainJson;
+  final Value<String> recurrence;
+  final Value<int?> archivedAtMillis;
+  final Value<int> createdAtMillis;
+  final Value<int> rowid;
+  const EventsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.atMillis = const Value.absent(),
+    this.leadTimeMillis = const Value.absent(),
+    this.missionChainJson = const Value.absent(),
+    this.recurrence = const Value.absent(),
+    this.archivedAtMillis = const Value.absent(),
+    this.createdAtMillis = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  EventsCompanion.insert({
+    required String id,
+    required String name,
+    required int atMillis,
+    required int leadTimeMillis,
+    this.missionChainJson = const Value.absent(),
+    this.recurrence = const Value.absent(),
+    this.archivedAtMillis = const Value.absent(),
+    required int createdAtMillis,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       atMillis = Value(atMillis),
+       leadTimeMillis = Value(leadTimeMillis),
+       createdAtMillis = Value(createdAtMillis);
+  static Insertable<EventRow> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? atMillis,
+    Expression<int>? leadTimeMillis,
+    Expression<String>? missionChainJson,
+    Expression<String>? recurrence,
+    Expression<int>? archivedAtMillis,
+    Expression<int>? createdAtMillis,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (atMillis != null) 'at_millis': atMillis,
+      if (leadTimeMillis != null) 'lead_time_millis': leadTimeMillis,
+      if (missionChainJson != null) 'mission_chain_json': missionChainJson,
+      if (recurrence != null) 'recurrence': recurrence,
+      if (archivedAtMillis != null) 'archived_at_millis': archivedAtMillis,
+      if (createdAtMillis != null) 'created_at_millis': createdAtMillis,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  EventsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? atMillis,
+    Value<int>? leadTimeMillis,
+    Value<String?>? missionChainJson,
+    Value<String>? recurrence,
+    Value<int?>? archivedAtMillis,
+    Value<int>? createdAtMillis,
+    Value<int>? rowid,
+  }) {
+    return EventsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      atMillis: atMillis ?? this.atMillis,
+      leadTimeMillis: leadTimeMillis ?? this.leadTimeMillis,
+      missionChainJson: missionChainJson ?? this.missionChainJson,
+      recurrence: recurrence ?? this.recurrence,
+      archivedAtMillis: archivedAtMillis ?? this.archivedAtMillis,
+      createdAtMillis: createdAtMillis ?? this.createdAtMillis,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (atMillis.present) {
+      map['at_millis'] = Variable<int>(atMillis.value);
+    }
+    if (leadTimeMillis.present) {
+      map['lead_time_millis'] = Variable<int>(leadTimeMillis.value);
+    }
+    if (missionChainJson.present) {
+      map['mission_chain_json'] = Variable<String>(missionChainJson.value);
+    }
+    if (recurrence.present) {
+      map['recurrence'] = Variable<String>(recurrence.value);
+    }
+    if (archivedAtMillis.present) {
+      map['archived_at_millis'] = Variable<int>(archivedAtMillis.value);
+    }
+    if (createdAtMillis.present) {
+      map['created_at_millis'] = Variable<int>(createdAtMillis.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EventsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('atMillis: $atMillis, ')
+          ..write('leadTimeMillis: $leadTimeMillis, ')
+          ..write('missionChainJson: $missionChainJson, ')
+          ..write('recurrence: $recurrence, ')
+          ..write('archivedAtMillis: $archivedAtMillis, ')
+          ..write('createdAtMillis: $createdAtMillis, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PersonGroupsTable extends PersonGroups
+    with TableInfo<$PersonGroupsTable, PersonGroupRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PersonGroupsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cadenceTypeMeta = const VerificationMeta(
+    'cadenceType',
+  );
+  @override
+  late final GeneratedColumn<String> cadenceType = GeneratedColumn<String>(
+    'cadence_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _semanticMeta = const VerificationMeta(
+    'semantic',
+  );
+  @override
+  late final GeneratedColumn<String> semantic = GeneratedColumn<String>(
+    'semantic',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _channelMeta = const VerificationMeta(
+    'channel',
+  );
+  @override
+  late final GeneratedColumn<String> channel = GeneratedColumn<String>(
+    'channel',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _handleMeta = const VerificationMeta('handle');
+  @override
+  late final GeneratedColumn<String> handle = GeneratedColumn<String>(
+    'handle',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _missionChainJsonMeta = const VerificationMeta(
+    'missionChainJson',
+  );
+  @override
+  late final GeneratedColumn<String> missionChainJson = GeneratedColumn<String>(
+    'mission_chain_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMillisMeta = const VerificationMeta(
+    'createdAtMillis',
+  );
+  @override
+  late final GeneratedColumn<int> createdAtMillis = GeneratedColumn<int>(
+    'created_at_millis',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _pausedUntilMillisMeta = const VerificationMeta(
+    'pausedUntilMillis',
+  );
+  @override
+  late final GeneratedColumn<int> pausedUntilMillis = GeneratedColumn<int>(
+    'paused_until_millis',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    cadenceType,
+    semantic,
+    channel,
+    handle,
+    missionChainJson,
+    createdAtMillis,
+    pausedUntilMillis,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'person_groups';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PersonGroupRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('cadence_type')) {
+      context.handle(
+        _cadenceTypeMeta,
+        cadenceType.isAcceptableOrUnknown(
+          data['cadence_type']!,
+          _cadenceTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_cadenceTypeMeta);
+    }
+    if (data.containsKey('semantic')) {
+      context.handle(
+        _semanticMeta,
+        semantic.isAcceptableOrUnknown(data['semantic']!, _semanticMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_semanticMeta);
+    }
+    if (data.containsKey('channel')) {
+      context.handle(
+        _channelMeta,
+        channel.isAcceptableOrUnknown(data['channel']!, _channelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_channelMeta);
+    }
+    if (data.containsKey('handle')) {
+      context.handle(
+        _handleMeta,
+        handle.isAcceptableOrUnknown(data['handle']!, _handleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_handleMeta);
+    }
+    if (data.containsKey('mission_chain_json')) {
+      context.handle(
+        _missionChainJsonMeta,
+        missionChainJson.isAcceptableOrUnknown(
+          data['mission_chain_json']!,
+          _missionChainJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at_millis')) {
+      context.handle(
+        _createdAtMillisMeta,
+        createdAtMillis.isAcceptableOrUnknown(
+          data['created_at_millis']!,
+          _createdAtMillisMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMillisMeta);
+    }
+    if (data.containsKey('paused_until_millis')) {
+      context.handle(
+        _pausedUntilMillisMeta,
+        pausedUntilMillis.isAcceptableOrUnknown(
+          data['paused_until_millis']!,
+          _pausedUntilMillisMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PersonGroupRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PersonGroupRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      cadenceType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cadence_type'],
+      )!,
+      semantic: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}semantic'],
+      )!,
+      channel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}channel'],
+      )!,
+      handle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}handle'],
+      )!,
+      missionChainJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mission_chain_json'],
+      ),
+      createdAtMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at_millis'],
+      )!,
+      pausedUntilMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}paused_until_millis'],
+      ),
+    );
+  }
+
+  @override
+  $PersonGroupsTable createAlias(String alias) {
+    return $PersonGroupsTable(attachedDatabase, alias);
+  }
+}
+
+class PersonGroupRow extends DataClass implements Insertable<PersonGroupRow> {
+  final String id;
+  final String name;
+  final String cadenceType;
+  final String semantic;
+  final String channel;
+  final String handle;
+  final String? missionChainJson;
+  final int createdAtMillis;
+  final int? pausedUntilMillis;
+  const PersonGroupRow({
+    required this.id,
+    required this.name,
+    required this.cadenceType,
+    required this.semantic,
+    required this.channel,
+    required this.handle,
+    this.missionChainJson,
+    required this.createdAtMillis,
+    this.pausedUntilMillis,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['cadence_type'] = Variable<String>(cadenceType);
+    map['semantic'] = Variable<String>(semantic);
+    map['channel'] = Variable<String>(channel);
+    map['handle'] = Variable<String>(handle);
+    if (!nullToAbsent || missionChainJson != null) {
+      map['mission_chain_json'] = Variable<String>(missionChainJson);
+    }
+    map['created_at_millis'] = Variable<int>(createdAtMillis);
+    if (!nullToAbsent || pausedUntilMillis != null) {
+      map['paused_until_millis'] = Variable<int>(pausedUntilMillis);
+    }
+    return map;
+  }
+
+  PersonGroupsCompanion toCompanion(bool nullToAbsent) {
+    return PersonGroupsCompanion(
+      id: Value(id),
+      name: Value(name),
+      cadenceType: Value(cadenceType),
+      semantic: Value(semantic),
+      channel: Value(channel),
+      handle: Value(handle),
+      missionChainJson: missionChainJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(missionChainJson),
+      createdAtMillis: Value(createdAtMillis),
+      pausedUntilMillis: pausedUntilMillis == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pausedUntilMillis),
+    );
+  }
+
+  factory PersonGroupRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PersonGroupRow(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      cadenceType: serializer.fromJson<String>(json['cadenceType']),
+      semantic: serializer.fromJson<String>(json['semantic']),
+      channel: serializer.fromJson<String>(json['channel']),
+      handle: serializer.fromJson<String>(json['handle']),
+      missionChainJson: serializer.fromJson<String?>(json['missionChainJson']),
+      createdAtMillis: serializer.fromJson<int>(json['createdAtMillis']),
+      pausedUntilMillis: serializer.fromJson<int?>(json['pausedUntilMillis']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'cadenceType': serializer.toJson<String>(cadenceType),
+      'semantic': serializer.toJson<String>(semantic),
+      'channel': serializer.toJson<String>(channel),
+      'handle': serializer.toJson<String>(handle),
+      'missionChainJson': serializer.toJson<String?>(missionChainJson),
+      'createdAtMillis': serializer.toJson<int>(createdAtMillis),
+      'pausedUntilMillis': serializer.toJson<int?>(pausedUntilMillis),
+    };
+  }
+
+  PersonGroupRow copyWith({
+    String? id,
+    String? name,
+    String? cadenceType,
+    String? semantic,
+    String? channel,
+    String? handle,
+    Value<String?> missionChainJson = const Value.absent(),
+    int? createdAtMillis,
+    Value<int?> pausedUntilMillis = const Value.absent(),
+  }) => PersonGroupRow(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    cadenceType: cadenceType ?? this.cadenceType,
+    semantic: semantic ?? this.semantic,
+    channel: channel ?? this.channel,
+    handle: handle ?? this.handle,
+    missionChainJson: missionChainJson.present
+        ? missionChainJson.value
+        : this.missionChainJson,
+    createdAtMillis: createdAtMillis ?? this.createdAtMillis,
+    pausedUntilMillis: pausedUntilMillis.present
+        ? pausedUntilMillis.value
+        : this.pausedUntilMillis,
+  );
+  PersonGroupRow copyWithCompanion(PersonGroupsCompanion data) {
+    return PersonGroupRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      cadenceType: data.cadenceType.present
+          ? data.cadenceType.value
+          : this.cadenceType,
+      semantic: data.semantic.present ? data.semantic.value : this.semantic,
+      channel: data.channel.present ? data.channel.value : this.channel,
+      handle: data.handle.present ? data.handle.value : this.handle,
+      missionChainJson: data.missionChainJson.present
+          ? data.missionChainJson.value
+          : this.missionChainJson,
+      createdAtMillis: data.createdAtMillis.present
+          ? data.createdAtMillis.value
+          : this.createdAtMillis,
+      pausedUntilMillis: data.pausedUntilMillis.present
+          ? data.pausedUntilMillis.value
+          : this.pausedUntilMillis,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PersonGroupRow(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('cadenceType: $cadenceType, ')
+          ..write('semantic: $semantic, ')
+          ..write('channel: $channel, ')
+          ..write('handle: $handle, ')
+          ..write('missionChainJson: $missionChainJson, ')
+          ..write('createdAtMillis: $createdAtMillis, ')
+          ..write('pausedUntilMillis: $pausedUntilMillis')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    cadenceType,
+    semantic,
+    channel,
+    handle,
+    missionChainJson,
+    createdAtMillis,
+    pausedUntilMillis,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PersonGroupRow &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.cadenceType == this.cadenceType &&
+          other.semantic == this.semantic &&
+          other.channel == this.channel &&
+          other.handle == this.handle &&
+          other.missionChainJson == this.missionChainJson &&
+          other.createdAtMillis == this.createdAtMillis &&
+          other.pausedUntilMillis == this.pausedUntilMillis);
+}
+
+class PersonGroupsCompanion extends UpdateCompanion<PersonGroupRow> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String> cadenceType;
+  final Value<String> semantic;
+  final Value<String> channel;
+  final Value<String> handle;
+  final Value<String?> missionChainJson;
+  final Value<int> createdAtMillis;
+  final Value<int?> pausedUntilMillis;
+  final Value<int> rowid;
+  const PersonGroupsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.cadenceType = const Value.absent(),
+    this.semantic = const Value.absent(),
+    this.channel = const Value.absent(),
+    this.handle = const Value.absent(),
+    this.missionChainJson = const Value.absent(),
+    this.createdAtMillis = const Value.absent(),
+    this.pausedUntilMillis = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PersonGroupsCompanion.insert({
+    required String id,
+    required String name,
+    required String cadenceType,
+    required String semantic,
+    required String channel,
+    required String handle,
+    this.missionChainJson = const Value.absent(),
+    required int createdAtMillis,
+    this.pausedUntilMillis = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       cadenceType = Value(cadenceType),
+       semantic = Value(semantic),
+       channel = Value(channel),
+       handle = Value(handle),
+       createdAtMillis = Value(createdAtMillis);
+  static Insertable<PersonGroupRow> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? cadenceType,
+    Expression<String>? semantic,
+    Expression<String>? channel,
+    Expression<String>? handle,
+    Expression<String>? missionChainJson,
+    Expression<int>? createdAtMillis,
+    Expression<int>? pausedUntilMillis,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (cadenceType != null) 'cadence_type': cadenceType,
+      if (semantic != null) 'semantic': semantic,
+      if (channel != null) 'channel': channel,
+      if (handle != null) 'handle': handle,
+      if (missionChainJson != null) 'mission_chain_json': missionChainJson,
+      if (createdAtMillis != null) 'created_at_millis': createdAtMillis,
+      if (pausedUntilMillis != null) 'paused_until_millis': pausedUntilMillis,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PersonGroupsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String>? cadenceType,
+    Value<String>? semantic,
+    Value<String>? channel,
+    Value<String>? handle,
+    Value<String?>? missionChainJson,
+    Value<int>? createdAtMillis,
+    Value<int?>? pausedUntilMillis,
+    Value<int>? rowid,
+  }) {
+    return PersonGroupsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      cadenceType: cadenceType ?? this.cadenceType,
+      semantic: semantic ?? this.semantic,
+      channel: channel ?? this.channel,
+      handle: handle ?? this.handle,
+      missionChainJson: missionChainJson ?? this.missionChainJson,
+      createdAtMillis: createdAtMillis ?? this.createdAtMillis,
+      pausedUntilMillis: pausedUntilMillis ?? this.pausedUntilMillis,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (cadenceType.present) {
+      map['cadence_type'] = Variable<String>(cadenceType.value);
+    }
+    if (semantic.present) {
+      map['semantic'] = Variable<String>(semantic.value);
+    }
+    if (channel.present) {
+      map['channel'] = Variable<String>(channel.value);
+    }
+    if (handle.present) {
+      map['handle'] = Variable<String>(handle.value);
+    }
+    if (missionChainJson.present) {
+      map['mission_chain_json'] = Variable<String>(missionChainJson.value);
+    }
+    if (createdAtMillis.present) {
+      map['created_at_millis'] = Variable<int>(createdAtMillis.value);
+    }
+    if (pausedUntilMillis.present) {
+      map['paused_until_millis'] = Variable<int>(pausedUntilMillis.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PersonGroupsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('cadenceType: $cadenceType, ')
+          ..write('semantic: $semantic, ')
+          ..write('channel: $channel, ')
+          ..write('handle: $handle, ')
+          ..write('missionChainJson: $missionChainJson, ')
+          ..write('createdAtMillis: $createdAtMillis, ')
+          ..write('pausedUntilMillis: $pausedUntilMillis, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PersonGroupMembersTable extends PersonGroupMembers
+    with TableInfo<$PersonGroupMembersTable, PersonGroupMemberRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PersonGroupMembersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _groupIdMeta = const VerificationMeta(
+    'groupId',
+  );
+  @override
+  late final GeneratedColumn<String> groupId = GeneratedColumn<String>(
+    'group_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _addedAtMillisMeta = const VerificationMeta(
+    'addedAtMillis',
+  );
+  @override
+  late final GeneratedColumn<int> addedAtMillis = GeneratedColumn<int>(
+    'added_at_millis',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastContactedMillisMeta =
+      const VerificationMeta('lastContactedMillis');
+  @override
+  late final GeneratedColumn<int> lastContactedMillis = GeneratedColumn<int>(
+    'last_contacted_millis',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    groupId,
+    personId,
+    addedAtMillis,
+    lastContactedMillis,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'person_group_members';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PersonGroupMemberRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('group_id')) {
+      context.handle(
+        _groupIdMeta,
+        groupId.isAcceptableOrUnknown(data['group_id']!, _groupIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_groupIdMeta);
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_personIdMeta);
+    }
+    if (data.containsKey('added_at_millis')) {
+      context.handle(
+        _addedAtMillisMeta,
+        addedAtMillis.isAcceptableOrUnknown(
+          data['added_at_millis']!,
+          _addedAtMillisMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_addedAtMillisMeta);
+    }
+    if (data.containsKey('last_contacted_millis')) {
+      context.handle(
+        _lastContactedMillisMeta,
+        lastContactedMillis.isAcceptableOrUnknown(
+          data['last_contacted_millis']!,
+          _lastContactedMillisMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {groupId, personId};
+  @override
+  PersonGroupMemberRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PersonGroupMemberRow(
+      groupId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}group_id'],
+      )!,
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      )!,
+      addedAtMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}added_at_millis'],
+      )!,
+      lastContactedMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_contacted_millis'],
+      ),
+    );
+  }
+
+  @override
+  $PersonGroupMembersTable createAlias(String alias) {
+    return $PersonGroupMembersTable(attachedDatabase, alias);
+  }
+}
+
+class PersonGroupMemberRow extends DataClass
+    implements Insertable<PersonGroupMemberRow> {
+  final String groupId;
+  final String personId;
+  final int addedAtMillis;
+  final int? lastContactedMillis;
+  const PersonGroupMemberRow({
+    required this.groupId,
+    required this.personId,
+    required this.addedAtMillis,
+    this.lastContactedMillis,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['group_id'] = Variable<String>(groupId);
+    map['person_id'] = Variable<String>(personId);
+    map['added_at_millis'] = Variable<int>(addedAtMillis);
+    if (!nullToAbsent || lastContactedMillis != null) {
+      map['last_contacted_millis'] = Variable<int>(lastContactedMillis);
+    }
+    return map;
+  }
+
+  PersonGroupMembersCompanion toCompanion(bool nullToAbsent) {
+    return PersonGroupMembersCompanion(
+      groupId: Value(groupId),
+      personId: Value(personId),
+      addedAtMillis: Value(addedAtMillis),
+      lastContactedMillis: lastContactedMillis == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastContactedMillis),
+    );
+  }
+
+  factory PersonGroupMemberRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PersonGroupMemberRow(
+      groupId: serializer.fromJson<String>(json['groupId']),
+      personId: serializer.fromJson<String>(json['personId']),
+      addedAtMillis: serializer.fromJson<int>(json['addedAtMillis']),
+      lastContactedMillis: serializer.fromJson<int?>(
+        json['lastContactedMillis'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'groupId': serializer.toJson<String>(groupId),
+      'personId': serializer.toJson<String>(personId),
+      'addedAtMillis': serializer.toJson<int>(addedAtMillis),
+      'lastContactedMillis': serializer.toJson<int?>(lastContactedMillis),
+    };
+  }
+
+  PersonGroupMemberRow copyWith({
+    String? groupId,
+    String? personId,
+    int? addedAtMillis,
+    Value<int?> lastContactedMillis = const Value.absent(),
+  }) => PersonGroupMemberRow(
+    groupId: groupId ?? this.groupId,
+    personId: personId ?? this.personId,
+    addedAtMillis: addedAtMillis ?? this.addedAtMillis,
+    lastContactedMillis: lastContactedMillis.present
+        ? lastContactedMillis.value
+        : this.lastContactedMillis,
+  );
+  PersonGroupMemberRow copyWithCompanion(PersonGroupMembersCompanion data) {
+    return PersonGroupMemberRow(
+      groupId: data.groupId.present ? data.groupId.value : this.groupId,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      addedAtMillis: data.addedAtMillis.present
+          ? data.addedAtMillis.value
+          : this.addedAtMillis,
+      lastContactedMillis: data.lastContactedMillis.present
+          ? data.lastContactedMillis.value
+          : this.lastContactedMillis,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PersonGroupMemberRow(')
+          ..write('groupId: $groupId, ')
+          ..write('personId: $personId, ')
+          ..write('addedAtMillis: $addedAtMillis, ')
+          ..write('lastContactedMillis: $lastContactedMillis')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(groupId, personId, addedAtMillis, lastContactedMillis);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PersonGroupMemberRow &&
+          other.groupId == this.groupId &&
+          other.personId == this.personId &&
+          other.addedAtMillis == this.addedAtMillis &&
+          other.lastContactedMillis == this.lastContactedMillis);
+}
+
+class PersonGroupMembersCompanion
+    extends UpdateCompanion<PersonGroupMemberRow> {
+  final Value<String> groupId;
+  final Value<String> personId;
+  final Value<int> addedAtMillis;
+  final Value<int?> lastContactedMillis;
+  final Value<int> rowid;
+  const PersonGroupMembersCompanion({
+    this.groupId = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.addedAtMillis = const Value.absent(),
+    this.lastContactedMillis = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PersonGroupMembersCompanion.insert({
+    required String groupId,
+    required String personId,
+    required int addedAtMillis,
+    this.lastContactedMillis = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : groupId = Value(groupId),
+       personId = Value(personId),
+       addedAtMillis = Value(addedAtMillis);
+  static Insertable<PersonGroupMemberRow> custom({
+    Expression<String>? groupId,
+    Expression<String>? personId,
+    Expression<int>? addedAtMillis,
+    Expression<int>? lastContactedMillis,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (groupId != null) 'group_id': groupId,
+      if (personId != null) 'person_id': personId,
+      if (addedAtMillis != null) 'added_at_millis': addedAtMillis,
+      if (lastContactedMillis != null)
+        'last_contacted_millis': lastContactedMillis,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PersonGroupMembersCompanion copyWith({
+    Value<String>? groupId,
+    Value<String>? personId,
+    Value<int>? addedAtMillis,
+    Value<int?>? lastContactedMillis,
+    Value<int>? rowid,
+  }) {
+    return PersonGroupMembersCompanion(
+      groupId: groupId ?? this.groupId,
+      personId: personId ?? this.personId,
+      addedAtMillis: addedAtMillis ?? this.addedAtMillis,
+      lastContactedMillis: lastContactedMillis ?? this.lastContactedMillis,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (groupId.present) {
+      map['group_id'] = Variable<String>(groupId.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (addedAtMillis.present) {
+      map['added_at_millis'] = Variable<int>(addedAtMillis.value);
+    }
+    if (lastContactedMillis.present) {
+      map['last_contacted_millis'] = Variable<int>(lastContactedMillis.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PersonGroupMembersCompanion(')
+          ..write('groupId: $groupId, ')
+          ..write('personId: $personId, ')
+          ..write('addedAtMillis: $addedAtMillis, ')
+          ..write('lastContactedMillis: $lastContactedMillis, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3259,6 +5119,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $RestDayBudgetsTable restDayBudgets = $RestDayBudgetsTable(this);
   late final $SettingsTable settings = $SettingsTable(this);
   late final $EventLogsTable eventLogs = $EventLogsTable(this);
+  late final $EventsTable events = $EventsTable(this);
+  late final $PersonGroupsTable personGroups = $PersonGroupsTable(this);
+  late final $PersonGroupMembersTable personGroupMembers =
+      $PersonGroupMembersTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3270,6 +5134,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     restDayBudgets,
     settings,
     eventLogs,
+    events,
+    personGroups,
+    personGroupMembers,
   ];
 }
 
@@ -3292,7 +5159,14 @@ typedef $$HabitsTableCreateCompanionBuilder =
       Value<int?> nth,
       Value<int?> weekday,
       Value<int?> referenceDayOfMonth,
+      Value<int?> endHour,
+      Value<int?> endMinute,
+      Value<int?> targetHours,
       Value<String?> missionChainJson,
+      Value<String> category,
+      Value<int> colorSeed,
+      Value<String?> iconName,
+      Value<int?> pausedUntilMillis,
       Value<int> rowid,
     });
 typedef $$HabitsTableUpdateCompanionBuilder =
@@ -3314,7 +5188,14 @@ typedef $$HabitsTableUpdateCompanionBuilder =
       Value<int?> nth,
       Value<int?> weekday,
       Value<int?> referenceDayOfMonth,
+      Value<int?> endHour,
+      Value<int?> endMinute,
+      Value<int?> targetHours,
       Value<String?> missionChainJson,
+      Value<String> category,
+      Value<int> colorSeed,
+      Value<String?> iconName,
+      Value<int?> pausedUntilMillis,
       Value<int> rowid,
     });
 
@@ -3412,8 +5293,43 @@ class $$HabitsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get endHour => $composableBuilder(
+    column: $table.endHour,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get endMinute => $composableBuilder(
+    column: $table.endMinute,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get targetHours => $composableBuilder(
+    column: $table.targetHours,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get missionChainJson => $composableBuilder(
     column: $table.missionChainJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get colorSeed => $composableBuilder(
+    column: $table.colorSeed,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get iconName => $composableBuilder(
+    column: $table.iconName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pausedUntilMillis => $composableBuilder(
+    column: $table.pausedUntilMillis,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -3512,8 +5428,43 @@ class $$HabitsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get endHour => $composableBuilder(
+    column: $table.endHour,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get endMinute => $composableBuilder(
+    column: $table.endMinute,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get targetHours => $composableBuilder(
+    column: $table.targetHours,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get missionChainJson => $composableBuilder(
     column: $table.missionChainJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get colorSeed => $composableBuilder(
+    column: $table.colorSeed,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get iconName => $composableBuilder(
+    column: $table.iconName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get pausedUntilMillis => $composableBuilder(
+    column: $table.pausedUntilMillis,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -3594,8 +5545,33 @@ class $$HabitsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get endHour =>
+      $composableBuilder(column: $table.endHour, builder: (column) => column);
+
+  GeneratedColumn<int> get endMinute =>
+      $composableBuilder(column: $table.endMinute, builder: (column) => column);
+
+  GeneratedColumn<int> get targetHours => $composableBuilder(
+    column: $table.targetHours,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get missionChainJson => $composableBuilder(
     column: $table.missionChainJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<int> get colorSeed =>
+      $composableBuilder(column: $table.colorSeed, builder: (column) => column);
+
+  GeneratedColumn<String> get iconName =>
+      $composableBuilder(column: $table.iconName, builder: (column) => column);
+
+  GeneratedColumn<int> get pausedUntilMillis => $composableBuilder(
+    column: $table.pausedUntilMillis,
     builder: (column) => column,
   );
 }
@@ -3645,7 +5621,14 @@ class $$HabitsTableTableManager
                 Value<int?> nth = const Value.absent(),
                 Value<int?> weekday = const Value.absent(),
                 Value<int?> referenceDayOfMonth = const Value.absent(),
+                Value<int?> endHour = const Value.absent(),
+                Value<int?> endMinute = const Value.absent(),
+                Value<int?> targetHours = const Value.absent(),
                 Value<String?> missionChainJson = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<int> colorSeed = const Value.absent(),
+                Value<String?> iconName = const Value.absent(),
+                Value<int?> pausedUntilMillis = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HabitsCompanion(
                 id: id,
@@ -3665,7 +5648,14 @@ class $$HabitsTableTableManager
                 nth: nth,
                 weekday: weekday,
                 referenceDayOfMonth: referenceDayOfMonth,
+                endHour: endHour,
+                endMinute: endMinute,
+                targetHours: targetHours,
                 missionChainJson: missionChainJson,
+                category: category,
+                colorSeed: colorSeed,
+                iconName: iconName,
+                pausedUntilMillis: pausedUntilMillis,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3687,7 +5677,14 @@ class $$HabitsTableTableManager
                 Value<int?> nth = const Value.absent(),
                 Value<int?> weekday = const Value.absent(),
                 Value<int?> referenceDayOfMonth = const Value.absent(),
+                Value<int?> endHour = const Value.absent(),
+                Value<int?> endMinute = const Value.absent(),
+                Value<int?> targetHours = const Value.absent(),
                 Value<String?> missionChainJson = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<int> colorSeed = const Value.absent(),
+                Value<String?> iconName = const Value.absent(),
+                Value<int?> pausedUntilMillis = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HabitsCompanion.insert(
                 id: id,
@@ -3707,7 +5704,14 @@ class $$HabitsTableTableManager
                 nth: nth,
                 weekday: weekday,
                 referenceDayOfMonth: referenceDayOfMonth,
+                endHour: endHour,
+                endMinute: endMinute,
+                targetHours: targetHours,
                 missionChainJson: missionChainJson,
+                category: category,
+                colorSeed: colorSeed,
+                iconName: iconName,
+                pausedUntilMillis: pausedUntilMillis,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -3747,6 +5751,7 @@ typedef $$PeopleTableCreateCompanionBuilder =
       Value<int?> monthOfYear,
       Value<bool> anchoredToWakeup,
       Value<String?> missionChainJson,
+      Value<int?> pausedUntilMillis,
       Value<int> rowid,
     });
 typedef $$PeopleTableUpdateCompanionBuilder =
@@ -3764,6 +5769,7 @@ typedef $$PeopleTableUpdateCompanionBuilder =
       Value<int?> monthOfYear,
       Value<bool> anchoredToWakeup,
       Value<String?> missionChainJson,
+      Value<int?> pausedUntilMillis,
       Value<int> rowid,
     });
 
@@ -3838,6 +5844,11 @@ class $$PeopleTableFilterComposer
 
   ColumnFilters<String> get missionChainJson => $composableBuilder(
     column: $table.missionChainJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pausedUntilMillis => $composableBuilder(
+    column: $table.pausedUntilMillis,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -3915,6 +5926,11 @@ class $$PeopleTableOrderingComposer
     column: $table.missionChainJson,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get pausedUntilMillis => $composableBuilder(
+    column: $table.pausedUntilMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PeopleTableAnnotationComposer
@@ -3978,6 +5994,11 @@ class $$PeopleTableAnnotationComposer
     column: $table.missionChainJson,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get pausedUntilMillis => $composableBuilder(
+    column: $table.pausedUntilMillis,
+    builder: (column) => column,
+  );
 }
 
 class $$PeopleTableTableManager
@@ -4021,6 +6042,7 @@ class $$PeopleTableTableManager
                 Value<int?> monthOfYear = const Value.absent(),
                 Value<bool> anchoredToWakeup = const Value.absent(),
                 Value<String?> missionChainJson = const Value.absent(),
+                Value<int?> pausedUntilMillis = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PeopleCompanion(
                 id: id,
@@ -4036,6 +6058,7 @@ class $$PeopleTableTableManager
                 monthOfYear: monthOfYear,
                 anchoredToWakeup: anchoredToWakeup,
                 missionChainJson: missionChainJson,
+                pausedUntilMillis: pausedUntilMillis,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4053,6 +6076,7 @@ class $$PeopleTableTableManager
                 Value<int?> monthOfYear = const Value.absent(),
                 Value<bool> anchoredToWakeup = const Value.absent(),
                 Value<String?> missionChainJson = const Value.absent(),
+                Value<int?> pausedUntilMillis = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PeopleCompanion.insert(
                 id: id,
@@ -4068,6 +6092,7 @@ class $$PeopleTableTableManager
                 monthOfYear: monthOfYear,
                 anchoredToWakeup: anchoredToWakeup,
                 missionChainJson: missionChainJson,
+                pausedUntilMillis: pausedUntilMillis,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -4882,6 +6907,749 @@ typedef $$EventLogsTableProcessedTableManager =
       EventLogRow,
       PrefetchHooks Function()
     >;
+typedef $$EventsTableCreateCompanionBuilder =
+    EventsCompanion Function({
+      required String id,
+      required String name,
+      required int atMillis,
+      required int leadTimeMillis,
+      Value<String?> missionChainJson,
+      Value<String> recurrence,
+      Value<int?> archivedAtMillis,
+      required int createdAtMillis,
+      Value<int> rowid,
+    });
+typedef $$EventsTableUpdateCompanionBuilder =
+    EventsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<int> atMillis,
+      Value<int> leadTimeMillis,
+      Value<String?> missionChainJson,
+      Value<String> recurrence,
+      Value<int?> archivedAtMillis,
+      Value<int> createdAtMillis,
+      Value<int> rowid,
+    });
+
+class $$EventsTableFilterComposer
+    extends Composer<_$AppDatabase, $EventsTable> {
+  $$EventsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get atMillis => $composableBuilder(
+    column: $table.atMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get leadTimeMillis => $composableBuilder(
+    column: $table.leadTimeMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get missionChainJson => $composableBuilder(
+    column: $table.missionChainJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get recurrence => $composableBuilder(
+    column: $table.recurrence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get archivedAtMillis => $composableBuilder(
+    column: $table.archivedAtMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAtMillis => $composableBuilder(
+    column: $table.createdAtMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$EventsTableOrderingComposer
+    extends Composer<_$AppDatabase, $EventsTable> {
+  $$EventsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get atMillis => $composableBuilder(
+    column: $table.atMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get leadTimeMillis => $composableBuilder(
+    column: $table.leadTimeMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get missionChainJson => $composableBuilder(
+    column: $table.missionChainJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get recurrence => $composableBuilder(
+    column: $table.recurrence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get archivedAtMillis => $composableBuilder(
+    column: $table.archivedAtMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAtMillis => $composableBuilder(
+    column: $table.createdAtMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$EventsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $EventsTable> {
+  $$EventsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get atMillis =>
+      $composableBuilder(column: $table.atMillis, builder: (column) => column);
+
+  GeneratedColumn<int> get leadTimeMillis => $composableBuilder(
+    column: $table.leadTimeMillis,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get missionChainJson => $composableBuilder(
+    column: $table.missionChainJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get recurrence => $composableBuilder(
+    column: $table.recurrence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get archivedAtMillis => $composableBuilder(
+    column: $table.archivedAtMillis,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get createdAtMillis => $composableBuilder(
+    column: $table.createdAtMillis,
+    builder: (column) => column,
+  );
+}
+
+class $$EventsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $EventsTable,
+          EventRow,
+          $$EventsTableFilterComposer,
+          $$EventsTableOrderingComposer,
+          $$EventsTableAnnotationComposer,
+          $$EventsTableCreateCompanionBuilder,
+          $$EventsTableUpdateCompanionBuilder,
+          (EventRow, BaseReferences<_$AppDatabase, $EventsTable, EventRow>),
+          EventRow,
+          PrefetchHooks Function()
+        > {
+  $$EventsTableTableManager(_$AppDatabase db, $EventsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$EventsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$EventsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$EventsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> atMillis = const Value.absent(),
+                Value<int> leadTimeMillis = const Value.absent(),
+                Value<String?> missionChainJson = const Value.absent(),
+                Value<String> recurrence = const Value.absent(),
+                Value<int?> archivedAtMillis = const Value.absent(),
+                Value<int> createdAtMillis = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EventsCompanion(
+                id: id,
+                name: name,
+                atMillis: atMillis,
+                leadTimeMillis: leadTimeMillis,
+                missionChainJson: missionChainJson,
+                recurrence: recurrence,
+                archivedAtMillis: archivedAtMillis,
+                createdAtMillis: createdAtMillis,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required int atMillis,
+                required int leadTimeMillis,
+                Value<String?> missionChainJson = const Value.absent(),
+                Value<String> recurrence = const Value.absent(),
+                Value<int?> archivedAtMillis = const Value.absent(),
+                required int createdAtMillis,
+                Value<int> rowid = const Value.absent(),
+              }) => EventsCompanion.insert(
+                id: id,
+                name: name,
+                atMillis: atMillis,
+                leadTimeMillis: leadTimeMillis,
+                missionChainJson: missionChainJson,
+                recurrence: recurrence,
+                archivedAtMillis: archivedAtMillis,
+                createdAtMillis: createdAtMillis,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$EventsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $EventsTable,
+      EventRow,
+      $$EventsTableFilterComposer,
+      $$EventsTableOrderingComposer,
+      $$EventsTableAnnotationComposer,
+      $$EventsTableCreateCompanionBuilder,
+      $$EventsTableUpdateCompanionBuilder,
+      (EventRow, BaseReferences<_$AppDatabase, $EventsTable, EventRow>),
+      EventRow,
+      PrefetchHooks Function()
+    >;
+typedef $$PersonGroupsTableCreateCompanionBuilder =
+    PersonGroupsCompanion Function({
+      required String id,
+      required String name,
+      required String cadenceType,
+      required String semantic,
+      required String channel,
+      required String handle,
+      Value<String?> missionChainJson,
+      required int createdAtMillis,
+      Value<int?> pausedUntilMillis,
+      Value<int> rowid,
+    });
+typedef $$PersonGroupsTableUpdateCompanionBuilder =
+    PersonGroupsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String> cadenceType,
+      Value<String> semantic,
+      Value<String> channel,
+      Value<String> handle,
+      Value<String?> missionChainJson,
+      Value<int> createdAtMillis,
+      Value<int?> pausedUntilMillis,
+      Value<int> rowid,
+    });
+
+class $$PersonGroupsTableFilterComposer
+    extends Composer<_$AppDatabase, $PersonGroupsTable> {
+  $$PersonGroupsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get cadenceType => $composableBuilder(
+    column: $table.cadenceType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get semantic => $composableBuilder(
+    column: $table.semantic,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get channel => $composableBuilder(
+    column: $table.channel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get handle => $composableBuilder(
+    column: $table.handle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get missionChainJson => $composableBuilder(
+    column: $table.missionChainJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAtMillis => $composableBuilder(
+    column: $table.createdAtMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pausedUntilMillis => $composableBuilder(
+    column: $table.pausedUntilMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PersonGroupsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PersonGroupsTable> {
+  $$PersonGroupsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get cadenceType => $composableBuilder(
+    column: $table.cadenceType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get semantic => $composableBuilder(
+    column: $table.semantic,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get channel => $composableBuilder(
+    column: $table.channel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get handle => $composableBuilder(
+    column: $table.handle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get missionChainJson => $composableBuilder(
+    column: $table.missionChainJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAtMillis => $composableBuilder(
+    column: $table.createdAtMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get pausedUntilMillis => $composableBuilder(
+    column: $table.pausedUntilMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PersonGroupsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PersonGroupsTable> {
+  $$PersonGroupsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get cadenceType => $composableBuilder(
+    column: $table.cadenceType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get semantic =>
+      $composableBuilder(column: $table.semantic, builder: (column) => column);
+
+  GeneratedColumn<String> get channel =>
+      $composableBuilder(column: $table.channel, builder: (column) => column);
+
+  GeneratedColumn<String> get handle =>
+      $composableBuilder(column: $table.handle, builder: (column) => column);
+
+  GeneratedColumn<String> get missionChainJson => $composableBuilder(
+    column: $table.missionChainJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get createdAtMillis => $composableBuilder(
+    column: $table.createdAtMillis,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get pausedUntilMillis => $composableBuilder(
+    column: $table.pausedUntilMillis,
+    builder: (column) => column,
+  );
+}
+
+class $$PersonGroupsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PersonGroupsTable,
+          PersonGroupRow,
+          $$PersonGroupsTableFilterComposer,
+          $$PersonGroupsTableOrderingComposer,
+          $$PersonGroupsTableAnnotationComposer,
+          $$PersonGroupsTableCreateCompanionBuilder,
+          $$PersonGroupsTableUpdateCompanionBuilder,
+          (
+            PersonGroupRow,
+            BaseReferences<_$AppDatabase, $PersonGroupsTable, PersonGroupRow>,
+          ),
+          PersonGroupRow,
+          PrefetchHooks Function()
+        > {
+  $$PersonGroupsTableTableManager(_$AppDatabase db, $PersonGroupsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PersonGroupsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PersonGroupsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PersonGroupsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> cadenceType = const Value.absent(),
+                Value<String> semantic = const Value.absent(),
+                Value<String> channel = const Value.absent(),
+                Value<String> handle = const Value.absent(),
+                Value<String?> missionChainJson = const Value.absent(),
+                Value<int> createdAtMillis = const Value.absent(),
+                Value<int?> pausedUntilMillis = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PersonGroupsCompanion(
+                id: id,
+                name: name,
+                cadenceType: cadenceType,
+                semantic: semantic,
+                channel: channel,
+                handle: handle,
+                missionChainJson: missionChainJson,
+                createdAtMillis: createdAtMillis,
+                pausedUntilMillis: pausedUntilMillis,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required String cadenceType,
+                required String semantic,
+                required String channel,
+                required String handle,
+                Value<String?> missionChainJson = const Value.absent(),
+                required int createdAtMillis,
+                Value<int?> pausedUntilMillis = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PersonGroupsCompanion.insert(
+                id: id,
+                name: name,
+                cadenceType: cadenceType,
+                semantic: semantic,
+                channel: channel,
+                handle: handle,
+                missionChainJson: missionChainJson,
+                createdAtMillis: createdAtMillis,
+                pausedUntilMillis: pausedUntilMillis,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PersonGroupsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PersonGroupsTable,
+      PersonGroupRow,
+      $$PersonGroupsTableFilterComposer,
+      $$PersonGroupsTableOrderingComposer,
+      $$PersonGroupsTableAnnotationComposer,
+      $$PersonGroupsTableCreateCompanionBuilder,
+      $$PersonGroupsTableUpdateCompanionBuilder,
+      (
+        PersonGroupRow,
+        BaseReferences<_$AppDatabase, $PersonGroupsTable, PersonGroupRow>,
+      ),
+      PersonGroupRow,
+      PrefetchHooks Function()
+    >;
+typedef $$PersonGroupMembersTableCreateCompanionBuilder =
+    PersonGroupMembersCompanion Function({
+      required String groupId,
+      required String personId,
+      required int addedAtMillis,
+      Value<int?> lastContactedMillis,
+      Value<int> rowid,
+    });
+typedef $$PersonGroupMembersTableUpdateCompanionBuilder =
+    PersonGroupMembersCompanion Function({
+      Value<String> groupId,
+      Value<String> personId,
+      Value<int> addedAtMillis,
+      Value<int?> lastContactedMillis,
+      Value<int> rowid,
+    });
+
+class $$PersonGroupMembersTableFilterComposer
+    extends Composer<_$AppDatabase, $PersonGroupMembersTable> {
+  $$PersonGroupMembersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get groupId => $composableBuilder(
+    column: $table.groupId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get addedAtMillis => $composableBuilder(
+    column: $table.addedAtMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastContactedMillis => $composableBuilder(
+    column: $table.lastContactedMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PersonGroupMembersTableOrderingComposer
+    extends Composer<_$AppDatabase, $PersonGroupMembersTable> {
+  $$PersonGroupMembersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get groupId => $composableBuilder(
+    column: $table.groupId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get addedAtMillis => $composableBuilder(
+    column: $table.addedAtMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastContactedMillis => $composableBuilder(
+    column: $table.lastContactedMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PersonGroupMembersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PersonGroupMembersTable> {
+  $$PersonGroupMembersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get groupId =>
+      $composableBuilder(column: $table.groupId, builder: (column) => column);
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<int> get addedAtMillis => $composableBuilder(
+    column: $table.addedAtMillis,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get lastContactedMillis => $composableBuilder(
+    column: $table.lastContactedMillis,
+    builder: (column) => column,
+  );
+}
+
+class $$PersonGroupMembersTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PersonGroupMembersTable,
+          PersonGroupMemberRow,
+          $$PersonGroupMembersTableFilterComposer,
+          $$PersonGroupMembersTableOrderingComposer,
+          $$PersonGroupMembersTableAnnotationComposer,
+          $$PersonGroupMembersTableCreateCompanionBuilder,
+          $$PersonGroupMembersTableUpdateCompanionBuilder,
+          (
+            PersonGroupMemberRow,
+            BaseReferences<
+              _$AppDatabase,
+              $PersonGroupMembersTable,
+              PersonGroupMemberRow
+            >,
+          ),
+          PersonGroupMemberRow,
+          PrefetchHooks Function()
+        > {
+  $$PersonGroupMembersTableTableManager(
+    _$AppDatabase db,
+    $PersonGroupMembersTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PersonGroupMembersTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PersonGroupMembersTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PersonGroupMembersTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> groupId = const Value.absent(),
+                Value<String> personId = const Value.absent(),
+                Value<int> addedAtMillis = const Value.absent(),
+                Value<int?> lastContactedMillis = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PersonGroupMembersCompanion(
+                groupId: groupId,
+                personId: personId,
+                addedAtMillis: addedAtMillis,
+                lastContactedMillis: lastContactedMillis,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String groupId,
+                required String personId,
+                required int addedAtMillis,
+                Value<int?> lastContactedMillis = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PersonGroupMembersCompanion.insert(
+                groupId: groupId,
+                personId: personId,
+                addedAtMillis: addedAtMillis,
+                lastContactedMillis: lastContactedMillis,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PersonGroupMembersTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PersonGroupMembersTable,
+      PersonGroupMemberRow,
+      $$PersonGroupMembersTableFilterComposer,
+      $$PersonGroupMembersTableOrderingComposer,
+      $$PersonGroupMembersTableAnnotationComposer,
+      $$PersonGroupMembersTableCreateCompanionBuilder,
+      $$PersonGroupMembersTableUpdateCompanionBuilder,
+      (
+        PersonGroupMemberRow,
+        BaseReferences<
+          _$AppDatabase,
+          $PersonGroupMembersTable,
+          PersonGroupMemberRow
+        >,
+      ),
+      PersonGroupMemberRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4898,4 +7666,10 @@ class $AppDatabaseManager {
       $$SettingsTableTableManager(_db, _db.settings);
   $$EventLogsTableTableManager get eventLogs =>
       $$EventLogsTableTableManager(_db, _db.eventLogs);
+  $$EventsTableTableManager get events =>
+      $$EventsTableTableManager(_db, _db.events);
+  $$PersonGroupsTableTableManager get personGroups =>
+      $$PersonGroupsTableTableManager(_db, _db.personGroups);
+  $$PersonGroupMembersTableTableManager get personGroupMembers =>
+      $$PersonGroupMembersTableTableManager(_db, _db.personGroupMembers);
 }
