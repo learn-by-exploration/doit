@@ -1,0 +1,99 @@
+// Tests for [AlarmScheduler] (and [FakeAlarmScheduler] which
+// is the in-memory test implementation).
+
+import 'package:common_games/habits/habit.dart';
+import 'package:common_games/habits/proof_mode.dart';
+import 'package:common_games/reminders/alarm_scheduler.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('AlarmId.forOccurrence', () {
+    test('same (habitId, scheduledAt) → same id (re-schedule dedupes)', () {
+      final at = DateTime(2026, 6, 13, 9);
+      final a = AlarmId.forOccurrence('h1', at);
+      final b = AlarmId.forOccurrence('h1', at);
+      expect(a, b);
+    });
+
+    test('different habit → different id', () {
+      final at = DateTime(2026, 6, 13, 9);
+      final a = AlarmId.forOccurrence('h1', at);
+      final b = AlarmId.forOccurrence('h2', at);
+      expect(a, isNot(b));
+    });
+
+    test('different scheduledAt → different id', () {
+      final a = AlarmId.forOccurrence('h1', DateTime(2026, 6, 13, 9));
+      final b = AlarmId.forOccurrence('h1', DateTime(2026, 6, 13, 10));
+      expect(a, isNot(b));
+    });
+
+    test('id is always positive', () {
+      // The 31-bit mask must keep the value positive (Android
+      // setExact rejects negative ids).
+      final at = DateTime(1970); // epoch 0
+      final id = AlarmId.forOccurrence('h1', at);
+      expect(id.value, greaterThanOrEqualTo(0));
+    });
+  });
+
+  group('FakeAlarmScheduler', () {
+    final habit = HabitFixed(
+      id: 'h1',
+      name: 'Stretch',
+      createdAt: DateTime(2026, 6),
+      restDaysPerMonth: 2,
+      proofMode: const SoftProof(),
+      weekdays: const {1, 3, 5},
+      time: const HabitTime(9, 0),
+    );
+
+    test('schedule records the alarm', () async {
+      final s = FakeAlarmScheduler();
+      final at = DateTime(2026, 6, 13, 9);
+      final id = await s.schedule(habit, at);
+      expect(id, isNotNull);
+      expect(s.scheduled.length, 1);
+      expect(s.scheduled.first.habitId, 'h1');
+      expect(s.scheduled.first.at, at);
+    });
+
+    test('cancel removes the alarm and records the id', () async {
+      final s = FakeAlarmScheduler();
+      final id = await s.schedule(habit, DateTime(2026, 6, 13, 9));
+      await s.cancel(id);
+      expect(s.scheduled, isEmpty);
+      expect(s.cancelledIds, contains(id));
+    });
+
+    test(
+      'snooze schedules a new alarm at +delay and cancels the old',
+      () async {
+        final s = FakeAlarmScheduler();
+        final id = await s.schedule(habit, DateTime(2026, 6, 13, 9));
+        final newId = await s.snooze(id, const Duration(minutes: 5));
+        expect(newId, isNot(id));
+        expect(s.scheduled.length, 1);
+        expect(s.scheduled.first.id, newId);
+        expect(s.scheduled.first.at, DateTime(2026, 6, 13, 9, 5));
+        expect(s.cancelledIds, contains(id));
+      },
+    );
+
+    test('rescheduleAll is a no-op (does not throw)', () async {
+      final s = FakeAlarmScheduler();
+      await s.rescheduleAll();
+    });
+
+    test('reliability defaults to optimal', () {
+      final s = FakeAlarmScheduler();
+      expect(s.reliability, Reliability.optimal);
+    });
+
+    test('setReliability flips to degraded', () {
+      final s = FakeAlarmScheduler();
+      s.setReliability(Reliability.degraded);
+      expect(s.reliability, Reliability.degraded);
+    });
+  });
+}

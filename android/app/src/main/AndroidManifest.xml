@@ -38,6 +38,36 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <!-- Boot survival (SYS-016). Receives BOOT_COMPLETED,
+             LOCKED_BOOT_COMPLETED, MY_PACKAGE_REPLACED, and
+             TIMEZONE_CHANGED. Re-arms every pending alarm.
+             See docs/v_model/notification_reliability.md § Layer 3. -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Alarm receiver. Fires when AlarmManager triggers a
+             pending reminder. The Dart side handles the actual
+             notification + next-occurrence scheduling.
+             See docs/v_model/notification_reliability.md § Layer 1. -->
+        <receiver
+            android:name=".AlarmReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.common_games.streak.FIRE_ALARM" />
+            </intent-filter>
+        </receiver>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
