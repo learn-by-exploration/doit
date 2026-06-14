@@ -95,5 +95,34 @@ void main() {
       s.setReliability(Reliability.degraded);
       expect(s.reliability, Reliability.degraded);
     });
+
+    test('cancelForHabit drops every alarm tied to the id', () async {
+      final s = FakeAlarmScheduler();
+      final h1 = _h(id: 'h1');
+      final h2 = _h(id: 'h2');
+      await s.schedule(h1, DateTime(2030));
+      await s.schedule(h2, DateTime(2030));
+      expect(s.scheduled.length, 2);
+      await s.cancelForHabit('h1');
+      expect(s.scheduled.length, 1);
+      expect(s.scheduled.first.habitId, 'h2');
+    });
+
+    test('cancelForHabit on unknown id is a no-op', () async {
+      final s = FakeAlarmScheduler();
+      await s.schedule(_h(id: 'h1'), DateTime(2030));
+      await s.cancelForHabit('does_not_exist');
+      expect(s.scheduled.length, 1);
+    });
   });
 }
+
+Habit _h({required String id}) => HabitFixed(
+  id: id,
+  name: 'X',
+  proofMode: const SoftProof(),
+  createdAt: DateTime(2026, 6, 1),
+  restDaysPerMonth: 0,
+  weekdays: const {1, 2, 3, 4, 5, 6, 7},
+  time: const HabitTime(9, 0),
+);

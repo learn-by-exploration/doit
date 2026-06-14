@@ -89,6 +89,10 @@ abstract class AlarmScheduler {
   /// Cancel a one-shot event reminder.
   Future<void> cancelEvent(String eventId);
 
+  /// Cancel every alarm tied to a given habit id (any
+  /// occurrence). Used by the "Cancel test reminder" button.
+  Future<void> cancelForHabit(String habitId);
+
   /// Current reliability state.
   Reliability get reliability;
 }
@@ -169,6 +173,18 @@ class FakeAlarmScheduler implements AlarmScheduler {
   @override
   Future<void> cancelEvent(String eventId) async {
     _scheduled.removeWhere((a) => a.habitId == 'event:$eventId');
+  }
+
+  @override
+  Future<void> cancelForHabit(String habitId) async {
+    _scheduled.removeWhere((a) => a.habitId == habitId);
+    for (final id
+        in _scheduled
+            .where((a) => a.habitId == habitId)
+            .map((a) => a.id)
+            .toList()) {
+      _cancelled.add(id);
+    }
   }
 
   @override

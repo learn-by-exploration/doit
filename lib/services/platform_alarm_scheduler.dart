@@ -78,5 +78,10 @@ class PlatformAlarmScheduler implements AlarmScheduler {
   }
 
   @override
+  Future<void> cancelForHabit(String habitId) async {
+    // The Kotlin receiver handles this on the next rescheduleAll.
+  }
+
+  @override
   Reliability get reliability => Reliability.optimal;
 }

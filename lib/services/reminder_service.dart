@@ -121,4 +121,39 @@ class ReminderService {
     await _ready.future;
     return bridge.probeReliability();
   }
+
+  /// Fire a synthetic test reminder [delay] from now (default 5
+  /// seconds). Used by the settings "Test reminder" button to
+  /// verify the notification pipeline end-to-end. The id is a
+  /// stable, well-known string so the user can also tap
+  /// "Cancel test reminder" to abort.
+  Future<AlarmId> scheduleTestReminder({
+    Duration delay = const Duration(seconds: 5),
+  }) async {
+    await _ready.future;
+    final at = DateTime.now().add(delay);
+    return scheduler.schedule(_testHabit, at);
+  }
+
+  /// Cancel a previously scheduled test reminder (if any). Safe
+  /// to call when no test reminder is pending.
+  Future<void> cancelTestReminder() async {
+    await _ready.future;
+    await scheduler.cancelForHabit('streak.test_reminder');
+  }
+
+  /// A synthetic [HabitFixed] used by the "Test reminder" button.
+  /// The id is a stable, well-known string so the test alarm
+  /// can be cancelled. The schedule is "every day at 00:00" but
+  /// since the test alarm is fired manually by the settings
+  /// button, the schedule itself is irrelevant.
+  static final HabitFixed _testHabit = HabitFixed(
+    id: 'streak.test_reminder',
+    name: 'Streak test reminder',
+    proofMode: const SoftProof(),
+    createdAt: DateTime.fromMillisecondsSinceEpoch(0),
+    restDaysPerMonth: 0,
+    weekdays: const {1, 2, 3, 4, 5, 6, 7},
+    time: const HabitTime(0, 0),
+  );
 }

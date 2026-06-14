@@ -77,6 +77,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _ReliabilityRow(
               reliability: ReminderService.instance.scheduler.reliability,
             ),
+            ListTile(
+              key: const ValueKey('settings.test_reminder'),
+              leading: const Icon(Icons.notifications_outlined),
+              title: const Text('Send a test reminder'),
+              subtitle: const Text('Fires a notification in ~5 seconds.'),
+              onTap: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                await ReminderService.instance.scheduleTestReminder();
+                if (!context.mounted) return;
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Test reminder scheduled for 5s from now.'),
+                  ),
+                );
+              },
+            ),
             const SizedBox(height: Spacing.md),
             const _SectionHeader('Backup'),
             ListTile(

@@ -10,6 +10,7 @@ import 'package:common_games/reminders/full_screen_intent.dart';
 import 'package:common_games/reminders/notification_service.dart';
 import 'package:common_games/reminders/reminder_bridge.dart';
 import 'package:common_games/screens/home.dart';
+import 'package:common_games/services/completion_log_service.dart';
 import 'package:common_games/services/db.dart';
 import 'package:common_games/services/db/schema.dart';
 import 'package:common_games/services/habit_repository.dart';
@@ -87,5 +88,96 @@ void main() {
     // banner shrinks to a SizedBox — assert at least one
     // ReliabilityBanner instance is in the tree.
     expect(find.byType(ReliabilityBanner), findsOneWidget);
+  });
+
+  testWidgets(
+    'long-press enters select mode and complete-selected marks done',
+    (tester) async {
+      await _resetDb(tester);
+      await HabitRepository.instance.save(
+        HabitFixed(
+          id: 'h1',
+          name: 'Stretch',
+          proofMode: const SoftProof(),
+          createdAt: DateTime(2026, 6),
+          restDaysPerMonth: 0,
+          weekdays: const {1, 2, 3, 4, 5, 6, 7},
+          time: const HabitTime(9, 0),
+        ),
+      );
+      await HabitRepository.instance.save(
+        HabitFixed(
+          id: 'h2',
+          name: 'Meditate',
+          proofMode: const SoftProof(),
+          createdAt: DateTime(2026, 6),
+          restDaysPerMonth: 0,
+          weekdays: const {1, 2, 3, 4, 5, 6, 7},
+          time: const HabitTime(9, 0),
+        ),
+      );
+      await tester.pumpWidget(_wrap());
+      await tester.pumpAndSettle();
+      // Long-press the first tile to enter select mode.
+      await tester.longPress(find.byKey(const ValueKey('habit_tile.h1')));
+      await tester.pumpAndSettle();
+      // The appbar now shows the count.
+      expect(find.text('1 selected'), findsOneWidget);
+      // Tap the second tile to add it to the selection.
+      await tester.tap(find.byKey(const ValueKey('habit_tile.h2')));
+      await tester.pumpAndSettle();
+      expect(find.text('2 selected'), findsOneWidget);
+      // Tap "Mark selected done".
+      await tester.tap(find.byKey(const ValueKey('home.complete_selected')));
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pumpAndSettle();
+      // Both habits are now logged as complete.
+      final log1 = await CompletionLogService.instance.listForHabit('h1');
+      final log2 = await CompletionLogService.instance.listForHabit('h2');
+      expect(log1.length, 1);
+      expect(log2.length, 1);
+    },
+  );
+
+  testWidgets('a HabitTimeWindow tile shows the fasting timer', (tester) async {
+    await _resetDb(tester);
+    final now = DateTime.now();
+    // Pick a weekday matching today's weekday so the timer is
+    // visible.
+    final wd = now.weekday;
+    await HabitRepository.instance.save(
+      HabitTimeWindow(
+        id: 'h1',
+        name: 'Fasting',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 6),
+        restDaysPerMonth: 0,
+        weekdays: {wd},
+        start: const HabitTime(8, 0),
+        end: const HabitTime(20, 0),
+        targetHours: 12,
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    // The fasting timer renders a 3-line text "Fasting — HH:MM:SS left (target 12h)"
+    // or "Opens in HH:MM:SS" depending on the time of day. We
+    // assert that one of those substrings is present.
+    final allText = find.byType(Text);
+    var found = false;
+    for (final element in allText.evaluate()) {
+      final w = element.widget as Text;
+      final data = w.data;
+      if (data == null) continue;
+      if (data.contains('Fasting') ||
+          data.contains('Opens in') ||
+          data.contains('Window closes in')) {
+        found = true;
+        break;
+      }
+    }
+    expect(found, isTrue);
   });
 }

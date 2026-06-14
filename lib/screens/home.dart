@@ -26,6 +26,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:common_games/habits/habit.dart';
+import 'package:common_games/services/completion_log_service.dart';
 import 'package:common_games/services/habit_repository.dart';
 import 'package:common_games/services/reminder_service.dart';
 import 'package:common_games/theme/app_theme.dart';
@@ -45,6 +46,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<List<Habit>>? _habitsFuture;
+  final Set<String> _selected = <String>{};
+  bool _selectMode = false;
 
   @override
   void initState() {
@@ -70,26 +73,86 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
+  void _toggleSelect(String id) {
+    setState(() {
+      if (_selected.contains(id)) {
+        _selected.remove(id);
+      } else {
+        _selected.add(id);
+      }
+      if (_selected.isEmpty) _selectMode = false;
+    });
+  }
+
+  void _enterSelectMode(String firstId) {
+    setState(() {
+      _selectMode = true;
+      _selected.add(firstId);
+    });
+  }
+
+  void _exitSelectMode() {
+    setState(() {
+      _selectMode = false;
+      _selected.clear();
+    });
+  }
+
+  Future<void> _completeSelected() async {
+    final now = DateTime.now();
+    for (final id in _selected) {
+      await CompletionLogService.instance.append(
+        habitId: id,
+        day: now,
+        source: CompletionSource.manual,
+        proofModeAtTime: 'soft',
+      );
+    }
+    if (!mounted) return;
+    _exitSelectMode();
+    _refresh();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Marked ${_selected.length} habit(s) done.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Streak'),
+        title: Text(_selectMode ? '${_selected.length} selected' : 'Streak'),
+        leading: _selectMode
+            ? IconButton(
+                key: const ValueKey('home.cancel_select'),
+                tooltip: 'Cancel',
+                icon: const Icon(Icons.close),
+                onPressed: _exitSelectMode,
+              )
+            : null,
         actions: [
-          IconButton(
-            tooltip: 'Stats',
-            icon: const Icon(Icons.bar_chart),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const StatsScreen()),
+          if (_selectMode)
+            IconButton(
+              key: const ValueKey('home.complete_selected'),
+              tooltip: 'Mark selected done',
+              icon: const Icon(Icons.check_circle),
+              onPressed: _selected.isEmpty ? null : _completeSelected,
+            )
+          else ...[
+            IconButton(
+              tooltip: 'Stats',
+              icon: const Icon(Icons.bar_chart),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const StatsScreen()),
+              ),
             ),
-          ),
-          IconButton(
-            tooltip: 'Settings',
-            icon: const Icon(Icons.settings),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+            IconButton(
+              tooltip: 'Settings',
+              icon: const Icon(Icons.settings),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+              ),
             ),
-          ),
+          ],
         ],
       ),
       body: SafeArea(
@@ -119,7 +182,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     itemCount: habits.length,
                     separatorBuilder: (_, _) =>
                         const SizedBox(height: Spacing.sm),
-                    itemBuilder: (_, i) => _HabitTile(habit: habits[i]),
+                    itemBuilder: (_, i) => _HabitTile(
+                      habit: habits[i],
+                      selected: _selected.contains(habits[i].id),
+                      selectMode: _selectMode,
+                      onLongPress: () => _enterSelectMode(habits[i].id),
+                      onTap: _selectMode
+                          ? () => _toggleSelect(habits[i].id)
+                          : null,
+                    ),
                   );
                 },
               ),
@@ -166,8 +237,18 @@ class _AddAnchorButton extends StatelessWidget {
 }
 
 class _HabitTile extends StatelessWidget {
-  const _HabitTile({required this.habit});
+  const _HabitTile({
+    required this.habit,
+    this.selected = false,
+    this.selectMode = false,
+    this.onLongPress,
+    this.onTap,
+  });
   final Habit habit;
+  final bool selected;
+  final bool selectMode;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -181,25 +262,42 @@ class _HabitTile extends StatelessWidget {
     return Semantics(
       label:
           'Habit ${habit.name}'
-          '${isPaused ? ', paused' : ''}',
+          '${isPaused ? ', paused' : ''}'
+          '${selected ? ', selected' : ''}',
       button: true,
+      selected: selected,
       child: Material(
-        color: color.withValues(alpha: 0.12),
+        color: selected
+            ? color.withValues(alpha: 0.30)
+            : color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           key: ValueKey('habit_tile.${habit.id}'),
           borderRadius: BorderRadius.circular(12),
-          onTap: () async {
-            await Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => AddHabitScreen(habitId: habit.id),
-              ),
-            );
-          },
+          onTap:
+              onTap ??
+              () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => AddHabitScreen(habitId: habit.id),
+                  ),
+                );
+              },
+          onLongPress: onLongPress,
           child: Padding(
             padding: const EdgeInsets.all(Spacing.md),
             child: Row(
               children: [
+                if (selectMode)
+                  Padding(
+                    padding: const EdgeInsets.only(right: Spacing.sm),
+                    child: Icon(
+                      selected
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                      color: color,
+                    ),
+                  ),
                 _TileIcon(
                   category: habit.category,
                   iconName: habit.iconName,
@@ -234,19 +332,22 @@ class _HabitTile extends StatelessWidget {
                         _describe(habit),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
+                      if (habit is HabitTimeWindow)
+                        _FastingTimer(habit: habit as HabitTimeWindow),
                     ],
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Mark done',
-                  icon: const Icon(Icons.check_circle_outline),
-                  iconSize: Sizing.tapHome / 2,
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Marked done.')),
-                    );
-                  },
-                ),
+                if (!selectMode)
+                  IconButton(
+                    tooltip: 'Mark done',
+                    icon: const Icon(Icons.check_circle_outline),
+                    iconSize: Sizing.tapHome / 2,
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Marked done.')),
+                      );
+                    },
+                  ),
               ],
             ),
           ),
@@ -263,6 +364,93 @@ class _HabitTile extends StatelessWidget {
       HabitDayOfX() => 'Day-of-X',
       HabitTimeWindow() => 'Window — ${h.start}–${h.end}',
     };
+  }
+}
+
+/// Live-updating fasting timer shown on HabitTimeWindow tiles.
+/// Ticks every second; shows the time until the window closes
+/// (or "starts in HH:MM" if the window hasn't opened yet).
+class _FastingTimer extends StatefulWidget {
+  const _FastingTimer({required this.habit});
+  final HabitTimeWindow habit;
+
+  @override
+  State<_FastingTimer> createState() => _FastingTimerState();
+}
+
+class _FastingTimerState extends State<_FastingTimer> {
+  late Stream<DateTime> _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Stream<DateTime>.periodic(
+      const Duration(seconds: 1),
+      (_) => DateTime.now(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DateTime>(
+      stream: _tick,
+      builder: (context, snap) {
+        final now = snap.data ?? DateTime.now();
+        final label = _windowLabel(widget.habit, now);
+        if (label == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: Spacing.xs),
+          child: Row(
+            children: [
+              const Icon(Icons.timer_outlined, size: 16),
+              const SizedBox(width: 4),
+              Text(label, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// "Closes in 02:30" / "Opens in 12:00" / null if today is
+  /// not a fasting weekday.
+  String? _windowLabel(HabitTimeWindow h, DateTime now) {
+    if (!h.weekdays.contains(now.weekday)) return null;
+    final open = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      h.start.hour,
+      h.start.minute,
+    );
+    final close = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      h.end.hour,
+      h.end.minute,
+    );
+    if (now.isBefore(open)) {
+      return 'Opens in ${_fmt(open.difference(now))}';
+    }
+    if (now.isBefore(close)) {
+      final remaining = close.difference(now);
+      final target = h.targetHours;
+      if (target != null) {
+        return 'Fasting — ${_fmt(remaining)} left (target ${target}h)';
+      }
+      return 'Window closes in ${_fmt(remaining)}';
+    }
+    return null;
+  }
+
+  String _fmt(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60);
+    final s = d.inSeconds.remainder(60);
+    return '${h.toString().padLeft(2, '0')}:'
+        '${m.toString().padLeft(2, '0')}:'
+        '${s.toString().padLeft(2, '0')}';
   }
 }
 
