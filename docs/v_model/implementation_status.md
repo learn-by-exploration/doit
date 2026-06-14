@@ -179,7 +179,7 @@ primary phone; the run does not require new code.
 | v0.2b — Events | _pending_ | _pending_ | _pending_ | _pending_ |
 | v0.2c — Groups | _pending_ | _pending_ | _pending_ | _pending_ |
 | v0.2d — UX delight | _pending_ | _pending_ | _pending_ | _pending_ |
-| v0.2e — Run #2 | _pending_ (runbook only) | n/a | n/a | n/a |
+| v0.2e — Run #2 runbook | _in flight_ (runbook only) | n/a | n/a | [`acceptance_run_v2.md`](acceptance_run_v2.md) drafted 2026-06-14 |
 
 ## How to update this file
 

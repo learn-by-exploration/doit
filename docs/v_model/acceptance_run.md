@@ -4,7 +4,9 @@ Status: pending — kickoff after v0.1 is feature-complete and `flutter
 build apk --debug` succeeds. Created 2026-06-14; this document
 supersedes the "Not started" entry in
 [`implementation_status.md`](implementation_status.md) once the run
-begins.
+begins. The v0.2 follow-up run is its own document —
+[`acceptance_run_v2.md`](acceptance_run_v2.md) — which stacks on
+top of this one once the v0.2 surface is built.
 
 This is the right-side verification for the
 [v0.1 baseline](v0_1_baseline.md). Every cell links to a SYS- ID (or

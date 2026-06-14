@@ -375,4 +375,4 @@ user's call on:
 | `traceability_matrix.md` | Will be updated when the user picks |
 | `mission_catalog.md` | § 5.7 test reminder — uses existing mission engine |
 | `notification_reliability.md` | § 5.1 events reuse the existing alarm scheduler |
-| `acceptance_run.md` | § 6 v0.2e run #2 is the analog of the v0.1 runbook |
+| `acceptance_run.md` | § 6 v0.2e run #2 is the analog of the v0.1 runbook — lives at [`acceptance_run_v2.md`](acceptance_run_v2.md) |

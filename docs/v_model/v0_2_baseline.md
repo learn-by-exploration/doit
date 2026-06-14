@@ -114,6 +114,11 @@ the user's primary phone, all of the following are true:
    the 14 days.**
 9. **Coverage ≥ 80% on the v0.2 changed files.**
 
+The per-day log, per-scenario acceptance table, and 3-gate log
+that gate these 9 criteria live in
+[`acceptance_run_v2.md`](acceptance_run_v2.md) — the v0.2 runbook
+that this baseline cites for the right-side verification.
+
 If any criterion fails, fix it before v0.3.
 
 ## Approval status
