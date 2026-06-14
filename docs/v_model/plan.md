@@ -64,6 +64,17 @@ is a wish. See [`traceability_matrix.md`](traceability_matrix.md).
    - Verify streak break rules across a missed rest-day window.
    - Decision gate: ship as personal-use build, or extend scope.
 
+5. **Life-coach richness (v0.2) — committed 2026-06-14**
+   - The 8 recommended workflows from
+     [`v0_2_proposal.md`](v0_2_proposal.md): events, contact groups,
+     time-window habits, edit / pause / test / bulk-complete,
+     category + color + icon.
+   - 16 new SYS-IDs (SYS-032..SYS-047). The contract is at
+     [`v0_2_baseline.md`](v0_2_baseline.md).
+   - Phased: v0.2a (foundation) → v0.2b (events) → v0.2c (groups) →
+     v0.2d (UX delight) → v0.2e (14-day run #2).
+   - Acceptance: 9 criteria in `v0_2_baseline.md`.
+
 ## Working Assumptions
 
 - **Tech stack:** Flutter 3.44 / Dart 3.12, matching `board_box` and

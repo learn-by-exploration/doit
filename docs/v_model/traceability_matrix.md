@@ -25,6 +25,14 @@ not yet a real requirement.
 | Permission-first UX | SYS-025 | `lib/screens/onboarding.dart` | Widget test, manual acceptance |
 | 3-gate and coverage | SYS-027, SYS-028 | CI workflow, `analysis_options.yaml` | CI run on every PR; coverage report artifact |
 | Home widget | SYS-029 | `android/app/src/main/.../HomeWidgetProvider.kt`, `lib/services/widget_sync.dart` | Widget test, manual device check |
+| One-off date reminder (event) | SYS-032, SYS-033, SYS-034, SYS-035 | `lib/events/event.dart`, `lib/events/event_repository.dart`, `lib/screens/add_event.dart`, `lib/screens/events_list.dart` | `test/events/event_repository_test.dart`, widget test for add-event, integration test for the one-shot schedule |
+| Contact group | SYS-036, SYS-037, SYS-038 | `lib/people/person_group.dart`, `lib/people/group_repository.dart`, `lib/screens/add_group.dart` | `test/people/group_repository_test.dart`, `test/people/group_rotation_test.dart` |
+| Time-window habit | SYS-039, SYS-040 | `lib/habits/habit_time_window.dart`, `lib/widgets/fasting_timer.dart` | `test/habits/time_window_schedule_test.dart`, widget test for the fasting timer |
+| Edit habit | SYS-042, SYS-043 | `lib/screens/edit_habit.dart` (extends `add_habit.dart`) | `test/screens/edit_habit_test.dart`, integration test that edit preserves log |
+| Pause / resume | SYS-047 | `lib/services/pause_service.dart`, `lib/screens/habit_detail.dart` | `test/services/pause_service_test.dart`, widget test for the pause UI |
+| Test reminder (30s) | SYS-041 | `lib/services/test_fire_service.dart`, `lib/screens/habit_detail.dart` | `test/services/test_fire_test.dart`, widget test for the test button |
+| Bulk complete | SYS-044 | `lib/services/bulk_completion_service.dart`, `lib/screens/home.dart` | `test/services/bulk_completion_test.dart`, widget test for the bulk button |
+| Category / color / icon | SYS-045, SYS-046 | `lib/habits/category.dart`, `lib/widgets/category_chip.dart`, `lib/widgets/icon_picker.dart`, `lib/screens/home.dart` | `test/habits/category_test.dart`, widget test for the icon picker |
 
 ## Workflow → Requirement → Verification
 
@@ -46,6 +54,14 @@ not yet a real requirement.
 | WF-014 First-unlock wake-up | SYS-015, SYS-016, SYS-017 | Unit test, manual device check |
 | WF-015 Reboot survival | SYS-016, SYS-017, SYS-030 | Integration test, manual device check |
 | WF-016 Timezone change / travel | SYS-016, SYS-017, SYS-019 | Unit test for `nextOccurrence` across DST + zone change |
+| WF-017 Add a one-off date reminder (v0.2) | SYS-032, SYS-033, SYS-034, SYS-035 | Widget test for the add-event flow + integration test for the one-shot alarm |
+| WF-018 Add a contact group (v0.2) | SYS-036, SYS-037, SYS-038 | Widget test for the add-group flow + unit test for the rotation selector |
+| WF-019 Add a time-window habit (v0.2) | SYS-039, SYS-040 | Unit test for `HabitTimeWindow.nextOccurrence()` + widget test for the live timer |
+| WF-022 Edit a habit (v0.2) | SYS-042, SYS-043 | Widget test for the edit flow + integration test that edit preserves the log |
+| WF-027 Pause / resume (v0.2) | SYS-047 | Unit test for the paused-state guard + widget test for the pause UI |
+| WF-028 Test reminder in 30s (v0.2) | SYS-041 | Widget test for the test button + integration test for the test fire |
+| WF-029 Bulk complete (v0.2) | SYS-044 | Widget test for the bulk button + integration test for the timestamp spread |
+| WF-031 Category / color / icon (v0.2) | SYS-045, SYS-046 | Widget test for the icon picker + stats grouping |
 
 ## How to use this matrix
 

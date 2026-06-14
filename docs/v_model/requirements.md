@@ -59,6 +59,16 @@ habit-tracking, contact-cadence, and Alarmy-style strong enforcement.
 - Watch / Wear OS companion for quick-done.
 - Web companion for read-only stats.
 
+### In scope for v0.2 (committed 2026-06-14)
+
+See [`v0_2_proposal.md`](v0_2_proposal.md) and
+[`v0_2_baseline.md`](v0_2_baseline.md) for the full scope. The
+8 workflows and 16 SYS-IDs that v0.2 adds (SYS-032..SYS-047) are
+committed; the model layer will be extended (categories, events,
+groups, time-window schedule, paused state, edit flow). v0.2 does
+NOT loosen any v0.1 constraint (still no `INTERNET`, no
+`CALL_PHONE`, no cloud, no telemetry).
+
 ### Out of scope unless re-approved
 
 - Multiple named users on one device (no family / partner profiles).
@@ -107,6 +117,22 @@ habit-tracking, contact-cadence, and Alarmy-style strong enforcement.
 | **SYS-029** | The app shall display a home screen widget that shows the next 3 due items, each with a "Done" button. Tapping "Done" shall mark the item done and refresh the widget. | Widget test + manual device check |
 | **SYS-030** | The app shall provide a permission baseline in `AndroidManifest.xml` that matches the v0.1 scope. No permission shall be added without an ADR. | `AndroidManifest.xml` review + diff in PRs that touch it |
 | **SYS-031** | The total mission-chain timeout (sum of per-mission `timeout` values) shall not exceed 5 minutes at habit-save time. A chain whose total exceeds 5 min shall be rejected with `ChainTimeoutTooLong`. Chains longer than 5 min shall require an explicit user confirmation in v0.2. | Unit test in `test/missions/chain_test.dart` validates that a chain with timeout sum > 5 min throws on save |
+| **SYS-032** | The app shall allow a user to add a one-off date-specific reminder ("event") with name, date+time, lead time, optional mission chain, optional recurrence (none / annually). The event shall surface on the home screen "Events" tab. After the event fires, it shall auto-archive (move to an "Archived" list, never deleted for 90 days). | Widget test for the add-event flow + integration test for the one-shot alarm schedule + manual acceptance |
+| **SYS-033** | The app shall schedule an event as a one-shot alarm at `event.at - event.leadTime`. The one-shot alarm shall use the same `AlarmScheduler` path as habit alarms (exact alarm primary, WorkManager fallback). A duplicate fire of the same event-id shall be deduped. | Unit test for the one-shot schedule computation + integration test for the alarm manager call |
+| **SYS-034** | The app shall support a per-event lead time of 5 min, 15 min, 1 h, 1 day, or 1 week. The lead time must be less than the gap from `now` to `event.at`. A lead-time violation at save time shall throw `InvalidLeadTime`. | Unit test for the lead-time validator |
+| **SYS-035** | The app shall auto-archive an event 24 h after it fires. Archived events shall be retained for 90 days, then purged by the next nightly backup. The user can browse archived events from the Events tab. | Integration test for the auto-archive job |
+| **SYS-036** | The app shall allow a user to add a contact group with 2-10 contacts, a name, a shared cadence, a shared channel, and a shared mission chain. The group shall be a first-class entity in the local DB (separate from `PersonRow`). | Widget test for the add-group flow + integration test for the group CRUD |
+| **SYS-037** | For a `Rotation` group, the scheduler shall pick the next contact by `least_recently_contacted`, breaking ties by `id` ascending. The picked contact is recorded in the `person_groups.lastContactedPersonId` field after a completion. | Unit test for the rotation selector across 4 cases (single member, all same timestamp, all different timestamps, ties) |
+| **SYS-038** | For an `Any` group, the completion log records which specific contact was contacted. For an `All` group, the next reminder is the member with the oldest `lastContactedAt`. An `All` group with any unresolved members is still schedulable; the user is shown a banner. | Unit test for the any/all selector |
+| **SYS-039** | The app shall support a `HabitTimeWindow` schedule type with start time, end time, and weekdays. The `nextOccurrence(from)` shall return the next `start` time on the next active weekday, or `now` if `now` is inside the window. The window's end-time shall be the deadline for completion. | Unit test for `HabitTimeWindow.nextOccurrence()` across DST, weekday wrap, and within-window |
+| **SYS-040** | The home screen shall display a live timer for any active time-window habit: "Fasting, 6h 12m elapsed, 1h 48m remaining" (or "Lunch window, 2h 18m left"). The timer shall update every minute via a `Ticker`. | Widget test + manual device check |
+| **SYS-041** | The habit detail screen shall expose a "Test in 30s" button. The test fire shall use the existing `AlarmScheduler` with a `test: true` flag, fire the same notification / full-screen intent the real reminder would, and NOT log a completion or reschedule the next occurrence. | Widget test for the test button + integration test for the test fire |
+| **SYS-042** | The habit `id` shall be immutable after creation. All other fields (name, schedule, proof mode, mission chain, streak policy, category, color, icon, pausedUntilMillis) shall be mutable via the edit flow. | Unit test for the immutable-id invariant |
+| **SYS-043** | An edit of a habit shall preserve the completion log and the streak history. The `id` is stable; only fields change. The streak is recomputed from the unchanged log. | Integration test: edit a habit, assert the log is intact, assert the streak is unchanged |
+| **SYS-044** | The app shall allow the user to bulk-complete N occurrences of an interval habit (1 ≤ N ≤ daily target, capped at 4 per tap). Each bulk-logged completion shall have a timestamp spread across the missed window range, not all at the bulk-log moment. | Widget test for the bulk button + integration test for the timestamp spread |
+| **SYS-045** | The app shall support a `HabitCategory` enum: `health`, `mind`, `relationships`, `productivity`, `home`, `other`. A new `category` field on `HabitRow` defaults to `other`. The stats screen shall group by category. | Unit test for the enum + widget test for the stats grouping |
+| **SYS-046** | The app shall support a per-habit icon from a 64-icon Material Symbols set. The icon shall be stored as a string key on `HabitRow` (e.g., `local_drink`, `directions_run`, `self_improvement`). A null icon defaults to the category's canonical icon. | Widget test for the icon picker |
+| **SYS-047** | The app shall support a paused state for habits and persons. A `pausedUntilMillis` field on `HabitRow` and `PersonRow` (nullable). When set and in the future, the scheduler shall not fire reminders for that row. A paused period shall not break streaks. | Unit test for the paused-state guard + widget test for the pause UI |
 
 ## Platform Constraints
 

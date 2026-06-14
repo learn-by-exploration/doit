@@ -547,3 +547,282 @@ detection path specifically.
   second one is deduped by occurrence-id).
 
 **Requirements covered:** SYS-016, SYS-017.
+
+---
+
+## v0.2 additions (status: committed 2026-06-14)
+
+The workflows below are part of v0.2. The proposal is at
+[`v0_2_proposal.md`](v0_2_proposal.md); the v0.2 baseline is at
+[`v0_2_baseline.md`](v0_2_baseline.md).
+
+---
+
+## WF-017 — Add a one-off date-specific reminder (event)
+
+**Preconditions:**
+- App is installed and onboarded.
+
+**Main flow:**
+1. User taps the floating add button on the home screen.
+2. User picks "Event".
+3. User enters a name (e.g., "Mom's birthday", "Doctor
+   appointment", "Submit taxes").
+4. User picks a date and time.
+5. User picks a lead time (5 min, 15 min, 1 h, 1 day, 1 week
+   before). Default: 1 day.
+6. User optionally picks a mission chain (default: just a
+   notification, no mission).
+7. User optionally picks recurrence: none (default), annually.
+8. App validates (date must be in the future, lead time must be
+   less than the gap to the date).
+9. User saves.
+
+**Postconditions:**
+- An event record is written to the local DB.
+- A one-shot alarm is scheduled for `(event.at - leadTime)`.
+- The event appears on the home "Events" tab.
+
+**Failure modes:**
+- Date in the past → reject with a clear error.
+- Alarm permission denied → fall back to WorkManager one-shot
+  with a "may be late" badge.
+- After the event fires, the event auto-archives; the user
+  can browse archived events from the Events tab.
+
+**Requirements covered:** SYS-032, SYS-033, SYS-034, SYS-035.
+
+---
+
+## WF-018 — Add a contact group (friend list, family list)
+
+**Preconditions:**
+- `READ_CONTACTS` has been granted.
+- The user has tapped "Add person" or "Add group" from the
+  People screen.
+
+**Main flow:**
+1. App opens a contact picker (multi-select).
+2. User picks 2-10 contacts.
+3. User picks a group name (e.g., "Family", "Close friends",
+   default: "Group of N").
+4. User picks a group cadence: every N days, weekly on day X,
+   monthly on day N, or custom.
+5. User picks a group cadence semantic:
+   - **Rotation:** the app picks a different contact each time,
+     cycling through the group. Tracks `lastContacted` per
+     member.
+   - **Any:** the user is reminded to contact "someone" in the
+     group. The user picks who when they complete.
+   - **All:** the user is reminded to contact every member in
+     the window. Each member's last-contacted timestamp is
+     tracked; the next reminder is the oldest.
+6. User picks a shared channel (dialer, WhatsApp, Telegram,
+   Signal, SMS).
+7. User picks a shared mission (if Strong mode).
+8. User saves.
+
+**Postconditions:**
+- A `PersonGroup` record is written.
+- One occurrence is scheduled for the next contact-or-window.
+- A "group added" snackbar is shown.
+
+**Failure modes:**
+- 1 or > 10 contacts → reject at picker.
+- IM app not installed for any member → channel is greyed out
+  for that member; the user can pick a different channel per
+  member.
+- Contact deleted from device → that member is marked
+  `unresolved`; the group keeps reminding for the others;
+  a banner says "1 member unresolved; archive or pick
+  replacement".
+
+**Requirements covered:** SYS-036, SYS-037, SYS-038.
+
+---
+
+## WF-019 — Add a time-window habit (meal, fasting)
+
+**Preconditions:**
+- App is installed and onboarded.
+
+**Main flow:**
+1. User taps add → "Habit" → "Time window".
+2. User enters a name (e.g., "16:8 fast", "Lunch window").
+3. User picks a start time and an end time.
+4. User picks days of week (default: every day).
+5. User picks a proof mode (default: Soft for meals, Auto for
+   fasting).
+6. For fasting, the user picks the target fast duration
+   (12, 14, 16, 18, 20 h). The window = target from the
+   start time.
+7. User saves.
+
+**Postconditions:**
+- A `HabitTimeWindow` record is written.
+- The home screen shows a live "Fasting, 6h 12m elapsed,
+  1h 48m remaining" widget when the window is active.
+- The widget auto-updates every minute via a `Ticker`.
+
+**Failure modes:**
+- End time before start time → reject.
+- Fast duration > 24 h → reject (out of scope; v0.3).
+- App killed mid-window → state restored on next launch from
+  the persisted window.
+
+**Requirements covered:** SYS-039, SYS-040.
+
+---
+
+## WF-022 — Edit an existing habit
+
+**Preconditions:**
+- The habit exists in the local DB.
+
+**Main flow:**
+1. User long-presses a habit on the home screen (or taps
+   "Edit" on the habit detail screen).
+2. App opens the same `AddHabit` flow, pre-filled with the
+   habit's current fields.
+3. User changes any field (name, schedule, proof mode, mission
+   chain, streak policy, category, color, icon).
+4. User saves.
+
+**Postconditions:**
+- The habit record is updated in place (id is stable; only
+  fields change).
+- The completion log is preserved; the streak is recomputed
+  from the log.
+- The next occurrence is rescheduled.
+
+**Failure modes:**
+- Schedule change would invalidate past completions → log
+  with a warning; the user can confirm "yes, change anyway".
+- Anchor references a now-archived anchor habit → reject
+  with a "pick a new anchor" prompt.
+
+**Requirements covered:** SYS-042, SYS-043.
+
+---
+
+## WF-027 — Pause / resume a habit or person
+
+**Preconditions:**
+- The habit or person exists in the local DB.
+
+**Main flow (pause):**
+1. User long-presses a habit/person → "Pause".
+2. User picks a duration: 1 day, 1 week, 2 weeks, 1 month,
+   or "Until I resume".
+3. App marks the habit/person as `pausedUntil = now + duration`
+   (or `pausedUntil = null` for "Until I resume").
+
+**Main flow (resume):**
+1. User long-presses a paused habit/person → "Resume".
+2. App clears `pausedUntil`.
+3. The next occurrence is scheduled.
+
+**Postconditions:**
+- While paused, no reminders fire; the schedule is preserved.
+- The completion log is preserved; the streak is preserved
+  (a paused period does not break the streak).
+
+**Failure modes:**
+- "Until I resume" pause runs for > 90 days → app shows a
+  "still paused?" prompt on next open.
+
+**Requirements covered:** SYS-047.
+
+---
+
+## WF-028 — Fire a test reminder in 30 seconds
+
+**Preconditions:**
+- The habit exists in the local DB.
+
+**Main flow:**
+1. User opens the habit detail screen.
+2. User taps "Test in 30s".
+3. A countdown shows: "Firing in 30… 29… 28…".
+4. At T-0, the scheduler fires the same notification /
+   full-screen intent that the real reminder would.
+5. A "Cancel test" affordance is available during the
+   countdown.
+
+**Postconditions:**
+- The test reminder fires exactly as the real one would
+  (same channel, same importance, same mission UI).
+- The test does NOT log a completion (it is a verification
+  artifact, not a habit completion).
+- The test does NOT reschedule the next occurrence.
+
+**Failure modes:**
+- Alarm permission denied → test still fires via WorkManager
+  fallback.
+- User cancels the test mid-countdown → no fire.
+
+**Requirements covered:** SYS-041.
+
+---
+
+## WF-029 — Bulk-complete N occurrences of an interval habit
+
+**Preconditions:**
+- The habit is an interval habit (e.g., drink water every
+  30 min, 8 windows/day).
+- The current day's completions are < the daily target.
+
+**Main flow:**
+1. User opens the home screen.
+2. For an interval habit with missed windows, the home tile
+   shows a "Mark N done" button.
+3. User taps the button. N defaults to the number of missed
+   windows, capped at 4 (to prevent accidental bulk-log).
+4. The home tile shows the updated completion count.
+5. The next window is computed from `now + interval`.
+
+**Postconditions:**
+- N completions are logged with timestamps spread across
+  the missed window range (e.g., 4 completions at 09:00,
+  10:00, 11:00, 12:00 — not all at the moment of bulk-log).
+- The streak and the next-window computation handle the
+  bulk log normally.
+
+**Failure modes:**
+- N > daily target → reject; the user must adjust the target.
+- App killed mid-bulk → the partial bulk is preserved
+  (each completion is its own row).
+
+**Requirements covered:** SYS-044.
+
+---
+
+## WF-031 — Set category, color, and icon on a habit
+
+**Preconditions:**
+- The habit exists (or is being created).
+
+**Main flow:**
+1. User opens add/edit habit.
+2. After the proof-mode step, user picks a category:
+   Health, Mind, Relationships, Productivity, Home, Other.
+3. App auto-assigns a color based on the category
+   (Health = green, Mind = teal, Relationships = amber,
+   Productivity = blue, Home = brown, Other = grey).
+4. User can override the color via a swatch row (8 swatches).
+5. User picks an icon from a 64-icon Material Symbols grid.
+6. User saves.
+
+**Postconditions:**
+- The habit has `category`, `colorSeed`, `iconName` fields set.
+- The home screen renders the icon + color swatch beside the
+  habit name.
+- The stats screen groups habits by category.
+
+**Failure modes:**
+- No category picked → default to "Other" / grey / a generic
+  icon.
+- Icon picker: no icon picked → default to category's
+  canonical icon.
+
+**Requirements covered:** SYS-045, SYS-046.

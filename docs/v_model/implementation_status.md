@@ -174,6 +174,12 @@ primary phone; the run does not require new code.
 | 5c — UI: 5 mission screens | `d4fd786` | ✓ | 5 widget tests | ≥ 80% |
 | 6 — Backup + restore | `5f4f31d` | ✓ | 6 backup_service tests | ≥ 80% |
 | 7 — Acceptance run | `eeb87a0` (doc only) | n/a (no code) | n/a | n/a |
+| v0.2 proposal | `76085e4` (doc only) | n/a (no code) | n/a | n/a |
+| **v0.2a — Completeness** | _in flight_ | _pending_ | _pending_ | _pending_ |
+| v0.2b — Events | _pending_ | _pending_ | _pending_ | _pending_ |
+| v0.2c — Groups | _pending_ | _pending_ | _pending_ | _pending_ |
+| v0.2d — UX delight | _pending_ | _pending_ | _pending_ | _pending_ |
+| v0.2e — Run #2 | _pending_ (runbook only) | n/a | n/a | n/a |
 
 ## How to update this file
 
