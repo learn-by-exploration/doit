@@ -42,6 +42,12 @@ dependencies:
   # the lint go away without an extra layer of indirection.
   meta: ^1.15.0
 
+  # State management for the UI layer. Per
+  # .claude/rules/lib-screens.md: "Use Provider (or ChangeNotifier
+  # directly)". We use provider for the standard Consumer /
+  # context.watch wiring.
+  provider: ^6.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

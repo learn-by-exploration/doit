@@ -8,11 +8,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:common_games/main.dart';
 
 void main() {
-  testWidgets('streak scaffold renders the placeholder', (tester) async {
+  testWidgets('Streak app boots into onboarding on first launch', (
+    tester,
+  ) async {
     await tester.pumpWidget(const StreakApp());
+    await tester.pump();
 
-    expect(find.text('Streak — scaffold'), findsOneWidget);
-    expect(find.text('Streak is loading.'), findsOneWidget);
+    // Onboarding is the initial route in v0.1.
+    expect(find.text('Welcome to Streak'), findsOneWidget);
     expect(find.byType(MaterialApp), findsOneWidget);
   });
 }
