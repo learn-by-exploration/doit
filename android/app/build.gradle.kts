@@ -6,7 +6,13 @@ plugins {
 
 android {
     namespace = "com.common_games.streak"
-    compileSdk = flutter.compileSdkVersion
+    // Bumped from flutter.compileSdkVersion (34) to 36: the
+    // file_picker plugin (used by onboarding) transitively
+    // pulls in flutter_plugin_android_lifecycle, whose AAR
+    // metadata requires compileSdk 36+. minSdk stays at 28 (the
+    // streak floor) and targetSdk still follows Flutter's
+    // default — the bump is compile-time only.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -25,8 +31,11 @@ android {
         // Any rename is a v0.2+ decision and requires an ADR.
         applicationId = "com.common_games.streak"
         // Streak floor is API 28 (Android 9) per
-        // docs/v_model/requirements.md § Platform Constraints. The
-        // compile/target SDKs follow Flutter's defaults, currently 34.
+        // docs/v_model/requirements.md § Platform Constraints.
+        // minSdk stays at 28. targetSdk follows Flutter's default
+        // (currently 34); bumping it is a v0.3 decision because
+        // it changes runtime behavior (notification permission
+        // model, exact-alarm policy) and must be reviewed.
         minSdk = 28
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
