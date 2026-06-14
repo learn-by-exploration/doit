@@ -52,7 +52,7 @@ void main() {
     expect(find.text('About'), findsOneWidget);
   });
 
-  testWidgets('restore button shows a Phase 6 snackbar', (tester) async {
+  testWidgets('restore button navigates to the restore screen', (tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -61,7 +61,7 @@ void main() {
     await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('settings.restore')));
-    await tester.pump();
-    expect(find.text('Restore lands in Phase 6.'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('settings_restore.pick')), findsOneWidget);
   });
 }

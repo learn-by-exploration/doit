@@ -17,6 +17,7 @@ import 'package:flutter/services.dart';
 
 import 'package:common_games/reminders/alarm_scheduler.dart';
 import 'package:common_games/reminders/anchor_detector.dart';
+import 'package:common_games/screens/settings_restore.dart';
 import 'package:common_games/services/reminder_service.dart';
 import 'package:common_games/services/settings_service.dart';
 import 'package:common_games/theme/app_theme.dart';
@@ -82,10 +83,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               key: const ValueKey('settings.restore'),
               leading: const Icon(Icons.restore_outlined),
               title: const Text('Restore from backup'),
-              subtitle: const Text('Phase 6 placeholder.'),
+              subtitle: const Text('Pick a Streak .json backup file.'),
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Restore lands in Phase 6.')),
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const SettingsRestoreScreen(),
+                  ),
                 );
               },
             ),

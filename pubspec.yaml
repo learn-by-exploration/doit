@@ -48,6 +48,11 @@ dependencies:
   # context.watch wiring.
   provider: ^6.1.2
 
+  # Backup / restore: lets the user pick a JSON backup file
+  # via Android's Storage Access Framework. No runtime
+  # permission required.
+  file_picker: ^8.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
