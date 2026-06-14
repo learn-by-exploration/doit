@@ -18,6 +18,7 @@
 
 import 'dart:async';
 
+import 'package:common_games/events/event.dart';
 import 'package:common_games/habits/habit.dart';
 import 'package:meta/meta.dart';
 
@@ -80,6 +81,13 @@ abstract class AlarmScheduler {
   /// `BootReceiver` (via a method channel) and on
   /// `ACTION_TIMEZONE_CHANGED`.
   Future<void> rescheduleAll();
+
+  /// Schedule a one-shot event reminder. The alarm id is derived
+  /// from the event id. Fires once at `at` and is unscheduled.
+  Future<AlarmId> scheduleEvent(Event event, DateTime at);
+
+  /// Cancel a one-shot event reminder.
+  Future<void> cancelEvent(String eventId);
 
   /// Current reliability state.
   Reliability get reliability;
@@ -147,6 +155,20 @@ class FakeAlarmScheduler implements AlarmScheduler {
   Future<void> rescheduleAll() async {
     // No-op in the fake. A real implementation re-queries the
     // local DB and re-arms every pending alarm.
+  }
+
+  @override
+  Future<AlarmId> scheduleEvent(Event event, DateTime at) async {
+    final id = AlarmId(_nextId++);
+    _scheduled.add(
+      ScheduledAlarm(id: id, habitId: 'event:${event.id}', at: at),
+    );
+    return id;
+  }
+
+  @override
+  Future<void> cancelEvent(String eventId) async {
+    _scheduled.removeWhere((a) => a.habitId == 'event:$eventId');
   }
 
   @override

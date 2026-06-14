@@ -11,6 +11,7 @@
 
 import 'dart:async';
 
+import 'package:common_games/events/event.dart';
 import 'package:common_games/habits/habit.dart';
 import 'package:common_games/habits/proof_mode.dart';
 import 'package:common_games/reminders/alarm_scheduler.dart';
@@ -75,6 +76,23 @@ class ReminderService {
       await fullScreen.show(habit, mode.chain);
     }
     return id;
+  }
+
+  /// Schedule a one-shot reminder for an event. Fires once at
+  /// `event.notifyAtMillis`. The alarm is unscheduled on fire
+  /// (handled by the scheduler for one-shot IDs).
+  Future<AlarmId> scheduleEvent(Event event) async {
+    await _ready.future;
+    return scheduler.scheduleEvent(
+      event,
+      DateTime.fromMillisecondsSinceEpoch(event.notifyAtMillis),
+    );
+  }
+
+  /// Cancel a scheduled event reminder.
+  Future<void> cancelEvent(String eventId) async {
+    await _ready.future;
+    await scheduler.cancelEvent(eventId);
   }
 
   /// Cancel a scheduled reminder.

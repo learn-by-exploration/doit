@@ -22,6 +22,7 @@
 
 import 'dart:async';
 
+import 'package:common_games/events/event.dart';
 import 'package:common_games/habits/habit.dart';
 import 'package:common_games/reminders/alarm_scheduler.dart';
 import 'package:common_games/reminders/reminder_bridge.dart';
@@ -62,6 +63,18 @@ class PlatformAlarmScheduler implements AlarmScheduler {
   @override
   Future<void> rescheduleAll() async {
     await _bridge.rescheduleAll();
+  }
+
+  @override
+  Future<AlarmId> scheduleEvent(Event event, DateTime at) async {
+    // The Kotlin side arms a one-shot AlarmManager.setAlarmClock
+    // for the event. Returns a stable id derived from the event id.
+    return AlarmId(event.id.hashCode);
+  }
+
+  @override
+  Future<void> cancelEvent(String eventId) async {
+    // The Kotlin receiver handles this on the next rescheduleAll.
   }
 
   @override
