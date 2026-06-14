@@ -12,6 +12,8 @@ import 'dart:math' as math;
 
 import 'package:meta/meta.dart';
 
+import 'package:common_games/missions/mission.dart';
+
 /// Raw input for a mission. The chain executor pattern-matches
 /// on the sealed shape and dispatches to the right
 /// [Mission.verify] implementation.
@@ -86,6 +88,64 @@ final class MathProblem {
   final int b;
   final MathOp op;
   final int answer;
+
+  /// Pure: generate a problem at the given [difficulty] using
+  /// the supplied [rng]. No `Random()` at module init per
+  /// `.claude/rules/lib-missions.md`.
+  ///
+  /// - easy: single-digit add / subtract, a, b ∈ [1, 9].
+  /// - normal: two-digit add / subtract, a, b ∈ [10, 99].
+  /// - hard: two-digit add / subtract OR two-digit × one-digit.
+  factory MathProblem.next(MathDifficulty difficulty, math.Random rng) {
+    final opRoll = rng.nextDouble();
+    final op = switch (difficulty) {
+      MathDifficulty.easy => opRoll < 0.5 ? MathOp.add : MathOp.subtract,
+      MathDifficulty.normal => opRoll < 0.5 ? MathOp.add : MathOp.subtract,
+      MathDifficulty.hard =>
+        opRoll < 0.34
+            ? MathOp.add
+            : opRoll < 0.67
+            ? MathOp.subtract
+            : MathOp.multiply,
+    };
+    return switch (op) {
+      MathOp.add => _add(difficulty, rng),
+      MathOp.subtract => _subtract(difficulty, rng),
+      MathOp.multiply => _multiply(difficulty, rng),
+    };
+  }
+
+  static MathProblem _add(MathDifficulty d, math.Random rng) {
+    final a = _pick(d, rng);
+    final b = _pick(d, rng);
+    return MathProblem(a: a, b: b, op: MathOp.add, answer: a + b);
+  }
+
+  static MathProblem _subtract(MathDifficulty d, math.Random rng) {
+    // Subtraction problems never produce negative results.
+    var a = _pick(d, rng);
+    var b = _pick(d, rng);
+    if (b > a) {
+      final t = a;
+      a = b;
+      b = t;
+    }
+    return MathProblem(a: a, b: b, op: MathOp.subtract, answer: a - b);
+  }
+
+  static MathProblem _multiply(MathDifficulty d, math.Random rng) {
+    // a, b are within the difficulty range. The result is
+    // well-defined.
+    final a = _pick(d, rng);
+    final b = _pick(d, rng);
+    return MathProblem(a: a, b: b, op: MathOp.multiply, answer: a * b);
+  }
+
+  static int _pick(MathDifficulty d, math.Random rng) => switch (d) {
+    MathDifficulty.easy => 1 + rng.nextInt(9),
+    MathDifficulty.normal => 10 + rng.nextInt(90),
+    MathDifficulty.hard => 10 + rng.nextInt(90),
+  };
 }
 
 enum MathOp { add, subtract, multiply }
@@ -106,4 +166,52 @@ final class MemoryPair {
   const MemoryPair(this.a, this.b);
   final int a;
   final int b;
+}
+
+/// A single memory card. The `symbol` is the human-readable
+/// label (e.g., a shape name or emoji). The `pairId` ties two
+/// cards together — same `pairId` means they match.
+@immutable
+final class MemoryCard {
+  const MemoryCard({required this.symbol, required this.pairId});
+  final String symbol;
+  final int pairId;
+}
+
+/// Pure: generate a fresh deck for a memory game.
+///
+/// The deck has `rows * cols` cards and `rows * cols / 2`
+/// distinct pairs. The `seed` parameter is required so widget
+/// tests are deterministic.
+class MemoryGame {
+  const MemoryGame._();
+
+  static const _themePool = <String, List<String>>{
+    'shapes': ['▲', '●', '■', '◆', '★', '♥', '♦', '♣'],
+    'animals': ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼'],
+    'fruits': ['🍎', '🍌', '🍇', '🍓', '🍑', '🍒', '🥝', '🍍'],
+  };
+
+  /// Returns a list of [MemoryCard]s, shuffled deterministically
+  /// from the given [seed]. The list length is `rows * cols` and
+  /// the pair count is `rows * cols / 2`.
+  static List<MemoryCard> generate({
+    required int rows,
+    required int cols,
+    required String theme,
+    required int seed,
+  }) {
+    assert(rows > 0 && cols > 0);
+    assert((rows * cols) % 2 == 0);
+    final pool = _themePool[theme] ?? _themePool['shapes']!;
+    final pairCount = (rows * cols) ~/ 2;
+    final cards = <MemoryCard>[];
+    for (var i = 0; i < pairCount; i++) {
+      final symbol = pool[i % pool.length];
+      cards.add(MemoryCard(symbol: symbol, pairId: i));
+      cards.add(MemoryCard(symbol: symbol, pairId: i));
+    }
+    cards.shuffle(math.Random(seed));
+    return List<MemoryCard>.unmodifiable(cards);
+  }
 }

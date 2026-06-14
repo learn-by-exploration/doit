@@ -40,6 +40,13 @@ class ShakeDetector {
   final int minSpacingMs;
   final int maxSpacingMs;
 
+  /// The full list of samples observed since [events] started
+  /// listening. Useful for building a [ShakeInput] when the
+  /// chain completes — the widget reads the same list the
+  /// detector processed, so a single-subscription stream is not
+  /// double-listened.
+  final List<ShakeSample> collected = <ShakeSample>[];
+
   /// Returns a stream of [ShakeEvent]s. The stream is single-
   /// subscription; cancelling the subscription cancels the
   /// listener.
@@ -49,6 +56,7 @@ class ShakeDetector {
     DateTime? lastShakeAt;
     samples.listen(
       (s) {
+        collected.add(s);
         if (s.magnitude < magnitudeThreshold) return;
         if (lastShakeAt == null) {
           count = 1;
