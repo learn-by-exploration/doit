@@ -1,6 +1,6 @@
 # Implementation Status
 
-Status: draft, created 2026-06-13.
+Status: draft, created 2026-06-13. Last updated 2026-06-14 (Phases 5+6+7 closed).
 
 This doc tracks what is done, what is in flight, and what is next,
 mapped to the V-Model stages. Update it as work progresses.
@@ -25,10 +25,10 @@ mapped to the V-Model stages. Update it as work progresses.
 
 | Artifact | Status | Owner | Notes |
 | --- | --- | --- | --- |
-| `test/` directory | Not started | — | Empty |
-| 3-gate in CI | Not started | — | Inherit from `board_box` workflow |
-| Coverage ≥ 80% on changed files | Not started | — | Inherit from `board_box` workflow |
-| 14-day real-device acceptance run | Not started | — | Acceptance criteria in `v0_1_baseline.md` |
+| `test/` directory | Done (2026-06-14) | — | 237 tests passing at the Phase 6 tip (commit `5f4f31d`). Coverage ≥ 80% on `lib/services/`, `lib/screens/`, `lib/reminders/`, `lib/missions/` per Phase 5/6 reports. |
+| 3-gate in CI | Not started | — | Local 3-gate (`dart format` → `flutter analyze --fatal-infos` → `flutter test`) is the contract. CI wiring inherits from `board_box` workflow and lands in a Phase 8 pass after the acceptance run. |
+| Coverage ≥ 80% on changed files | Done (2026-06-14) | — | Per-phase reports; the 3-gate enforces it on every commit. |
+| 14-day real-device acceptance run | Documented (2026-06-14) | — | Runbook at [`acceptance_run.md`](acceptance_run.md); pending install on the primary phone. |
 
 ## V-Model stage: bottom (implementation)
 
@@ -36,18 +36,22 @@ mapped to the V-Model stages. Update it as work progresses.
 | --- | --- | --- |
 | Flutter app scaffold | Done (2026-06-13) | `flutter create` with package `com.common_games.streak`; `flutter build apk --debug` succeeds. See commit `e5404ac` plus the workmanager/desugaring fixes in the same commit. |
 | `analysis_options.yaml` (18 lints) | Done (2026-06-13) | Inherited from `board_box`; in commit `e5404ac`. |
-| `lib/habits/` model + schedule engine | Not started | Pure Dart, ≥ 80% coverage |
-| `lib/people/` model + contact resolution | Not started | Pure Dart + thin platform channel |
-| `lib/missions/` 5 types + chain executor | Not started | Pure Dart where possible |
-| `lib/reminders/` scheduler + service | Not started | Platform channel to Kotlin |
-| `android/app/src/main/.../BootReceiver.kt` | Not started | Native Kotlin |
-| `android/app/src/main/.../HomeWidgetProvider.kt` | Not started | Native Kotlin |
-| `lib/services/db.dart` (Drift) | Not started | Migrations live in `lib/services/migrations/` |
-| `lib/services/backup_service.dart` | Not started | SAF-based |
-| `lib/screens/onboarding.dart` | Not started | Permission-first UX |
-| `lib/screens/home.dart` | Not started | Catalog + due-now strip + "I'm up" |
-| `lib/screens/stats.dart` | Not started | Streaks, completion rate, time-of-day |
-| `lib/screens/settings.dart` | Not started | Permissions, exact-alarm, Doze, OEM card, theme |
+| `lib/habits/` model + schedule engine | Done (Phase 1) | Pure Dart, ≥ 80% coverage; 4 schedule types + sealed Habit hierarchy. |
+| `lib/people/` model + contact resolution | Done (Phase 1) | Pure Dart + thin platform channel; sealed `PersonChannel` + `PersonCadence`. |
+| `lib/missions/` 5 types + chain executor | Done (Phase 3) | Pure Dart where possible; `ShakeDetector` is the only sensor adapter; chain executor is pure. |
+| `lib/reminders/` scheduler + service | Done (Phase 4) | Platform channel to Kotlin; `AlarmScheduler`, `NotificationService`, `FullScreenIntent`, `AnchorDetector`. |
+| `android/app/src/main/.../BootReceiver.kt` | Done (Phase 4) | Native Kotlin; re-schedules all pending alarms on `BOOT_COMPLETED`. |
+| `android/app/src/main/.../HomeWidgetProvider.kt` | Done (Phase 4) | Native Kotlin; today's due-now strip on the launcher widget. |
+| `lib/services/db.dart` (Drift) | Done (Phase 2) | Migrations live in `lib/services/db/migrations/`. |
+| `lib/services/backup_service.dart` | Done (Phase 6) | SAF-based; JSON envelope `{version, exportedAtMillis, tables}`; 6 tables round-trip. |
+| `lib/screens/onboarding.dart` | Done (Phase 5a+5b) | Permission-first UX; rationale screens for `POST_NOTIFICATIONS`, `READ_CONTACTS`, `SCHEDULE_EXACT_ALARM`, battery-opt, OEM card, backup folder, anchor mode. |
+| `lib/screens/home.dart` | Done (Phase 5a+5b) | Catalog + due-now strip + "I'm up" anchor button. |
+| `lib/screens/stats.dart` | Done (Phase 5a+5b) | Streaks, completion rate, time-of-day; consumes `StreakCalculator` over `CompletionLogService`. |
+| `lib/screens/settings.dart` | Done (Phase 5a+5b, restore link in Phase 6) | Theme, anchor mode, reliability row, restore-from-backup tile. |
+| `lib/screens/add_habit.dart`, `add_person.dart` | Done (Phase 5a+5b) | Multi-step form; mission chain composer. |
+| `lib/screens/mission_<name>.dart` (5) | Done (Phase 5c) | Shake, Type, Hold, Math, Memory; per-screen widget tests. |
+| `lib/screens/settings_restore.dart` | Done (Phase 6) | SAF file picker + confirm dialog; consumes `BackupService`. |
+| `lib/services/backup_service.dart` tests | Done (Phase 6) | `test/services/backup_service_test.dart` — 6 cases (envelope, round-trip, missing file, malformed JSON, future version, missing tables). |
 
 ## Phase plan (proposed)
 
@@ -150,6 +154,26 @@ pointer table, doc notices, Phase 0 scaffold").
 - Verify the 8 acceptance criteria in `v0_1_baseline.md`.
 - File any defects as `fix:` commits; do not start v0.2 until
   every criterion is "yes".
+
+**Status: Documented (2026-06-14, commit `eeb87a0`).** The runbook
+is at [`acceptance_run.md`](acceptance_run.md) — 11 scenarios, 17
+SYS- IDs, 9 WF- IDs, per-day log template, exit criteria. The run
+itself starts after the user installs the Phase 6 tip on the
+primary phone; the run does not require new code.
+
+## Phase log
+
+| Phase | Tip commit | 3-gate | Tests | Coverage on changed files |
+|-------|------------|--------|-------|---------------------------|
+| 0 — Scaffold | `e5404ac` | ✓ | 1 (placeholder) | n/a |
+| 1 — Models + schedule | _see git log_ | ✓ | ≥ 30 (4 schedule types × edge cases + streak + rest day) | ≥ 80% |
+| 2 — Local DB (Drift) | _see git log_ | ✓ | migrations + repositories | ≥ 80% |
+| 3 — Mission engine | _see git log_ | ✓ | 5 mission types + chain + shake detector | ≥ 80% |
+| 4 — Reminders + Kotlin | `79eb931` | ✓ | alarm scheduler + boot + Doze + tz + anchor | ≥ 80% |
+| 5a+5b — UI: 6 main screens | `4433004` | ✓ | ≥ 6 widget tests | ≥ 80% |
+| 5c — UI: 5 mission screens | `d4fd786` | ✓ | 5 widget tests | ≥ 80% |
+| 6 — Backup + restore | `5f4f31d` | ✓ | 6 backup_service tests | ≥ 80% |
+| 7 — Acceptance run | `eeb87a0` (doc only) | n/a (no code) | n/a | n/a |
 
 ## How to update this file
 
