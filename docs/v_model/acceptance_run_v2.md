@@ -281,3 +281,17 @@ If rejected, append a v0.2 fix-loop plan link instead.
 
 If any of the above sneaks into the run, it is a scope creep;
 cut it back to the matrix and ship the in-scope fix.
+
+## Parallel track: the v0.3 sideload-to-friends release
+
+The v0.2 personal-use run (this runbook) is one gate. The
+**v0.3 release** is the parallel public-release gate: "I trust
+someone else's hands to use it." v0.3 ships a release-signed
+apk / aab to a few trusted users while this run is still in
+flight; the two do not block each other. The v0.3 left-side
+doc is [`v0_3_release_baseline.md`](v0_3_release_baseline.md);
+the right-side gate is
+[`v0_3_release_checklist.md`](v0_3_release_checklist.md). If
+this run (Run #2) finds a v0.2 defect on Day N, the v0.3
+release is paused until the fix lands, and the v0.3 release
+resumes on a clean v0.2 tip.

@@ -175,11 +175,16 @@ primary phone; the run does not require new code.
 | 6 — Backup + restore | `5f4f31d` | ✓ | 6 backup_service tests | ≥ 80% |
 | 7 — Acceptance run | `eeb87a0` (doc only) | n/a (no code) | n/a | n/a |
 | v0.2 proposal | `76085e4` (doc only) | n/a (no code) | n/a | n/a |
-| **v0.2a — Completeness** | _in flight_ | _pending_ | _pending_ | _pending_ |
-| v0.2b — Events | _pending_ | _pending_ | _pending_ | _pending_ |
-| v0.2c — Groups | _pending_ | _pending_ | _pending_ | _pending_ |
-| v0.2d — UX delight | _pending_ | _pending_ | _pending_ | _pending_ |
-| v0.2e — Run #2 runbook | _in flight_ | n/a | n/a | [`acceptance_run_v2.md`](acceptance_run_v2.md) kicked off 2026-06-14 at SHA `c1b9e64`; Day 0 prep passed (3-gate green, debug apk built, v0.2 changed-files coverage 89.8%) |
+| **v0.2a — Completeness** | `9c032fc` | ✓ | 4 (category, icon, edit, pause) widget + model tests | ≥ 80% |
+| v0.2b — Events | `a828333` | ✓ | event_repository + add_event + events_list | ≥ 80% |
+| v0.2c — Groups | `457de5b` | ✓ | person_group + person_group_repository + rotation + screens | ≥ 80% |
+| v0.2d — UX delight | `54be40f` | ✓ | test reminder (WF-028) + bulk complete (WF-029) + fasting timer (WF-019) | ≥ 80% |
+| v0.2e — Run #2 runbook | `fd1a4d9` (doc only) | n/a (no code) | n/a | [`acceptance_run_v2.md`](acceptance_run_v2.md) kicked off 2026-06-14 at SHA `c1b9e64`; Day 0 prep passed (3-gate green, debug apk built, v0.2 changed-files coverage 89.8%) |
+| **v0.3a — Public docs + version constant** | `6502432` | ✓ | 4 build_info_test | n/a (docs + a 2-line constant) |
+| v0.3b — Release signingConfig | `bcb5c9b` | ✓ | 8 release_signing_test (static analysis) | n/a (Gradle config) |
+| v0.3c — In-app About / Licenses | `78b8302` | ✓ | 3 settings_licenses_test | ≥ 80% on `lib/screens/settings.dart` About changes |
+| v0.3d — Fresh-install smoke | `50781ce` | ✓ | 1 fresh_install_test (end-to-end) | n/a (integration test) |
+| v0.3e — Release (sign-off) | _pending_ | _tbd_ | _tbd_ | [`v0_3_release_checklist.md`](v0_3_release_checklist.md) is the right-side gate; `flutter build appbundle --release` is the user's hands-on step. |
 
 ## How to update this file
 

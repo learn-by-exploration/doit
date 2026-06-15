@@ -33,6 +33,16 @@ not yet a real requirement.
 | Test reminder (30s) | SYS-041 | `lib/services/test_fire_service.dart`, `lib/screens/habit_detail.dart` | `test/services/test_fire_test.dart`, widget test for the test button |
 | Bulk complete | SYS-044 | `lib/services/bulk_completion_service.dart`, `lib/screens/home.dart` | `test/services/bulk_completion_test.dart`, widget test for the bulk button |
 | Category / color / icon | SYS-045, SYS-046 | `lib/habits/category.dart`, `lib/widgets/category_chip.dart`, `lib/widgets/icon_picker.dart`, `lib/screens/home.dart` | `test/habits/category_test.dart`, widget test for the icon picker |
+| Test reminder — v0.1 aspirational (habit-detail "Test in 30s") | SYS-041 | `lib/services/test_fire_service.dart`, `lib/screens/habit_detail.dart` | Deferred in v0.2; superseded by the Settings tile (SYS-048). |
+| Test reminder — v0.2 actual (Settings → "Send a test reminder") | SYS-048 | `lib/screens/settings.dart` (About section), `lib/services/reminder_service.dart` | `test/screens/settings_test_reminder_test.dart`, `test/services/reminder_service_test.dart` |
+| Bulk complete — v0.1 aspirational (interval bulk) | SYS-044 | `lib/services/bulk_completion_service.dart` | Subsumed by the v0.2 home-screen bulk action (SYS-049). |
+| Bulk complete — v0.2 actual (home-screen bulk) | SYS-049 | `lib/screens/home.dart`, `lib/services/completion_log_service.dart` | `test/services/bulk_complete_test.dart` |
+| v0.3 release docs (LICENSE, PRIVACY) | SYS-050, SYS-051 | `LICENSE` (MIT), `PRIVACY.md` | File checks at repo root; reviewed against the v0.3 floor. |
+| v0.3 version constant | SYS-052 | `lib/build_info.dart`, `pubspec.yaml` | `test/build_info_test.dart` parses pubspec + asserts constants. |
+| v0.3 release signing | SYS-053 | `android/app/build.gradle.kts`, `android/key.properties.example`, `.gitignore` | `test/release_signing_test.dart` parses the build script + gitignore. Hands-on `flutter build appbundle --release` with the user's env vars. |
+| v0.3 in-app About / Licenses | SYS-054 | `lib/screens/settings.dart` (About section) | `test/screens/settings_licenses_test.dart` |
+| v0.3 fresh-install smoke | SYS-055 | `test/integration/fresh_install_test.dart` | The widget test + the user's hands-on wiped-device checklist in `v0_3_release_checklist.md`. |
+| v0.3 honest README | SYS-056 | `README.md` | Manual review on every commit that touches `README.md`. |
 
 ## Workflow → Requirement → Verification
 
@@ -59,9 +69,10 @@ not yet a real requirement.
 | WF-019 Add a time-window habit (v0.2) | SYS-039, SYS-040 | Unit test for `HabitTimeWindow.nextOccurrence()` + widget test for the live timer |
 | WF-022 Edit a habit (v0.2) | SYS-042, SYS-043 | Widget test for the edit flow + integration test that edit preserves the log |
 | WF-027 Pause / resume (v0.2) | SYS-047 | Unit test for the paused-state guard + widget test for the pause UI |
-| WF-028 Test reminder in 30s (v0.2) | SYS-041 | Widget test for the test button + integration test for the test fire |
-| WF-029 Bulk complete (v0.2) | SYS-044 | Widget test for the bulk button + integration test for the timestamp spread |
+| WF-028 Test reminder in 30s (v0.2) | SYS-041, SYS-048 | v0.1 aspirational (SYS-041, habit detail button) deferred in v0.2; the v0.2 actual surface is the Settings → About "Send a test reminder" tile (SYS-048). Widget test for the tile + integration test for the test fire. |
+| WF-029 Bulk complete (v0.2) | SYS-044, SYS-049 | v0.1 aspirational (SYS-044, interval bulk) subsumed by the v0.2 home-screen bulk action (SYS-049). Widget test for the bulk button + integration test for the timestamp spread. |
 | WF-031 Category / color / icon (v0.2) | SYS-045, SYS-046 | Widget test for the icon picker + stats grouping |
+| WF-032 Open source licenses (v0.3) | SYS-054 | Widget test for the licenses tile + the route push |
 
 ## How to use this matrix
 
