@@ -26,7 +26,7 @@ mapped to the V-Model stages. Update it as work progresses.
 | Artifact | Status | Owner | Notes |
 | --- | --- | --- | --- |
 | `test/` directory | Done (2026-06-14) | — | 237 tests passing at the Phase 6 tip (commit `5f4f31d`). Coverage ≥ 80% on `lib/services/`, `lib/screens/`, `lib/reminders/`, `lib/missions/` per Phase 5/6 reports. |
-| 3-gate in CI | Not started | — | Local 3-gate (`dart format` → `flutter analyze --fatal-infos` → `flutter test`) is the contract. CI wiring inherits from `board_box` workflow and lands in a Phase 8 pass after the acceptance run. |
+| 3-gate in CI | Done (2026-06-14) | — | v0.4a.1: `.github/workflows/ci.yml` runs the 3-gate on every PR and push to `main`. `test/ci_workflow_test.dart` parses the workflow and asserts the three steps in order. See commit _v0.4a.1_. |
 | Coverage ≥ 80% on changed files | Done (2026-06-14) | — | Per-phase reports; the 3-gate enforces it on every commit. |
 | 14-day real-device acceptance run | Documented (2026-06-14) | — | Runbook at [`acceptance_run.md`](acceptance_run.md); pending install on the primary phone. |
 
@@ -185,6 +185,7 @@ primary phone; the run does not require new code.
 | v0.3c — In-app About / Licenses | `78b8302` | ✓ | 3 settings_licenses_test | ≥ 80% on `lib/screens/settings.dart` About changes |
 | v0.3d — Fresh-install smoke | `50781ce` | ✓ | 1 fresh_install_test (end-to-end) | n/a (integration test) |
 | v0.3e — Release (sign-off) | _pending_ | _tbd_ | _tbd_ | [`v0_3_release_checklist.md`](v0_3_release_checklist.md) is the right-side gate; `flutter build appbundle --release` is the user's hands-on step. |
+| **v0.4a.1 — CI 3-gate** | _v0.4a.1_ | ✓ | _v0.4a.1_ | `.github/workflows/ci.yml` + `test/ci_workflow_test.dart`. Closes the "Not started" row in the right-side table. |
 
 ## How to update this file
 

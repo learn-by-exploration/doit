@@ -43,6 +43,7 @@ not yet a real requirement.
 | v0.3 in-app About / Licenses | SYS-054 | `lib/screens/settings.dart` (About section) | `test/screens/settings_licenses_test.dart` |
 | v0.3 fresh-install smoke | SYS-055 | `test/integration/fresh_install_test.dart` | The widget test + the user's hands-on wiped-device checklist in `v0_3_release_checklist.md`. |
 | v0.3 honest README | SYS-056 | `README.md` | Manual review on every commit that touches `README.md`. |
+| v0.4 CI 3-gate | SYS-057 | `.github/workflows/ci.yml` | `test/ci_workflow_test.dart` parses the workflow and asserts the three steps + the trigger set. |
 
 ## Workflow → Requirement → Verification
 
