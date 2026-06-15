@@ -125,7 +125,7 @@ until it is backfilled.
 | `b370d50` | clean (0 changed) | clean (41, matches v0.3 baseline) | 355 / 355 (350 prior + 5 new: 5 encryption) | v0.4c.1: backup encryption at rest. |
 | `8a26cf6` | clean (0 changed) | clean (41, matches v0.3 baseline) | 373 / 373 (355 prior + 18 new: 18 a11y per-file) | v0.4c.2: TalkBack / a11y static review. |
 | `________` | _tbd_ | _tbd_ | _tbd_ | v0.4d: sign-off + v0.4 CHANGELOG section. |
-| `efbfbdc` | clean (0 changed) | clean (41, matches v0.3 baseline) | 373 / 373 (no new tests; CHANGELOG.md `[0.4.0]` section appended) | v0.4d: sign-off commit. Pending user's hands-on TalkBack pass. |
+| `aa4d79e` | clean (0 changed) | clean (41, matches v0.3 baseline) | 373 / 373 (no new tests; CHANGELOG.md `[0.4.0]` section appended) | v0.4d: sign-off commit. Pending user's hands-on TalkBack pass. |
 
 _(Append a row for each v0.4 commit.)_
 
@@ -155,7 +155,7 @@ The v0.4 release is closed by a single line:
 Accepted on YYYY-MM-DD by <user>. Final SHA: <git rev-parse HEAD>.
 ```
 
-The v0.4d commit is `efbfbdc` (CHANGELOG + checklist). The
+The v0.4d commit is `aa4d79e` (CHANGELOG + checklist). The
 release is _in flight_ until the user's hands-on TalkBack pass
 on a real device (or emulator) clears SYS-062 row 6 — the
 checklist is not signed off below until that step is
