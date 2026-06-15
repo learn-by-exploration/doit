@@ -15,6 +15,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:common_games/build_info.dart';
 import 'package:common_games/reminders/alarm_scheduler.dart';
 import 'package:common_games/reminders/anchor_detector.dart';
 import 'package:common_games/screens/settings_restore.dart';
@@ -112,8 +113,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const _SectionHeader('About'),
             const ListTile(
               title: Text('Streak'),
-              subtitle: Text('v0.1.0 — local-only.'),
+              subtitle: Text(
+                '$kAppVersion — local-only. See PRIVACY.md for the data '
+                'we store and the data we do not.',
+              ),
               dense: true,
+            ),
+            ListTile(
+              key: const ValueKey('settings.licenses'),
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('Open source licenses'),
+              subtitle: const Text(
+                'Flutter, Drift, flutter_local_notifications, …',
+              ),
+              onTap: () => showLicensePage(
+                context: context,
+                applicationName: 'Streak',
+                applicationVersion: kAppVersion,
+                applicationLegalese: 'Local-only. No telemetry. No accounts.',
+              ),
             ),
           ],
         ),
