@@ -1,7 +1,24 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Release-signing material lives in `android/key.properties` (gitignored).
+// The real file is owned by the user and is *not* in VCS. The build
+// reads it via `java.util.Properties()`; if the file is absent (the
+// common dev case), the `release` buildType falls back to the debug
+// signingConfig so `flutter run --release` and `flutter build apk
+// --debug` keep working. See `android/key.properties.example` for the
+// four keys. The keystore file itself is referenced by `storeFile` and
+// also gitignored.
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android {
@@ -42,11 +59,45 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        // The release signingConfig reads the four keys from
+        // `android/key.properties` when the file is present. When
+        // it is absent (dev builds), the config has no keystore
+        // attached, but the `buildTypes.release` block below falls
+        // back to the debug signingConfig so the build still
+        // succeeds. The release artifact will be debug-signed in
+        // that case — which is the existing v0.1 / v0.2 behavior.
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // v0.3 release signing. The user's keystore lives in
+            // `android/key.properties` (gitignored). If that file
+            // is present, the release artifact is signed with the
+            // user's upload key. If it is absent, fall back to the
+            // debug signingConfig so `flutter run --release` keeps
+            // working for local dev.
+            //
+            // R8 / minify is OFF for v0.3 (decision recorded in
+            // `docs/v_model/decision_record.md` — minify-off is a
+            // v0.3 release-tier choice to keep stack traces
+            // readable and avoid missing keep-rule breaks in
+            // Flutter plugins). `isMinifyEnabled` is intentionally
+            // not set; the test
+            // `test/release_signing_test.dart` pins the decision.
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
