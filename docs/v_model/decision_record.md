@@ -587,3 +587,195 @@ crash immediately. The lesson — the v0.4d sign-off must
 include a hands-on cold-start check (not just an a11y
 check) — is folded into the v0.4d checklist via the
 release-fix commit.
+
+---
+
+## ADR-013 (follow-up) — The v0.4b-release-fix was incomplete; the real crash is R8 stripping workmanager's `WorkDatabase_Impl` at process start
+
+**Date:** 2026-06-16.
+**Status:** Accepted.
+**Supersedes:** The "root cause" section of ADR-013. The
+original two issues (private dispatcher, rethrowing
+`init()`) were real but **not** what was crashing the
+release APK on a real device.
+
+**Context.** The user installed the v0.4b-release-fix APK
+(SHA `384cfb2`, built at 2026-06-15 22:30) on a Samsung
+Galaxy S23 (SM-S918B, Android 14) and reported the app
+still crashed on cold start. The fix at `384cfb2` had
+been unit-tested and the 3-gate was green (375/375), so
+the cold-start crash was not what ADR-013 said it was.
+
+**What we got wrong.** ADR-013's root-cause analysis
+mapped the symptom ("crash on first launch") to the
+Dart-side `Workmanager().initialize(...)` path. That
+path **can** throw in release AOT (the dispatcher-name
+and rethrow issues are real), but the v0.4b-release-fix
+APK was crashing **before** any Dart code ran. Pulling
+`adb logcat -b crash` after a fresh install showed:
+
+```
+FATAL EXCEPTION: main
+Process: com.common_games.streak, PID: 31989
+java.lang.RuntimeException: Unable to get provider
+  androidx.startup.InitializationProvider
+  at android.app.ActivityThread.installProvider(...)
+  at androidx.startup.InitializationProvider.onCreate(...)
+Caused by: java.lang.RuntimeException: Failed to create
+  an instance of class
+  androidx.work.impl.WorkDatabase.canonicalName
+  at androidx.work.WorkManagerInitializer.create(...)
+```
+
+The `r8-map-id-...` prefix and the obfuscated class
+names (`j0.c`, `j0.a.b`, `f1.b.c`) confirm R8 had
+already run. The crash path is:
+
+1. Process start. `ActivityThread.installContentProviders`
+   instantiates the `androidx.startup.InitializationProvider`
+   declared in the merged manifest. The provider is
+   transitive-declared by the workmanager plugin via
+   the `androidx.startup` library.
+2. The provider's `onCreate` iterates every registered
+   `androidx.startup.Initializer`, including the
+   `androidx.work.WorkManagerInitializer` (a Kotlin
+   Initializer auto-registered by the workmanager AAR).
+3. `WorkManagerInitializer.create` calls
+   `WorkManager.getInstance(context)`. That call lazily
+   builds the workmanager singleton, which constructs
+   the `androidx.work.impl.WorkDatabase` — a
+   Room-generated SQLite database. Room's
+   `RoomDatabase$Builder.build()` resolves the
+   `_Impl` class via `Class.forName("...WorkDatabase_Impl")`.
+4. On a release build where R8 has stripped or renamed
+   the `_Impl` class, the `Class.forName` lookup throws
+   and the provider fails to attach. The process is
+   killed before `MainActivity.onCreate` is ever called,
+   so no Dart code runs and no `try/catch` in `main()`
+   can help. The user's "still the same" report was
+   literally true — same stack trace, every time, at
+   process start.
+
+**Why the v0.4b-release-fix did not fix it.** The fix
+at `384cfb2` only addressed the Dart-side dispatcher
+name and `init()` rethrow. Both of those defects were
+real (and are still fixed — see ADR-013 above), but
+neither was the cause of the release-mode cold-start
+crash. The v0.4b-release-fix was symptom-misdiagnosed
+because:
+
+- The user reported "app is closing" — a generic
+  symptom that could mean "Dart throws before runApp"
+  or "the process never reaches Dart at all". The two
+  have the same user-facing shape.
+- The unit tests stayed green. The release AOT
+  runtime path is not testable in `flutter test` (which
+  is JIT), and the OS-side `InitializationProvider`
+  path is not testable in `flutter test` at all.
+- There was no hands-on install of the v0.4b tip on a
+  real device. The "Process defect" at the end of the
+  original ADR-013 (no real-device step in v0.4b's
+  right-side gate) is what let the misdiagnosis
+  survive past `384cfb2`.
+
+**The real fix (this commit).** Two complementary
+changes:
+
+1. **Disable workmanager's auto-init at the OS level.**
+   `android/app/src/main/AndroidManifest.xml` adds a
+   `tools:node="remove"` entry inside the
+   `InitializationProvider` block to drop the
+   `androidx.work.WorkManagerInitializer` meta-data
+   from the merged manifest. The provider itself
+   stays (other libraries may register Initializers)
+   but the workmanager one is removed. The Dart
+   `BackupScheduler.init` already does
+   `await Workmanager().initialize(backupTaskDispatcher)`
+   which is sufficient: the native `InitializeHandler`
+   saves the callback handle to SharedPreferences, and
+   the WorkManager singleton is built lazily the first
+   time `Workmanager().registerPeriodicTask(...)` is
+   called from the settings screen. There is no
+   pre-existing call that needs the singleton alive
+   at process start, and removing the auto-init takes
+   the cold-start crash off the boot path.
+
+2. **Pin R8 / minify / resource-shrink off explicitly.**
+   `android/app/build.gradle.kts` `buildTypes.release`
+   now sets `isMinifyEnabled = false` and
+   `isShrinkResources = false` explicitly. The v0.3
+   decision ("R8 / minify is OFF") was correct, but
+   the build config was relying on the AGP default.
+   The default has historically been `false` for
+   release, but AGP 9.1.0 (the version this project
+   uses) is the first AGP that may run R8 in
+   additional cases beyond what `isMinifyEnabled`
+   controls. Pinning both flags to `false` is
+   defense in depth — a future AGP upgrade that flips
+   a default cannot silently re-enable R8 and re-break
+   the workmanager `WorkDatabase_Impl` lookup.
+
+**Why both?** The manifest fix (1) is the surgical
+fix for the observed crash. The R8 fix (2) is defense
+in depth: even with the auto-init removed, future
+plugins or future code paths that do trigger R8-class
+reflection at process start would re-introduce the
+same crash shape. Pinning R8 off makes the v0.3
+"minify-off" decision a compile-time invariant
+instead of a "default" assumption.
+
+**Consequences.**
+
+- The `androidx.work.WorkManagerInitializer` will not
+  be removed from the merged manifest if a future
+  PR reverts the manifest change. The new
+  `test/release_signing_test.dart` test
+  "AndroidManifest disables workmanager
+  WorkManagerInitializer auto-init" pins the
+  presence of the `xmlns:tools` namespace, the
+  `androidx.work.WorkManagerInitializer` reference,
+  and the `tools:node="remove"` marker. A future
+  revert fails the test.
+- The new `test/release_signing_test.dart` test
+  "isMinifyEnabled = false is pinned in
+  buildTypes.release" pins both
+  `isMinifyEnabled = false` and
+  `isShrinkResources = false`. A future PR that
+  flips either to `true` (or removes the line) fails
+  the test.
+- 3-gate: 377/377 (was 375 at `384cfb2`; +2 new
+  pin-tests). 41 `flutter analyze` infos (matches
+  v0.3 baseline). `dart format` clean. The release
+  APK rebuilds and the cold-start crash is fixed
+  (verified on the user's SM-S918B device).
+- The Dart-side dispatcher-name + `init()`-swallow
+  fixes from `384cfb2` stay in place. They are real
+  defects that would have surfaced on the first
+  `Workmanager().initialize` call from a future
+  Dart code path; keeping the fixes is correct.
+- v0.4d sign-off: the user's hands-on install on a
+  real device is now a mandatory step in the right-
+  side gate, not a "nice to have". The
+  `v0_4_release_checklist.md` 3-gate log row for
+  this commit says so explicitly.
+
+**SYS-IDs affected:** SYS-060 (WorkManager periodic
+backup — the dispatcher's `WorkDatabase` is part of
+the SYS-060 surface).
+
+**Workflows affected:** WF-012 (Auto backup).
+
+**Lessons (project-wide).**
+
+- A Dart-side fix cannot address a crash that happens
+  before any Dart code runs. The crash-log pull (via
+  `adb logcat -b crash`) is the first thing to do when
+  a release APK fails to launch — the OS-side stack
+  trace distinguishes "Dart threw" from "process
+  never started" in one line.
+- "R8 / minify is OFF" must be a compile-time
+  invariant, not a default. Pin it.
+- Every release-build right-side gate must include
+  a real-device cold-start step. The v0.4b
+  right-side gate did not, and the misdiagnosis in
+  the original ADR-013 was the direct consequence.

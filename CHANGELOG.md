@@ -139,6 +139,78 @@ every commit. Right-side gate: `v0_4_release_checklist.md`.
   artifact the TalkBack pass should exercise. See
   `decision_record.md` ADR-013.
 
+### v0.4b-release-fix-2 (ADR-013 follow-up) — The real cold-start crash: R8 stripping workmanager's `WorkDatabase_Impl`
+
+- **The v0.4b-release-fix at `384cfb2` was a misdiagnosis.**
+  The user installed the rebuilt APK on a Samsung Galaxy S23
+  (SM-S918B, Android 14) and reported the app still crashed
+  on cold start. The 3-gate stayed green, the Dart-side
+  dispatcher-name and `init()`-rethrow fixes from `384cfb2`
+  are correct on their own, but they were not the cause of
+  the release-mode cold-start crash. Pulling
+  `adb logcat -b crash` showed the OS-side stack trace:
+  `FATAL EXCEPTION: main` → `Unable to get provider
+  androidx.startup.InitializationProvider` →
+  `WorkManagerInitializer.create` → `Failed to create an
+  instance of class
+  androidx.work.impl.WorkDatabase.canonicalName`. The
+  `r8-map-id-...` prefix on the stack frames confirms R8 had
+  run, renaming Room's generated `WorkDatabase_Impl` class
+  such that `Class.forName(...)` inside
+  `WorkManagerInitializer.create` throws. The crash fires
+  at process start, before any Dart code can run.
+- **The real cause.** Two compounding issues:
+  1. **workmanager's `androidx.startup` auto-init runs at
+     process start.** The workmanager 0.6.0 plugin
+     auto-registers an `androidx.startup.Initializer` (the
+     `WorkManagerInitializer`) that fires before
+     `MainActivity.onCreate` and constructs the workmanager
+     singleton (which builds the `WorkDatabase`). Streak
+     already owns the WorkManager init order from
+     `BackupScheduler.init` in Dart — the OS does not need
+     to pre-create the singleton.
+  2. **R8 ran in this AGP build.** The v0.3 decision was
+     "R8 / minify is OFF" but the build config relied on
+     the AGP default. AGP 9.1.0 (the version this project
+     uses) ran R8 even with `isMinifyEnabled` not set, and
+     R8 stripped/renamed the Room-generated
+     `WorkDatabase_Impl` class.
+- **The fix.**
+  1. **Disable workmanager's auto-init at the OS level.**
+     `android/app/src/main/AndroidManifest.xml` adds a
+     `tools:node="remove"` entry inside the
+     `InitializationProvider` block to drop the
+     `androidx.work.WorkManagerInitializer` meta-data from
+     the merged manifest. The provider itself stays; only
+     the workmanager auto-init is removed.
+  2. **Pin R8 / minify / resource-shrink off explicitly.**
+     `android/app/build.gradle.kts` `buildTypes.release`
+     now sets `isMinifyEnabled = false` and
+     `isShrinkResources = false` explicitly. The v0.3
+     decision becomes a compile-time invariant instead of a
+     default assumption. A future AGP upgrade that flips a
+     default cannot silently re-enable R8 and re-introduce
+     the same crash shape.
+- **Two new tests in `test/release_signing_test.dart`** pin
+  both invariants:
+  - `isMinifyEnabled = false is pinned in
+    buildTypes.release` — asserts the explicit
+    `isMinifyEnabled = false` and `isShrinkResources = false`
+    lines.
+  - `AndroidManifest disables workmanager
+    WorkManagerInitializer auto-init` — asserts the
+    `xmlns:tools` namespace, the
+    `androidx.work.WorkManagerInitializer` reference, and
+    the `tools:node="remove"` marker.
+  A future revert of either change fails the test.
+- **The release APK is rebuilt (69.7 MB, 2026-06-16).** The
+  user installed it on the same SM-S918B device and the app
+  launched — `pidof com.common_games.streak` is non-zero,
+  the crash buffer is empty, first frame rendered, touch
+  events flowing. The cold-start crash is fixed. See
+  `decision_record.md` ADR-013 (follow-up) for the full
+  post-mortem, the lessons, and the consequences.
+
 ## [0.3.0] — 2026-06-14 — Sideload-to-friends release
 
 The first release that is not just for the user's primary phone.

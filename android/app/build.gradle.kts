@@ -86,13 +86,20 @@ android {
             // debug signingConfig so `flutter run --release` keeps
             // working for local dev.
             //
-            // R8 / minify is OFF for v0.3 (decision recorded in
-            // `docs/v_model/decision_record.md` — minify-off is a
-            // v0.3 release-tier choice to keep stack traces
-            // readable and avoid missing keep-rule breaks in
-            // Flutter plugins). `isMinifyEnabled` is intentionally
-            // not set; the test
+            // R8 / minify / resource-shrink is OFF for v0.3
+            // (decision recorded in `docs/v_model/decision_record.md`
+            // — minify-off is a v0.3 release-tier choice to keep
+            // stack traces readable and avoid missing keep-rule
+            // breaks in Flutter plugins). v0.4b-release-fix-2
+            // (ADR-013 follow-up) pins both flags explicitly: AGP
+            // defaults are version-dependent and a missing
+            // explicit `false` can let R8 run, which strips
+            // Room-generated classes (e.g. workmanager's
+            // `WorkDatabase_Impl`) and crashes the app at
+            // process start before any Dart code runs. The test
             // `test/release_signing_test.dart` pins the decision.
+            isMinifyEnabled = false
+            isShrinkResources = false
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {

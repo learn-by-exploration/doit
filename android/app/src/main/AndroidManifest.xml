@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- v0.1 permission baseline.
          See docs/v_model/architecture_options.md § Permission Baseline.
          The list is the source of truth. Any new permission requires an
@@ -73,6 +74,50 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- v0.4b-release-fix-2 (ADR-013 follow-up): disable
+             workmanager's `androidx.startup` auto-init.
+
+             The `androidx.startup.InitializationProvider` is
+             declared transitively by the workmanager plugin via
+             the `androidx.startup` library. On a fresh process
+             start the provider's `onCreate` instantiates every
+             `androidx.startup.Initializer` it knows about,
+             including `androidx.work.WorkManagerInitializer`,
+             which calls `WorkManager.getInstance(context)`.
+             That call constructs the workmanager `WorkDatabase`
+             (a Room-generated SQLite database). On release
+             builds the Room-generated `WorkDatabase_Impl` class
+             was being stripped or renamed by R8 even though
+             `isMinifyEnabled = false` was the intent — AGP
+             defaults are version-dependent and the build was
+             running R8, leaving the `Class.forName(...)` lookup
+             in `WorkManagerInitializer.create` to throw
+             "Failed to create an instance of class
+             androidx.work.impl.WorkDatabase.canonicalName". The
+             crash fires before `MainActivity.onCreate` so no
+             Dart code can catch it.
+
+             Removing the `WorkManagerInitializer` meta-data
+             from the merged manifest defers the WorkManager
+             singleton creation to the first Dart-side call to
+             `Workmanager().initialize(...)` (which lives in
+             `lib/services/backup_scheduler.dart`'s
+             `BackupScheduler.init`). The singleton is built
+             lazily from that point on; the workmanager
+             periodic task is registered later, from the
+             settings screen, when the user opts in. See
+             `docs/v_model/decision_record.md` ADR-013. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
