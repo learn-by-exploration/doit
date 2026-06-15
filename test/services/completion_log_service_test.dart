@@ -1,8 +1,8 @@
 // Tests for [CompletionLogService] — append + dedupe + list.
 
-import 'package:common_games/services/completion_log_service.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
+import 'package:doit/services/completion_log_service.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 

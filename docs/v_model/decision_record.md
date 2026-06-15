@@ -15,7 +15,7 @@ add a new ADR that supersedes it and link both.
 
 **Context.** The user already ships `board_box` and `card_box` in
 Flutter from the same monorepo. The choice was between adding a
-third Flutter app to `common_games` or building Streak in native
+third Flutter app to `common_games` or building do it in native
 Kotlin. Native would have been slightly better for the Android
 exact-alarm and Doze APIs, but it would have introduced a second
 toolchain, second CI, and a second set of conventions.
@@ -182,7 +182,7 @@ SYS-013.
 the app or loses the phone, the data is gone. Options:
 - No backup (uninstall = data loss).
 - Manual export (user has to remember).
-- Auto to a fixed path (e.g., Documents/Streak/) — fragile across
+- Auto to a fixed path (e.g., Documents/do it/) — fragile across
   Android versions and OEM file managers.
 - Auto to a user-chosen folder via Storage Access Framework.
 
@@ -212,7 +212,7 @@ in v0.1; encrypted backup is a v0.2 candidate.
 the user. Some users want the "day count" pressure; some want
 honest stats without the guilt.
 
-**Decision.** Streak model is configurable per habit. Defaults:
+**Decision.** do it model is configurable per habit. Defaults:
 - Per-habit streak: consecutive successful days.
 - Overall streak: % of active habits hit, default threshold 80%.
 - Rest-day budget: 2 / month per habit (configurable; can be 0).
@@ -364,7 +364,7 @@ the most important permissions when each request is paired with
 a clear, in-context rationale rather than a wall of requests at
 once.
 
-**Decision.** Streak asks in this order, in this order, and
+**Decision.** do it asks in this order, in this order, and
 with this rationale:
 
 1. **`POST_NOTIFICATIONS` (Android 13+).** Without this,
@@ -418,7 +418,7 @@ independently in each place (Math: 3-wrong nudge; Snooze:
 decision, the next "finite attempts" feature will be picked
 arbitrarily.
 
-**Decision.** Streak uses a **3-strikes policy** as the UX
+**Decision.** do it uses a **3-strikes policy** as the UX
 default for any finite-attempt behavior. Beyond 3 attempts,
 the app either:
 

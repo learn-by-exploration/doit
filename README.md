@@ -1,4 +1,4 @@
-# Streak
+# do it
 
 A personal, local-first Android habit and relationship app. Reminds you to do
 the small things — drink water, call Mom, run the morning routine — with the
@@ -12,7 +12,7 @@ artifacts on each side of the V.
 ## Why this app
 
 Existing habit apps let you tap "done" without doing the thing. Existing
-contact apps remind you to call people but never insist. Streak fuses the
+contact apps remind you to call people but never insist. do it fuses the
 two:
 
 - **Habits** with three proof modes: soft (one-tap), strong (mission

@@ -7,9 +7,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:common_games/missions/mission.dart';
-import 'package:common_games/missions/mission_input.dart';
-import 'package:common_games/theme/app_theme.dart';
+import 'package:doit/missions/mission.dart';
+import 'package:doit/missions/mission_input.dart';
+import 'package:doit/theme/app_theme.dart';
 
 class MissionMemoryScreen extends StatefulWidget {
   const MissionMemoryScreen({super.key, required this.mission, int? seed})

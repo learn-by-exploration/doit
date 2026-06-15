@@ -1,17 +1,18 @@
 # v0.1 Requirements Baseline
 
-Status: draft baseline, created 2026-06-13.
+Status: draft baseline, created 2026-06-13. Renamed from "Streak" to
+"do it" in v0.5a (commit in v0.5).
 
 ## Product Name
 
-Working name: **Streak**.
+Working name: **do it** (originally "Streak" until v0.5a).
 
 Short, action-focused, voice-friendly. Reads naturally in a
-notification ("Streak: Call Mom — due in 12 min"). May be revisited
+notification ("do it: Call Mom — due in 12 min"). May be revisited
 before any public release if a simpler or more creative name appears.
 
-The package id is `com.common_games.streak`. The display name in the
-launcher is "Streak".
+The package id is `com.doit.package`. The display name in the
+launcher is "do it".
 
 ## Prototype Strategy
 
@@ -73,7 +74,7 @@ of mission N (not a restart of the chain).
 
 Defer to v0.2: Barcode/QR, Photo.
 
-## Streak Model (v0.1)
+## do it Model (v0.1)
 
 User-configurable per habit; defaults are sensible.
 
@@ -85,7 +86,7 @@ User-configurable per habit; defaults are sensible.
   consume a rest day to skip without breaking the streak.
 - **Grace window:** default "until 03:00 next day", so a habit
   completed just past midnight still counts for the previous day.
-- **Streak off:** a habit can opt out of streaks entirely and just
+- **do it off:** a habit can opt out of streaks entirely and just
   show raw completion rate.
 
 ## Proof Modes (v0.1)

@@ -1,4 +1,4 @@
-// Streak — entry point.
+// do it — entry point.
 //
 // Wires up the singletons (DB, reminder, settings) before
 // `runApp` and mounts a `MultiProvider` so widgets can read
@@ -10,19 +10,19 @@
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter/material.dart';
 
-import 'package:common_games/reminders/anchor_detector.dart';
-import 'package:common_games/reminders/reminder_bridge.dart';
-import 'package:common_games/screens/home.dart';
-import 'package:common_games/screens/onboarding.dart';
-import 'package:common_games/services/backup_scheduler.dart';
-import 'package:common_games/services/backup_service.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/platform_alarm_scheduler.dart';
-import 'package:common_games/services/platform_full_screen_intent.dart';
-import 'package:common_games/services/platform_notification_service.dart';
-import 'package:common_games/services/reminder_service.dart';
-import 'package:common_games/services/settings_service.dart';
-import 'package:common_games/theme/app_theme.dart';
+import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/reminders/reminder_bridge.dart';
+import 'package:doit/screens/home.dart';
+import 'package:doit/screens/onboarding.dart';
+import 'package:doit/services/backup_scheduler.dart';
+import 'package:doit/services/backup_service.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/platform_alarm_scheduler.dart';
+import 'package:doit/services/platform_full_screen_intent.dart';
+import 'package:doit/services/platform_notification_service.dart';
+import 'package:doit/services/reminder_service.dart';
+import 'package:doit/services/settings_service.dart';
+import 'package:doit/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
 Future<void> main() async {
@@ -105,7 +105,7 @@ class StreakApp extends StatelessWidget {
         builder: (_, mode, _) => ValueListenableBuilder<bool>(
           valueListenable: SettingsService.instance.firstLaunchCompleted,
           builder: (_, firstLaunchDone, _) => MaterialApp(
-            title: 'Streak',
+            title: 'do it',
             theme: AppTheme.light,
             darkTheme: AppTheme.dark,
             themeMode: mode,

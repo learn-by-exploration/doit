@@ -11,10 +11,10 @@
 // `lastContactedMillis` per member. Marking a member as
 // contacted writes a new `addedAtMillis`-preserving row.
 
-import 'package:common_games/people/cadence.dart';
-import 'package:common_games/people/person_group.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
+import 'package:doit/people/cadence.dart';
+import 'package:doit/people/person_group.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
 import 'package:drift/drift.dart';
 
 class PersonGroupRepository {

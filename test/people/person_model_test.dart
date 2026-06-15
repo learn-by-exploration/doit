@@ -1,7 +1,7 @@
 // Tests for the Person model and PersonChannel hierarchy.
 
-import 'package:common_games/people/cadence.dart';
-import 'package:common_games/people/person.dart';
+import 'package:doit/people/cadence.dart';
+import 'package:doit/people/person.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 ContactPerson _person({PersonChannel? channel, PersonCadence? cadence}) {

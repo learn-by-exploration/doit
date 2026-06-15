@@ -25,7 +25,7 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:common_games/habits/category.dart';
+import 'package:doit/habits/category.dart';
 
 /// Show the icon picker as a modal bottom sheet. Returns the
 /// picked icon key, or null if the user dismissed.

@@ -8,7 +8,7 @@
 
 import 'dart:collection';
 
-import 'package:common_games/missions/mission.dart';
+import 'package:doit/missions/mission.dart';
 
 /// An unmodifiable, ordered list of missions.
 ///

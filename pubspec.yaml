@@ -1,12 +1,14 @@
-name: common_games
-description: "Streak: a slightly stubborn habit coach for Android."
+name: doit
+description: "do it: a slightly stubborn habit coach for Android."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none'
 
-# Streak is a personal-use Android habit app. iOS is v0.2+ scope. The
+# do it is a personal-use Android habit app. iOS is v0.2+ scope. The
 # version and build number are overridden by `flutter build` flags.
-version: 0.3.0+3
+# v0.5 is the rename-to-"do it" + permission-wiring milestone
+# (see docs/v_model/plan.md).
+version: 0.5.0+6
 
 environment:
   sdk: ^3.12.0

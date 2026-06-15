@@ -6,10 +6,10 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:common_games/events/event.dart';
-import 'package:common_games/services/event_repository.dart';
-import 'package:common_games/services/reminder_service.dart';
-import 'package:common_games/theme/app_theme.dart';
+import 'package:doit/events/event.dart';
+import 'package:doit/services/event_repository.dart';
+import 'package:doit/services/reminder_service.dart';
+import 'package:doit/theme/app_theme.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});

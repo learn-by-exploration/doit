@@ -9,9 +9,9 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/services/reminder_service.dart';
-import 'package:common_games/theme/app_theme.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/services/reminder_service.dart';
+import 'package:doit/theme/app_theme.dart';
 
 /// The visual surface for the reliability banner. Tap
 /// behavior is configurable via [onTap]; if null, the

@@ -1,18 +1,18 @@
-// Root widget tests. Pumps the Streak entry and verifies the
+// Root widget tests. Pumps the do it entry and verifies the
 // initial route. v0.4a.3 (SYS-059) adds the second test:
 // after `markFirstLaunchCompleted()` the next mount skips
 // onboarding and lands on `HomeScreen`.
 
-import 'package:common_games/main.dart';
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/reminders/anchor_detector.dart';
-import 'package:common_games/reminders/full_screen_intent.dart';
-import 'package:common_games/reminders/notification_service.dart';
-import 'package:common_games/reminders/reminder_bridge.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
-import 'package:common_games/services/reminder_service.dart';
-import 'package:common_games/services/settings_service.dart';
+import 'package:doit/main.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/reminders/full_screen_intent.dart';
+import 'package:doit/reminders/notification_service.dart';
+import 'package:doit/reminders/reminder_bridge.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
+import 'package:doit/services/reminder_service.dart';
+import 'package:doit/services/settings_service.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,7 +54,7 @@ Future<void> _setUpApp(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('Streak app boots into onboarding on a wiped install', (
+  testWidgets('do it app boots into onboarding on a wiped install', (
     tester,
   ) async {
     // Wiped-install precondition: empty SharedPreferences,
@@ -66,7 +66,7 @@ void main() {
     await tester.pump();
 
     expect(
-      find.text('Welcome to Streak'),
+      find.text('Welcome to do it'),
       findsOneWidget,
       reason: 'Onboarding must render on a wiped install',
     );
@@ -74,7 +74,7 @@ void main() {
   });
 
   testWidgets(
-    'Streak app skips onboarding after markFirstLaunchCompleted() (SYS-059)',
+    'do it app skips onboarding after markFirstLaunchCompleted() (SYS-059)',
     (tester) async {
       await _setUpApp(tester);
 
@@ -82,7 +82,7 @@ void main() {
       await tester.pumpWidget(const StreakApp());
       await tester.pump();
       expect(
-        find.text('Welcome to Streak'),
+        find.text('Welcome to do it'),
         findsOneWidget,
         reason: 'Onboarding renders while the flag is false',
       );
@@ -99,7 +99,7 @@ void main() {
       });
       // Re-mount: the ValueListenableBuilder rebuilds, and
       // OnboardingScreen is gone. We then assert the
-      // OnboardingScreen "Welcome to Streak" header is gone.
+      // OnboardingScreen "Welcome to do it" header is gone.
       //
       // We deliberately do NOT use `pumpAndSettle` here.
       // `HomeScreen._habitsFuture` is a real `Future` from
@@ -116,7 +116,7 @@ void main() {
       await tester.pumpWidget(const StreakApp());
       await tester.pump();
       expect(
-        find.text('Welcome to Streak'),
+        find.text('Welcome to do it'),
         findsNothing,
         reason:
             'After markFirstLaunchCompleted, the next mount must skip Onboarding',
@@ -124,7 +124,7 @@ void main() {
     },
   );
 
-  testWidgets('Streak app firstLaunchOverride=true forces onboarding', (
+  testWidgets('do it app firstLaunchOverride=true forces onboarding', (
     tester,
   ) async {
     // The override is a per-mount switch the widget exposes
@@ -139,7 +139,7 @@ void main() {
     await tester.pumpWidget(const StreakApp(firstLaunchOverride: true));
     await tester.pump();
     expect(
-      find.text('Welcome to Streak'),
+      find.text('Welcome to do it'),
       findsOneWidget,
       reason:
           'firstLaunchOverride=true forces the OnboardingScreen, regardless of the persisted flag',

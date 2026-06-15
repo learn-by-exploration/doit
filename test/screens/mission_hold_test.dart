@@ -1,8 +1,8 @@
 // Tests for the Hold-tap mission screen.
 
-import 'package:common_games/missions/mission.dart';
-import 'package:common_games/screens/mission_hold.dart';
-import 'package:common_games/theme/app_theme.dart';
+import 'package:doit/missions/mission.dart';
+import 'package:doit/screens/mission_hold.dart';
+import 'package:doit/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -1,9 +1,9 @@
 // Tests for EventRepository (WF-017).
 
-import 'package:common_games/events/event.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
-import 'package:common_games/services/event_repository.dart';
+import 'package:doit/events/event.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
+import 'package:doit/services/event_repository.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 

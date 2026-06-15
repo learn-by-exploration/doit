@@ -56,8 +56,7 @@ class SettingsService extends ChangeNotifier {
   /// Key under which the `firstLaunchCompleted` boolean is
   /// persisted. Private to the service — widgets never read or
   /// write `SharedPreferences` directly (.claude/rules/lib-screens.md §5).
-  static const String _kFirstLaunchCompletedKey =
-      'streak.first_launch_completed';
+  static const String _kFirstLaunchCompletedKey = 'doit.first_launch_completed';
 
   /// Idempotent init. Loads the persisted values; safe to call
   /// multiple times (the gate is completed on the first call and

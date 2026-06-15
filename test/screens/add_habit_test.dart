@@ -1,16 +1,16 @@
 // Tests for the AddHabitScreen.
 
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/reminders/anchor_detector.dart';
-import 'package:common_games/reminders/full_screen_intent.dart';
-import 'package:common_games/reminders/notification_service.dart';
-import 'package:common_games/reminders/reminder_bridge.dart';
-import 'package:common_games/habits/habit.dart' as domain;
-import 'package:common_games/screens/add_habit.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
-import 'package:common_games/services/habit_repository.dart';
-import 'package:common_games/services/reminder_service.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/reminders/full_screen_intent.dart';
+import 'package:doit/reminders/notification_service.dart';
+import 'package:doit/reminders/reminder_bridge.dart';
+import 'package:doit/habits/habit.dart' as domain;
+import 'package:doit/screens/add_habit.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
+import 'package:doit/services/habit_repository.dart';
+import 'package:doit/services/reminder_service.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -13,8 +13,8 @@ import 'dart:async';
 
 import 'package:drift/drift.dart';
 
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
 
 /// Source of a completion event. Logged so the streak calculator
 /// can distinguish manual completions from rest days.

@@ -103,7 +103,7 @@ void main() {
   test('android/*.jks and android/*.der patterns are gitignored', () {
     final gitignore = _read('.gitignore');
     // The root .gitignore has `*.jks` and `*.der` patterns; the
-    // android/-scoped line `/android/streak-release-key.jks` is
+    // android/-scoped line `/android/doit-release-key.jks` is
     // belt-and-braces. We assert the root patterns are present.
     expect(
       gitignore,
@@ -151,7 +151,7 @@ void main() {
     // the Room-generated `WorkDatabase_Impl` class. On a
     // release build where R8 has stripped that class, the
     // `Class.forName(...)` lookup throws and the process
-    // crashes before any Dart code can run. Streak owns the
+    // crashes before any Dart code can run. do it owns the
     // WorkManager init order itself (see
     // `lib/services/backup_scheduler.dart`); the OS does not
     // need to pre-create the singleton. The manifest must
@@ -174,6 +174,160 @@ void main() {
       manifest,
       contains('tools:node="remove"'),
       reason: 'manifest must remove the WorkManagerInitializer auto-init entry',
+    );
+  });
+
+  // ── v0.5a rename pins ────────────────────────────────────────────
+  // The app's identity moved from "Streak" / `com.common_games.streak`
+  // to "do it" / `com.doit.package`. These tests pin the v0.5a
+  // invariants so a future accidental revert fails CI.
+
+  test('build.gradle.kts pins applicationId to com.doit.package (v0.5a)', () {
+    final build = _read('android/app/build.gradle.kts');
+    expect(
+      build,
+      contains('applicationId = "com.doit.package"'),
+      reason:
+          'v0.5a pinned applicationId to com.doit.package. A revert to '
+          'com.common_games.streak would break the on-device install '
+          '(the user already uninstalled the v0.4b build).',
+    );
+    expect(
+      build,
+      contains('namespace = "com.doit.package"'),
+      reason:
+          'v0.5a pinned namespace to com.doit.package (must match '
+          'applicationId for Android resource lookup).',
+    );
+    expect(
+      build,
+      isNot(contains('com.common_games.streak')),
+      reason:
+          'v0.5a rename is full-scope — no com.common_games.streak '
+          'remnants in build.gradle.kts.',
+    );
+  });
+
+  test('pubspec.yaml name is "doit" and version is 0.5.0+6 (v0.5a)', () {
+    final pubspec = _read('pubspec.yaml');
+    expect(
+      pubspec,
+      contains('name: doit'),
+      reason:
+          'v0.5a renamed the Dart package from common_games to doit. '
+          'Every `package:doit/...` import depends on this.',
+    );
+    expect(
+      pubspec,
+      contains('version: 0.5.0+6'),
+      reason:
+          'v0.5a bumped the version from 0.4.0+5 to 0.5.0+6 to mark '
+          'the rename + permission-wiring milestone.',
+    );
+    expect(
+      pubspec,
+      isNot(contains('name: common_games')),
+      reason: 'pubspec.yaml must not reference the old common_games name.',
+    );
+  });
+
+  test('lib/build_info.dart mirrors pubspec 0.5.0+6 (v0.5a)', () {
+    final info = _read('lib/build_info.dart');
+    expect(
+      info,
+      contains("kAppVersion = '0.5.0'"),
+      reason: 'lib/build_info.dart must mirror pubspec.yaml version (0.5.0).',
+    );
+    expect(
+      info,
+      contains('kAppVersionCode = 6'),
+      reason: 'lib/build_info.dart must mirror pubspec.yaml versionCode (6).',
+    );
+  });
+
+  test('android/app/src/main/res/values/strings.xml app_name is "do it" '
+      '(v0.5a)', () {
+    final strings = _read('android/app/src/main/res/values/strings.xml');
+    expect(
+      strings,
+      contains('<string name="app_name">do it</string>'),
+      reason:
+          'The launcher label must read "do it" (v0.5a rename). The '
+          'manifest uses android:label="@string/app_name" so this '
+          'single source controls the launcher.',
+    );
+    expect(
+      strings,
+      isNot(contains('<string name="app_name">Streak</string>')),
+      reason: 'v0.5a full-scope rename: no "Streak" app_name in strings.xml.',
+    );
+  });
+
+  test('MethodChannel "doit/reminders" is the only reminders channel '
+      '(v0.5a)', () {
+    final bridge = _read('lib/reminders/reminder_bridge.dart');
+    // Match either `MethodChannel('doit/reminders')` or
+    // `MethodChannel("doit/reminders")` — the test only cares that
+    // the channel name is "doit/reminders" and that there is
+    // exactly one declaration site.
+    final channelDeclarations = RegExp(
+      '''MethodChannel\\(['"]doit/reminders['"]\\)''',
+    ).allMatches(bridge);
+    expect(
+      channelDeclarations.length,
+      1,
+      reason:
+          'lib/reminders/reminder_bridge.dart must declare the '
+          'doit/reminders MethodChannel exactly once. v0.5a renamed '
+          'it from streak/reminders; a duplicate declaration would '
+          'break the platform-side lookup.',
+    );
+    expect(
+      bridge,
+      isNot(contains("'streak/reminders'")),
+      reason:
+          'v0.5a renamed the MethodChannel name; no streak/reminders '
+          'string literal must remain in the bridge.',
+    );
+  });
+
+  test('notification channel id is "doit.reminders" (v0.5a)', () {
+    // The id is declared as a Dart constant in
+    // `lib/reminders/notification_service.dart` so the widget
+    // layer and the platform-side channel registration can
+    // share a single source of truth. The value must be
+    // exactly 'doit.reminders'.
+    final source = _read('lib/reminders/notification_service.dart');
+    expect(
+      source,
+      contains("'doit.reminders'"),
+      reason:
+          'The notification channel id must be exactly "doit.reminders" '
+          '(v0.5a rename from streak.reminders). The id is used by '
+          'Android to group notifications and survives app updates.',
+    );
+    expect(
+      source,
+      isNot(contains("'streak.reminders'")),
+      reason: 'v0.5a full-scope rename: no streak.reminders string literal.',
+    );
+  });
+
+  test('WorkManager backup task name is "doit.backup.nightly" (v0.5a)', () {
+    final scheduler = _read('lib/services/backup_scheduler.dart');
+    expect(
+      scheduler,
+      contains("'doit.backup.nightly'"),
+      reason:
+          'v0.5a renamed the WorkManager task name from '
+          'streak.backup.nightly. The name is read at runtime by the '
+          'workmanager plugin; the Kotlin side reads it from the '
+          'intent Data map, so no Kotlin change was needed.',
+    );
+    expect(
+      scheduler,
+      isNot(contains("'streak.backup.nightly'")),
+      reason: 'v0.5a full-scope rename: no streak.backup.nightly literal.',
     );
   });
 }

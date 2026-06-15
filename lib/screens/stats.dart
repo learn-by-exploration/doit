@@ -15,13 +15,13 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:common_games/habits/habit.dart';
-import 'package:common_games/habits/rest_day_budget.dart';
-import 'package:common_games/habits/streak_calculator.dart';
-import 'package:common_games/services/completion_log_service.dart';
-import 'package:common_games/services/habit_repository.dart';
-import 'package:common_games/theme/app_theme.dart';
-import 'package:common_games/widgets/category_chip.dart';
+import 'package:doit/habits/habit.dart';
+import 'package:doit/habits/rest_day_budget.dart';
+import 'package:doit/habits/streak_calculator.dart';
+import 'package:doit/services/completion_log_service.dart';
+import 'package:doit/services/habit_repository.dart';
+import 'package:doit/theme/app_theme.dart';
+import 'package:doit/widgets/category_chip.dart';
 
 /// A pre-baked row. Computed in the screen's `initState` /
 /// `_load()` so the build method is pure.

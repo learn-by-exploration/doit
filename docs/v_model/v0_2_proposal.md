@@ -131,7 +131,7 @@ Studying Alarmy, Habit Now, StickK, Fabulous, and the v0.1 surface:
 | WF-012 Auto backup | ✓ Solid | The 02:00-04:00 window is in `v0_1_baseline.md` but not in the WF. Add. |
 | WF-013 Restore | ✓ Solid | Destructive wipe is documented; no "merge" option. Fine for personal use, document it. |
 | WF-014 First-unlock | ✓ Solid | (deferred to WF-008) |
-| WF-015 Reboot survival | ⚠️ Minor | "Open Streak once to re-arm" banner is invisible if the user never opens the app. **Missing: home widget indicator.** (Polish, defer.) |
+| WF-015 Reboot survival | ⚠️ Minor | "Open do it once to re-arm" banner is invisible if the user never opens the app. **Missing: home widget indicator.** (Polish, defer.) |
 | WF-016 Timezone change | ✓ Solid | DST jump forward "silently drops" 02:30 — should be a banner, not silent. (Polish, defer.) |
 
 ### 4.2 Missing workflows (15 proposed for v0.2)
@@ -163,7 +163,7 @@ the rest for v0.3.
 
 Each item: workflow title, the user's "why," the UX summary, the new
 SYS-IDs to add, and an effort estimate (in phase units, where 1 phase
-≈ the Phase 5/6 effort for the Streak team).
+≈ the Phase 5/6 effort for the do it team).
 
 ### 5.1 WF-017 — One-off date-specific reminder (the Alarmy "appointment" model)
 

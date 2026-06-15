@@ -6,7 +6,7 @@
 
 import 'dart:io';
 
-import 'package:common_games/build_info.dart';
+import 'package:doit/build_info.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 ({String version, int code}) _readPubspecVersion() {

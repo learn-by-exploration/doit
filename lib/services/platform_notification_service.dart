@@ -17,9 +17,9 @@
 
 import 'dart:async';
 
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/reminders/notification_service.dart';
-import 'package:common_games/reminders/reminder_bridge.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/notification_service.dart';
+import 'package:doit/reminders/reminder_bridge.dart';
 
 class PlatformNotificationService implements NotificationService {
   PlatformNotificationService(this.bridge);

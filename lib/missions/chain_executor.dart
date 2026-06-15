@@ -11,9 +11,9 @@
 // for Hold-tap) and the mission's `verify` returns
 // [MissionTimedOut] via the input layer.
 
-import 'package:common_games/missions/chain.dart';
-import 'package:common_games/missions/mission_input.dart';
-import 'package:common_games/missions/mission_result.dart';
+import 'package:doit/missions/chain.dart';
+import 'package:doit/missions/mission_input.dart';
+import 'package:doit/missions/mission_result.dart';
 
 /// Pure chain executor. `inputs[i]` is fed to `chain[i]`; the
 /// result is a [MissionChainResult]. The number of inputs MUST

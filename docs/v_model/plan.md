@@ -4,7 +4,7 @@
 
 Use the V-model to keep the app honest: user needs and system requirements on
 the left side, implementation at the bottom, and explicit verification on
-the right side. Streak is opinionated — strong reminders, no cloud, single
+the right side. do it is opinionated — strong reminders, no cloud, single
 user — so the V must make those opinions visible at every stage. If a
 document stops describing those opinions, it has drifted.
 
@@ -52,7 +52,7 @@ is a wish. See [`traceability_matrix.md`](traceability_matrix.md).
    - Full-screen intent + home widget.
    - Wake-up anchor (manual + first-unlock).
    - Auto local backup.
-   - Streak model with rest days and per-habit + overall.
+   - do it model with rest days and per-habit + overall.
    - Acceptance: the user runs the app for 14 consecutive days with at
      least 3 of the 4 presets active and >70% completion rate.
 

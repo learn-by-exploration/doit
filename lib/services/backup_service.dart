@@ -1,4 +1,4 @@
-// Backup service — JSON export / import for Streak's local DB.
+// Backup service — JSON export / import for do it's local DB.
 //
 // The service is the only writer of backup files. Export
 // serializes every table (Habits, People, Completions,
@@ -26,8 +26,8 @@ import 'dart:math' show Random;
 import 'package:cryptography/cryptography.dart';
 import 'package:drift/drift.dart';
 
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
 
 /// Thrown by [BackupService.importFrom] when the file is missing,
 /// unparseable, or has a different schema version.

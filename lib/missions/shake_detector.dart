@@ -16,7 +16,7 @@
 
 import 'dart:async';
 
-import 'package:common_games/missions/mission_input.dart';
+import 'package:doit/missions/mission_input.dart';
 
 /// Emitted every time a new shake event is detected. The
 /// `countSinceFirst` is a monotonically increasing counter

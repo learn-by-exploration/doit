@@ -2,8 +2,8 @@
 // the [PlatformReminderBridge] talks to the real method
 // channel and is exercised in the integration build).
 
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/reminders/reminder_bridge.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/reminder_bridge.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -51,7 +51,7 @@ void main() {
   });
 
   group('PlatformReminderBridge', () {
-    const channel = MethodChannel('streak/reminders');
+    const channel = MethodChannel('doit/reminders');
     final List<MethodCall> log = <MethodCall>[];
 
     setUp(() {
@@ -115,7 +115,7 @@ void main() {
       const codec = StandardMethodCodec();
       final encoded = codec.encodeMethodCall(const MethodCall('rescheduleAll'));
       await messenger.handlePlatformMessage(
-        'streak/reminders',
+        'doit/reminders',
         encoded,
         (data) {},
       );
@@ -134,7 +134,7 @@ void main() {
         const MethodCall('fireAlarm', {'alarmId': 7}),
       );
       await messenger.handlePlatformMessage(
-        'streak/reminders',
+        'doit/reminders',
         encoded,
         (data) {},
       );
@@ -152,7 +152,7 @@ void main() {
         const MethodCall('fireAlarm', <String, dynamic>{}),
       );
       await messenger.handlePlatformMessage(
-        'streak/reminders',
+        'doit/reminders',
         encoded,
         (data) {},
       );
@@ -167,9 +167,7 @@ void main() {
       const codec = StandardMethodCodec();
       final encoded = codec.encodeMethodCall(const MethodCall('mystery'));
       Object? caught;
-      await messenger.handlePlatformMessage('streak/reminders', encoded, (
-        data,
-      ) {
+      await messenger.handlePlatformMessage('doit/reminders', encoded, (data) {
         if (data != null) {
           try {
             codec.decodeEnvelope(data);

@@ -15,7 +15,7 @@
 // hands-on TalkBack pass (v0.4d) is the real verification.
 //
 // The list of widget types is conservative — any new
-// interactive widget type in Flutter that Streak adopts
+// interactive widget type in Flutter that do it adopts
 // (e.g., `Switch.adaptive`, `Slider`) needs to be added to
 // the regex.
 

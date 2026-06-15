@@ -6,10 +6,10 @@
 
 import 'dart:io';
 
-import 'package:common_games/services/backup_scheduler.dart';
-import 'package:common_games/services/backup_service.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
+import 'package:doit/services/backup_scheduler.dart';
+import 'package:doit/services/backup_service.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -43,9 +43,9 @@ void main() {
   });
 
   test('runBackupTask() with a real folder writes a JSON file', () async {
-    final dir = await Directory.systemTemp.createTemp('streak-backup-task-');
+    final dir = await Directory.systemTemp.createTemp('doit-backup-task-');
     final uri = dir.uri.toString();
-    SharedPreferences.setMockInitialValues({'streak.backup.folder_uri': uri});
+    SharedPreferences.setMockInitialValues({'doit.backup.folder_uri': uri});
     final db = AppDatabaseService.instance.db;
     await db
         .into(db.habits)
@@ -63,7 +63,7 @@ void main() {
         );
     final ok = await runBackupTask();
     expect(ok, isTrue, reason: 'A valid folder should yield a successful run');
-    final out = File('${dir.path}/streak-backup.json');
+    final out = File('${dir.path}/doit-backup.json');
     expect(await out.exists(), isTrue);
     final contents = await out.readAsString();
     expect(
@@ -74,11 +74,11 @@ void main() {
   });
 
   test('runBackupTask() with a missing folder returns true (no-op)', () async {
-    final dir = await Directory.systemTemp.createTemp('streak-backup-missing-');
+    final dir = await Directory.systemTemp.createTemp('doit-backup-missing-');
     // Do not create the directory. The URI points to a path
     // that does not exist.
     final uri = '${dir.uri.toString()}no-such-subdir/';
-    SharedPreferences.setMockInitialValues({'streak.backup.folder_uri': uri});
+    SharedPreferences.setMockInitialValues({'doit.backup.folder_uri': uri});
     final ok = await runBackupTask();
     expect(
       ok,

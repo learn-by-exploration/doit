@@ -12,7 +12,7 @@ cannot be traced to a SYS- ID, the requirement is missing.
 action ("Drink water", "Call Mom", "Submit report"), append the
 streak number only as a secondary line, never use "broke"/"lost"
 (missed/skipped instead), and keep the tone calm and slightly
-stubborn. Avoid the prefix "Streak:" — the brand name does the
+stubborn. Avoid the prefix "do it:" — the brand name does the
 work. If a workflow's copy ever drifts from the brand voice, the
 voice wins; the workflow is updated in the same PR.
 
@@ -456,7 +456,7 @@ SYS-011, SYS-012, SYS-020.
 **Failure modes:**
 - File is not a valid backup → reject with a clear error.
 - File is from a newer version → "this backup is from a newer
-  version of Streak; please update the app first".
+  version of do it; please update the app first".
 - File is from an older version → run forward-migrations if any
   exist, else restore as-is.
 - Restoring the same file twice is idempotent (no duplicates).
@@ -494,11 +494,11 @@ detection path specifically.
 
 **Preconditions:**
 - The device reboots.
-- Streak was installed and had scheduled reminders.
+- do it was installed and had scheduled reminders.
 
 **Main flow:**
 1. The OS finishes booting.
-2. The boot receiver in Streak fires.
+2. The boot receiver in do it fires.
 3. The app re-schedules all pending reminders from the local
    DB.
 4. The app logs the reboot-reschedule event.
@@ -510,7 +510,7 @@ detection path specifically.
 
 **Failure modes:**
 - Boot receiver denied (some OEM settings) → app cannot
-  re-schedule until the user opens it. Banner: "Open Streak
+  re-schedule until the user opens it. Banner: "Open do it
   once to re-arm your reminders."
 - App data was wiped by the OEM → user starts fresh (this is
   not a bug; it's a factory reset).

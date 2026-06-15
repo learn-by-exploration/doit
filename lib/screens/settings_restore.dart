@@ -13,8 +13,8 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import 'package:common_games/services/backup_service.dart';
-import 'package:common_games/theme/app_theme.dart';
+import 'package:doit/services/backup_service.dart';
+import 'package:doit/theme/app_theme.dart';
 
 class SettingsRestoreScreen extends StatefulWidget {
   const SettingsRestoreScreen({super.key});
@@ -135,7 +135,7 @@ class _SettingsRestoreScreenState extends State<SettingsRestoreScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Pick a Streak backup (.json). The file must have '
+                        'Pick a do it backup (.json). The file must have '
                         'been produced by this app — restoring overwrites '
                         'every habit and completion currently on the '
                         'device.',

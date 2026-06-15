@@ -1,13 +1,13 @@
-# Streak — Privacy Notice
+# do it — Privacy Notice
 
-Streak is a personal, local-first Android habit and relationship app. The
+do it is a personal, local-first Android habit and relationship app. The
 short version: **your data lives on your phone, period**. This document
 spells out exactly what the app stores, what it does not do, and the
 caveats a careful reviewer should know.
 
-## What Streak stores on your device
+## What do it stores on your device
 
-Streak persists the following to a local SQLite database managed by the
+do it persists the following to a local SQLite database managed by the
 [Drift](https://drift.simonbinder.eu/) library (the schema lives in
 [`lib/services/db/schema.dart`](lib/services/db/schema.dart), schema
 version 2):
@@ -30,7 +30,7 @@ version 2):
 - **Event logs** — diagnostic rows written when reminders fire, get
   completed, or are missed. Used by the Stats screen.
 
-Streak also writes a JSON backup file to a folder you pick via the
+do it also writes a JSON backup file to a folder you pick via the
 system Storage Access Framework (SAF). The backup envelope is
 `{"version": 1, "exportedAtMillis": ..., "tables": ...}`. The file
 is plain text, scoped to the folder you choose, and lives on your
@@ -38,13 +38,13 @@ device's shared storage. Uninstalling the app removes the database
 but does not remove the backup file (it is in your SAF folder, not
 the app's private storage).
 
-In memory, Streak holds the in-app `SettingsService`, a handful of
+In memory, do it holds the in-app `SettingsService`, a handful of
 singleton services, and the in-memory copy of the Drift tables. None
 of that crosses a process boundary.
 
-## What Streak does NOT do
+## What do it does NOT do
 
-- **No server.** Streak has no backend, no API, no remote config.
+- **No server.** do it has no backend, no API, no remote config.
 - **No analytics.** No Firebase Analytics, no Mixpanel, no Segment,
   no Amplitude, no Crashlytics, no Sentry, no Bugsnag, no Datadog.
 - **No telemetry.** No install ID, no advertising ID, no device
@@ -72,9 +72,9 @@ fails on any `import 'package:http'` or `Uri.http(s)` outside the
 dev-only test harness. The PRIVACY.md is not a promise — the
 absence of the permission in the manifest is the contract.
 
-## Permissions Streak does request
+## Permissions do it does request
 
-These are the runtime permissions Streak asks for, with a rationale
+These are the runtime permissions do it asks for, with a rationale
 screen in onboarding for each:
 
 - **`POST_NOTIFICATIONS`** (Android 13+) — to show reminders.
@@ -92,7 +92,7 @@ screen in onboarding for each:
   and does not store the full vCard; it stores a stable lookup
   key, the cached display name, and the channel handle.
 
-Streak does **not** request `CALL_PHONE`, `READ_CALL_LOG`,
+do it does **not** request `CALL_PHONE`, `READ_CALL_LOG`,
 `RECORD_AUDIO`, `READ_PHONE_STATE`, `READ_SMS`, `ACCESS_FINE_LOCATION`,
 or `CAMERA`. The "Call a person" reminder opens the system dialer
 with the number pre-filled via `Intent.ACTION_DIAL` — it does not
@@ -146,7 +146,7 @@ of the v0.3 release:
 
 ## Reporting a privacy concern
 
-Streak is a personal project. If you received a copy and have a
+do it is a personal project. If you received a copy and have a
 concern, raise it with the person who handed you the apk. There is
 no public issue tracker. The PRIVACY.md and the
 `AndroidManifest.xml` are the source of truth — any code change

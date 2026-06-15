@@ -22,10 +22,10 @@
 
 import 'dart:async';
 
-import 'package:common_games/habits/habit.dart';
-import 'package:common_games/people/person.dart';
-import 'package:common_games/services/habit_repository.dart';
-import 'package:common_games/services/person_repository.dart';
+import 'package:doit/habits/habit.dart';
+import 'package:doit/people/person.dart';
+import 'package:doit/services/habit_repository.dart';
+import 'package:doit/services/person_repository.dart';
 
 class PauseService {
   PauseService._();

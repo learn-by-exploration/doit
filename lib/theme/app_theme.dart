@@ -1,4 +1,4 @@
-// Streak theme — M3 seed + 4dp grid + spacing tokens.
+// do it theme — M3 seed + 4dp grid + spacing tokens.
 //
 // Extracted from main.dart in Phase 5 so the dark/light pair
 // can be reused by widget tests and (in v0.2) swapped at
@@ -10,7 +10,7 @@
 
 import 'package:flutter/material.dart';
 
-/// Streak brand seed. A muted purple — calm, slightly
+/// do it brand seed. A muted purple — calm, slightly
 /// stubborn. Used by both light and dark.
 const Color streakSeed = Color(0xFF6750A4);
 
@@ -40,7 +40,7 @@ abstract class Sizing {
 /// [light]. The `StreakApp` widget picks one based on
 /// `SettingsService.themeMode`.
 abstract class AppTheme {
-  /// Dark theme — Streak's default per
+  /// Dark theme — do it's default per
   /// docs/v_model/architecture_options.md § Early Design
   /// Decisions.
   static ThemeData get dark => _build(Brightness.dark);

@@ -1,14 +1,14 @@
 // Widget tests for the settings "Test reminder" button (WF-028).
 
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/reminders/anchor_detector.dart';
-import 'package:common_games/reminders/full_screen_intent.dart';
-import 'package:common_games/reminders/notification_service.dart';
-import 'package:common_games/reminders/reminder_bridge.dart';
-import 'package:common_games/screens/settings.dart';
-import 'package:common_games/services/reminder_service.dart';
-import 'package:common_games/services/settings_service.dart';
-import 'package:common_games/theme/app_theme.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/reminders/full_screen_intent.dart';
+import 'package:doit/reminders/notification_service.dart';
+import 'package:doit/reminders/reminder_bridge.dart';
+import 'package:doit/screens/settings.dart';
+import 'package:doit/services/reminder_service.dart';
+import 'package:doit/services/settings_service.dart';
+import 'package:doit/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -71,6 +71,6 @@ void main() {
     // And the scheduler recorded exactly one alarm.
     final fake = ReminderService.instance.scheduler as FakeAlarmScheduler;
     expect(fake.scheduled.length, 1);
-    expect(fake.scheduled.first.habitId, 'streak.test_reminder');
+    expect(fake.scheduled.first.habitId, 'doit.test_reminder');
   });
 }

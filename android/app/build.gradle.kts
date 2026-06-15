@@ -22,12 +22,12 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.common_games.streak"
+    namespace = "com.doit.package"
     // Bumped from flutter.compileSdkVersion (34) to 36: the
     // file_picker plugin (used by onboarding) transitively
     // pulls in flutter_plugin_android_lifecycle, whose AAR
     // metadata requires compileSdk 36+. minSdk stays at 28 (the
-    // streak floor) and targetSdk still follows Flutter's
+    // app's floor) and targetSdk still follows Flutter's
     // default — the bump is compile-time only.
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
@@ -44,10 +44,12 @@ android {
     }
 
     defaultConfig {
-        // Application id pinned to com.common_games.streak per AGENTS.md.
-        // Any rename is a v0.2+ decision and requires an ADR.
-        applicationId = "com.common_games.streak"
-        // Streak floor is API 28 (Android 9) per
+        // Application id is com.doit.package per v0.5 (rename
+        // from "Streak" to "do it"). Future renames are a v0.6+
+        // decision and require an ADR. The v0.5a pin test in
+        // test/release_signing_test.dart asserts this exact value.
+        applicationId = "com.doit.package"
+        // App's floor is API 28 (Android 9) per
         // docs/v_model/requirements.md § Platform Constraints.
         // minSdk stays at 28. targetSdk follows Flutter's default
         // (currently 34); bumping it is a v0.3 decision because

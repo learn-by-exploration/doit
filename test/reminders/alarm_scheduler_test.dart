@@ -1,9 +1,9 @@
 // Tests for [AlarmScheduler] (and [FakeAlarmScheduler] which
 // is the in-memory test implementation).
 
-import 'package:common_games/habits/habit.dart';
-import 'package:common_games/habits/proof_mode.dart';
-import 'package:common_games/reminders/alarm_scheduler.dart';
+import 'package:doit/habits/habit.dart';
+import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

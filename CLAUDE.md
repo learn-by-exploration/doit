@@ -1,4 +1,4 @@
-# CLAUDE.md — Streak (Claude Code layer)
+# CLAUDE.md — do it (Claude Code layer)
 
 **Read [`AGENTS.md`](AGENTS.md) first.** It has the project overview, the
 3-gate, app invariants, commit conventions, and the secret-management
@@ -37,7 +37,7 @@ For deep-dives, see [`docs/v_model/`](docs/v_model/).
 - `flutter test --coverage`
 - `flutter build apk --debug`
 - `flutter build appbundle --release` — **ask first** (touches signing)
-- `flutter build web --release --base-href /Streak/`
+- `flutter build web --release --base-href /doit/`
 - `git status`, `git diff`, `git log`, `git add`, `git commit`, `git push`
 - `gh pr create`, `gh pr view`, `gh pr list`, `gh run list`, `gh run view`
 - Read-only shell: `cat`, `ls`, `find`, `grep`, `rg`
@@ -134,7 +134,7 @@ compaction keeps losing important state, add a one-line rule to
 
 ## V-Model-aware workflow
 
-Streak follows the V-Model from
+do it follows the V-Model from
 [`docs/v_model/plan.md`](docs/v_model/plan.md). When working on this
 repo, the right-side verification is just as important as the
 left-side requirement:

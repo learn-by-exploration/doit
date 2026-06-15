@@ -1,7 +1,7 @@
 // Tests for the ReliabilityBanner widget.
 
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/widgets/reliability_banner.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/widgets/reliability_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

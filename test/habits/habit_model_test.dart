@@ -1,8 +1,8 @@
 // Tests for the Habit model: validation, immutability, copyWith.
 
-import 'package:common_games/habits/habit.dart';
-import 'package:common_games/habits/proof_mode.dart';
-import 'package:common_games/missions/chain.dart';
+import 'package:doit/habits/habit.dart';
+import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/missions/chain.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 DateTime _createdAt() => DateTime(2026);

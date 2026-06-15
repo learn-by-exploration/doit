@@ -40,7 +40,7 @@ of:
   same one used for Run #1 (no second device).
 - **Build:** `flutter build apk --debug` from the tip of `main`,
   with `flutter test --coverage` clean on the same SHA.
-- **Account:** none. Streak is single-user, single-device,
+- **Account:** none. do it is single-user, single-device,
   local-only. No login flow exists or will be created for
   this run.
 - **Network:** disabled for the app (`INTERNET` is not in the

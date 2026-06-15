@@ -7,7 +7,7 @@
 // fresh `SharedPreferences` mock. The test also asserts the
 // flag is `false` on a wiped install.
 
-import 'package:common_games/services/settings_service.dart';
+import 'package:doit/services/settings_service.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

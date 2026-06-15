@@ -1,10 +1,10 @@
 // Tests for PersonGroupRepository (WF-018).
 
-import 'package:common_games/people/cadence.dart';
-import 'package:common_games/people/person_group.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
-import 'package:common_games/services/person_group_repository.dart';
+import 'package:doit/people/cadence.dart';
+import 'package:doit/people/person_group.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
+import 'package:doit/services/person_group_repository.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 

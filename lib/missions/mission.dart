@@ -12,8 +12,8 @@
 
 import 'package:meta/meta.dart';
 
-import 'package:common_games/missions/mission_input.dart';
-import 'package:common_games/missions/mission_result.dart';
+import 'package:doit/missions/mission_input.dart';
+import 'package:doit/missions/mission_result.dart';
 
 /// A sealed mission. The 5 v0.1 types are exhaustive; adding a
 /// v0.2 type (Barcode, Photo) means adding a new subclass here.

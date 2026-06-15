@@ -3,7 +3,7 @@
 // Coverage:
 //   1. Fresh-install creates the v1 schema (all 6 tables present).
 //   2. Re-opening an existing v1 DB does NOT re-run onCreate.
-//   3. A `streak.db` from a hypothetical v0 → v1 upgrade is
+//   3. A `doit.db` from a hypothetical v0 → v1 upgrade is
 //      idempotent (the v1 schema is a superset of the empty
 //      schema; createAll is safe on a fresh DB).
 //
@@ -11,8 +11,8 @@
 // `drift/native.dart` `NativeDatabase.memory()` gives us an
 // in-process SQLite without touching the filesystem.
 
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 

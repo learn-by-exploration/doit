@@ -1,4 +1,4 @@
-package com.common_games.streak
+package com.doit.package
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -9,7 +9,7 @@ import android.os.Build
 
 /**
  * Receives the AlarmManager broadcast. Hands off to the Dart
- * side via the `streak/reminders` method channel (call:
+ * side via the `doit/reminders` method channel (call:
  * `fireAlarm(alarmId)`) so the Dart side can:
  *   1. Show the notification (or full-screen intent for
  *      Strong-mode habits).
@@ -34,7 +34,7 @@ class AlarmReceiver : BroadcastReceiver() {
 
         fun pendingIntent(context: Context, alarmId: Int): PendingIntent {
             val intent = Intent(context, AlarmReceiver::class.java).apply {
-                action = "com.common_games.streak.FIRE_ALARM"
+                action = "com.doit.package.FIRE_ALARM"
                 putExtra(EXTRA_ALARM_ID, alarmId)
             }
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

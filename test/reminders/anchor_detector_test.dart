@@ -1,6 +1,6 @@
 // Tests for [AnchorDetector] and [FakeAnchorDetector].
 
-import 'package:common_games/reminders/anchor_detector.dart';
+import 'package:doit/reminders/anchor_detector.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

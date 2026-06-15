@@ -1,7 +1,7 @@
 // Platform bridge for reminders.
 //
 // The Kotlin side (BootReceiver, MainActivity) talks to Dart
-// through a single [MethodChannel] named `streak/reminders`.
+// through a single [MethodChannel] named `doit/reminders`.
 // The Dart side is the source of truth for "what to schedule";
 // the Kotlin side is a thin wrapper that just calls into
 // `AlarmManager` and `WorkManager`.
@@ -25,7 +25,7 @@
 
 import 'dart:async';
 
-import 'package:common_games/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:flutter/services.dart';
 
 /// Public surface for the Kotlin ↔ Dart bridge.
@@ -55,12 +55,12 @@ abstract class ReminderInbound {
 }
 
 /// The default bridge — wraps a [MethodChannel] for
-/// `streak/reminders`. Constructed in `main.dart` after
+/// `doit/reminders`. Constructed in `main.dart` after
 /// `WidgetsFlutterBinding.ensureInitialized()`.
 class PlatformReminderBridge implements ReminderBridge {
   PlatformReminderBridge({this.inbound});
 
-  static const _channel = MethodChannel('streak/reminders');
+  static const _channel = MethodChannel('doit/reminders');
 
   /// Optional inbound handler. Set after construction.
   final ReminderInbound? inbound;
@@ -87,7 +87,7 @@ class PlatformReminderBridge implements ReminderBridge {
         return null;
       default:
         throw MissingPluginException(
-          'streak/reminders has no method ${call.method}',
+          'doit/reminders has no method ${call.method}',
         );
     }
   }

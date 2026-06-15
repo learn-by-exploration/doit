@@ -9,14 +9,14 @@
 // Layer rules (per .claude/rules/lib-reminders.md):
 // - No `DateTime.now()` inside the service; the caller passes
 //   the trigger time in [ReminderEvent.at].
-// - Notification channel is `streak.reminders`, high importance.
+// - Notification channel is `doit.reminders`, high importance.
 // - The action button is "Done" (or "Open" for strong-mode
 //   habits).
-// - A custom monochrome icon `ic_streak_notification` is used.
+// - A custom monochrome icon `ic_doit_notification` is used.
 
 import 'dart:async';
 
-import 'package:common_games/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:meta/meta.dart';
 
 /// A reminder to surface. The widget layer composes this; the
@@ -39,7 +39,7 @@ class ReminderEvent {
 
 /// Public surface for the notification service.
 abstract class NotificationService {
-  /// Show [event] on the streak.reminders channel.
+  /// Show [event] on the doit.reminders channel.
   Future<void> show(ReminderEvent event);
 
   /// Dismiss the notification for [alarmId].
@@ -62,3 +62,13 @@ class FakeNotificationService implements NotificationService {
     dismissed.add(id);
   }
 }
+
+/// The Android notification channel id for reminder
+/// notifications. v0.5a renamed this from `streak.reminders` to
+/// `doit.reminders` to match the renamed app id. The id is the
+/// Android-side key used by `NotificationManager` to group
+/// notifications and is preserved across app updates, so it
+/// MUST match the value used by the platform-side channel
+/// registration. Pinned by a static-analysis test in
+/// `test/release_signing_test.dart`.
+const String kNotificationChannelId = 'doit.reminders';

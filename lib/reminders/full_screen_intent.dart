@@ -15,8 +15,8 @@
 
 import 'dart:async';
 
-import 'package:common_games/habits/habit.dart';
-import 'package:common_games/missions/chain.dart';
+import 'package:doit/habits/habit.dart';
+import 'package:doit/missions/chain.dart';
 import 'package:meta/meta.dart';
 
 /// A launch request for the full-screen mission UI.

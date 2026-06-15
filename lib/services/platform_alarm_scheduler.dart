@@ -22,10 +22,10 @@
 
 import 'dart:async';
 
-import 'package:common_games/events/event.dart';
-import 'package:common_games/habits/habit.dart';
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/reminders/reminder_bridge.dart';
+import 'package:doit/events/event.dart';
+import 'package:doit/habits/habit.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/reminder_bridge.dart';
 
 class PlatformAlarmScheduler implements AlarmScheduler {
   PlatformAlarmScheduler(this._bridge);

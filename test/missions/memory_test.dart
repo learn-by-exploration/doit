@@ -1,8 +1,8 @@
 // Tests for [MemoryMission.verify].
 
-import 'package:common_games/missions/mission.dart';
-import 'package:common_games/missions/mission_input.dart';
-import 'package:common_games/missions/mission_result.dart';
+import 'package:doit/missions/mission.dart';
+import 'package:doit/missions/mission_input.dart';
+import 'package:doit/missions/mission_result.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 List<MemoryPair> _pairs(int n) => [

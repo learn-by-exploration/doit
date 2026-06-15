@@ -20,10 +20,10 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:common_games/reminders/anchor_detector.dart';
-import 'package:common_games/services/reminder_service.dart';
-import 'package:common_games/services/settings_service.dart';
-import 'package:common_games/theme/app_theme.dart';
+import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/services/reminder_service.dart';
+import 'package:doit/services/settings_service.dart';
+import 'package:doit/theme/app_theme.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key, required this.onDone});
@@ -42,7 +42,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _OnboardingStep(
       title: 'Notifications',
       body:
-          'Streak sends a daily reminder for each habit. Android '
+          'do it sends a daily reminder for each habit. Android '
           'asks for the notification permission once.',
       cta: 'Allow',
     ),
@@ -50,7 +50,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: 'Contacts',
       body:
           'If you add a "cadence" habit — call Mom every Sunday — '
-          'Streak reads the contact you pick. It never imports the '
+          'do it reads the contact you pick. It never imports the '
           'whole address book.',
       cta: 'Allow',
     ),
@@ -58,7 +58,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: 'Exact alarms',
       body:
           'Exact alarms fire reminders on the minute, not up to '
-          '15 minutes late. If you decline, Streak falls back to a '
+          '15 minutes late. If you decline, do it falls back to a '
           'best-effort schedule.',
       cta: 'Allow',
     ),
@@ -66,7 +66,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: 'Backup folder',
       body:
           'Pick a folder on your phone (or SD card) for nightly '
-          'auto-backups. Streak writes a single encrypted file; the '
+          'auto-backups. do it writes a single encrypted file; the '
           'folder stays yours.',
       cta: 'Pick folder',
     ),
@@ -77,7 +77,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (_step < _steps.length) {
       final s = _steps[_step];
       return Scaffold(
-        appBar: AppBar(title: const Text('Welcome to Streak')),
+        appBar: AppBar(title: const Text('Welcome to do it')),
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(Spacing.lg),
@@ -126,7 +126,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'How should Streak detect your morning?',
+                'How should do it detect your morning?',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: Spacing.md),

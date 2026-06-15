@@ -9,9 +9,9 @@
 // Recurrence: the row stores 'none' | 'annually'. The domain model
 // uses the sealed `EventRecurrence` enum.
 
-import 'package:common_games/events/event.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
+import 'package:doit/events/event.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
 import 'package:drift/drift.dart';
 
 class EventRepository {

@@ -25,17 +25,17 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:common_games/habits/habit.dart';
-import 'package:common_games/services/completion_log_service.dart';
-import 'package:common_games/services/habit_repository.dart';
-import 'package:common_games/services/reminder_service.dart';
-import 'package:common_games/theme/app_theme.dart';
-import 'package:common_games/widgets/category_chip.dart';
-import 'package:common_games/widgets/reliability_banner.dart';
-import 'package:common_games/screens/add_habit.dart';
-import 'package:common_games/screens/add_person.dart';
-import 'package:common_games/screens/settings.dart';
-import 'package:common_games/screens/stats.dart';
+import 'package:doit/habits/habit.dart';
+import 'package:doit/services/completion_log_service.dart';
+import 'package:doit/services/habit_repository.dart';
+import 'package:doit/services/reminder_service.dart';
+import 'package:doit/theme/app_theme.dart';
+import 'package:doit/widgets/category_chip.dart';
+import 'package:doit/widgets/reliability_banner.dart';
+import 'package:doit/screens/add_habit.dart';
+import 'package:doit/screens/add_person.dart';
+import 'package:doit/screens/settings.dart';
+import 'package:doit/screens/stats.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -120,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_selectMode ? '${_selected.length} selected' : 'Streak'),
+        title: Text(_selectMode ? '${_selected.length} selected' : 'do it'),
         leading: _selectMode
             ? IconButton(
                 key: const ValueKey('home.cancel_select'),

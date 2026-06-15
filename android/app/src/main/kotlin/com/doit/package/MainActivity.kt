@@ -1,4 +1,4 @@
-package com.common_games.streak
+package com.doit.package
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine

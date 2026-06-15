@@ -15,15 +15,15 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:common_games/habits/category.dart';
-import 'package:common_games/habits/habit.dart' as domain;
-import 'package:common_games/habits/proof_mode.dart';
-import 'package:common_games/missions/chain.dart';
-import 'package:common_games/missions/mission.dart';
+import 'package:doit/habits/category.dart';
+import 'package:doit/habits/habit.dart' as domain;
+import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/missions/chain.dart';
+import 'package:doit/missions/mission.dart';
 import 'package:drift/drift.dart';
 
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
 
 class HabitRepository {
   HabitRepository._();

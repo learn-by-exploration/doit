@@ -18,8 +18,8 @@
 
 import 'dart:async';
 
-import 'package:common_games/events/event.dart';
-import 'package:common_games/habits/habit.dart';
+import 'package:doit/events/event.dart';
+import 'package:doit/habits/habit.dart';
 import 'package:meta/meta.dart';
 
 /// A stable identifier for a scheduled alarm. The alarm id is

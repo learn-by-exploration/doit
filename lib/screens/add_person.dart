@@ -12,10 +12,10 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:common_games/people/cadence.dart';
-import 'package:common_games/people/person.dart';
-import 'package:common_games/services/person_repository.dart';
-import 'package:common_games/theme/app_theme.dart';
+import 'package:doit/people/cadence.dart';
+import 'package:doit/people/person.dart';
+import 'package:doit/services/person_repository.dart';
+import 'package:doit/theme/app_theme.dart';
 
 class AddPersonScreen extends StatefulWidget {
   const AddPersonScreen({super.key});

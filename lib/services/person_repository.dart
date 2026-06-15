@@ -5,14 +5,14 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:common_games/missions/chain.dart';
-import 'package:common_games/missions/mission.dart';
-import 'package:common_games/people/cadence.dart' as domain;
-import 'package:common_games/people/person.dart' as domain;
+import 'package:doit/missions/chain.dart';
+import 'package:doit/missions/mission.dart';
+import 'package:doit/people/cadence.dart' as domain;
+import 'package:doit/people/person.dart' as domain;
 import 'package:drift/drift.dart';
 
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
 
 class PersonRepository {
   PersonRepository._();

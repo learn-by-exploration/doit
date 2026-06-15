@@ -1,9 +1,9 @@
 // Tests for the AddPersonScreen.
 
-import 'package:common_games/screens/add_person.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
-import 'package:common_games/services/person_repository.dart';
+import 'package:doit/screens/add_person.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
+import 'package:doit/services/person_repository.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

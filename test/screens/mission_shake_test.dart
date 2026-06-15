@@ -2,10 +2,10 @@
 
 import 'dart:async';
 
-import 'package:common_games/missions/mission.dart';
-import 'package:common_games/missions/mission_input.dart';
-import 'package:common_games/screens/mission_shake.dart';
-import 'package:common_games/theme/app_theme.dart';
+import 'package:doit/missions/mission.dart';
+import 'package:doit/missions/mission_input.dart';
+import 'package:doit/screens/mission_shake.dart';
+import 'package:doit/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -1,6 +1,6 @@
 // Tests for the rest-day budget.
 
-import 'package:common_games/habits/rest_day_budget.dart';
+import 'package:doit/habits/rest_day_budget.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

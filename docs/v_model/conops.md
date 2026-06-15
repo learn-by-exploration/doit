@@ -4,7 +4,7 @@ Status: draft baseline, created 2026-06-13.
 
 ## Mission
 
-Streak helps a single user build daily habits and maintain important
+do it helps a single user build daily habits and maintain important
 relationships by turning the phone into a slightly stubborn coach. The
 app reminds you to do the things you said you would — drink water, call
 Mom, run the morning routine — and tracks the truth of what you actually
@@ -13,19 +13,19 @@ than inflate a streak.
 
 ### Brand voice
 
-The product is named *Streak*, but the surface area spans habits,
+The product is named *do it*, but the surface area spans habits,
 todos, call/message cadences, and anchored routines. Notification copy
 should lead with the **thing you do** ("Call Mom", "Drink water",
 "Submit report") and end with the streak number only when it adds
 motivation. The name does the work; the copy does not lean on it.
 
-- **Lead with the action.** "Drink water" beats "Streak: hydrate".
-- **Streak number is the period, not the point.** Append it as a
+- **Lead with the action.** "Drink water" beats "do it: hydrate".
+- **do it number is the period, not the point.** Append it as a
   secondary line, not the headline: "Drink water in 5 min — 12 days
   running".
 - **No shame.** Missed days are facts, not failures. Copy says
   "missed" or "skipped", never "broke" or "lost".
-- **Tone is calm, slightly stubborn.** Streak is the friend who
+- **Tone is calm, slightly stubborn.** do it is the friend who
   doesn't let you off the hook, but doesn't yell either.
 
 ## Operational Context
@@ -92,7 +92,7 @@ modes.
 
 ## Normal Operational Scenario
 
-1. User installs Streak from a signed APK.
+1. User installs do it from a signed APK.
 2. Onboarding explains what the app does and asks for permissions in
    order (notifications first, contacts second, exact-alarm third,
    battery optimization last, with rationale for each).
@@ -110,8 +110,8 @@ modes.
 10. The user continues through the day: drink water pings every 30 min
     and they confirm in the window; a "call Mom" reminder surfaces in
     the evening; the user taps it, the dialer opens, the call is made,
-    the user returns to Streak and taps "Done — I called Mom".
-11. Each night, Streak writes a snapshot to the user's chosen backup
+    the user returns to do it and taps "Done — I called Mom".
+11. Each night, do it writes a snapshot to the user's chosen backup
     folder.
 12. After 30 days, the stats screen shows: 28/30 days hit on drink
     water, 10 calls to Mom (cadence kept), morning routine streak of
@@ -140,9 +140,9 @@ modes.
 The app succeeds if, after 30 consecutive days of use, the user can
 truthfully answer "yes" to all of the following:
 
-1. Streak fired a reminder for each scheduled habit within ±60 seconds
+1. do it fired a reminder for each scheduled habit within ±60 seconds
    of its target time, for at least 95% of scheduled occurrences.
-2. Streak survived at least one device reboot without dropping
+2. do it survived at least one device reboot without dropping
    reminders.
 3. The user called or messaged each named contact at least once per
    cadence window, for at least 80% of windows.

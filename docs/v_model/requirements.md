@@ -79,7 +79,7 @@ NOT loosen any v0.1 constraint (still no `INTERNET`, no
 - Telemetry, analytics, crash reporting that leaves the device.
 - Storing payment cards, bank data, or any credentials.
 - CALL_PHONE permission. Always dialer pre-fill.
-- Access-card / RFID / NFC emulation. Streak reminds you to take
+- Access-card / RFID / NFC emulation. do it reminds you to take
   action; it does not pretend to be the thing.
 
 ## System Requirements
@@ -139,7 +139,7 @@ NOT loosen any v0.1 constraint (still no `INTERNET`, no
 | **SYS-051** | The repository shall include a `PRIVACY.md` at the project root that discloses (1) the on-device data inventory, (2) what the app does **not** do (no server, no analytics, no telemetry, no advertising ID, no install ID, no crash reporter, no cloud backup), (3) the no-`INTERNET` enforcement, and (4) honest caveats about unimplemented features whose schema slots exist. The privacy notice shall not claim more than the code does. | File check on `PRIVACY.md` exists at repo root + manual review of the four sections |
 | **SYS-052** | The app's version string shall be a single source of truth: a `kAppVersion` / `kAppVersionCode` constant in `lib/build_info.dart` that mirrors the `pubspec.yaml` `version:` field. A test (`test/build_info_test.dart`) shall parse `pubspec.yaml` and assert the two stay in sync; the 3-gate shall fail on drift. | Unit test in `test/build_info_test.dart` |
 | **SYS-053** | The release build shall read `android/key.properties` (gitignored) and wire a real `signingConfigs.release` block in `android/app/build.gradle.kts`. The `release` buildType shall reference `signingConfigs.getByName("release")` and shall NOT set `isMinifyEnabled` (R8 / minify is off for v0.3). If `key.properties` is missing, the build shall fall back to the debug signing config so dev builds keep working. The keystore files (`*.jks`, `*.der`, `key.properties`) shall never be committed. | Unit test in `test/release_signing_test.dart` parses the build file + `.gitignore` check + hands-on `flutter build appbundle --release` |
-| **SYS-054** | The Settings → About section shall include a "Open source licenses" `ListTile` that opens the standard Flutter `showLicensePage` (passing `applicationName: 'Streak'`, `applicationVersion: kAppVersion`, `applicationLegalese: 'Local-only. No telemetry. No accounts.'`). The static version row in the About section shall read `kAppVersion`. (See `WF-032`.) | Widget test in `test/screens/settings_licenses_test.dart` |
+| **SYS-054** | The Settings → About section shall include a "Open source licenses" `ListTile` that opens the standard Flutter `showLicensePage` (passing `applicationName: 'do it'`, `applicationVersion: kAppVersion`, `applicationLegalese: 'Local-only. No telemetry. No accounts.'`). The static version row in the About section shall read `kAppVersion`. (See `WF-032`.) | Widget test in `test/screens/settings_licenses_test.dart` |
 | **SYS-055** | A widget test in `test/integration/fresh_install_test.dart` shall simulate a wiped-device install: empty Drift DB → `OnboardingScreen` renders → "done" path is exercised → `HomeScreen` renders → add a `HabitFixed` → fire a test reminder via `ReminderService.scheduleTestReminder()` → assert the scheduler received the request. A 2-paragraph wiped-device checklist in `docs/v_model/v0_3_release_checklist.md` § Fresh-install smoke test shall be ticked off by the user on a wiped phone (or emulator) before handing the apk to friends. | Widget test in `test/integration/fresh_install_test.dart` + manual checklist sign-off |
 | **SYS-056** | The `README.md` Status section shall be honest: it shall not say "Implementation has not started" once v0.1 code has shipped, and shall not claim a future milestone as "done". It shall point to `docs/v_model/implementation_status.md` for the current slice. | Manual review on every commit that touches `README.md` |
 | **SYS-057** | The repository shall include a `.github/workflows/ci.yml` file that runs the 3-gate (`dart format` → `flutter analyze --fatal-infos` → `flutter test`) on every `pull_request` and `push` to `main`. A static-analysis test (`test/ci_workflow_test.dart`) shall parse the workflow file and assert the three steps are present in the right order. | Unit test in `test/ci_workflow_test.dart` parses the workflow + green CI run on the v0.4a.1 tip |
@@ -180,7 +180,7 @@ NOT loosen any v0.1 constraint (still no `INTERNET`, no
 A v0.1 build is acceptable if, after a 14-day real-device run on the
 user's primary phone, all of the following are true:
 
-1. Streak fired a reminder for each of the 4 active presets within
+1. do it fired a reminder for each of the 4 active presets within
    ±60 seconds of its target time, for ≥ 95% of scheduled occurrences.
 2. The user completed at least 70% of the reminders with the
    configured proof mode.

@@ -16,7 +16,7 @@
 //   - No Flutter imports.
 //   - Immutable; mutations go through [PersonGroup.copyWith].
 
-import 'package:common_games/people/cadence.dart';
+import 'package:doit/people/cadence.dart';
 import 'package:meta/meta.dart';
 
 /// Stable, opaque group identifier. Same shape as [PersonId].

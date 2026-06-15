@@ -13,10 +13,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:common_games/missions/mission.dart';
-import 'package:common_games/missions/mission_input.dart';
-import 'package:common_games/missions/shake_detector.dart';
-import 'package:common_games/theme/app_theme.dart';
+import 'package:doit/missions/mission.dart';
+import 'package:doit/missions/mission_input.dart';
+import 'package:doit/missions/shake_detector.dart';
+import 'package:doit/theme/app_theme.dart';
 
 class MissionShakeScreen extends StatefulWidget {
   const MissionShakeScreen({super.key, required this.mission, this.samples});

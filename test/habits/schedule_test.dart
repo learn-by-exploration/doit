@@ -5,8 +5,8 @@
 // test. The tests use UTC offsets to keep dates stable across
 // CI machines; `.toLocal()` happens inside the engine.
 
-import 'package:common_games/habits/habit.dart';
-import 'package:common_games/habits/proof_mode.dart';
+import 'package:doit/habits/habit.dart';
+import 'package:doit/habits/proof_mode.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 HabitFixed _fixed({

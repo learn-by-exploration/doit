@@ -20,13 +20,13 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:common_games/habits/habit.dart';
-import 'package:common_games/habits/proof_mode.dart';
-import 'package:common_games/services/habit_repository.dart';
-import 'package:common_games/services/reminder_service.dart';
-import 'package:common_games/theme/app_theme.dart';
-import 'package:common_games/widgets/category_chip.dart';
-import 'package:common_games/widgets/icon_picker.dart';
+import 'package:doit/habits/habit.dart';
+import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/services/habit_repository.dart';
+import 'package:doit/services/reminder_service.dart';
+import 'package:doit/theme/app_theme.dart';
+import 'package:doit/widgets/category_chip.dart';
+import 'package:doit/widgets/icon_picker.dart';
 
 class AddHabitScreen extends StatefulWidget {
   const AddHabitScreen({super.key, this.habitId});

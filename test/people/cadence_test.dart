@@ -1,6 +1,6 @@
 // Tests for the PersonCadence sealed hierarchy.
 
-import 'package:common_games/people/cadence.dart';
+import 'package:doit/people/cadence.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,6 +1,6 @@
 // Tests for the Event model (WF-017).
 
-import 'package:common_games/events/event.dart';
+import 'package:doit/events/event.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

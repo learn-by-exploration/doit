@@ -8,7 +8,7 @@
 // async even for synchronous results so the caller can `await`
 // them.
 //
-// The DB file lives at `getApplicationSupportDirectory()/streak.db`
+// The DB file lives at `getApplicationSupportDirectory()/doit.db`
 // — a path the platform clears on uninstall. The location is
 // resolved lazily at `init()` time so the singleton can be
 // constructed at compile time without a binding.
@@ -20,7 +20,7 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import 'package:common_games/services/db/schema.dart';
+import 'package:doit/services/db/schema.dart';
 
 /// Singleton holder for the Drift database.
 class AppDatabaseService {
@@ -65,7 +65,7 @@ class AppDatabaseService {
     }
     try {
       final dir = await getApplicationSupportDirectory();
-      final dbPath = p.join(dir.path, 'streak.db');
+      final dbPath = p.join(dir.path, 'doit.db');
       final file = await _ensureFile(dbPath);
       _db = AppDatabase(NativeDatabase(file));
       _ready.complete();

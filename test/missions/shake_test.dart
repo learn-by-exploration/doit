@@ -3,10 +3,10 @@
 
 import 'dart:async';
 
-import 'package:common_games/missions/mission.dart';
-import 'package:common_games/missions/mission_input.dart';
-import 'package:common_games/missions/mission_result.dart';
-import 'package:common_games/missions/shake_detector.dart';
+import 'package:doit/missions/mission.dart';
+import 'package:doit/missions/mission_input.dart';
+import 'package:doit/missions/mission_result.dart';
+import 'package:doit/missions/shake_detector.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 ShakeSample _s({required int ms, double x = 0, double y = 0, double z = 0}) {

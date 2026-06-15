@@ -12,7 +12,7 @@ import 'dart:math' as math;
 
 import 'package:meta/meta.dart';
 
-import 'package:common_games/missions/mission.dart';
+import 'package:doit/missions/mission.dart';
 
 /// Raw input for a mission. The chain executor pattern-matches
 /// on the sealed shape and dispatches to the right

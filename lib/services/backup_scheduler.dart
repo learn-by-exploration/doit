@@ -12,8 +12,8 @@
 //
 // The dispatcher is defined in [backupTaskDispatcher] below
 // and registered via `Workmanager().initialize(...)` from
-// `init()`. The unique name is `streak.backup.nightly` and
-// the task name is also `streak.backup.nightly` (workmanager
+// `init()`. The unique name is `doit.backup.nightly` and
+// the task name is also `doit.backup.nightly` (workmanager
 // requires both; the unique name dedupes, the task name
 // dispatches).
 //
@@ -44,7 +44,7 @@
 import 'dart:async';
 import 'dart:io' show Directory, File;
 
-import 'package:common_games/services/backup_service.dart';
+import 'package:doit/services/backup_service.dart';
 import 'package:meta/meta.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
@@ -53,17 +53,17 @@ import 'package:workmanager/workmanager.dart';
 /// periodic task. Both must be the same string for the OS to
 /// match the schedule to the dispatcher.
 @visibleForTesting
-const String kBackupNightlyTaskName = 'streak.backup.nightly';
+const String kBackupNightlyTaskName = 'doit.backup.nightly';
 
 /// The SharedPreferences key the scheduler reads to find the
 /// SAF folder URI the user picked on first launch. The
 /// production path is the user-picked SAF folder; the
 /// scheduler's job is just to find the file, not to choose
 /// the folder.
-const String _kBackupFolderKey = 'streak.backup.folder_uri';
+const String _kBackupFolderKey = 'doit.backup.folder_uri';
 
 /// Periodic frequency for the nightly backup. WorkManager's
-/// minimum is 15 minutes; 24 hours is the documented Streak
+/// minimum is 15 minutes; 24 hours is the documented do it
 /// cadence in [docs/v_model/plan.md] (nightly during
 /// 02:00..04:00 local).
 const Duration _kBackupFrequency = Duration(hours: 24);
@@ -118,7 +118,7 @@ Future<bool> runBackupTask() async {
     if (!await dir.exists()) {
       return true;
     }
-    final out = File('${dir.path}/streak-backup.json');
+    final out = File('${dir.path}/doit-backup.json');
     await BackupService.instance.exportTo(out);
     return true;
   } catch (_) {

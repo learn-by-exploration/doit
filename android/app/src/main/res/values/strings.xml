@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Launcher label. Pinned to "Streak" per AGENTS.md.
-         Any rename is a v0.2+ decision and requires an ADR. -->
-    <string name="app_name">Streak</string>
+    <!-- Launcher label. v0.5 renamed app to "do it" (lowercase, with a
+         space). Pinned here so the manifest does not hardcode the
+         label. Future renames are a v0.6+ decision and require an ADR. -->
+    <string name="app_name">do it</string>
 </resources>

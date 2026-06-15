@@ -5,8 +5,8 @@
 // today?" See docs/v_model/requirements.md § SYS-004 and
 // docs/v_model/mission_catalog.md.
 
-import 'package:common_games/missions/chain.dart';
-import 'package:common_games/missions/mission.dart';
+import 'package:doit/missions/chain.dart';
+import 'package:doit/missions/mission.dart';
 import 'package:meta/meta.dart';
 
 /// How the user proves they completed a habit on a given day.

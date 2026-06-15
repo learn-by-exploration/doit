@@ -7,15 +7,15 @@
 
 import 'dart:io';
 
-import 'package:common_games/services/backup_service.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
+import 'package:doit/services/backup_service.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Future<File> _writeTemp(String name, String body) async {
-  final dir = await Directory.systemTemp.createTemp('streak-enc-');
+  final dir = await Directory.systemTemp.createTemp('doit-enc-');
   final f = File('${dir.path}/$name');
   await f.writeAsString(body);
   return f;

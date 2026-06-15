@@ -11,14 +11,14 @@
 
 import 'dart:async';
 
-import 'package:common_games/events/event.dart';
-import 'package:common_games/habits/habit.dart';
-import 'package:common_games/habits/proof_mode.dart';
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/reminders/anchor_detector.dart';
-import 'package:common_games/reminders/full_screen_intent.dart';
-import 'package:common_games/reminders/notification_service.dart';
-import 'package:common_games/reminders/reminder_bridge.dart';
+import 'package:doit/events/event.dart';
+import 'package:doit/habits/habit.dart';
+import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/reminders/full_screen_intent.dart';
+import 'package:doit/reminders/notification_service.dart';
+import 'package:doit/reminders/reminder_bridge.dart';
 import 'package:meta/meta.dart';
 
 @immutable
@@ -139,7 +139,7 @@ class ReminderService {
   /// to call when no test reminder is pending.
   Future<void> cancelTestReminder() async {
     await _ready.future;
-    await scheduler.cancelForHabit('streak.test_reminder');
+    await scheduler.cancelForHabit('doit.test_reminder');
   }
 
   /// A synthetic [HabitFixed] used by the "Test reminder" button.
@@ -148,8 +148,8 @@ class ReminderService {
   /// since the test alarm is fired manually by the settings
   /// button, the schedule itself is irrelevant.
   static final HabitFixed _testHabit = HabitFixed(
-    id: 'streak.test_reminder',
-    name: 'Streak test reminder',
+    id: 'doit.test_reminder',
+    name: 'do it test reminder',
     proofMode: const SoftProof(),
     createdAt: DateTime.fromMillisecondsSinceEpoch(0),
     restDaysPerMonth: 0,

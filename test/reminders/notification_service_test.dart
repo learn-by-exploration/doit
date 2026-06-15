@@ -1,7 +1,7 @@
 // Tests for [NotificationService] and the [FakeNotificationService].
 
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/reminders/notification_service.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/notification_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

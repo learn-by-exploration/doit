@@ -1,4 +1,4 @@
-// Drift table definitions for Streak's local SQLite database.
+// Drift table definitions for do it's local SQLite database.
 //
 // The schema is deliberately normalized: a habit's schedule-type
 // discriminator lives in `Habits.scheduleType`; the type-specific

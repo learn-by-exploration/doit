@@ -20,8 +20,8 @@
 
 import 'package:drift/drift.dart';
 
-import 'package:common_games/services/db/migrations/v1_to_v2.dart';
-import 'package:common_games/services/db/tables.dart';
+import 'package:doit/services/db/migrations/v1_to_v2.dart';
+import 'package:doit/services/db/tables.dart';
 
 part 'schema.g.dart';
 

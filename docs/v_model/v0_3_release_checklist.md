@@ -76,7 +76,7 @@ handing the apk to friends.
    (`build/app/outputs/bundle/release/app-release.aab` → extract
    an .apk with `bundletool build-apks` or sideload the .aab
    directly via `adb install`).
-2. Open Streak. The OnboardingScreen renders (Notifications step
+2. Open do it. The OnboardingScreen renders (Notifications step
    is first, "Skip" CTA visible).
 3. Tap Skip. The HomeScreen renders with the "No habits yet."
    empty-state placeholder.
@@ -86,12 +86,12 @@ handing the apk to friends.
    notification appears within ~10 seconds.
 6. Open Settings → About → "Open source licenses". The standard
    Flutter license page renders with the application name
-   "Streak", version `0.3.0`, and the legalese "Local-only. No
+   "do it", version `0.3.0`, and the legalese "Local-only. No
    telemetry. No accounts."
 
 ### On the same wiped device, after the smoke test
 
-1. Uninstall Streak. Verify that the database under
+1. Uninstall do it. Verify that the database under
    `/data/data/com.common_games.streak/` is gone (use
    `adb shell run-as com.common_games.streak ls databases/`
    before uninstall).

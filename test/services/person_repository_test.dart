@@ -1,11 +1,11 @@
 // Tests for [PersonRepository] — round-trips for all 4 cadence
 // types and 5 channels.
 
-import 'package:common_games/people/cadence.dart';
-import 'package:common_games/people/person.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
-import 'package:common_games/services/person_repository.dart';
+import 'package:doit/people/cadence.dart';
+import 'package:doit/people/person.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
+import 'package:doit/services/person_repository.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -27,7 +27,7 @@
 // lives in a top-level function and cannot be reached
 // through the `BackupScheduler` API.
 
-import 'package:common_games/services/backup_scheduler.dart';
+import 'package:doit/services/backup_scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -95,12 +95,12 @@ void main() {
     expect(
       args['uniqueName'],
       kBackupNightlyTaskName,
-      reason: 'uniqueName must be streak.backup.nightly',
+      reason: 'uniqueName must be doit.backup.nightly',
     );
     expect(
       args['taskName'],
       kBackupNightlyTaskName,
-      reason: 'taskName must be streak.backup.nightly',
+      reason: 'taskName must be doit.backup.nightly',
     );
     // frequency is serialized as a Duration object; we check
     // the inMinutes / inHours keys (workmanager 0.6.0 sends

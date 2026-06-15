@@ -16,14 +16,14 @@
 //     habit_time_window.dart), which is the foundation for
 //     WF-019 (v0.2d).
 
-import 'package:common_games/habits/category.dart';
-import 'package:common_games/habits/proof_mode.dart';
-import 'package:common_games/missions/chain.dart';
+import 'package:doit/habits/category.dart';
+import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/missions/chain.dart';
 import 'package:meta/meta.dart';
 
-export 'package:common_games/habits/category.dart'
+export 'package:doit/habits/category.dart'
     show HabitCategory, CategoryPalette, HabitIcons;
-export 'package:common_games/missions/mission.dart'
+export 'package:doit/missions/mission.dart'
     show
         Mission,
         ShakeMission,

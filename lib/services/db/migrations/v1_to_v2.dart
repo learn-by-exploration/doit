@@ -25,7 +25,7 @@
 
 import 'package:drift/drift.dart';
 
-import 'package:common_games/services/db/schema.dart';
+import 'package:doit/services/db/schema.dart';
 
 Future<void> migrateV1ToV2(Migrator m, AppDatabase db) async {
   // --- Column adds on existing tables (raw SQL — Drift's

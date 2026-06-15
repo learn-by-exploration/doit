@@ -95,7 +95,7 @@ or shape if answered differently.
     - v0.1: a "Try a mission" screen in Settings → Missions.
 17. **Should the app be a launcher (replace the home screen)?**
     - Some habit apps do this; some users love it, some hate it.
-    - No. Streak is an app, not a launcher.
+    - No. do it is an app, not a launcher.
 18. **Should the app support Android Auto or Wear OS?**
     - Out of v0.1 scope. Possible v0.2.
 19. **What is the language for the v0.1 release?**

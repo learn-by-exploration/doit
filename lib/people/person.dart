@@ -11,7 +11,7 @@
 //   - The model is immutable; mutations go through
 //     [Person.copyWith].
 
-import 'package:common_games/people/cadence.dart';
+import 'package:doit/people/cadence.dart';
 import 'package:meta/meta.dart';
 
 /// Stable, opaque person identifier. Same shape as [HabitId]:
@@ -28,7 +28,7 @@ sealed class PersonChannel {
 
 /// Open the system dialer with the contact's number. No
 /// `CALL_PHONE` permission is used; the user must press
-/// the call button themselves. See streak-non-negotiables.
+/// the call button themselves. See doit-non-negotiables.
 final class ChannelDialer extends PersonChannel {
   const ChannelDialer(this.phoneNumber);
   final String phoneNumber;
@@ -134,7 +134,7 @@ sealed class Person {
     this.pausedUntil,
   });
 
-  /// Stable identifier within Streak. Different from the
+  /// Stable identifier within do it. Different from the
   /// `lookupKey`, which identifies the *contact*; the `id`
   /// identifies the *habit binding* to that contact.
   final PersonId id;

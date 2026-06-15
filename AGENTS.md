@@ -1,6 +1,6 @@
-# AGENTS.md — Streak
+# AGENTS.md — do it
 
-**Package:** `common_games` · **App:** Streak · **Android:** `com.common_games.streak`
+**Package:** `doit` · **App:** do it · **Android:** `com.doit.package`
 **Flutter:** 3.44.0 stable (CI-pinned) · **Dart:** `^3.12.0` · **JVM:** 17
 
 A Flutter app for Android: habits, call/message reminders, anchored
@@ -63,9 +63,9 @@ verification step changes.
   new state shape, or any reversal of a previous decision. Append to
   [`decision_record.md`](docs/v_model/decision_record.md); do not
   edit history.
-- **The package id is `com.common_games.streak` and the launcher name
-  is "Streak".** This is committed. Any rename is a v0.2+ decision
-  and requires an ADR.
+- **The package id is `com.doit.package` and the launcher name
+  is "do it".** This is committed (v0.5a). Any further rename is
+  a v0.6+ decision and requires an ADR.
 
 ## The 3-gate
 
@@ -98,7 +98,7 @@ behavior. Failing these silently ships a broken habit app.
 | **Soft vs. Strong vs. Auto** | A habit's proof mode is immutable per-instance. The model must not let a habit silently flip between modes. |
 | **Calling reminder** | Tapping a call reminder MUST open the system dialer with the contact's number pre-filled. The app MUST NOT call `ACTION_CALL` (no `CALL_PHONE` permission). |
 | **Backup integrity** | A backup file is the source of truth for restore. Restoring MUST be idempotent — re-importing the same file twice must not create duplicates. |
-| **Streak break** | A streak breaks only on a missed day past the grace window. A `rest_day` token (capped per period) prevents the break. Stats must reflect the actual completion log, not the streak number. |
+| **do it break** | A streak breaks only on a missed day past the grace window. A `rest_day` token (capped per period) prevents the break. Stats must reflect the actual completion log, not the streak number. |
 | **Local-only data** | The app must never make a network call with user data. No analytics, no telemetry, no cloud sync. Any `http(s)://` usage is a security defect and must be removed. |
 
 ## Testing
@@ -136,7 +136,7 @@ behavior. Failing these silently ships a broken habit app.
 ## Style highlights (lint-enforced — see [`analysis_options.yaml`](analysis_options.yaml))
 
 Inherit from `board_box` (the 18 enabled lints). The three most relevant to
-Streak:
+do it:
 
 - **`avoid_print`** — `print()` is banned. Use `debugPrint` behind a
   `kDebugMode` guard, or surface the message to the UI.
@@ -144,7 +144,7 @@ Streak:
   `unawaited(...)` from `dart:async`. Reminder scheduling is the
   asynchronous critical path; missing an `await` is the easiest way to
   ship a dropped alarm.
-- **`always_use_package_imports`** — `package:common_games/...` imports
+- **`always_use_package_imports`** — `package:doit/...` imports
   only. No relative `../` imports.
 
 Full rationale: see `board_box/docs/engineering/flutter-dart-style.md`.
@@ -191,7 +191,7 @@ Do not modify these — report issues instead:
 - **Shake mission uses sensors, not timers.** Holding the phone still
   must not advance the shake count. The detector thresholds magnitude
   AND inter-shake spacing.
-- **Streak grace vs. rest day.** A grace window is automatic (e.g., "miss
+- **do it grace vs. rest day.** A grace window is automatic (e.g., "miss
   until 3 AM next day still counts"). A rest day is a user-granted
   manual pass. The model must distinguish them.
 - **Backup file path is user-chosen.** The app must not assume a fixed

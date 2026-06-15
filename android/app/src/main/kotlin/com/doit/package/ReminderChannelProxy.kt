@@ -1,4 +1,4 @@
-package com.common_games.streak
+package com.doit.package
 
 import android.app.AlarmManager
 import android.content.Context
@@ -7,7 +7,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * Thin Kotlin-side adapter for the `streak/reminders` method
+ * Thin Kotlin-side adapter for the `doit/reminders` method
  * channel.
  *
  * Responsibilities:
@@ -22,7 +22,7 @@ import io.flutter.plugin.common.MethodChannel
  * AlarmManager.
  */
 object ReminderChannelProxy {
-    private const val CHANNEL = "streak/reminders"
+    private const val CHANNEL = "doit/reminders"
     private var channel: MethodChannel? = null
 
     fun attach(engine: FlutterEngine) {

@@ -62,7 +62,7 @@ for v0.1.
 | **People** | Contact resolution, person record, cadence, channel selection | `lib/people/` |
 | **Missions** | The 5 mission types and the chain executor | `lib/missions/` |
 | **Reminders** | Alarm scheduling, notification service, full-screen intent, anchor detection, boot survival | `lib/reminders/` + `android/app/src/main/.../` |
-| **Streaks & stats** | Streak calculator, rest-day budget, stats service | `lib/habits/streak_calculator.dart`, `lib/services/stats_service.dart` |
+| **Streaks & stats** | do it calculator, rest-day budget, stats service | `lib/habits/streak_calculator.dart`, `lib/services/stats_service.dart` |
 | **Local DB** | Drift database, migrations, queries | `lib/services/db.dart`, `lib/services/migrations/` |
 | **Backup** | Auto backup, restore, file picker integration | `lib/services/backup_service.dart`, `lib/screens/settings_restore.dart` |
 | **Settings** | Permissions, exact-alarm, Doze prompt, OEM guide, theme, sound | `lib/screens/settings.dart` |

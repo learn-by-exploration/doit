@@ -1,4 +1,4 @@
-package com.common_games.streak
+package com.doit.package
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -12,7 +12,7 @@ import android.content.Intent
  *   - ACTION_TIMEZONE_CHANGED (the device zone changed)
  *
  * The receiver is short-lived. It hands off to the Dart side
- * via the `streak/reminders` method channel (call:
+ * via the `doit/reminders` method channel (call:
  * `rescheduleAll`) and the Dart side reads the local DB and
  * re-arms each pending alarm through AlarmManager.
  *

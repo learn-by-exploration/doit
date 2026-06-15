@@ -11,9 +11,9 @@
 
 import 'dart:async';
 
-import 'package:common_games/habits/habit.dart';
-import 'package:common_games/missions/chain.dart';
-import 'package:common_games/reminders/full_screen_intent.dart';
+import 'package:doit/habits/habit.dart';
+import 'package:doit/missions/chain.dart';
+import 'package:doit/reminders/full_screen_intent.dart';
 
 class PlatformFullScreenIntent implements FullScreenIntent {
   @override

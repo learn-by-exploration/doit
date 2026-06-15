@@ -16,7 +16,7 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:common_games/habits/category.dart';
+import 'package:doit/habits/category.dart';
 
 /// The resolved visual identity for a habit: the swatch ARGB
 /// int to paint with, and the human-readable label of the

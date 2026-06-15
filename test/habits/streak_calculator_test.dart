@@ -2,8 +2,8 @@
 //
 // The calculator is pure. `asOf` is the reference clock.
 
-import 'package:common_games/habits/rest_day_budget.dart';
-import 'package:common_games/habits/streak_calculator.dart';
+import 'package:doit/habits/rest_day_budget.dart';
+import 'package:doit/habits/streak_calculator.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 StreakConfig _config({Duration grace = const Duration(hours: 3)}) {

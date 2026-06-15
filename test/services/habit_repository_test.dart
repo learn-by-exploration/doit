@@ -1,12 +1,12 @@
 // Tests for [HabitRepository] — round-trips for all 4 schedule
 // types and proof modes, dedupe-by-name, mission-chain JSON.
 
-import 'package:common_games/habits/habit.dart';
-import 'package:common_games/habits/proof_mode.dart';
-import 'package:common_games/missions/chain.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
-import 'package:common_games/services/habit_repository.dart';
+import 'package:doit/habits/habit.dart';
+import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/missions/chain.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
+import 'package:doit/services/habit_repository.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 

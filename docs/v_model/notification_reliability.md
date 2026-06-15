@@ -4,7 +4,7 @@ Status: draft baseline, created 2026-06-13.
 
 Reminders are the product. If they fire late, the user loses trust
 in two days and never comes back. This document is the spec for
-how Streak fights Doze, App Standby, OEM battery savers, and
+how do it fights Doze, App Standby, OEM battery savers, and
 Android 12+'s `SCHEDULE_EXACT_ALARM` gating.
 
 ## Goals
@@ -21,7 +21,7 @@ Android 12+'s `SCHEDULE_EXACT_ALARM` gating.
 
 ## Layers of defense
 
-Streak uses five layers, in order. Each one is verified by a test
+do it uses five layers, in order. Each one is verified by a test
 or a manual check.
 
 ### Layer 1 — Exact alarm (primary)
@@ -110,7 +110,7 @@ permission set.
 
 Out of scope for v0.1. If the 14-day acceptance run shows > 5%
 drop rate, v0.2 adds a foreground service with a low-priority
-persistent notification ("Streak is keeping your reminders
+persistent notification ("do it is keeping your reminders
 accurate"). The service is purely a heartbeat — it does not
 do work — and the persistent notification is the cost.
 
@@ -156,7 +156,7 @@ ask the user to help. There are three asks:
 
 `flutter_local_notifications` and `android_alarm_manager_plus`
 take a `DateTime` that the OS interprets in the device's
-current zone. Streak stores all schedules in **local wall-clock
+current zone. do it stores all schedules in **local wall-clock
 time** (no UTC normalization), and re-computes `nextOccurrence`
 on `ACTION_TIMEZONE_CHANGED`.
 
@@ -204,9 +204,9 @@ Dart.
 - **Notification action "Why am I getting this late?"** on any
   late-fired reminder; tapping it opens the same settings page
   with a one-tap fix.
-- **Streak at risk** in the streak-grace window: if a habit
+- **do it at risk** in the streak-grace window: if a habit
   was missed, the user gets a notification at 22:00 saying
-  "Streak at risk: 2 habits still due today. Tap to open."
+  "do it at risk: 2 habits still due today. Tap to open."
 
 ## What we do NOT do
 

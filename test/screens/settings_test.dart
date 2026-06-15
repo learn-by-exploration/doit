@@ -1,14 +1,14 @@
 // Tests for the SettingsScreen.
 
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/reminders/anchor_detector.dart';
-import 'package:common_games/reminders/full_screen_intent.dart';
-import 'package:common_games/reminders/notification_service.dart';
-import 'package:common_games/reminders/reminder_bridge.dart';
-import 'package:common_games/screens/settings.dart';
-import 'package:common_games/services/reminder_service.dart';
-import 'package:common_games/services/settings_service.dart';
-import 'package:common_games/theme/app_theme.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/reminders/full_screen_intent.dart';
+import 'package:doit/reminders/notification_service.dart';
+import 'package:doit/reminders/reminder_bridge.dart';
+import 'package:doit/screens/settings.dart';
+import 'package:doit/services/reminder_service.dart';
+import 'package:doit/services/settings_service.dart';
+import 'package:doit/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';

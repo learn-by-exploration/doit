@@ -1,6 +1,6 @@
-# Streak — Changelog
+# do it — Changelog
 
-All notable changes to the Streak app are documented here. Streak
+All notable changes to the do it app are documented here. do it
 follows a V-Model process: each release has a left-side baseline
 (`docs/v_model/v<major>_<minor>_baseline.md`) and a right-side
 checklist (`v<major>_<minor>_release_checklist.md`). This changelog
@@ -9,8 +9,48 @@ V-Model artifacts are the engineering contract.
 
 ## [Unreleased]
 
-_Empty. The v0.4 sign-off commit (v0.4d) appends the
-`[0.4.0]` section below._
+### v0.5a — rename to "do it"
+
+App-level rename. The app's display name, package id, directory,
+notification channel, WorkManager task name, MethodChannel, and
+Dart package `name:` are all changed. Feature-level identifiers
+(`StreakCalculator`, `StreakService`, `StreakSnapshot`,
+`StreakConfig`, `streak_calculator.dart`, `streak_service.dart`,
+`currentStreak`, `longestStreak`) are unchanged — they describe
+the *streak* feature, not the app.
+
+- **App name:** "Streak" → "do it" (lowercase, with a space).
+- **Android `applicationId` / `namespace`:** `com.common_games.streak`
+  → `com.doit.package`. Forces uninstall-before-install on existing
+  v0.4b devices at v0.5e.
+- **Dart package `name:`:** `common_games` → `doit`. Every
+  `package:common_games/...` import becomes `package:doit/...`.
+- **Directory:** `/home/shyam/common_games/streak/` →
+  `/home/shyam/common_games/doit/`.
+- **Kotlin tree:** `com/common_games/streak/` →
+  `com/doit/package/`. `package com.common_games.streak` →
+  `package com.doit.package`.
+- **MethodChannel:** `streak/reminders` → `doit/reminders`.
+- **Notification channel id:** `streak.reminders` → `doit.reminders`.
+- **WorkManager task name:** `streak.backup.nightly` →
+  `doit.backup.nightly`.
+- **SharedPreferences key:** `streak.backup.folder_uri` →
+  `doit.backup.folder_uri`.
+- **Test reminder habit id:** `streak.test_reminder` →
+  `doit.test_reminder`.
+- **Version:** `0.4.0+5` → `0.5.0+6` (`pubspec.yaml` and
+  `lib/build_info.dart`).
+- **User-facing display strings:** every "Streak" / "Streak test
+  reminder" / "Welcome to Streak" / "Pick a Streak backup" string
+  in user-facing copy updated.
+- **v0.5a pin tests** added to `test/release_signing_test.dart`
+  asserting `applicationId` is exactly `com.doit.package`, the
+  `MethodChannel('doit/reminders')` is declared exactly once, the
+  notification channel id is `'doit.reminders'`, and the backup
+  task name is `'doit.backup.nightly'`.
+
+App behavior is unchanged; this is a pure rename. The release APK
+is rebuilt at v0.5e.
 
 ## [0.4.0] — 2026-06-15 — Contract closure
 
@@ -165,7 +205,7 @@ every commit. Right-side gate: `v0_4_release_checklist.md`.
      auto-registers an `androidx.startup.Initializer` (the
      `WorkManagerInitializer`) that fires before
      `MainActivity.onCreate` and constructs the workmanager
-     singleton (which builds the `WorkDatabase`). Streak
+     singleton (which builds the `WorkDatabase`). do it
      already owns the WorkManager init order from
      `BackupScheduler.init` in Dart — the OS does not need
      to pre-create the singleton.
@@ -250,7 +290,7 @@ Six PR-shaped work items (`6502432` → `5ebb441`):
   section is split into two: an informational tile that reads
   `${kAppVersion} — local-only. See PRIVACY.md for the data we
   store`, plus a tappable "Open source licenses" tile that opens
-  `showLicensePage(applicationName: 'Streak',
+  `showLicensePage(applicationName: 'do it',
   applicationVersion: kAppVersion, applicationLegalese: 'Local-only.
   No telemetry. No accounts.')`. (SYS-054.)
 - `test/screens/settings_licenses_test.dart` asserts both tiles

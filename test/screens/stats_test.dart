@@ -1,13 +1,13 @@
 // Tests for the StatsScreen — empty state, error retry, and
 // a happy path that asserts a single habit renders.
 
-import 'package:common_games/habits/habit.dart';
-import 'package:common_games/habits/proof_mode.dart';
-import 'package:common_games/screens/stats.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
-import 'package:common_games/services/habit_repository.dart';
-import 'package:common_games/services/completion_log_service.dart';
+import 'package:doit/habits/habit.dart';
+import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/screens/stats.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
+import 'package:doit/services/habit_repository.dart';
+import 'package:doit/services/completion_log_service.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

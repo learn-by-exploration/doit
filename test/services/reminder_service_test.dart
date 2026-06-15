@@ -4,14 +4,14 @@
 // schedules a synthetic alarm 5 seconds from now. This file
 // pins the behavior so the button cannot regress silently.
 
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/reminders/anchor_detector.dart';
-import 'package:common_games/reminders/full_screen_intent.dart';
-import 'package:common_games/reminders/notification_service.dart';
-import 'package:common_games/reminders/reminder_bridge.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
-import 'package:common_games/services/reminder_service.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/reminders/full_screen_intent.dart';
+import 'package:doit/reminders/notification_service.dart';
+import 'package:doit/reminders/reminder_bridge.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
+import 'package:doit/services/reminder_service.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -83,6 +83,6 @@ void main() {
   test('scheduled test alarm has the well-known test habit id', () async {
     await service.scheduleTestReminder();
     expect(scheduler.scheduled.length, 1);
-    expect(scheduler.scheduled.first.habitId, 'streak.test_reminder');
+    expect(scheduler.scheduled.first.habitId, 'doit.test_reminder');
   });
 }

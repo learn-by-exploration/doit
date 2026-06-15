@@ -9,21 +9,21 @@
 // hands-on "Wiped-device smoke" step documented in
 // docs/v_model/v0_3_release_checklist.md.
 
-import 'package:common_games/habits/habit.dart';
-import 'package:common_games/habits/proof_mode.dart';
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/reminders/anchor_detector.dart';
-import 'package:common_games/reminders/full_screen_intent.dart';
-import 'package:common_games/reminders/notification_service.dart';
-import 'package:common_games/reminders/reminder_bridge.dart';
-import 'package:common_games/screens/home.dart';
-import 'package:common_games/screens/onboarding.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
-import 'package:common_games/services/habit_repository.dart';
-import 'package:common_games/services/reminder_service.dart';
-import 'package:common_games/services/settings_service.dart';
-import 'package:common_games/theme/app_theme.dart';
+import 'package:doit/habits/habit.dart';
+import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/reminders/full_screen_intent.dart';
+import 'package:doit/reminders/notification_service.dart';
+import 'package:doit/reminders/reminder_bridge.dart';
+import 'package:doit/screens/home.dart';
+import 'package:doit/screens/onboarding.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
+import 'package:doit/services/habit_repository.dart';
+import 'package:doit/services/reminder_service.dart';
+import 'package:doit/services/settings_service.dart';
+import 'package:doit/theme/app_theme.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -114,7 +114,7 @@ void main() {
 
     // 4) Save a HabitFixed. The minimum-viable payload is an id,
     //    a name, a proof mode, weekdays, and a time. The habit id
-    //    'streak.test_reminder' is reserved by ReminderService;
+    //    'doit.test_reminder' is reserved by ReminderService;
     //    pick something distinct.
     await HabitRepository.instance.save(
       HabitFixed(
@@ -139,6 +139,6 @@ void main() {
     //    well-known test id. This is the contract the v0.3
     //    sideloaders will see when they tap the test button.
     expect(fakeScheduler.scheduled.length, 1);
-    expect(fakeScheduler.scheduled.first.habitId, 'streak.test_reminder');
+    expect(fakeScheduler.scheduled.first.habitId, 'doit.test_reminder');
   });
 }

@@ -1,19 +1,19 @@
 // Widget tests for PersonGroupsScreen (WF-018).
 
-import 'package:common_games/people/cadence.dart';
-import 'package:common_games/people/person.dart';
-import 'package:common_games/people/person_group.dart';
-import 'package:common_games/screens/person_groups.dart';
-import 'package:common_games/services/db.dart';
-import 'package:common_games/services/db/schema.dart';
-import 'package:common_games/services/person_group_repository.dart';
-import 'package:common_games/services/person_repository.dart';
-import 'package:common_games/services/reminder_service.dart';
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/reminders/anchor_detector.dart';
-import 'package:common_games/reminders/full_screen_intent.dart';
-import 'package:common_games/reminders/notification_service.dart';
-import 'package:common_games/reminders/reminder_bridge.dart';
+import 'package:doit/people/cadence.dart';
+import 'package:doit/people/person.dart';
+import 'package:doit/people/person_group.dart';
+import 'package:doit/screens/person_groups.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
+import 'package:doit/services/person_group_repository.dart';
+import 'package:doit/services/person_repository.dart';
+import 'package:doit/services/reminder_service.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/reminders/full_screen_intent.dart';
+import 'package:doit/reminders/notification_service.dart';
+import 'package:doit/reminders/reminder_bridge.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

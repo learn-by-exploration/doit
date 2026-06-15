@@ -1,7 +1,7 @@
 // Tests for the PersonGroup model and rotation selector (WF-018).
 
-import 'package:common_games/people/cadence.dart';
-import 'package:common_games/people/person_group.dart';
+import 'package:doit/people/cadence.dart';
+import 'package:doit/people/person_group.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 PersonGroup _group({

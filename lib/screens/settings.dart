@@ -15,14 +15,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:common_games/build_info.dart';
-import 'package:common_games/reminders/alarm_scheduler.dart';
-import 'package:common_games/reminders/anchor_detector.dart';
-import 'package:common_games/screens/settings_restore.dart';
-import 'package:common_games/services/reminder_service.dart';
-import 'package:common_games/services/settings_service.dart';
-import 'package:common_games/theme/app_theme.dart';
-import 'package:common_games/widgets/reliability_banner.dart';
+import 'package:doit/build_info.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/screens/settings_restore.dart';
+import 'package:doit/services/reminder_service.dart';
+import 'package:doit/services/settings_service.dart';
+import 'package:doit/theme/app_theme.dart';
+import 'package:doit/widgets/reliability_banner.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -100,7 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               key: const ValueKey('settings.restore'),
               leading: const Icon(Icons.restore_outlined),
               title: const Text('Restore from backup'),
-              subtitle: const Text('Pick a Streak .json backup file.'),
+              subtitle: const Text('Pick a do it .json backup file.'),
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -112,7 +112,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: Spacing.lg),
             const _SectionHeader('About'),
             const ListTile(
-              title: Text('Streak'),
+              title: Text('do it'),
               subtitle: Text(
                 '$kAppVersion — local-only. See PRIVACY.md for the data '
                 'we store and the data we do not.',
@@ -128,7 +128,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               onTap: () => showLicensePage(
                 context: context,
-                applicationName: 'Streak',
+                applicationName: 'do it',
                 applicationVersion: kAppVersion,
                 applicationLegalese: 'Local-only. No telemetry. No accounts.',
               ),

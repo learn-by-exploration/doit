@@ -22,7 +22,7 @@
 //   - `asOf` is the reference "now" — the test's frozen clock
 //     or the app's wall clock.
 
-import 'package:common_games/habits/rest_day_budget.dart';
+import 'package:doit/habits/rest_day_budget.dart';
 import 'package:meta/meta.dart';
 
 /// A single completion of a habit.

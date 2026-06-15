@@ -5,9 +5,9 @@
 // `HabitCategory` (a pure-Dart enum) into a Flutter `Color`.
 // Coverage target: ≥ 80% on the file.
 
-import 'package:common_games/habits/category.dart';
-import 'package:common_games/theme/app_theme.dart';
-import 'package:common_games/widgets/category_chip.dart';
+import 'package:doit/habits/category.dart';
+import 'package:doit/theme/app_theme.dart';
+import 'package:doit/widgets/category_chip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
