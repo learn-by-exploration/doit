@@ -118,10 +118,13 @@ of the v0.3 release:
 - The `Settings`, `EventLogs`, and `RestDayBudgets` Drift tables
   exist in the schema but are not yet fully populated by the v0.2
   screen layer. They will land in subsequent runs.
-- The on-device `WorkManager` periodic backup scheduler is a
-  forward dependency in `pubspec.yaml`; the scheduling call is
-  not yet wired. v0.3 users must trigger backups manually from
-  Settings, or rely on the SAF write that happens on app exit.
+- The on-device `WorkManager` periodic backup scheduler is
+  wired (v0.4b / SYS-060). Once the user opts in from
+  Settings, the OS runs a 24-hour periodic task that exports
+  a JSON snapshot of the local DB to the user's SAF folder.
+  The scheduling is strictly local; the scheduler makes no
+  network call. v0.3 users had to trigger backups manually
+  from Settings; v0.4 users get the auto-backup.
 - The `PersonResolver` (a service in `lib/services/`) is
   forward-referenced in the rules but not yet implemented.
   Contacts are resolved at write time only.

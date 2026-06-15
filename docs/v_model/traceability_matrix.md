@@ -46,6 +46,7 @@ not yet a real requirement.
 | v0.4 CI 3-gate | SYS-057 | `.github/workflows/ci.yml` | `test/ci_workflow_test.dart` parses the workflow and asserts the three steps + the trigger set. |
 | v0.4 `CHANGELOG.md` | SYS-058 | `CHANGELOG.md` (repo root) | Manual review on every commit that touches the changelog; `open_questions.md` #20 closed by this row. |
 | v0.4 firstLaunch persisted | SYS-059 | `lib/services/settings_service.dart` (firstLaunchCompleted ValueNotifier + SharedPreferences round-trip), `lib/main.dart` (route switch) | `test/services/first_launch_persisted_test.dart` (7 tests) + `test/widget_test.dart` (3 tests: wiped install, mark+remount, override). |
+| v0.4 WorkManager periodic backup | SYS-060 | `lib/services/backup_scheduler.dart` (Workmanager register/cancel + top-level dispatcher) | `test/services/backup_scheduler_test.dart` (5 tests) + `test/services/backup_task_dispatcher_test.dart` (3 tests). |
 
 ## Workflow → Requirement → Verification
 

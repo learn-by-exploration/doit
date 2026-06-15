@@ -13,6 +13,7 @@ import 'package:common_games/reminders/anchor_detector.dart';
 import 'package:common_games/reminders/reminder_bridge.dart';
 import 'package:common_games/screens/home.dart';
 import 'package:common_games/screens/onboarding.dart';
+import 'package:common_games/services/backup_scheduler.dart';
 import 'package:common_games/services/backup_service.dart';
 import 'package:common_games/services/db.dart';
 import 'package:common_games/services/platform_alarm_scheduler.dart';
@@ -52,6 +53,11 @@ Future<void> main() async {
   // 4. Init the backup service so the restore screen can
   //    export / import JSON snapshots of the local DB.
   await BackupService.instance.init();
+
+  // 5. Init the WorkManager-backed nightly backup scheduler
+  //    (v0.4b / SYS-060). The schedule itself is registered
+  //    later, from the settings screen, so users can opt out.
+  await BackupScheduler.instance.init();
 
   runApp(const StreakApp());
 }

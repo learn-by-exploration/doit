@@ -188,6 +188,7 @@ primary phone; the run does not require new code.
 | **v0.4a.1 — CI 3-gate** | _v0.4a.1_ | ✓ | _v0.4a.1_ | `.github/workflows/ci.yml` + `test/ci_workflow_test.dart`. Closes the "Not started" row in the right-side table. |
 | v0.4a.2 — CHANGELOG | _v0.4a.2_ | ✓ | _v0.4a.2_ | `CHANGELOG.md` (Keep-a-Changelog shape, v0.4 [Unreleased] section). |
 | v0.4a.3 — firstLaunch persisted | _v0.4a.3_ | ✓ | 7 first_launch_persisted + 3 widget_test (SYS-059) | `SettingsService.firstLaunchCompleted` backed by `SharedPreferences`. The "onboarding re-appears on reinstall" caveat in `PRIVACY.md` is removed. |
+| v0.4b — WorkManager periodic backup | _v0.4b_ | ✓ | 5 backup_scheduler_test + 3 backup_task_dispatcher_test (SYS-060) | `lib/services/backup_scheduler.dart` wires the `workmanager` plugin to register a 24-hour periodic task. The "scheduling call not yet wired" caveat in `PRIVACY.md` is removed. |
 
 ## How to update this file
 
