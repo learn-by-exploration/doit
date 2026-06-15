@@ -48,6 +48,7 @@ The V-model artifacts live in [`docs/v_model/`](docs/v_model/):
 - [Implementation status](docs/v_model/implementation_status.md)
 - [Mission catalog](docs/v_model/mission_catalog.md)
 - [Notification reliability](docs/v_model/notification_reliability.md)
+- [Changelog](CHANGELOG.md) — user-facing summary of every release; lives next to the README by convention.
 
 ## Status
 

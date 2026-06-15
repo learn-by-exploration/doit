@@ -90,3 +90,10 @@ or shape if answered differently.
 20. **Should we ship a `CHANGELOG.md` and `RELEASE_NOTES.md`?**
     - Yes, the standard 3-app pattern.
     - Track in v0.2 once the first release is cut.
+    - **Closed 2026-06-14 (v0.4a.2, SYS-058):** `CHANGELOG.md`
+      exists at the repo root. v0.1, v0.2, and v0.3 sections land
+      in v0.4a.2; the v0.4 section is appended in the v0.4d
+      sign-off commit. The project ships a single changelog (no
+      separate `RELEASE_NOTES.md`); the per-release
+      `v*_<version>_baseline.md` and `v*_<version>_release_checklist.md`
+      are the engineering release notes.
