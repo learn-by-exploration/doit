@@ -32,7 +32,7 @@ v0.4 is accepted when every row in the table below is "yes":
 
 | # | SYS- | What the user / CI verifies | Yes / No |
 |---|------|------------------------------|----------|
-| 1 | SYS-057 | A `.github/workflows/ci.yml` exists with three jobs / steps (`dart format`, `flutter analyze --fatal-infos`, `flutter test`). The CI run is green on the v0.4 tip. The test `test/ci_workflow_test.dart` parses the workflow and asserts the three steps. | ___ |
+| 1 | SYS-057 | A `.github/workflows/ci.yml` exists with three jobs / steps (`dart format`, `flutter analyze --fatal-infos`, `flutter test`). The CI run is green on the v0.4 tip. The test `test/ci_workflow_test.dart` parses the workflow and asserts the three steps. | yes (`608483e`; the green CI run on `main` requires the user's hands-on merge of the workflow file into the GitHub repo). |
 | 2 | SYS-058 | A `CHANGELOG.md` exists at the repo root with sections for v0.1, v0.2, v0.3, and v0.4. Open question #20 is closed. | ___ |
 | 3 | SYS-059 | The `firstLaunch` flag is persisted via `SharedPreferences`. The `lib/main.dart` `firstLaunch` is no longer hard-coded `true`. The test `test/services/first_launch_persisted_test.dart` asserts the flag persists across "app restarts" (close + reopen). `PRIVACY.md` no longer discloses the "Onboarding on every reinstall" caveat. | ___ |
 | 4 | SYS-060 | `BackupService.scheduleNightlyBackup()` registers a `workmanager` periodic task. The test asserts the scheduler is called with the right task name and frequency. `PRIVACY.md` no longer discloses the "scheduling call not yet wired" caveat. | ___ |
@@ -118,7 +118,7 @@ until it is backfilled.
 
 | SHA | `dart format` | `flutter analyze` | `flutter test` (count) | Notes |
 |-----|---------------|-------------------|------------------------|-------|
-| `________` | _tbd_ | _tbd_ | _tbd_ | v0.4a.1: CI 3-gate workflow. |
+| `608483e` | clean (0 changed) | clean (41, matches v0.3 baseline) | 333 / 333 (328 prior + 5 new) | v0.4a.1: CI 3-gate workflow. |
 | `________` | _tbd_ | _tbd_ | _tbd_ | v0.4a.2: CHANGELOG.md (v0.1 / v0.2 / v0.3 sections). |
 | `________` | _tbd_ | _tbd_ | _tbd_ | v0.4a.3: firstLaunch persisted flag. |
 | `________` | _tbd_ | _tbd_ | _tbd_ | v0.4b: WorkManager periodic backup scheduler. |
