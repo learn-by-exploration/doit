@@ -48,6 +48,7 @@ not yet a real requirement.
 | v0.4 firstLaunch persisted | SYS-059 | `lib/services/settings_service.dart` (firstLaunchCompleted ValueNotifier + SharedPreferences round-trip), `lib/main.dart` (route switch) | `test/services/first_launch_persisted_test.dart` (7 tests) + `test/widget_test.dart` (3 tests: wiped install, mark+remount, override). |
 | v0.4 WorkManager periodic backup | SYS-060 | `lib/services/backup_scheduler.dart` (Workmanager register/cancel + top-level dispatcher) | `test/services/backup_scheduler_test.dart` (5 tests) + `test/services/backup_task_dispatcher_test.dart` (3 tests). |
 | v0.4 backup encryption | SYS-061 | `lib/services/backup_service.dart` (v2 envelope: PBKDF2-HMAC-SHA256 + AES-256-GCM) | `test/services/backup_encryption_test.dart` (5 tests: round-trip, wrong passphrase, missing passphrase, v1 back-compat, KDF floor). |
+| v0.4 TalkBack / a11y static review | SYS-062 | `lib/screens/*.dart`, `lib/widgets/*.dart` (every interactive element with a `tooltip` / `semanticLabel` / `Semantics` wrapper) | `test/a11y/semantics_labels_test.dart` (18 per-file tests: walks every screens + widgets file and asserts the labels). User's hands-on TalkBack pass on a real device is the v0.4d sign-off step. |
 
 ## Workflow → Requirement → Verification
 

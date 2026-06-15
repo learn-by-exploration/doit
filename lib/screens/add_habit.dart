@@ -476,11 +476,13 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton(
+                  tooltip: 'Decrement',
                   onPressed: () => setLocal(() => n = (n - 1).clamp(1, 365)),
                   icon: const Icon(Icons.remove),
                 ),
                 Text('$n', style: Theme.of(ctx).textTheme.titleLarge),
                 IconButton(
+                  tooltip: 'Increment',
                   onPressed: () => setLocal(() => n = (n + 1).clamp(1, 365)),
                   icon: const Icon(Icons.add),
                 ),
@@ -547,11 +549,13 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton(
+                  tooltip: 'Decrement',
                   onPressed: () => setLocal(() => d = (d - 1).clamp(1, 31)),
                   icon: const Icon(Icons.remove),
                 ),
                 Text('$d', style: Theme.of(ctx).textTheme.titleLarge),
                 IconButton(
+                  tooltip: 'Increment',
                   onPressed: () => setLocal(() => d = (d + 1).clamp(1, 31)),
                   icon: const Icon(Icons.add),
                 ),
@@ -586,11 +590,13 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton(
+                  tooltip: 'Decrement',
                   onPressed: () => setLocal(() => n = (n - 1).clamp(1, 5)),
                   icon: const Icon(Icons.remove),
                 ),
                 Text(_nthLabel(n), style: Theme.of(ctx).textTheme.titleLarge),
                 IconButton(
+                  tooltip: 'Increment',
                   onPressed: () => setLocal(() => n = (n + 1).clamp(1, 5)),
                   icon: const Icon(Icons.add),
                 ),
