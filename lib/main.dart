@@ -3,9 +3,9 @@
 // Wires up the singletons (DB, reminder, settings) before
 // `runApp` and mounts a `MultiProvider` so widgets can read
 // them via `context.watch` / `context.read`. The default route
-// is the Home screen; onboarding is shown only on first
-// launch (the `firstLaunch` flag is hard-coded `true` in v0.1
-// — the persisted flag is a v0.2 line item).
+// is decided by [SettingsService.firstLaunchCompleted]; a
+// fresh install shows the onboarding screen, a returning user
+// sees the home screen directly.
 
 import 'package:flutter/material.dart';
 
@@ -44,7 +44,9 @@ Future<void> main() async {
     ),
   );
 
-  // 3. Init settings (no-op in v0.1; persisted in v0.2).
+  // 3. Init settings. The v0.4a.3 (SYS-059) first-launch flag
+  //    is loaded here; the gate ensures widgets only read it
+  //    after the SharedPreferences read has completed.
   await SettingsService.instance.init();
 
   // 4. Init the backup service so the restore screen can
@@ -54,14 +56,18 @@ Future<void> main() async {
   runApp(const StreakApp());
 }
 
-/// Root widget. Reads the current theme from
-/// [SettingsService] and shows the home screen.
+/// Root widget. Reads the current theme and the persisted
+/// first-launch flag from [SettingsService].
 class StreakApp extends StatelessWidget {
-  const StreakApp({super.key, this.firstLaunch = true});
+  const StreakApp({super.key, this.firstLaunchOverride});
 
-  /// True on the first launch. In v0.1 this is hard-coded —
-  /// the persisted flag is a v0.2 follow-up.
-  final bool firstLaunch;
+  /// Test-only override for the persisted first-launch flag.
+  /// When `null` (the production default), the widget reads
+  /// [SettingsService.firstLaunchCompleted]. When set, the
+  /// widget uses the override directly. The override is a
+  /// per-mount switch so the widget test does not have to
+  /// reach into [SharedPreferences] from a child test.
+  final bool? firstLaunchOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -73,19 +79,25 @@ class StreakApp extends StatelessWidget {
       ],
       child: ValueListenableBuilder<ThemeMode>(
         valueListenable: SettingsService.instance.themeMode,
-        builder: (_, mode, _) => MaterialApp(
-          title: 'Streak',
-          theme: AppTheme.light,
-          darkTheme: AppTheme.dark,
-          themeMode: mode,
-          home: firstLaunch
-              ? OnboardingScreen(
-                  onDone: () {
-                    // In v0.1 we just rebuild without
-                    // onboarding. v0.2 persists the flag.
-                  },
-                )
-              : const HomeScreen(),
+        builder: (_, mode, _) => ValueListenableBuilder<bool>(
+          valueListenable: SettingsService.instance.firstLaunchCompleted,
+          builder: (_, firstLaunchDone, _) => MaterialApp(
+            title: 'Streak',
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: mode,
+            home: (firstLaunchOverride ?? !firstLaunchDone)
+                ? OnboardingScreen(
+                    // v0.4a.3 (SYS-059): persist the flag so the
+                    // next mount skips onboarding. The notifier
+                    // updates synchronously, so the
+                    // ValueListenableBuilder above will rebuild
+                    // on the next frame.
+                    // ignore: discarded_futures
+                    onDone: SettingsService.instance.markFirstLaunchCompleted,
+                  )
+                : const HomeScreen(),
+          ),
         ),
       ),
     );

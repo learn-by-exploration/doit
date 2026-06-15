@@ -186,6 +186,8 @@ primary phone; the run does not require new code.
 | v0.3d — Fresh-install smoke | `50781ce` | ✓ | 1 fresh_install_test (end-to-end) | n/a (integration test) |
 | v0.3e — Release (sign-off) | _pending_ | _tbd_ | _tbd_ | [`v0_3_release_checklist.md`](v0_3_release_checklist.md) is the right-side gate; `flutter build appbundle --release` is the user's hands-on step. |
 | **v0.4a.1 — CI 3-gate** | _v0.4a.1_ | ✓ | _v0.4a.1_ | `.github/workflows/ci.yml` + `test/ci_workflow_test.dart`. Closes the "Not started" row in the right-side table. |
+| v0.4a.2 — CHANGELOG | _v0.4a.2_ | ✓ | _v0.4a.2_ | `CHANGELOG.md` (Keep-a-Changelog shape, v0.4 [Unreleased] section). |
+| v0.4a.3 — firstLaunch persisted | _v0.4a.3_ | ✓ | 7 first_launch_persisted + 3 widget_test (SYS-059) | `SettingsService.firstLaunchCompleted` backed by `SharedPreferences`. The "onboarding re-appears on reinstall" caveat in `PRIVACY.md` is removed. |
 
 ## How to update this file
 

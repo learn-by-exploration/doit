@@ -53,6 +53,11 @@ dependencies:
   # permission required.
   file_picker: ^8.1.2
 
+  # Persisted user-tweakable settings (theme mode, first-launch
+  # flag). The v0.4a.3 firstLaunch persisted flag is the first
+  # feature that uses this; v0.1 stored settings in memory only.
+  shared_preferences: ^2.3.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

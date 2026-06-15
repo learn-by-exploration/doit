@@ -1,9 +1,11 @@
-// Settings — minimal in-memory store for v0.1.
+// Settings — user-tweakable preferences, persisted via
+// `shared_preferences` as of v0.4a.3.
 //
 // Per .claude/rules/lib-services.md, services are singletons
-// with an idempotent `init()`. The v0.1 service only stores
-// the theme mode in memory; v0.2 will persist via
-// `shared_preferences`.
+// with an idempotent `init()` gated by a `Completer<void> _ready`.
+// The v0.1 service only stored the theme mode in memory;
+// v0.4a.3 adds the `firstLaunchCompleted` flag (SYS-059) and
+// routes the persisted read through `_ready.future`.
 //
 // The settings screen binds to [themeMode] via a
 // `ValueListenableBuilder` so changes propagate without
@@ -11,8 +13,11 @@
 // [ChangeNotifier] so it can be exposed via
 // `ChangeNotifierProvider` (per .claude/rules/lib-screens.md).
 
-import 'package:flutter/material.dart'
-    show ChangeNotifier, ValueNotifier, ThemeMode;
+import 'dart:async' show Completer;
+
+import 'package:flutter/foundation.dart' show ChangeNotifier, ValueNotifier;
+import 'package:flutter/material.dart' show ThemeMode;
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Singleton holder for user-tweakable settings. The runtime
 /// value lives in a [ValueNotifier] so widgets can listen
@@ -29,14 +34,68 @@ class SettingsService extends ChangeNotifier {
     ThemeMode.dark,
   );
 
-  /// Idempotent init. The v0.1 in-memory version is a no-op;
-  /// v0.2 will load persisted values here.
-  Future<void> init() async {}
+  /// `true` once the user has finished the onboarding flow at
+  /// least once on this install. Defaults to `false`. Read by
+  /// [StreakApp] to decide whether to show [OnboardingScreen] or
+  /// [HomeScreen] as the initial route. Backed by
+  /// [SharedPreferences] under [_kFirstLaunchCompletedKey].
+  ///
+  /// v0.4a.3 (SYS-059) introduces the persisted flag. v0.1..v0.3
+  /// had this hard-coded `true` in [StreakApp]'s constructor,
+  /// which meant the onboarding screen re-appeared on every
+  /// reinstall.
+  final ValueNotifier<bool> firstLaunchCompleted = ValueNotifier<bool>(false);
 
-  /// Test helper. Resets the singleton state.
+  /// Init gate (`Completer<void> _ready`). Public reads wait on
+  /// this before touching the underlying [SharedPreferences]
+  /// instance. Pattern: see .claude/rules/lib-services.md §2.
+  Completer<void> _ready = Completer<void>();
+  Future<void> get ready => _ready.future;
+  late SharedPreferences _prefs;
+
+  /// Key under which the `firstLaunchCompleted` boolean is
+  /// persisted. Private to the service — widgets never read or
+  /// write `SharedPreferences` directly (.claude/rules/lib-screens.md §5).
+  static const String _kFirstLaunchCompletedKey =
+      'streak.first_launch_completed';
+
+  /// Idempotent init. Loads the persisted values; safe to call
+  /// multiple times (the gate is completed on the first call and
+  /// subsequent calls are no-ops).
+  Future<void> init() async {
+    if (_ready.isCompleted) return;
+    _prefs = await SharedPreferences.getInstance();
+    firstLaunchCompleted.value =
+        _prefs.getBool(_kFirstLaunchCompletedKey) ?? false;
+    if (!_ready.isCompleted) _ready.complete();
+  }
+
+  /// Mark the first-launch onboarding as complete. Persists the
+  /// value so the next [StreakApp] mount skips the onboarding
+  /// screen. Awaiting this is safe in widget tests; in widget
+  /// bodies, the [firstLaunchCompleted] [ValueNotifier] updates
+  /// synchronously so a `setState` is not required.
+  Future<void> markFirstLaunchCompleted() async {
+    await _ready.future;
+    firstLaunchCompleted.value = true;
+    await _prefs.setBool(_kFirstLaunchCompletedKey, true);
+  }
+
+  /// Test helper. Resets the singleton's in-memory state so the
+  /// next [init()] re-loads from the `SharedPreferences` backing
+  /// store. Does **not** touch the backing store itself; tests
+  /// that want a wiped install call
+  /// `SharedPreferences.setMockInitialValues({})` before the
+  /// next [init()]. Tests that want to assert persistence
+  /// across a restart call this helper and then re-`init()`.
   // ignore: use_setters_to_change_properties
   void resetForTesting() {
     themeMode.value = ThemeMode.dark;
+    firstLaunchCompleted.value = false;
+    // Allow a subsequent init() to re-load from the backing
+    // store. Re-creating the completer is the standard pattern
+    // when the gate has not yet been awaited in tests.
+    _ready = Completer<void>();
   }
 
   @override

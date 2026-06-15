@@ -128,9 +128,12 @@ of the v0.3 release:
 - Backup files are **plain JSON, not encrypted**. A user with
   access to your SAF folder can read them. Encryption is a v0.4
   line item behind a user passphrase.
-- The first-launch onboarding screen is hard-coded to show on
-  every install (no persisted "I have done this" flag). This
-  means the rationale screens re-appear if you re-install. v0.4.
+- The first-launch onboarding screen shows the permission
+  rationale (and the backup-folder + anchor-mode walkthrough)
+  the **first time** you launch the app on a given install.
+  A "done" flag is persisted in `SharedPreferences` so the
+  screen does not re-appear on subsequent launches. v0.4
+  (SYS-059).
 
 ## Reporting a privacy concern
 
