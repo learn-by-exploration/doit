@@ -192,6 +192,7 @@ primary phone; the run does not require new code.
 | v0.4c.1 — Backup encryption | _v0.4c.1_ | ✓ | 5 backup_encryption_test (SYS-061) | `kBackupFormatVersion` bumped to 2; AES-256-GCM with PBKDF2-HMAC-SHA256 (100k iterations) behind a user passphrase. v1 plain-JSON stays importable for back-compat. The "plain JSON backups" caveat in `PRIVACY.md` is updated. |
 | v0.4c.2 — TalkBack / a11y static review | _v0.4c.2_ | ✓ | 18 a11y/semantics_labels_test (SYS-062) | Static analysis walks every `lib/screens/*.dart` and `lib/widgets/*.dart` and asserts every `IconButton`, `ListTile`, button, `GestureDetector`, and `InkWell` has a `tooltip` / `semanticLabel` / `Text` / `Semantics` / `excludeFromSemantics: true`. Adds 6 missing tooltips to `add_habit.dart`. |
 | v0.4d — sign-off | `efbfbdc` | ✓ | 373 / 373 (no new tests; CHANGELOG.md `[0.4.0]` section appended) | v0.4 release checklist updated; sign-off line is "Pending. Awaiting user's hands-on TalkBack pass (SYS-062)." The right-side gate is `v0_4_release_checklist.md`. |
+| v0.4b-release-fix (ADR-013) | _tbd_ | ✓ | 375 / 375 (373 prior + 2 new: cold-start platform-throw + dispatcher symbol) | Post-mortem on the v0.4b release-mode launch crash. Renamed `_backupTaskDispatcher` to public `backupTaskDispatcher` so `PluginUtilities.getCallbackHandle` resolves it in release AOT. Made `init()` swallow platform exceptions (defense in depth). Wrapped `main()`'s `await BackupScheduler.instance.init()` in try/catch. Rebuilds the release APK. See `decision_record.md` ADR-013. |
 
 ## How to update this file
 

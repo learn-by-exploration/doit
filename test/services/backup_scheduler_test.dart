@@ -9,8 +9,18 @@
 //   3. `cancelNightlyBackup()` calls
 //      `Workmanager().cancelByUniqueName(...)`.
 //   4. `scheduleNightlyBackup()` before `init()` throws.
+//   5. (v0.4b release fix, ADR-013) `init()` does not
+//      rethrow when the platform throws. The cold-start
+//      smoke test in `main()` must not crash the app if
+//      the workmanager plugin is missing or restricted.
+//   6. (v0.4b release fix, ADR-013) the dispatcher function
+//      passed to `Workmanager().initialize(...)` is the
+//      **public** top-level `backupTaskDispatcher`. A
+//      private dispatcher cannot be resolved by name from
+//      a background isolate in release AOT builds, which
+//      causes the OS to fail to bind the periodic task.
 //
-// The dispatcher itself (`_backupTaskDispatcher`) is the
+// The dispatcher itself (`backupTaskDispatcher`) is the
 // Dart entry point the OS calls when a periodic task fires.
 // Dispatcher behavior is tested separately in
 // `backup_task_dispatcher_test.dart` because the dispatcher
@@ -117,4 +127,60 @@ void main() {
       expect(BackupScheduler.instance.isNightlyScheduled, isFalse);
     },
   );
+
+  // v0.4b release fix (ADR-013). If the workmanager plugin
+  // throws on a real device (e.g. an OEM that has killed
+  // WorkManager, or a missing callback handle on a build
+  // without the plugin side wired up), `init()` MUST NOT
+  // rethrow. `main()` calls `await init()` before `runApp`;
+  // a rethrown exception would crash the app on first
+  // launch. The catch path logs the error and leaves the
+  // gate uncompleted so a later retry can re-init.
+  test(
+    'init() swallows platform exceptions (release-mode crash fix, ADR-013)',
+    () async {
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        if (call.method == 'initialize') {
+          throw PlatformException(
+            code: '1',
+            message: 'Simulated workmanager plugin failure',
+          );
+        }
+        return null;
+      });
+      // Must not throw.
+      await BackupScheduler.instance.init();
+      // The init() call was made; the platform exception
+      // was swallowed.
+      final inits = calls.where((c) => c.method == 'initialize').toList();
+      expect(inits.length, 1, reason: 'init() was attempted');
+      // The gate is left uncompleted: a follow-up
+      // scheduleNightlyBackup() must throw StateError, so the
+      // UI surfaces a clear error rather than a silent miss.
+      expect(
+        BackupScheduler.instance.scheduleNightlyBackup,
+        throwsA(isA<StateError>()),
+      );
+    },
+  );
+
+  // v0.4b release fix (ADR-013). The dispatcher passed to
+  // `Workmanager().initialize(...)` must be the **public**
+  // top-level `backupTaskDispatcher`. A private dispatcher
+  // (a leading underscore) cannot be resolved by name from
+  // a background isolate in release AOT builds, which causes
+  // the OS to fail to bind the periodic task. This test
+  // pins the symbol at the type-system level: the export
+  // is public, and the symbol exists at top level.
+  test('backupTaskDispatcher is a public top-level function (ADR-013)', () {
+    // Compile-time check: the symbol is reachable as a
+    // top-level function (not a private one). `const`
+    // evaluates the reference at compile time, which is
+    // the strongest possible "this is a real symbol" pin
+    // — a renamed/privatized symbol would break the
+    // compilation of this test, not just the runtime.
+    const Function ref = backupTaskDispatcher;
+    expect(ref, isNotNull);
+  });
 }

@@ -99,6 +99,46 @@ every commit. Right-side gate: `v0_4_release_checklist.md`.
 - The user's hands-on TalkBack pass on a real device (or
   emulator) is the v0.4d sign-off step.
 
+### v0.4b-release-fix (ADR-013) — WorkManager cold-start crash
+
+- **Post-mortem on the v0.4b release-mode launch crash.** The
+  v0.4b release APK (`build/app/outputs/flutter-apk/app-release.apk`
+  at SHA `8f0ec5c`) crashed on every cold start on a real
+  device. Root cause: two interlocking defects in
+  `lib/services/backup_scheduler.dart` —
+  1. The WorkManager dispatcher was a **private** top-level
+     function (`_backupTaskDispatcher`). In a release AOT
+     build, `PluginUtilities.getCallbackHandle` cannot
+     resolve a private symbol by name, and
+     `Workmanager().initialize(...)` throws before `runApp`.
+  2. `init()` rethrew the platform exception. The exception
+     propagated out of `main()` and the OS killed the
+     process.
+- **The fix.**
+  1. The dispatcher is renamed to a **public** top-level
+     function `backupTaskDispatcher`. The `@pragma('vm:entry-point')`
+     annotation stays. The symbol is pinned at the type
+     level by a new test
+     (`test/services/backup_scheduler_test.dart`:
+     `backupTaskDispatcher is a public top-level function`).
+  2. `init()` no longer rethrows. A platform exception is
+     logged (debug-only, via the `assert(() { print(...);
+     return true; }())` pattern that compiles to a no-op in
+     release) and the gate is left uncompleted. A follow-up
+     `scheduleNightlyBackup()` throws a clear `StateError`.
+  3. `main()` wraps the `await BackupScheduler.instance.init()`
+     call in a defensive `try/catch` (debug-only `debugPrint`).
+- **The new test** `init() swallows platform exceptions`
+  throws a `PlatformException` from the mock's
+  `initialize` handler and asserts `init()` does not
+  rethrow, the call was made, and the gate is left
+  uncompleted.
+- **The release APK is rebuilt.** v0.4d's sign-off line
+  remains "Pending. Awaiting user's hands-on TalkBack
+  pass (SYS-062)"; the v0.4b-release-fix commit is the
+  artifact the TalkBack pass should exercise. See
+  `decision_record.md` ADR-013.
+
 ## [0.3.0] — 2026-06-14 — Sideload-to-friends release
 
 The first release that is not just for the user's primary phone.

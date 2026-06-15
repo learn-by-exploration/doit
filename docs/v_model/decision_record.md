@@ -454,3 +454,136 @@ policies are pinned in the matching SYS- IDs:
 **Workflows affected:** WF-006, WF-009, WF-012.
 
 ---
+
+## ADR-013 — v0.4b WorkManager dispatcher must be a public top-level function; cold-start `init()` must not crash the app
+
+**Status:** Accepted 2026-06-15 (post-mortem on the v0.4b
+release-mode launch crash).
+
+**Context.** v0.4b (SYS-060) added the WorkManager-backed
+nightly backup scheduler. The release APK built at SHA
+`8f0ec5c` (and the prior `9290652` build) crashed on first
+launch on a real device — the system reported
+"App keeps stopping" and the process exited before
+`runApp`. The crash repro'd on every cold start and was
+independent of the user's onboarding state. The v0.4b unit
+tests (`backup_scheduler_test.dart` + `backup_task_dispatcher_test.dart`)
+were all green at the v0.4d sign-off, and `flutter test`
+reported 373/373. The crash therefore had a release-mode
+fingerprint that the test harness did not exercise.
+
+**Root cause.** Two interlocking issues, both in
+`lib/services/backup_scheduler.dart`:
+
+1. **The dispatcher was a private top-level function**
+   (`_backupTaskDispatcher`, leading underscore).
+   `PluginUtilities.getCallbackHandle(callbackDispatcher)`
+   resolves the function by name from a background isolate.
+   In a release AOT build, private top-level functions are
+   not always reachable by name (the AOT compiler can prune
+   them or strip the symbol table entry), and
+   `Workmanager().initialize(...)` then throws an
+   `ArgumentError` ("the callbackDispatcher needs to be
+   either a static function or a top level function"). The
+   exception propagated out of `main()` and the OS killed
+   the process before `runApp`.
+
+2. **`init()` rethrew the platform exception.** Even
+   without the dispatcher-name issue, `init()` was
+   `try { ... } catch (e, st) { _ready.completeError(...);
+   rethrow; }`. The rethrow was the right call for unit
+   tests (which need a clear failure signal), but wrong for
+   the production cold-start path: `main()` calls
+   `await BackupScheduler.instance.init()` *before* `runApp`.
+   Any platform exception (a missing keystore, a restricted
+   OEM, a transient WorkManager error) becomes a fatal app
+   crash.
+
+**Why the unit tests did not catch it.** The unit tests
+mock the workmanager method channel. The mock returns
+`null` for every call. The mock never goes through
+`PluginUtilities.getCallbackHandle`, so the AOT
+name-resolution path is never exercised. The release AOT
+compiler is also not running — tests use the JIT. The
+crash was a release-AOT-only defect.
+
+**Decision.**
+
+1. **The dispatcher is renamed to a public top-level
+   function** (`backupTaskDispatcher`, no underscore). The
+   `@pragma('vm:entry-point')` annotation stays. The symbol
+   is referenced in the unit test as a `const Function ref =
+   backupTaskDispatcher;` so a future rename back to
+   private would break the test at compile time.
+
+2. **`init()` no longer rethrows.** A platform exception is
+   logged (debug-only, via the `assert(() { print(...);
+   return true; }())` pattern that compiles to a no-op in
+   release) and the gate is left uncompleted. A later retry
+   can re-call `init()` if the platform side recovers. A
+   follow-up `scheduleNightlyBackup()` throws a clear
+   `StateError` so the UI can surface the failure to the
+   user, instead of silently missing the schedule.
+
+3. **`main()` wraps the `init()` call in a defensive
+   `try/catch`.** Defense in depth — even if a future
+   change in `init()` reintroduces a rethrow, the app still
+   launches. The `try/catch` body is debug-only
+   `debugPrint`; release builds stay silent in logcat.
+
+4. **A new unit test pins both invariants:**
+   `test/services/backup_scheduler_test.dart` has two
+   new tests (a) `init() swallows platform exceptions` —
+   throws a `PlatformException` from the mock's
+   `initialize` handler and asserts `init()` does not
+   rethrow, the call was made, and the gate is left
+   uncompleted (so a follow-up `scheduleNightlyBackup()`
+   throws `StateError`); and (b)
+   `backupTaskDispatcher is a public top-level function` —
+   pins the symbol at compile time via a `const Function
+   ref = backupTaskDispatcher;`. The dispatcher-name test
+   would have caught the original bug if the test had
+   referenced the symbol at the type-system level.
+
+**Consequences.**
+
+- Any future background isolate entry point (a v0.5+
+  feature, e.g. a v0.2f VIP escalation that adds a second
+  `Workmanager().initialize` for a different cadence)
+  **must** be a public top-level function. The pattern is
+  documented in `lib/services/backup_scheduler.dart`'s
+  file-level comment and in the dispatcher's doc comment.
+- A service's `init()` must never block `runApp` for an
+  external reason. The contract is:
+  `init()` may complete, may complete-with-error-and-leave-
+  the-gate-uncompleted, or may swallow-and-log. It must
+  never rethrow. The fresh-install integration test
+  (`test/integration/fresh_install_test.dart`) is the
+  right place to assert this at the call-site level.
+- The "no widget test for the release-mode cold-start path"
+  gap is closed: a new test
+  (`backup_scheduler_test.dart` "init() swallows platform
+  exceptions") exercises the platform-throw path under
+  a mock that simulates the missing-plugin or
+  restricted-WorkManager case. The AOT name-resolution
+  path is still not exercised by tests (it cannot be —
+  the AOT compiler runs at build time, not test time),
+  but the symbol is pinned at the Dart type level so a
+  future rename back to private would fail compilation
+  rather than fail at runtime.
+
+**SYS-IDs affected:** SYS-060 (WorkManager periodic
+backup — the dispatcher is part of the SYS-060 surface).
+
+**Workflows affected:** WF-012 (Auto backup — the
+scheduler that runs the periodic export).
+
+**Post-mortem note.** The "no real-device step on the
+v0.4b path" is itself a process defect. v0.4d's
+right-side gate (`v0_4_release_checklist.md`) lists the
+user's hands-on TalkBack pass as the v0.4d step, but a
+TalkBack pass on a v0.4b build would have surfaced the
+crash immediately. The lesson — the v0.4d sign-off must
+include a hands-on cold-start check (not just an a11y
+check) — is folded into the v0.4d checklist via the
+release-fix commit.

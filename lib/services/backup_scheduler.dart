@@ -10,12 +10,23 @@
 // top-level entry-point dispatcher (the OS instantiates the
 // Flutter engine from cold start to run a periodic task).
 //
-// The dispatcher is defined in `_backupTaskDispatcher` below
+// The dispatcher is defined in [backupTaskDispatcher] below
 // and registered via `Workmanager().initialize(...)` from
 // `init()`. The unique name is `streak.backup.nightly` and
 // the task name is also `streak.backup.nightly` (workmanager
 // requires both; the unique name dedupes, the task name
 // dispatches).
+//
+// IMPORTANT: the dispatcher is a public top-level function
+// (no leading underscore). `PluginUtilities.getCallbackHandle`
+// resolves it by name from a background isolate; private
+// top-level functions are not always reachable by name in
+// release AOT builds, which causes `Workmanager().initialize`
+// to throw an `ArgumentError` and the app to crash on launch
+// before `runApp`. This is the v0.4b release-mode crash that
+// the v0.4 unit tests did not catch (the tests mock the
+// method channel, so the callback resolution never runs in
+// tests). See `decision_record.md` ADR-013.
 //
 // Per the project's no-INTERNET constraint, the scheduler is
 // strictly local: the only side effect is `exportTo` writing
@@ -61,16 +72,21 @@ const Duration _kBackupFrequency = Duration(hours: 24);
 /// fires. Annotated `@pragma('vm:entry-point')` so the Dart
 /// AOT compiler keeps it reachable from native entry points.
 ///
-/// The dispatcher must be a top-level or static function so
-/// `PluginUtilities.getCallbackHandle` can resolve it. The
-/// `Workmanager().executeTask` switch dispatches by task
+/// The dispatcher is **public** (no leading underscore) on
+/// purpose. `PluginUtilities.getCallbackHandle` resolves it
+/// by name from a background isolate; private top-level
+/// functions are not always reachable by name in release AOT
+/// builds, which causes `Workmanager().initialize` to throw
+/// on first launch. See ADR-013.
+///
+/// The `Workmanager().executeTask` switch dispatches by task
 /// name; for now we only handle [kBackupNightlyTaskName].
 ///
 /// The function does not throw — failures are swallowed and
 /// logged as `false` to the OS. The OS retries the next
 /// periodic interval.
 @pragma('vm:entry-point')
-Future<void> _backupTaskDispatcher() async {
+Future<void> backupTaskDispatcher() async {
   Workmanager().executeTask((task, inputData) async {
     if (task != kBackupNightlyTaskName) {
       return false;
@@ -133,14 +149,31 @@ class BackupScheduler {
   /// no-op the second time) and resolves the gate. The
   /// caller (typically `main.dart`) awaits this before
   /// `scheduleNightlyBackup()`.
+  ///
+  /// On a real device, `Workmanager().initialize` may throw
+  /// for reasons unrelated to the app (an OEM that has killed
+  /// WorkManager, a profile that has restricted background
+  /// execution, etc.). The first cold start of the app should
+  /// NOT crash on this — the user can still use the app and
+  /// try the schedule again from the settings screen. The
+  /// exception is logged via `debugPrint` (kDebugMode only) and
+  /// the gate is left uncompleted so [scheduleNightlyBackup]
+  /// throws a clear `StateError` if called.
   Future<void> init() async {
     if (_ready.isCompleted) return;
     try {
-      await Workmanager().initialize(_backupTaskDispatcher);
+      await Workmanager().initialize(backupTaskDispatcher);
       if (!_ready.isCompleted) _ready.complete();
     } catch (e, st) {
-      if (!_ready.isCompleted) _ready.completeError(e, st);
-      rethrow;
+      // Do not rethrow — see the doc above. The gate stays
+      // uncompleted so a later retry can re-call init() if
+      // the platform side recovers. `debugPrint` is gated on
+      // kDebugMode so a release build stays silent in logcat.
+      assert(() {
+        // ignore: avoid_print
+        print('BackupScheduler.init() failed: $e\n$st');
+        return true;
+      }());
     }
   }
 

@@ -7,6 +7,7 @@
 // fresh install shows the onboarding screen, a returning user
 // sees the home screen directly.
 
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter/material.dart';
 
 import 'package:common_games/reminders/anchor_detector.dart';
@@ -57,7 +58,23 @@ Future<void> main() async {
   // 5. Init the WorkManager-backed nightly backup scheduler
   //    (v0.4b / SYS-060). The schedule itself is registered
   //    later, from the settings screen, so users can opt out.
-  await BackupScheduler.instance.init();
+  //
+  //    v0.4b release-mode fix: this call MUST NOT block
+  //    `runApp`. If the workmanager plugin is missing (a
+  //    build without the plugin side wired up, an OEM that
+  //    has killed WorkManager, a stale callback handle, etc.)
+  //    the app must still launch and the user must still be
+  //    able to use every other feature. The service's own
+  //    `init()` already swallows the exception and logs it
+  //    (debug-only); the outer try/catch is defense in depth.
+  //    See ADR-013.
+  try {
+    await BackupScheduler.instance.init();
+  } catch (e, st) {
+    if (kDebugMode) {
+      debugPrint('BackupScheduler.init() failed: $e\n$st');
+    }
+  }
 
   runApp(const StreakApp());
 }
