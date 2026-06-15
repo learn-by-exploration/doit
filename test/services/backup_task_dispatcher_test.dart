@@ -68,7 +68,7 @@ void main() {
     final contents = await out.readAsString();
     expect(
       contents,
-      contains('"version":${BackupService.kBackupFormatVersion}'),
+      contains('"version":${BackupService.kBackupFormatVersionV1}'),
     );
     expect(contents, contains('Stretch'));
   });

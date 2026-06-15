@@ -128,9 +128,15 @@ of the v0.3 release:
 - The `PersonResolver` (a service in `lib/services/`) is
   forward-referenced in the rules but not yet implemented.
   Contacts are resolved at write time only.
-- Backup files are **plain JSON, not encrypted**. A user with
-  access to your SAF folder can read them. Encryption is a v0.4
-  line item behind a user passphrase.
+- Backups can be either **plain JSON (v1, read-only on v0.4+,
+  still supported for back-compat)** or **encrypted (v2,
+  AES-256-GCM, key derived from a user-supplied passphrase
+  via PBKDF2-HMAC-SHA256 with 100,000 iterations + 16-byte
+  random salt)**. The user opts into encryption from the
+  backup screen with a passphrase prompt. A user with access
+  to your SAF folder can read v1 backups; v2 backups require
+  the passphrase. v0.3 backups (plain JSON) remain
+  importable on v0.4+ via the v1 read path.
 - The first-launch onboarding screen shows the permission
   rationale (and the backup-folder + anchor-mode walkthrough)
   the **first time** you launch the app on a given install.

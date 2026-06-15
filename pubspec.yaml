@@ -58,6 +58,13 @@ dependencies:
   # feature that uses this; v0.1 stored settings in memory only.
   shared_preferences: ^2.3.4
 
+  # Backup encryption (v0.4c.1 / SYS-061). Provides PBKDF2-HMAC-SHA256
+  # and AES-256-GCM for the v2 backup envelope. The plain-JSON v1
+  # path stays supported for back-compat reads; the v2 path requires
+  # a user-supplied passphrase and derives a 32-byte key via
+  # PBKDF2 with ≥ 100,000 iterations + 16-byte random salt.
+  cryptography: ^2.9.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

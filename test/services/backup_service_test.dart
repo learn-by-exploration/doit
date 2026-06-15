@@ -35,14 +35,14 @@ void main() {
     await BackupService.instance.init();
   });
 
-  test('export on an empty DB writes a valid JSON envelope', () async {
+  test('export on an empty DB writes a v1 plain-JSON envelope', () async {
     final tmp = await _writeTemp('empty.json', '');
     final bytes = await BackupService.instance.exportTo(tmp);
     expect(bytes, greaterThan(0));
     final contents = await tmp.readAsString();
     expect(
       contents,
-      contains('"version":${BackupService.kBackupFormatVersion}'),
+      contains('"version":${BackupService.kBackupFormatVersionV1}'),
     );
     expect(contents, contains('"tables"'));
   });

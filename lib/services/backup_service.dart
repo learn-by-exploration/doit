@@ -6,13 +6,24 @@
 // import wipes the local DB and replaces it with the parsed
 // payload. The wire format is `{"version": 1, "tables": {...}}`.
 //
+// v0.4c.1 (SYS-061) adds the v2 envelope: AES-256-GCM over
+// the same JSON payload, key derived from a user-supplied
+// passphrase via PBKDF2-HMAC-SHA256 (≥ 100,000 iterations,
+// 16-byte random salt). The v1 plain-JSON path stays
+// supported on read for back-compat; writes default to v2
+// when a passphrase is supplied. v0.4 does NOT auto-write
+// v2 backups — the user opts in from the backup screen with
+// a passphrase prompt.
+//
 // Layer rules (per .claude/rules/lib-services.md): singleton
 // with `Completer<void> _ready`; all public methods async.
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' show Random;
 
+import 'package:cryptography/cryptography.dart';
 import 'package:drift/drift.dart';
 
 import 'package:common_games/services/db.dart';
@@ -51,14 +62,44 @@ class BackupService {
 
   /// Current backup format version. Bumped on any breaking
   /// change to the on-disk JSON layout.
-  static const int kBackupFormatVersion = 1;
+  ///
+  /// - v1: plain JSON envelope, no encryption. Read-only on
+  ///   v0.4+; the import path still accepts v1 for back-compat.
+  /// - v2 (v0.4c.1 / SYS-061): encrypted envelope. The JSON
+  ///   payload is encrypted with AES-256-GCM using a key
+  ///   derived from a user-supplied passphrase via
+  ///   PBKDF2-HMAC-SHA256 (100,000 iterations, 16-byte salt).
+  ///   The envelope is:
+  ///   `{"version": 2, "kdf": {"name": "pbkdf2-hmac-sha256",
+  ///   "iterations": 100000, "saltB64": "..."}, "ciphertextB64":
+  ///   "...", "nonceB64": "..."}`.
+  static const int kBackupFormatVersion = 2;
+
+  /// Number of PBKDF2 iterations for the v2 envelope. 100,000
+  /// is OWASP's 2023+ recommendation; lower values are not
+  /// accepted on read.
+  static const int kBackupKdfIterations = 100000;
+
+  /// The plain-JSON v1 envelope version. Read-only on v0.4+;
+  /// the import path still accepts it for back-compat.
+  static const int kBackupFormatVersionV1 = 1;
 
   /// Write a JSON snapshot of every table to [file]. Overwrites
   /// any existing file. Returns the number of bytes written.
-  Future<int> exportTo(File file) async {
+  ///
+  /// If [passphrase] is `null`, writes a v1 plain-JSON
+  /// envelope (back-compat). If [passphrase] is non-null,
+  /// writes a v2 encrypted envelope.
+  Future<int> exportTo(File file, {String? passphrase}) async {
     await ready;
     final payload = await _readAllTables();
-    final bytes = utf8.encode(jsonEncode(payload));
+    if (passphrase == null) {
+      final bytes = utf8.encode(jsonEncode(payload));
+      await file.writeAsBytes(bytes, flush: true);
+      return bytes.length;
+    }
+    final envelope = await _encryptV2(payload, passphrase);
+    final bytes = utf8.encode(jsonEncode(envelope));
     await file.writeAsBytes(bytes, flush: true);
     return bytes.length;
   }
@@ -67,24 +108,41 @@ class BackupService {
   /// contents with it. The current contents are wiped inside a
   /// transaction; if the file is malformed the transaction
   /// rolls back and the DB is left untouched.
-  Future<int> importFrom(File file) async {
+  ///
+  /// Accepts both v1 (plain JSON) and v2 (encrypted) envelopes.
+  /// For v2 the caller must supply [passphrase]; a wrong
+  /// passphrase throws [BackupFormatException] ("decryption
+  /// failed"). For v1 the [passphrase] is ignored.
+  Future<int> importFrom(File file, {String? passphrase}) async {
     await ready;
     if (!await file.exists()) {
       throw BackupFormatException('File does not exist: ${file.path}');
     }
     final raw = await file.readAsBytes();
-    final Map<String, Object?> payload;
+    final Map<String, Object?> envelope;
     try {
-      payload = jsonDecode(utf8.decode(raw)) as Map<String, Object?>;
+      envelope = jsonDecode(utf8.decode(raw)) as Map<String, Object?>;
     } catch (e) {
       throw BackupFormatException('File is not valid JSON: $e');
     }
-    final version = payload['version'];
+    final version = envelope['version'];
     if (version is! int || version > kBackupFormatVersion) {
       throw BackupFormatException(
         'Unsupported backup version: $version '
         '(this build understands up to $kBackupFormatVersion).',
       );
+    }
+    final Map<String, Object?> payload;
+    if (version == kBackupFormatVersionV1) {
+      payload = envelope;
+    } else {
+      // v2: decrypt with the user-supplied passphrase.
+      if (passphrase == null || passphrase.isEmpty) {
+        throw BackupFormatException(
+          'Backup is encrypted (v2); a passphrase is required.',
+        );
+      }
+      payload = await _decryptV2(envelope, passphrase);
     }
     final tables = payload['tables'] as Map<String, Object?>?;
     if (tables == null) {
@@ -147,7 +205,12 @@ class BackupService {
     final settings = await _db.select(_db.settings).get();
     final events = await _db.select(_db.eventLogs).get();
     return {
-      'version': kBackupFormatVersion,
+      // The inner payload version is always 1 — the v2 envelope
+      // wraps the same payload in an outer `{version: 2, kdf: ...}`
+      // shell. Keeping the inner version at 1 means the v1
+      // import path is the single source of truth on read, and
+      // v1 fixtures stay back-compat.
+      'version': kBackupFormatVersionV1,
       'exportedAtMillis': DateTime.now().toUtc().millisecondsSinceEpoch,
       'tables': {
         'habits': habits.map(_habitToJson).toList(growable: false),
@@ -352,4 +415,114 @@ class BackupService {
         kind: Value(j['kind']! as String),
         detailJson: Value(j['detailJson'] as String?),
       );
+
+  // --- v2 encryption envelope (SYS-061) ---------------------------
+  //
+  // The plaintext is the same JSON payload that v1 writes
+  // (`{"version": 1, "tables": {...}, ...}` — note the inner
+  // version stays 1 so the v1 parser is the single source of
+  // truth on read). The envelope is:
+  //
+  //   {
+  //     "version": 2,
+  //     "kdf": { "name": "pbkdf2-hmac-sha256",
+  //              "iterations": 100000,
+  //              "saltB64": "<16 random bytes, base64>" },
+  //     "ciphertextB64": "<AES-256-GCM ciphertext, base64>",
+  //     "nonceB64": "<12 random bytes, base64>"
+  //   }
+  //
+  // The MAC tag is appended to the ciphertext by the
+  // `cryptography` package's AES-GCM; the v2 envelope does
+  // not store it separately. A wrong passphrase surfaces
+  // as a decryption failure (the MAC check rejects it).
+
+  static final Random _rng = Random.secure();
+  static final Pbkdf2 _pbkdf2 = Pbkdf2.hmacSha256(
+    iterations: kBackupKdfIterations,
+    bits: 256,
+  );
+  static final AesGcm _aesGcm = AesGcm.with256bits();
+
+  Future<Map<String, Object?>> _encryptV2(
+    Map<String, Object?> payload,
+    String passphrase,
+  ) async {
+    final salt = _randomBytes(16);
+    final nonce = _randomBytes(12);
+    final secretKey = await _pbkdf2.deriveKey(
+      secretKey: SecretKey(utf8.encode(passphrase)),
+      nonce: salt,
+    );
+    final box = await _aesGcm.encrypt(
+      utf8.encode(jsonEncode(payload)),
+      secretKey: secretKey,
+      nonce: nonce,
+    );
+    return {
+      'version': kBackupFormatVersion,
+      'kdf': {
+        'name': 'pbkdf2-hmac-sha256',
+        'iterations': kBackupKdfIterations,
+        'saltB64': base64Encode(salt),
+      },
+      'ciphertextB64': base64Encode(box.cipherText),
+      'macB64': base64Encode(box.mac.bytes),
+      'nonceB64': base64Encode(nonce),
+    };
+  }
+
+  Future<Map<String, Object?>> _decryptV2(
+    Map<String, Object?> envelope,
+    String passphrase,
+  ) async {
+    final kdf = envelope['kdf'];
+    if (kdf is! Map) {
+      throw BackupFormatException('Missing or malformed "kdf" object.');
+    }
+    final name = kdf['name'];
+    final iterations = kdf['iterations'];
+    final saltB64 = kdf['saltB64'];
+    final ciphertextB64 = envelope['ciphertextB64'];
+    final macB64 = envelope['macB64'];
+    final nonceB64 = envelope['nonceB64'];
+    if (name != 'pbkdf2-hmac-sha256' ||
+        iterations is! int ||
+        saltB64 is! String ||
+        ciphertextB64 is! String ||
+        macB64 is! String ||
+        nonceB64 is! String) {
+      throw BackupFormatException('Malformed v2 envelope.');
+    }
+    if (iterations < kBackupKdfIterations) {
+      throw BackupFormatException(
+        'KDF iterations below minimum: $iterations < $kBackupKdfIterations',
+      );
+    }
+    final salt = base64Decode(saltB64);
+    final ciphertext = base64Decode(ciphertextB64);
+    final macBytes = base64Decode(macB64);
+    final nonce = base64Decode(nonceB64);
+    final secretKey = await _pbkdf2.deriveKey(
+      secretKey: SecretKey(utf8.encode(passphrase)),
+      nonce: salt,
+    );
+    try {
+      final clear = await _aesGcm.decrypt(
+        SecretBox(ciphertext, nonce: nonce, mac: Mac(macBytes)),
+        secretKey: secretKey,
+      );
+      return jsonDecode(utf8.decode(clear)) as Map<String, Object?>;
+    } catch (e) {
+      throw BackupFormatException('Decryption failed (wrong passphrase?).');
+    }
+  }
+
+  List<int> _randomBytes(int n) {
+    final out = List<int>.filled(n, 0);
+    for (var i = 0; i < n; i++) {
+      out[i] = _rng.nextInt(256);
+    }
+    return out;
+  }
 }
