@@ -6,7 +6,7 @@ publish_to: 'none'
 
 # Streak is a personal-use Android habit app. iOS is v0.2+ scope. The
 # version and build number are overridden by `flutter build` flags.
-version: 0.1.0+1
+version: 0.3.0+3
 
 environment:
   sdk: ^3.12.0
