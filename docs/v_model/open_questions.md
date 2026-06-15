@@ -34,12 +34,26 @@ or shape if answered differently.
    adding a person?**
    - Pause all person-based habits, banner explains why.
    - v0.1: pause, banner. Re-granting the permission resumes.
+   - **Closed 2026-06-16 (v0.5, SYS-064 / ADR-016).** The
+     `PermissionService.requestContacts()` call lives in
+     onboarding step 1; the sealed `PermissionResult` is the
+     single source of truth. The Settings → Permissions tile is
+     the recovery affordance. The "pause all person-based
+     habits" behavior is unchanged from the v0.1 answer.
 6. **What happens if the SAF backup URI is revoked?**
    - Pause auto-backup, banner explains, ask the user to pick a
      new folder.
    - v0.1: pause, banner, manual re-pick. v0.2: try to recover
      gracefully if Android retains the URI across permission
      changes.
+   - **Closed 2026-06-16 (v0.5, SYS-066 / ADR-016).** The
+     `PermissionService.requestBackupFolder()` call lives in
+     onboarding step 3; the `treeUri` is persisted to
+     `SettingsService.backupFolderUri` (a `ValueNotifier<String?>`)
+     and consumed by `BackupService` at backup time. The "pause
+     + banner + manual re-pick" behavior is unchanged from the
+     v0.1 answer; the v0.2 graceful-recovery path is the
+     Settings → Restore flow.
 7. **Should the streak be visible on the home widget?**
    - Yes: "12-day streak — drink water in 8 min".
    - No: the widget is for *upcoming* not *past*.
