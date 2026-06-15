@@ -121,7 +121,7 @@ until it is backfilled.
 | `608483e` | clean (0 changed) | clean (41, matches v0.3 baseline) | 333 / 333 (328 prior + 5 new) | v0.4a.1: CI 3-gate workflow. |
 | `7bbb2aa` | clean (0 changed) | clean (41, matches v0.3 baseline) | 333 / 333 (unchanged) | v0.4a.2: CHANGELOG.md (v0.1 / v0.2 / v0.3 sections). |
 | `f74f3ff` | clean (0 changed) | clean (41, matches v0.3 baseline) | 342 / 342 (333 prior + 9 new: 7 first_launch_persisted + 2 widget) | v0.4a.3: firstLaunch persisted flag. |
-| `________` | _tbd_ | _tbd_ | _tbd_ | v0.4b: WorkManager periodic backup scheduler. |
+| `9290652` | clean (0 changed) | clean (41, matches v0.3 baseline) | 350 / 350 (342 prior + 8 new: 5 scheduler + 3 dispatcher) | v0.4b: WorkManager periodic backup scheduler. |
 | `________` | _tbd_ | _tbd_ | _tbd_ | v0.4c.1: backup encryption at rest. |
 | `________` | _tbd_ | _tbd_ | _tbd_ | v0.4c.2: TalkBack / a11y static review. |
 | `________` | _tbd_ | _tbd_ | _tbd_ | v0.4d: sign-off + v0.4 CHANGELOG section. |
