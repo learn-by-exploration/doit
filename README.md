@@ -51,6 +51,9 @@ The V-model artifacts live in [`docs/v_model/`](docs/v_model/):
 
 ## Status
 
-v0.1 docs are drafted. Implementation has not started. See
-[`docs/v_model/implementation_status.md`](docs/v_model/implementation_status.md)
-for the current slice of work.
+Implementation in flight. v0.1 is feature-complete and the 14-day real-device
+run is running on the user's primary phone; v0.2 (events, groups, time
+windows, edit, pause, test reminder, bulk complete) is also in flight on the
+same phone. See [`docs/v_model/implementation_status.md`](docs/v_model/implementation_status.md)
+for the current slice. The v0.3 sideload-to-friends release plan is at
+[`docs/v_model/v0_3_release_baseline.md`](docs/v_model/v0_3_release_baseline.md).
