@@ -191,6 +191,7 @@ primary phone; the run does not require new code.
 | v0.4b — WorkManager periodic backup | _v0.4b_ | ✓ | 5 backup_scheduler_test + 3 backup_task_dispatcher_test (SYS-060) | `lib/services/backup_scheduler.dart` wires the `workmanager` plugin to register a 24-hour periodic task. The "scheduling call not yet wired" caveat in `PRIVACY.md` is removed. |
 | v0.4c.1 — Backup encryption | _v0.4c.1_ | ✓ | 5 backup_encryption_test (SYS-061) | `kBackupFormatVersion` bumped to 2; AES-256-GCM with PBKDF2-HMAC-SHA256 (100k iterations) behind a user passphrase. v1 plain-JSON stays importable for back-compat. The "plain JSON backups" caveat in `PRIVACY.md` is updated. |
 | v0.4c.2 — TalkBack / a11y static review | _v0.4c.2_ | ✓ | 18 a11y/semantics_labels_test (SYS-062) | Static analysis walks every `lib/screens/*.dart` and `lib/widgets/*.dart` and asserts every `IconButton`, `ListTile`, button, `GestureDetector`, and `InkWell` has a `tooltip` / `semanticLabel` / `Text` / `Semantics` / `excludeFromSemantics: true`. Adds 6 missing tooltips to `add_habit.dart`. |
+| v0.4d — sign-off | `efbfbdc` | ✓ | 373 / 373 (no new tests; CHANGELOG.md `[0.4.0]` section appended) | v0.4 release checklist updated; sign-off line is "Pending. Awaiting user's hands-on TalkBack pass (SYS-062)." The right-side gate is `v0_4_release_checklist.md`. |
 
 ## How to update this file
 

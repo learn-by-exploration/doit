@@ -7,34 +7,97 @@ checklist (`v<major>_<minor>_release_checklist.md`). This changelog
 is the user-facing summary of what shipped in each release; the
 V-Model artifacts are the engineering contract.
 
-## [Unreleased] — v0.4 polish + privacy
+## [Unreleased]
 
-In flight on 2026-06-14. Closes the v0.3 contract items the v0.3
-docs flagged as v0.4 line items. The v0.4 section is appended in
-the v0.4d sign-off commit; this entry will be filled in at that
-time. The scope is:
+_Empty. The v0.4 sign-off commit (v0.4d) appends the
+`[0.4.0]` section below._
 
-- **CI 3-gate** — a `.github/workflows/ci.yml` runs `dart format`,
-  `flutter analyze --fatal-infos`, and `flutter test` on every PR
-  and push to `main` (SYS-057). Lands in v0.4a.1.
-- **`CHANGELOG.md`** — this file; closes [open question
-  #20](docs/v_model/open_questions.md#20) (SYS-058). Lands in
-  v0.4a.2.
-- **`firstLaunch` persisted flag** — `SharedPreferences`-backed
-  boolean replaces the hard-coded `true` in `lib/main.dart`. The
-  onboarding screen no longer re-appears on every reinstall
-  (SYS-059). Lands in v0.4a.3.
-- **WorkManager periodic backup** — the dormant `workmanager: ^0.6.0`
-  dep is wired up; `BackupService.scheduleNightlyBackup()` registers
-  the periodic task (SYS-060). Lands in v0.4b.
-- **Backup encryption at rest** — `kBackupFormatVersion` bumps to
-  2; AES-256-GCM with PBKDF2-HMAC-SHA256 (≥ 100,000 iterations)
-  keyed by a user passphrase (SYS-061). Lands in v0.4c.1.
-- **TalkBack / a11y static review** — `Semantics` labels on every
-  interactive element in `lib/screens/*.dart` and
-  `lib/widgets/*.dart`; a static-analysis test walks the widget
-  tree (SYS-062). Lands in v0.4c.2. The user's hands-on TalkBack
-  pass on a real device is the v0.4d step.
+## [0.4.0] — 2026-06-15 — Contract closure
+
+Six work items that close the v0.3 contract items the v0.3 docs
+flagged as v0.4 line items, plus the "Not started" CI 3-gate. The
+release is contract-closure work — no new features beyond what
+the v0.3 baseline promised. SHA range:
+`608483e` → `efbfbdc` (v0.4a..v0.4d). 373 / 373 tests, 41
+analyze infos (matches v0.3 baseline), `dart format` clean at
+every commit. Right-side gate: `v0_4_release_checklist.md`.
+
+### v0.4a.1 — CI 3-gate
+
+- `.github/workflows/ci.yml` runs `dart format`,
+  `flutter analyze --fatal-infos`, and `flutter test` on every
+  PR and push to `main` (SYS-057). Three jobs: `quality` (the
+  3-gate), `build-debug` (APK), and `build-android-release`
+  (AAB on main, gated on 4 `ANDROID_*` secrets). A coverage
+  report is uploaded as a CI artifact.
+- `test/ci_workflow_test.dart` parses the workflow and asserts
+  the three steps + the trigger set. Closes the "Not started"
+  row in the v0.3 implementation status table.
+
+### v0.4a.2 — `CHANGELOG.md`
+
+- This file. Sections for v0.1, v0.2, v0.3, and v0.4
+  (Keep-a-Changelog shape) (SYS-058). Closes [open question
+  #20](docs/v_model/open_questions.md#20).
+
+### v0.4a.3 — `firstLaunch` persisted flag
+
+- `SettingsService.firstLaunchCompleted` is a
+  `SharedPreferences`-backed `ValueNotifier<bool>` (SYS-059).
+  The hard-coded `true` in `lib/main.dart` is replaced with a
+  `ValueListenableBuilder` that reads the notifier. The
+  onboarding screen no longer re-appears on every reinstall.
+- `test/services/first_launch_persisted_test.dart` (7 tests) +
+  `test/widget_test.dart` (3 tests) cover the flag's
+  persistence across "app restarts" and the route-switch
+  behavior.
+- The "Onboarding re-appears on every reinstall" caveat in
+  `PRIVACY.md` is removed.
+
+### v0.4b — WorkManager periodic backup
+
+- The dormant `workmanager: ^0.6.0` dep is wired up (SYS-060).
+  `lib/services/backup_scheduler.dart` registers a 24-hour
+  periodic task; the top-level
+  `@pragma('vm:entry-point')` dispatcher
+  (`_backupTaskDispatcher`) is registered via
+  `Workmanager().initialize()`. The scheduler is opt-in from
+  the settings screen.
+- The "scheduling call not yet wired" caveat in `PRIVACY.md` is
+  removed.
+
+### v0.4c.1 — Backup encryption at rest
+
+- `kBackupFormatVersion` bumps to 2 (SYS-061). The export flow
+  takes a user-supplied passphrase, derives a 32-byte key via
+  `PBKDF2-HMAC-SHA256` (100,000 iterations, 16-byte random
+  salt), and encrypts the JSON payload with `AES-256-GCM`
+  (12-byte nonce, MAC appended). Envelope:
+  `{"version": 2, "kdf": {name, iterations, saltB64},
+  ciphertextB64, macB64, nonceB64}`.
+- The import flow supports v1 (plain JSON, back-compat) and v2
+  (passphrase + encrypted). A wrong passphrase surfaces as
+  `BackupFormatException`. The KDF iteration floor is
+  enforced on read.
+- The "plain JSON backups" caveat in `PRIVACY.md` is updated
+  to describe both the v1 (read-only) and v2 (encrypted)
+  paths.
+- New dep: `cryptography: ^2.9.0` (mirrors `card_box`).
+
+### v0.4c.2 — TalkBack / a11y static review
+
+- `test/a11y/semantics_labels_test.dart` walks every
+  `lib/screens/*.dart` and `lib/widgets/*.dart`, finds every
+  `IconButton`, `ListTile`, button, `GestureDetector`, and
+  `InkWell`, and asserts each has a `tooltip` / `semanticLabel`
+  / `Text` / `Semantics` wrapper / `excludeFromSemantics: true`
+  (SYS-062). 18 per-file tests, all green.
+- The static analysis caught 6 real issues in
+  `lib/screens/add_habit.dart` (three pairs of `+`/`-`
+  IconButtons in the `n` / day-of-month / nth-weekday dialogs
+  were missing tooltips). Fixed.
+- The user's hands-on TalkBack pass on a real device (or
+  emulator) is the v0.4d sign-off step.
 
 ## [0.3.0] — 2026-06-14 — Sideload-to-friends release
 
