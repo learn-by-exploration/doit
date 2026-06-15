@@ -128,6 +128,7 @@ until it is backfilled.
 | `aa4d79e` | clean (0 changed) | clean (41, matches v0.3 baseline) | 373 / 373 (no new tests; CHANGELOG.md `[0.4.0]` section appended) | v0.4d: sign-off commit. Pending user's hands-on TalkBack pass. |
 | `8f0ec5c` | clean (0 changed) | clean (41, matches v0.3 baseline) | 373 / 373 (no new tests) | v0.4d: backfill v0.4d commit SHA in the checklist row. |
 | `<v0.4b-fix>` | clean (0 changed) | clean (41, matches v0.3 baseline) | 375 / 375 (373 prior + 2 new: cold-start platform-throw + dispatcher symbol) | **v0.4b-release-fix (ADR-013).** Rename `_backupTaskDispatcher` to public `backupTaskDispatcher` so `PluginUtilities.getCallbackHandle` resolves it in release AOT; make `init()` swallow platform exceptions (defense in depth) so a missing / restricted workmanager plugin does not crash `main()`. The release APK is rebuilt. |
+| `384cfb2` | clean (0 changed) | clean (41, matches v0.3 baseline) | 375 / 375 (no new tests) | v0.4b-release-fix commit. Renamed dispatcher, hardened init(), added 2 tests. Rebuilds the release APK. See ADR-013. |
 
 _(Append a row for each v0.4 commit.)_
 
