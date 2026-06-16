@@ -76,13 +76,13 @@ Future<void> main() async {
     }
   }
 
-  runApp(const StreakApp());
+  runApp(const DoItApp());
 }
 
 /// Root widget. Reads the current theme and the persisted
 /// first-launch flag from [SettingsService].
-class StreakApp extends StatelessWidget {
-  const StreakApp({super.key, this.firstLaunchOverride});
+class DoItApp extends StatelessWidget {
+  const DoItApp({super.key, this.firstLaunchOverride});
 
   /// Test-only override for the persisted first-launch flag.
   /// When `null` (the production default), the widget reads

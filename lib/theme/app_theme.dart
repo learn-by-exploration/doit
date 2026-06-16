@@ -37,7 +37,7 @@ abstract class Sizing {
 }
 
 /// Centralized theme builder. Two static getters: [dark] and
-/// [light]. The `StreakApp` widget picks one based on
+/// [light]. The `DoItApp` widget picks one based on
 /// `SettingsService.themeMode`.
 abstract class AppTheme {
   /// Dark theme — do it's default per

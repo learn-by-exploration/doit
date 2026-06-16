@@ -62,7 +62,7 @@ void main() {
     // the flag from `SettingsService.firstLaunchCompleted`,
     // which defaults to `false`.
     await _setUpApp(tester);
-    await tester.pumpWidget(const StreakApp());
+    await tester.pumpWidget(const DoItApp());
     await tester.pump();
 
     expect(
@@ -79,7 +79,7 @@ void main() {
       await _setUpApp(tester);
 
       // First mount: flag is false -> Onboarding.
-      await tester.pumpWidget(const StreakApp());
+      await tester.pumpWidget(const DoItApp());
       await tester.pump();
       expect(
         find.text('Welcome to do it'),
@@ -113,7 +113,7 @@ void main() {
       // about) without trying to settle the entire future
       // chain. The contract under test is the route decision,
       // not the home screen's habit list.
-      await tester.pumpWidget(const StreakApp());
+      await tester.pumpWidget(const DoItApp());
       await tester.pump();
       expect(
         find.text('Welcome to do it'),
@@ -136,7 +136,7 @@ void main() {
     });
     await tester.pump();
 
-    await tester.pumpWidget(const StreakApp(firstLaunchOverride: true));
+    await tester.pumpWidget(const DoItApp(firstLaunchOverride: true));
     await tester.pump();
     expect(
       find.text('Welcome to do it'),

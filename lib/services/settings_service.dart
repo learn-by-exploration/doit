@@ -36,12 +36,12 @@ class SettingsService extends ChangeNotifier {
 
   /// `true` once the user has finished the onboarding flow at
   /// least once on this install. Defaults to `false`. Read by
-  /// [StreakApp] to decide whether to show [OnboardingScreen] or
+  /// [DoItApp] to decide whether to show [OnboardingScreen] or
   /// [HomeScreen] as the initial route. Backed by
   /// [SharedPreferences] under [_kFirstLaunchCompletedKey].
   ///
   /// v0.4a.3 (SYS-059) introduces the persisted flag. v0.1..v0.3
-  /// had this hard-coded `true` in [StreakApp]'s constructor,
+  /// had this hard-coded `true` in [DoItApp]'s constructor,
   /// which meant the onboarding screen re-appeared on every
   /// reinstall.
   final ValueNotifier<bool> firstLaunchCompleted = ValueNotifier<bool>(false);
@@ -83,7 +83,7 @@ class SettingsService extends ChangeNotifier {
   }
 
   /// Mark the first-launch onboarding as complete. Persists the
-  /// value so the next [StreakApp] mount skips the onboarding
+  /// value so the next [DoItApp] mount skips the onboarding
   /// screen. Awaiting this is safe in widget tests; in widget
   /// bodies, the [firstLaunchCompleted] [ValueNotifier] updates
   /// synchronously so a `setState` is not required.

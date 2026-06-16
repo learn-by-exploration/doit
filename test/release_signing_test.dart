@@ -330,4 +330,39 @@ void main() {
       reason: 'v0.5a full-scope rename: no streak.backup.nightly literal.',
     );
   });
+
+  // ── v0.5a-fix rename pin ─────────────────────────────────────────
+  // v0.5a renamed the user-facing identity (applicationId,
+  // strings.xml, MethodChannel, etc.) but missed the Dart root
+  // widget class `StreakApp` in lib/main.dart. The class is
+  // app-level (it is the root widget of the do it app, not the
+  // streak *feature*) so v0.5a-fix renames it to `DoItApp` and
+  // updates every doc comment that referenced the old name.
+  // This test pins the rename so a future accidental revert
+  // fails CI before the v0.5e install block runs.
+  test('lib/main.dart root widget class is DoItApp (v0.5a-fix)', () {
+    final main = _read('lib/main.dart');
+    expect(
+      main,
+      contains('class DoItApp extends StatelessWidget'),
+      reason:
+          'The root widget of the do it app must be named `DoItApp` '
+          '(v0.5a-fix, was `StreakApp` until the v0.5a commit missed '
+          'it). The class is app-level — it sits at the top of the '
+          'widget tree — and a future revert to `StreakApp` would '
+          'leave the Dart source code referencing the old app name.',
+    );
+    expect(
+      main,
+      isNot(contains('class StreakApp')),
+      reason:
+          'v0.5a-fix removed the `StreakApp` class name. The old name '
+          'must not reappear in lib/main.dart.',
+    );
+    expect(
+      main,
+      contains('runApp(const DoItApp());'),
+      reason: 'main() must mount `DoItApp` (was `StreakApp`).',
+    );
+  });
 }
