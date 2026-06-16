@@ -31,6 +31,16 @@ dependencies:
   # changelog for the migration.
   workmanager: ^0.6.0
   permission_handler: ^11.3.1
+  # The platform-interface package is re-exported by
+  # `permission_handler` for the user-facing types
+  # (`Permission`, `PermissionStatus`, ...) but NOT for the
+  # `PermissionHandlerPlatform` interface or the
+  # `PermissionStatusValue` extension that exposes
+  # `status.value` (the integer wire format). The v0.5b
+  # service + tests import these directly; pinning the
+  # platform-interface version avoids the
+  # `depend_on_referenced_packages` lint.
+  permission_handler_platform_interface: ^4.3.0
   drift: ^2.20.2
   flutter_contacts: ^1.1.9+2
   # DB file lives under the OS app-support directory; the path
