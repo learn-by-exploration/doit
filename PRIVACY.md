@@ -143,6 +143,33 @@ of the v0.3 release:
   A "done" flag is persisted in `SharedPreferences` so the
   screen does not re-appear on subsequent launches. v0.4
   (SYS-059).
+- The four runtime permissions
+  (`POST_NOTIFICATIONS`, `READ_CONTACTS`,
+  `SCHEDULE_EXACT_ALARM`, backup folder) are requested
+  in the order set by [ADR-014](docs/v_model/decision_record.md#adr-014--onboarding-permission-order-notifications--contacts--exact-alarm--backup-folder)
+  and
+  [ADR-016](docs/v_model/decision_record.md#adr-016--permission-service-seam-sealed-result-singleton-on-demand-probe),
+  with a rationale screen for each. v0.5 closes the v0.1
+  "visual walkthrough" — the CTAs at each step now issue
+  the real `permission_handler.request(...)` call (or the
+  `file_picker` SAF call for the backup folder). Denial is
+  graceful: `POST_NOTIFICATIONS` and `READ_CONTACTS` can
+  be re-asked from the app's **Settings → Permissions**
+  tile (SYS-063..064). The backup folder is skippable
+  (per ADR-015 — a user who declines the SAF picker is
+  still a valid user; they get no auto-backup and can
+  pick a folder later from the same Settings →
+  Permissions tile). `SCHEDULE_EXACT_ALARM` is a system
+  policy permission on Android 12+ (SYS-065) and is
+  granted via the Android system Alarms & reminders
+  settings page; the Settings → Permissions tile
+  deep-links there via
+  `PermissionService.openAppSettings()`. The
+  `NotificationService`, the contact picker, and the
+  WorkManager backup scheduler all check their
+  permissions at call time and gracefully degrade if
+  the user has not granted them — do it never crashes
+  on a denied permission.
 
 ## Reporting a privacy concern
 

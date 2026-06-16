@@ -52,6 +52,128 @@ the *streak* feature, not the app.
 App behavior is unchanged; this is a pure rename. The release APK
 is rebuilt at v0.5e.
 
+### v0.5b — `PermissionService` + sealed result
+
+The v0.1 onboarding was a "visual walkthrough" — the rationale
+UI existed, the runtime request did not. v0.5b introduces the
+seam that the v0.5c wiring uses:
+
+- **`lib/services/permission_service.dart`** — singleton with
+  the `_ready`-gated init pattern from
+  `.claude/rules/lib-services.md`. Public methods:
+  `requestNotifications()` (SYS-063),
+  `requestContacts()` (SYS-064),
+  `requestExactAlarm()` (SYS-065),
+  `requestBackupFolder()` (SYS-066),
+  `openAppSettings()` (deep-link to system app-settings for
+  `permanentlyDenied` recovery), and `init()` (idempotent;
+  swallows platform-channel errors per the v0.4b-release-fix
+  lesson).
+- **`lib/services/permission_result.dart`** — sealed class
+  hierarchy. Runtime results: `PermissionResultGranted()`,
+  `PermissionResultDenied({required bool canOpenSettings})`,
+  `PermissionResultPermanentlyDenied()`. Backup-folder results:
+  `BackupFolderPicked({required String path})`,
+  `BackupFolderCancelled()`,
+  `BackupFolderError({required String message})`. The widget
+  layer never sees `PermissionStatus` directly; the
+  `_mapStatus` private method folds `restricted` and
+  `limited` into `denied` for widget purposes.
+- **`test/services/permission_service_test.dart`** — 9
+  service tests pinning the sealed result branches (granted /
+  denied / permanentlyDenied for each of the three runtime
+  permissions; picked / cancelled / error for backup folder;
+  idempotent init; platform-error swallow).
+- The widget layer is **not** touched at v0.5b — the seam
+  exists in isolation. v0.5c wires the onboarding CTAs to it.
+
+### v0.5c — wire onboarding CTAs to `PermissionService`
+
+The four onboarding "Allow" / "Pick folder" buttons (which in
+v0.1 were visual stubs that did `setState(() => _step++)`)
+are now wired to the v0.5b seam:
+
+- **`lib/screens/onboarding.dart`** — `_handleStepCta` dispatches
+  on `_step`:
+  - `_step == 0` → `requestNotifications()`; advance on
+    `granted`.
+  - `_step == 1` → `requestContacts()`; advance on `granted`.
+  - `_step == 2` → `requestExactAlarm()`; on
+    `denied(canOpenSettings: true)` / `permanentlyDenied` show
+    the "Open Android settings" `FilledButton.tonal` that
+    deep-links to the system Alarms & reminders page via
+    `PermissionService.openAppSettings()`. Re-tapping the CTA
+    after returning from system settings re-probes and advances
+    on `granted`.
+  - `_step == 3` → `requestBackupFolder()`. On `picked` persist
+    via `SettingsService.setBackupFolderUri` and advance. On
+    `cancelled` advance (per ADR-015 — the backup folder is
+    skippable). On `error` show the rationale and stay on the
+    step.
+- **`lib/services/settings_service.dart`** — new
+  `ValueNotifier<String?> backupFolderUri` (defaults `null`);
+  `setBackupFolderUri(String?)` mutates it.
+- **`test/services/settings_service_backup_uri_test.dart`** — 3
+  tests pinning the notifier (default-null, set-then-read,
+  listener fires).
+- **`test/screens/onboarding_permission_wiring_test.dart`** — 6
+  tests pinning the call-and-advance behavior (4 step CTAs +
+  skip + backupUri persistence). The `'tapping Allow on step 0
+  calls requestNotifications and advances on granted'` test
+  would have failed on the v0.1 stub because the channel saw
+  zero calls.
+- The widget layer no longer imports `permission_handler` or
+  `file_picker` directly; the seam is `PermissionService`.
+- `lib/screens/onboarding.dart`'s file-level comment is
+  updated to drop the "visual walkthrough" wording.
+
+### v0.5d — Settings → "Permissions" tile + ADR-016
+
+A user who taps "Don't ask again" on any of the four onboarding
+steps needs an in-app recovery path. v0.5d adds it:
+
+- **`lib/screens/settings.dart`** — new `Permissions` section
+  between `Wake-up anchor` and `Reliability`. Three new
+  widgets:
+  - `_PermissionsRow` — subscribes to
+    `PermissionService.instance.statuses` (a
+    `ValueNotifier<Map<PermissionKind, PermissionResult?>>`),
+    renders one `ListTile` per permission (notifications,
+    contacts, exact alarms, backup folder).
+  - `_PermissionTile` — icon + name + status text + a
+    "Settings" `TextButton` for `permanentlyDenied` rows that
+    deep-links to the system app-settings page via
+    `PermissionService.openAppSettings()`. Tapping the row
+    re-probes via `requestX()`.
+  - `_BackupFolderTile` — picked path (or "Not picked") + a
+    "Re-pick" `TextButton` when a path is set; tapping the
+    row or button calls `requestBackupFolder()` and persists
+    via `setBackupFolderUri()`. The re-pick path is the
+    recovery affordance for users who revoked the SAF grant
+    from system settings.
+- **`test/screens/settings_permissions_test.dart`** — 4 tests
+  pinning the recovery affordance (row renders, "Settings"
+  button on `permanentlyDenied` only, deep-link tap, on-demand
+  re-probe).
+- **`docs/v_model/notification_reliability.md`** — line
+  126-127 is updated. The pre-v0.5 "On first scheduling of a
+  fixed-time habit, the app detects whether the user has
+  granted `SCHEDULE_EXACT_ALARM`" copy is replaced with: "The
+  app probes `SCHEDULE_EXACT_ALARM` at onboarding step 2
+  (SYS-065) and surfaces the result on the home screen
+  reliability banner. If the user denies, the
+  `Reliability.degraded` path activates and the Settings →
+  Permissions tile is the recovery affordance."
+- **`decision_record.md`** — ADR-016 is appended: "Permission
+  service seam: sealed result, singleton, on-demand probe".
+  The ADR also documents ADR-014 (onboarding permission
+  order) and ADR-015 (backup folder is skippable) — both
+  pre-existing decisions that v0.5 makes explicit.
+- **`docs/v_model/open_questions.md` items #5
+  (READ_CONTACTS revocation) and #6 (SAF URI revocation) are
+  closed by v0.5d (ADR-016) — both surfaces now have an
+  in-app recovery affordance.
+
 ## [0.4.0] — 2026-06-15 — Contract closure
 
 Six work items that close the v0.3 contract items the v0.3 docs
