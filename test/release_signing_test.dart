@@ -179,24 +179,28 @@ void main() {
 
   // ── v0.5a rename pins ────────────────────────────────────────────
   // The app's identity moved from "Streak" / `com.common_games.streak`
-  // to "do it" / `com.doit.package`. These tests pin the v0.5a
+  // to "do it" / `com.doit`. These tests pin the v0.5a
   // invariants so a future accidental revert fails CI.
+  //
+  // v0.5e-fix: the original `com.doit.package` namespace was invalid
+  // because `package` is a Java reserved keyword (AGP rejected it at
+  // build time). The actual package id is `com.doit`.
 
-  test('build.gradle.kts pins applicationId to com.doit.package (v0.5a)', () {
+  test('build.gradle.kts pins applicationId to com.doit (v0.5a)', () {
     final build = _read('android/app/build.gradle.kts');
     expect(
       build,
-      contains('applicationId = "com.doit.package"'),
+      contains('applicationId = "com.doit"'),
       reason:
-          'v0.5a pinned applicationId to com.doit.package. A revert to '
+          'v0.5a pinned applicationId to com.doit. A revert to '
           'com.common_games.streak would break the on-device install '
           '(the user already uninstalled the v0.4b build).',
     );
     expect(
       build,
-      contains('namespace = "com.doit.package"'),
+      contains('namespace = "com.doit"'),
       reason:
-          'v0.5a pinned namespace to com.doit.package (must match '
+          'v0.5a pinned namespace to com.doit (must match '
           'applicationId for Android resource lookup).',
     );
     expect(
@@ -205,6 +209,14 @@ void main() {
       reason:
           'v0.5a rename is full-scope — no com.common_games.streak '
           'remnants in build.gradle.kts.',
+    );
+    expect(
+      build,
+      isNot(contains('com.doit.package')),
+      reason:
+          'v0.5e-fix: `com.doit.package` is an invalid Java namespace '
+          '(`package` is a reserved keyword). The applicationId and '
+          'namespace must be `com.doit`, not `com.doit.package`.',
     );
   });
 

@@ -38,7 +38,7 @@ v0.5 is accepted when every row in the table below is "yes":
 | 2 | SYS-064 | Onboarding step 1 ("Contacts") calls `PermissionService.requestContacts()`; on `granted` the step advances. The Settings → `_PermissionTile` for `PermissionKind.contacts` renders the "Settings" `TextButton` on `permanentlyDenied` and deep-links to the system app-settings page. `test/screens/settings_permissions_test.dart` "tapping Settings on a permanentlyDenied row calls openAppSettings (SYS-064)" is green. | yes (v0.5c / v0.5d). |
 | 3 | SYS-065 | Onboarding step 2 ("Exact alarms") calls `PermissionService.requestExactAlarm()`. The "Open Android settings" `FilledButton.tonal` is shown on `denied` (canOpenSettings: true) and on `permanentlyDenied`. `notification_reliability.md` layer 5 bullet 1 copy is updated to point at the on-demand probe + the Settings → Permissions tile recovery affordance. ADR-016 is appended to `decision_record.md`. | yes (v0.5c / v0.5d). |
 | 4 | SYS-066 | `SettingsService.backupFolderUri` is a `ValueNotifier<String?>` (defaults `null`); `test/services/settings_service_backup_uri_test.dart` (3 tests) is green. Onboarding step 3 ("Backup folder") calls `PermissionService.requestBackupFolder()`; on `picked` the path is persisted via `SettingsService.setBackupFolderUri`; on `cancelled` the step advances (per ADR-015); on `error` the rationale text shows the message. The Settings → `_BackupFolderTile` "Re-pick" `TextButton` is rendered when a path is set; tapping it re-picks and persists. | yes (v0.5c / v0.5d). |
-| 5 | App identity | `pubspec.yaml` `name:` is `doit`. `lib/build_info.dart` `kAppVersion` is `'0.5.0'`. `android/app/build.gradle.kts` `applicationId` is `com.doit.package` and `namespace` is `com.doit.package`. `AndroidManifest.xml` `android:label` is `"do it"`. `MethodChannel('doit/reminders')` is declared exactly once. The notification channel id is `'doit.reminders'`. The workmanager task name is `'doit.backup.nightly'`. The test reminder habit id is `'doit.test_reminder'`. The `test/release_signing_test.dart` v0.5a pin tests assert all of the above. | yes (v0.5a). |
+| 5 | App identity | `pubspec.yaml` `name:` is `doit`. `lib/build_info.dart` `kAppVersion` is `'0.5.0'`. `android/app/build.gradle.kts` `applicationId` is `com.doit` and `namespace` is `com.doit`. `AndroidManifest.xml` `android:label` is `"do it"`. `MethodChannel('doit/reminders')` is declared exactly once. The notification channel id is `'doit.reminders'`. The workmanager task name is `'doit.backup.nightly'`. The test reminder habit id is `'doit.test_reminder'`. The `test/release_signing_test.dart` v0.5a pin tests assert all of the above (and additionally assert no `com.doit.package` remnants). | yes (v0.5a, v0.5e-fix). |
 
 ## Per-phase acceptance criteria
 
@@ -48,13 +48,19 @@ v0.5 is accepted when every row in the table below is "yes":
 - `lib/build_info.dart` `kAppVersion` is `'0.5.0'`,
   `kAppVersionCode` is `6`.
 - `android/app/build.gradle.kts` `applicationId` is
-  `com.doit.package`; `namespace` is `com.doit.package`.
+  `com.doit`; `namespace` is `com.doit`.
 - `android/app/src/main/AndroidManifest.xml` `package` is
-  `com.doit.package`; `android:label` is `"do it"`.
+  `com.doit`; `android:label` is `"do it"`. (The manifest
+  `package` attribute is no longer required in AGP 8.x — the
+  `namespace` from `build.gradle.kts` is the source of
+  truth — but do it pins it explicitly so the file's
+  app-level identity is clear.)
 - `android/app/src/main/kotlin/com/common_games/streak/` is
-  renamed to `android/app/src/main/kotlin/com/doit/package/`
-  via `git mv`; every `.kt` file's `package` declaration is
-  updated.
+  renamed to `android/app/src/main/kotlin/com/doit/` via
+  `git mv`; every `.kt` file's `package` declaration is
+  updated. (The earlier v0.5a draft picked
+  `com/doit/package/`; v0.5e-fix renames to `com/doit/`
+  because `package` is a Java reserved keyword.)
 - `lib/main.dart` `MaterialApp.title` is `'do it'`; the
   `showLicensePage(applicationName: 'do it', ...)` (if
   present) is updated.
@@ -95,8 +101,7 @@ v0.5 is accepted when every row in the table below is "yes":
 grep -rn "streak" --include="*.dart" --include="*.kts" \
   --include="*.kt" --include="*.xml" --include="*.yaml" \
   lib/ android/ test/ | \
-  grep -v "StreakCalculator\|StreakService\|StreakSnapshot\|StreakConfig\|streak_calculator\|streak_service\|streak_snapshot\|kStreak" | \
-  grep -v "com.doit.package" | wc -l
+  grep -v "StreakCalculator\|StreakService\|StreakSnapshot\|StreakConfig\|streak_calculator\|streak_service\|streak_snapshot\|kStreak" | wc -l
 ```
 returns zero. The `Streak*` identifiers are feature-level,
 intentionally kept.
@@ -241,7 +246,7 @@ intentionally kept.
 - The v0.5 release APK is installed:
   `adb -s <device> install build/app/outputs/flutter-apk/app-release.apk`.
 - The app is launched:
-  `adb -s <device> shell monkey -p com.doit.package -c
+  `adb -s <device> shell monkey -p com.doit -c
   android.intent.category.LAUNCHER 1`.
 
 **On-device verification (seven steps on a real SM-S918B):**

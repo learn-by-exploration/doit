@@ -1,4 +1,4 @@
-package com.doit.package
+package com.doit
 
 import android.app.AlarmManager
 import android.content.Context

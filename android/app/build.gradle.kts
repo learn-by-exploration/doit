@@ -22,7 +22,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.doit.package"
+    namespace = "com.doit"
     // Bumped from flutter.compileSdkVersion (34) to 36: the
     // file_picker plugin (used by onboarding) transitively
     // pulls in flutter_plugin_android_lifecycle, whose AAR
@@ -44,11 +44,16 @@ android {
     }
 
     defaultConfig {
-        // Application id is com.doit.package per v0.5 (rename
-        // from "Streak" to "do it"). Future renames are a v0.6+
-        // decision and require an ADR. The v0.5a pin test in
-        // test/release_signing_test.dart asserts this exact value.
-        applicationId = "com.doit.package"
+        // Application id is com.doit per v0.5 (rename from
+        // "Streak" to "do it" in v0.5a). The v0.5a pin test in
+        // test/release_signing_test.dart asserts this exact
+        // value. The earlier v0.5a draft picked a longer
+        // namespace, but `package` is a Java reserved keyword
+        // and AGP rejected it. The v0.5a test guard
+        // additionally asserts no remnants of the bad
+        // namespace reappear; see the test for the full
+        // v0.5e-fix history.
+        applicationId = "com.doit"
         // App's floor is API 28 (Android 9) per
         // docs/v_model/requirements.md § Platform Constraints.
         // minSdk stays at 28. targetSdk follows Flutter's default

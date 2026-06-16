@@ -11,8 +11,11 @@ Short, action-focused, voice-friendly. Reads naturally in a
 notification ("do it: Call Mom — due in 12 min"). May be revisited
 before any public release if a simpler or more creative name appears.
 
-The package id is `com.doit.package`. The display name in the
-launcher is "do it".
+The package id is `com.doit`. The display name in the
+launcher is "do it". (The earlier v0.5a draft picked
+`com.doit.package` but `package` is a Java reserved keyword;
+v0.5e-fix renames the applicationId and namespace to
+`com.doit`.)
 
 ## Prototype Strategy
 

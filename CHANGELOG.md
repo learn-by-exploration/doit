@@ -21,15 +21,18 @@ the *streak* feature, not the app.
 
 - **App name:** "Streak" → "do it" (lowercase, with a space).
 - **Android `applicationId` / `namespace`:** `com.common_games.streak`
-  → `com.doit.package`. Forces uninstall-before-install on existing
-  v0.4b devices at v0.5e.
+  → `com.doit`. The earlier draft picked `com.doit.package` but
+  `package` is a Java reserved keyword and AGP rejected the
+  namespace at build time. v0.5e-fix renames to `com.doit`.
+  Forces uninstall-before-install on existing v0.4b devices at
+  v0.5e.
 - **Dart package `name:`:** `common_games` → `doit`. Every
   `package:common_games/...` import becomes `package:doit/...`.
 - **Directory:** `/home/shyam/common_games/streak/` →
   `/home/shyam/common_games/doit/`.
 - **Kotlin tree:** `com/common_games/streak/` →
-  `com/doit/package/`. `package com.common_games.streak` →
-  `package com.doit.package`.
+  `com/doit/`. `package com.common_games.streak` →
+  `package com.doit`.
 - **MethodChannel:** `streak/reminders` → `doit/reminders`.
 - **Notification channel id:** `streak.reminders` → `doit.reminders`.
 - **WorkManager task name:** `streak.backup.nightly` →
@@ -44,7 +47,7 @@ the *streak* feature, not the app.
   reminder" / "Welcome to Streak" / "Pick a Streak backup" string
   in user-facing copy updated.
 - **v0.5a pin tests** added to `test/release_signing_test.dart`
-  asserting `applicationId` is exactly `com.doit.package`, the
+  asserting `applicationId` is exactly `com.doit`, the
   `MethodChannel('doit/reminders')` is declared exactly once, the
   notification channel id is `'doit.reminders'`, and the backup
   task name is `'doit.backup.nightly'`.

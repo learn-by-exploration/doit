@@ -62,7 +62,7 @@ commit:
 | v0.5b | `PermissionService` singleton + sealed `PermissionResult` | The widget layer cannot call the platform directly (per `.claude/rules/lib-screens.md`); a service seam is required to make the v0.5c wiring testable. | Deferred: v0.1's onboarding rationale UI was a stub; the seam was not needed for a stub. |
 | v0.5c | Wire onboarding "Allow" / "Pick folder" buttons to `PermissionService` | The v0.1 buttons did `setState(() => _step++)` — no real permission request was ever issued. v0.5 makes the rationale UI do what it always said it did. | Deferred: same as v0.5b. |
 | v0.5d | Settings → "Permissions" tile (recovery for "Don't ask again") | A user who taps "Don't ask again" on any of the four onboarding steps needs an in-app recovery path. Pre-v0.5 the only path was "reinstall". | Deferred: the tile requires a `PermissionService.statuses` `ValueNotifier` and a sealed `PermissionResult` — both gated on v0.5b. |
-| v0.5e | Release APK rebuild + on-device verification | The applicationId changed (`com.common_games.streak` → `com.doit.package`), which forces an uninstall-before-install. The new APK must be built and verified on a real device. | Deferred: the rename is the install boundary. |
+| v0.5e | Release APK rebuild + on-device verification | The applicationId changed (`com.common_games.streak` → `com.doit`), which forces an uninstall-before-install. The new APK must be built and verified on a real device. | Deferred: the rename is the install boundary. (The earlier v0.5a draft picked `com.doit.package`; v0.5e-fix renames to `com.doit` because `package` is a Java reserved keyword.) |
 | v0.5f | Sign-off + CHANGELOG [0.5.0] | v0.5 close-out. Moves the v0.5 entries from `[Unreleased]` to `[0.5.0]`, closes the open-questions from v0.5d. | Deferred: cannot sign off without the on-device verification. |
 
 ## Constraints (v0.5 floor — same as v0.4)
@@ -225,7 +225,7 @@ Three ADRs are appended to
 | `docs/v_model/notification_reliability.md` | SYS-065 — layer 5 bullet 1 copy update (onboarding probe + Settings → Permissions recovery). |
 | `decision_record.md` | ADR-014, ADR-015, ADR-016. |
 | `pubspec.yaml` + `lib/build_info.dart` | v0.5a — `name: doit`, `version: 0.5.0+6`. |
-| `android/app/build.gradle.kts` + `AndroidManifest.xml` | v0.5a — `applicationId = "com.doit.package"`, `android:label="do it"`. |
+| `android/app/build.gradle.kts` + `AndroidManifest.xml` | v0.5a — `applicationId = "com.doit"`, `android:label="do it"`. (The earlier draft picked `com.doit.package`; v0.5e-fix renames to `com.doit` because `package` is a Java reserved keyword.) |
 | `lib/reminders/reminder_bridge.dart` | v0.5a — `MethodChannel('doit/reminders')`. |
 | `lib/services/notification_service.dart` | v0.5a — channel id `'doit.reminders'`. |
 | `lib/services/backup_scheduler.dart` | v0.5a — task name `'doit.backup.nightly'`. |

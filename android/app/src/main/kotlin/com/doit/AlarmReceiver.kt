@@ -1,4 +1,4 @@
-package com.doit.package
+package com.doit
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -34,7 +34,7 @@ class AlarmReceiver : BroadcastReceiver() {
 
         fun pendingIntent(context: Context, alarmId: Int): PendingIntent {
             val intent = Intent(context, AlarmReceiver::class.java).apply {
-                action = "com.doit.package.FIRE_ALARM"
+                action = "com.doit.FIRE_ALARM"
                 putExtra(EXTRA_ALARM_ID, alarmId)
             }
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

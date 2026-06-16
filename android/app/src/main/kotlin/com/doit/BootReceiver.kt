@@ -1,4 +1,4 @@
-package com.doit.package
+package com.doit
 
 import android.content.BroadcastReceiver
 import android.content.Context

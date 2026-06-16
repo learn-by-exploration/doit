@@ -1,6 +1,6 @@
 # AGENTS.md — do it
 
-**Package:** `doit` · **App:** do it · **Android:** `com.doit.package`
+**Package:** `doit` · **App:** do it · **Android:** `com.doit`
 **Flutter:** 3.44.0 stable (CI-pinned) · **Dart:** `^3.12.0` · **JVM:** 17
 
 A Flutter app for Android: habits, call/message reminders, anchored
@@ -63,8 +63,10 @@ verification step changes.
   new state shape, or any reversal of a previous decision. Append to
   [`decision_record.md`](docs/v_model/decision_record.md); do not
   edit history.
-- **The package id is `com.doit.package` and the launcher name
-  is "do it".** This is committed (v0.5a). Any further rename is
+- **The package id is `com.doit` and the launcher name is "do
+  it".** This is committed (v0.5a, v0.5e-fix). The earlier draft
+  picked `com.doit.package` but `package` is a Java reserved
+  keyword; v0.5e-fix renames to `com.doit`. Any further rename is
   a v0.6+ decision and requires an ADR.
 
 ## The 3-gate
