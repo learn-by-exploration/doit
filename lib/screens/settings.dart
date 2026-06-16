@@ -11,6 +11,16 @@
 //     settings pages (best-effort; not all OEMs expose them).
 //   - A "Restore from backup" placeholder that hands off to
 //     `BackupService` once Phase 6 lands.
+//
+// v0.5d (ADR-016) adds a new `Permissions` section between
+// `Wake-up anchor` and `Reliability`. The section surfaces
+// the current `PermissionService.statuses` map as four
+// `ListTile`s (notifications, contacts, exact alarms,
+// backup folder) with a "Settings" `TextButton` for any
+// permission that is `permanentlyDenied`. Tapping the row
+// re-probes the relevant permission via the service's
+// `requestX()` method; the "Settings" button deep-links to
+// the Android system app-settings page.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,6 +29,8 @@ import 'package:doit/build_info.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/screens/settings_restore.dart';
+import 'package:doit/services/permission_result.dart';
+import 'package:doit/services/permission_service.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/settings_service.dart';
 import 'package:doit/theme/app_theme.dart';
@@ -73,6 +85,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ..start(mode: m);
               },
             ),
+            const SizedBox(height: Spacing.md),
+            const _SectionHeader('Permissions'),
+            const _PermissionsRow(),
             const SizedBox(height: Spacing.md),
             const _SectionHeader('Reliability'),
             _ReliabilityRow(
@@ -222,5 +237,214 @@ class _ReliabilityRow extends StatelessWidget {
       subtitle: Text(label),
       onTap: HapticFeedback.selectionClick,
     );
+  }
+}
+
+/// v0.5d (ADR-016): the four `PermissionService`-backed
+/// permission rows. Reads from
+/// [PermissionService.instance.statuses] (a
+/// `ValueNotifier<Map<PermissionKind, PermissionResult?>>`
+/// exposed by the service) and renders one `ListTile` per
+/// runtime permission plus the backup-folder picker. The
+/// row is tappable as a "Tap to fix" affordance: the
+/// `requestX()` call re-probes the permission (and shows
+/// the system dialog if not yet granted). The "Settings"
+/// `TextButton` on `permanentlyDenied` rows deep-links to
+/// the Android system app-settings page so the user can
+/// grant the policy permission that the system dialog no
+/// longer surfaces.
+class _PermissionsRow extends StatelessWidget {
+  const _PermissionsRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Map<PermissionKind, PermissionResult?>>(
+      valueListenable: PermissionService.instance.statuses,
+      builder: (context, statuses, _) {
+        return Column(
+          children: [
+            _PermissionTile(
+              key: const ValueKey('settings.permission.notifications'),
+              kind: PermissionKind.notifications,
+              icon: Icons.notifications_outlined,
+              title: 'Notifications',
+              result: statuses[PermissionKind.notifications],
+            ),
+            _PermissionTile(
+              key: const ValueKey('settings.permission.contacts'),
+              kind: PermissionKind.contacts,
+              icon: Icons.contacts_outlined,
+              title: 'Contacts',
+              result: statuses[PermissionKind.contacts],
+            ),
+            _PermissionTile(
+              key: const ValueKey('settings.permission.exactAlarm'),
+              kind: PermissionKind.exactAlarm,
+              icon: Icons.alarm_outlined,
+              title: 'Exact alarms',
+              result: statuses[PermissionKind.exactAlarm],
+            ),
+            const _BackupFolderTile(),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// One row in the v0.5d Permissions section. Maps a
+/// [PermissionKind] to a `ListTile` with the right icon,
+/// status text, and (on `permanentlyDenied`) a "Settings"
+/// `TextButton` for the deep-link to the system
+/// app-settings page. Tapping the row re-probes the
+/// permission via [PermissionService.requestNotifications]
+/// / [PermissionService.requestContacts] /
+/// [PermissionService.requestExactAlarm]; the system
+/// dialog appears only if the permission is denied and
+/// not yet permanently denied.
+class _PermissionTile extends StatelessWidget {
+  const _PermissionTile({
+    super.key,
+    required this.kind,
+    required this.icon,
+    required this.title,
+    required this.result,
+  });
+
+  final PermissionKind kind;
+  final IconData icon;
+  final String title;
+  final PermissionResult? result;
+
+  @override
+  Widget build(BuildContext context) {
+    final permanentlyDenied = result is PermissionResultPermanentlyDenied;
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(title),
+      subtitle: Text(_statusText(result)),
+      // The "Settings" `TextButton` is rendered only for
+      // `permanentlyDenied` because that is the only
+      // state where the system dialog will not re-appear;
+      // the user has to go to the system app-settings
+      // page to grant the permission. For one-shot
+      // denials (`denied(canOpenSettings: true)`) the
+      // row's `onTap` re-probes via `requestX()`, which
+      // shows the system dialog without needing a
+      // deep-link. For `granted` and `null` (not asked
+      // yet) the row's `onTap` is still the primary
+      // affordance.
+      trailing: permanentlyDenied
+          ? TextButton(
+              key: ValueKey('settings.permission.settings.${kind.name}'),
+              onPressed: PermissionService.instance.openAppSettings,
+              child: const Text('Settings'),
+            )
+          : const Icon(Icons.chevron_right),
+      onTap: _reProbe,
+    );
+  }
+
+  /// Re-probe the permission via the service. For
+  /// already-granted permissions `requestX()` returns
+  /// `granted` without a system dialog. For one-shot
+  /// denials the dialog re-appears. For
+  /// `permanentlyDenied` (where the system dialog will
+  /// not re-appear) the user can still tap the row to
+  /// re-probe; the call returns `permanentlyDenied` and
+  /// the status display is unchanged. The "Settings"
+  /// `TextButton` is the deeper recovery path for that
+  /// state.
+  Future<void> _reProbe() async {
+    final service = PermissionService.instance;
+    switch (kind) {
+      case PermissionKind.notifications:
+        await service.requestNotifications();
+      case PermissionKind.contacts:
+        await service.requestContacts();
+      case PermissionKind.exactAlarm:
+        await service.requestExactAlarm();
+      case PermissionKind.backupFolder:
+        // The backup folder is not a runtime permission;
+        // it's a SAF picker. The re-pick is handled in
+        // `_BackupFolderTile` separately, so this branch
+        // is unreachable from the row's `onTap`.
+        break;
+    }
+  }
+
+  static String _statusText(PermissionResult? r) {
+    return switch (r) {
+      PermissionResultGranted() => 'Granted',
+      PermissionResultDenied() => 'Not granted — tap to ask again',
+      PermissionResultPermanentlyDenied() =>
+        "Blocked. Tap 'Settings' to grant.",
+      null => 'Not asked yet — tap to ask',
+    };
+  }
+}
+
+/// v0.5d (ADR-016) / SYS-066: the backup-folder tile.
+/// Reads [SettingsService.instance.backupFolderUri] and
+/// surfaces the picked path (or "Not picked" if null).
+/// Tapping the tile re-picks via
+/// [PermissionService.requestBackupFolder]; on
+/// [BackupFolderPicked] the path is persisted to
+/// [SettingsService.setBackupFolderUri]. The re-pick
+/// path is the recovery affordance for users who revoked
+/// the SAF grant from system settings — without it, a
+/// missed /revoke would silently break nightly backups.
+class _BackupFolderTile extends StatelessWidget {
+  const _BackupFolderTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<String?>(
+      valueListenable: SettingsService.instance.backupFolderUri,
+      builder: (context, uri, _) {
+        return ListTile(
+          key: const ValueKey('settings.permission.backupFolder'),
+          leading: const Icon(Icons.folder_outlined),
+          title: const Text('Backup folder'),
+          subtitle: Text(uri ?? 'Not picked — tap to pick'),
+          trailing: uri == null
+              ? const Icon(Icons.chevron_right)
+              : TextButton(
+                  key: const ValueKey(
+                    'settings.permission.backupFolder.repick',
+                  ),
+                  onPressed: () => _rePick(context),
+                  child: const Text('Re-pick'),
+                ),
+          onTap: uri == null ? () => _rePick(context) : null,
+        );
+      },
+    );
+  }
+
+  Future<void> _rePick(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await PermissionService.instance.requestBackupFolder();
+    if (!context.mounted) return;
+    switch (result) {
+      case BackupFolderPicked(:final path):
+        SettingsService.instance.setBackupFolderUri(path);
+        messenger.showSnackBar(
+          SnackBar(content: Text('Backup folder set: $path')),
+        );
+      case BackupFolderCancelled():
+        // Silent: the user cancelled, the previous URI
+        // (if any) is unchanged. The empty case body
+        // needs an explicit `break` to keep the cases
+        // disjoint — Dart 3's switch-statement case
+        // bodies share if no break / return / throw
+        // ends them, and `BackupFolderError.message` is
+        // only bound in its own case.
+        break;
+      case BackupFolderError(:final message):
+        messenger.showSnackBar(
+          SnackBar(content: Text('Folder picker error: $message')),
+        );
+    }
   }
 }

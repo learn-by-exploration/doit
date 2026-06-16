@@ -47,6 +47,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Appearance'), findsOneWidget);
     expect(find.text('Wake-up anchor'), findsOneWidget);
+    // v0.5d (ADR-016) adds the `Permissions` section
+    // between `Wake-up anchor` and `Reliability`.
+    expect(find.text('Permissions'), findsOneWidget);
     expect(find.text('Reliability'), findsOneWidget);
     expect(find.text('Backup'), findsOneWidget);
     expect(find.text('About'), findsOneWidget);

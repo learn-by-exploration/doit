@@ -779,3 +779,389 @@ the SYS-060 surface).
   a real-device cold-start step. The v0.4b
   right-side gate did not, and the misdiagnosis in
   the original ADR-013 was the direct consequence.
+
+---
+
+## ADR-014 — Onboarding permission order: notifications → contacts → exact alarm → backup folder
+
+**Date:** 2026-06-13.
+**Status:** Accepted.
+
+**Context.** The v0.1 onboarding rationale screens were
+written but the runtime permission requests were not
+implemented (the visual walkthrough was a stub). When v0.5
+wired the runtime path, the order in which the four
+permissions are requested had to be pinned because:
+
+- A permission that is requested before a prior one is
+  granted can deadlock the user (e.g., requesting
+  `READ_CONTACTS` before `POST_NOTIFICATIONS` means a
+  notifications-off user can still see a contact-rationale
+  step, which is irrational — contacts are optional;
+  notifications are the primary delivery channel).
+- Android shows the runtime prompt **inline** the moment
+  `request()` is called. Re-ordering later means the
+  user sees prompts in the wrong order, which they read
+  as "the app is confused".
+- `SCHEDULE_EXACT_ALARM` on Android 12+ is a **policy**
+  permission: the system does not show a runtime dialog
+  for it. The path is `request()` returns `denied` on the
+  first call, and the user has to go through the system
+  Alarms & reminders settings to grant it. This must be
+  the third step (after the two runtime prompts the
+  user is most likely to grant) so the user is not
+  startled by "go to settings" before they have granted
+  anything.
+- The backup-folder SAF picker is the *last* runtime
+  affordance because it is the only one that is
+  **skippable** (per the ADR-014 step 6 decision: a
+  user who declines the backup folder is a valid
+  user, not a broken install).
+
+**Decision.** The four onboarding steps run in this
+order:
+
+1. **Step 0 — `POST_NOTIFICATIONS`** (Android 13+).
+   SYS-063. Runtime prompt. The system shows the
+   "Allow notifications?" dialog inline. The CTA
+   `Allow` calls `PermissionService.requestNotifications()`
+   and advances on `granted`.
+2. **Step 1 — `READ_CONTACTS`** (cadence-style
+   habits). SYS-064. Runtime prompt. The system shows
+   the "Allow do it to access your contacts?" dialog
+   inline. The CTA `Allow` calls
+   `PermissionService.requestContacts()` and advances
+   on `granted`. Denial is graceful: cadence habits
+   remain creatable in the form (the contact picker
+   still works in the ad-hoc mode).
+3. **Step 2 — `SCHEDULE_EXACT_ALARM`** (best-effort;
+   gracefully degrades). SYS-065. Policy permission
+   on Android 12+. The runtime `request()` call
+   returns `denied` on the first invocation; the
+   step surfaces a `FilledButton.tonal` labeled "Open
+   Android settings" that calls
+   `PermissionService.openAppSettings()`. The user
+   re-taps the CTA after returning from system
+   settings; the service re-probes and advances on
+   `granted`.
+4. **Step 3 — backup folder (SAF)**. SYS-066. The
+   `file_picker` `getDirectoryPath()` call shows the
+   platform folder picker. On a non-null `treeUri`
+   the service persists the path to
+   `SettingsService.instance.backupFolderUri`. On
+   cancellation the step advances **without**
+   persisting (skippable, see below). On a picker
+   error the rationale text shows the error and the
+   step stays.
+
+A `Skip` `TextButton` is present on every step; it
+calls `widget.onDone` immediately. Skipping is a
+valid user choice; the next launch re-presents
+onboarding only if `SettingsService.firstLaunchCompleted`
+is still `false` (per SYS-059, v0.4a.3).
+
+**Consequences.**
+
+- The `permission_handler` `Permission` enum is the
+  source of truth for the request ordering; the
+  onboarding step list and the `PermissionService`
+  method list are kept in sync by code review
+  (the v0.5a rename test pins the four
+  `requestX()` methods exist as a side effect of
+  pinning the order).
+- A new step (e.g., v0.2f's `READ_PHONE_STATE` for
+  VIP escalation) is added by appending to the
+  `_steps` list in `lib/screens/onboarding.dart` and
+  adding a new `requestX()` method on
+  `PermissionService`. The dispatch in
+  `_handleStepCta` is a switch on the integer
+  `_step`, not a Map lookup, so the new case is
+  explicit.
+- The v0.5d Settings → Permissions tile (SYS-063..066)
+  is the recovery affordance for users who hit
+  "Don't ask again" on any of the four steps. The
+  tile reads from `PermissionService.instance.statuses`
+  (a `ValueNotifier<Map<PermissionKind, PermissionResult?>>`
+  populated by `PermissionService.init()` and refreshed
+  by every `requestX()` call) and shows the current
+  status of each.
+- The `firstLaunchCompleted` flag (SYS-059) stays the
+  gate for re-presenting onboarding. A user who
+  denies all four permissions and taps `Skip` is
+  treated as a completed onboarding; the Settings
+  → Permissions tile is the in-app recovery path.
+- The on-device v0.5e verification is the right-side
+  gate for the *order* — the SM-S918B's Alarms &
+  reminders settings page must be reachable from
+  the step-2 "Open Android settings" button without
+  crossing any other system prompt.
+
+**SYS-IDs affected:** SYS-063, SYS-064, SYS-065, SYS-066.
+
+**Workflows affected:** WF-001 (First-run onboarding).
+
+---
+
+## ADR-015 — Backup folder is skippable on onboarding (step 3 / SYS-066)
+
+**Date:** 2026-06-13.
+**Status:** Accepted.
+
+**Context.** The four runtime permissions in the v0.5
+onboarding flow are not equal: `POST_NOTIFICATIONS`,
+`READ_CONTACTS`, and `SCHEDULE_EXACT_ALARM` are
+**app-required** (the app cannot deliver reminders
+without the first, cannot create a cadence habit
+without the second, and degrades silently without the
+third to a best-effort schedule). The backup folder
+(SAF) is a **user convenience** — it enables the
+nightly auto-backup feature, but the app functions
+without it (a user who does not pick a folder simply
+does not get auto-backup; the in-app restore is still
+available from a manually-exported backup file).
+
+Asking the user for the backup folder the same way we
+ask for notifications — "Allow" / "Don't allow" with
+no skip — is a UX failure: a user who is in a hurry,
+who has not yet decided where to put the backups, or
+who does not understand SAF is forced to either pick
+a folder they will later change or to decline and be
+locked out of the rest of the onboarding flow.
+
+**Decision.** The backup-folder onboarding step
+treats both the `picked` and the `cancelled` SAF
+result as advancing. The user is moved on to the
+anchor-mode / theme-mode / finish step in either
+case:
+
+- `BackupFolderPicked(:final path)` →
+  `SettingsService.instance.setBackupFolderUri(path)`
+  is called, then `_step++`.
+- `BackupFolderCancelled()` → no
+  `setBackupFolderUri` call (the previous `null`
+  value of `SettingsService.backupFolderUri` stays);
+  `_step++` runs.
+- `BackupFolderError(:final message)` → the
+  rationale text shows "Folder picker error: $message"
+  and the step does **not** advance. The user can
+  re-tap `Pick folder` or `Skip`.
+
+The v0.5d Settings → Permissions tile (and its
+`_BackupFolderTile`) is the post-onboarding recovery
+affordance: a user who skipped step 3 can pick a
+folder later from the tile, and a user who picked a
+folder and then revoked the SAF grant from system
+settings can re-pick from the tile's "Re-pick"
+`TextButton`. The tile reads
+`SettingsService.instance.backupFolderUri` (a
+`ValueNotifier<String?>`) and surfaces the picked
+path or "Not picked — tap to pick".
+
+**Consequences.**
+
+- The v0.5c onboarding test
+  `'tapping Pick folder on step 3 advances on cancelled (per ADR-014 step 6: skippable)'`
+  pins this contract: a scripted SAF cancellation
+  must advance the step and must **not** set
+  `SettingsService.instance.backupFolderUri`.
+- A user who skips the backup folder at onboarding
+  gets no auto-backup. This is documented in the
+  "Honest caveats" section of `PRIVACY.md` (added
+  in v0.5e) and surfaced in the Settings → Backup
+  section as a "Pick a backup folder" call-to-action
+  (existing v0.4c copy).
+- The Settings → `_BackupFolderTile.onTap` is a
+  no-op when a folder is already picked (it shows
+  the "Re-pick" `TextButton` instead). This avoids
+  a confusing "I tapped the row and nothing happened"
+  UX for users who have already picked a folder.
+- The workmanager nightly backup task is registered
+  in `BackupScheduler.init` (v0.4b, SYS-060) only
+  if `SettingsService.backupFolderUri` is non-null.
+  A user who skipped onboarding step 3 has
+  `backupFolderUri == null` and so the periodic
+  task is **not** registered. (This is the same
+  behavior as a user who never opens the app: no
+  background work, no data egress.)
+
+**SYS-IDs affected:** SYS-066.
+
+**Workflows affected:** WF-001, WF-012.
+
+---
+
+## ADR-016 — Permission service seam: sealed result, singleton, on-demand probe
+
+**Date:** 2026-06-16.
+**Status:** Accepted.
+
+**Context.** The v0.1 onboarding was shipped as a
+"visual walkthrough" — the rationale UI existed, the
+runtime request did not. The rationale text in
+`lib/screens/onboarding.dart`'s file-level comment
+explicitly said "requestX methods are no-op stubs" and
+the four `Allow` / `Pick folder` CTAs all did
+`setState(() => _step++)`. The runtime call landed in
+v0.5 with `permission_handler ^11.3.1` and a
+`file_picker` SAF call. The widget layer cannot call
+the platform directly per `.claude/rules/lib-screens.md`
+("No platform calls in widgets"). The widget layer
+cannot call `permission_handler.requestPermission` and
+surface a sealed result without a service seam. The
+new `PermissionService` is that seam.
+
+**Decision.**
+
+1. A new `lib/services/permission_service.dart` singleton
+   with the `_ready`-gated init pattern from
+   `.claude/rules/lib-services.md` (mirrors
+   `BackupService`, `SettingsService`, `HabitRepository`).
+2. A sealed `PermissionResult` in
+   `lib/services/permission_result.dart`:
+   `PermissionResult.granted()`,
+   `PermissionResult.denied({required bool canOpenSettings})`,
+   `PermissionResult.permanentlyDenied()`. The widget
+   layer never sees `PermissionStatus` (the
+   `permission_handler` enum) directly — the
+   `_mapStatus` private method folds `restricted` and
+   `limited` into `denied` for widget purposes.
+3. The onboarding CTAs in
+   `_OnboardingScreenState._handleStepCta` dispatch
+   on `_step` to the right `requestX()` method
+   (`requestNotifications` / `requestContacts` /
+   `requestExactAlarm` / `requestBackupFolder`) and
+   advance on `granted` / `picked` / `cancelled`
+   (per ADR-015). On `denied` the inline rationale
+   text and, when `canOpenSettings: true`, the
+   "Open Android settings" `FilledButton.tonal` are
+   revealed. On `permanentlyDenied` the same
+   settings button is shown unconditionally.
+4. A new Settings → Permissions tile
+   (`_PermissionsRow` + `_PermissionTile` +
+   `_BackupFolderTile` in `lib/screens/settings.dart`,
+   between `Wake-up anchor` and `Reliability`) is the
+   recovery affordance for users who hit "Don't ask
+   again" on any of the four steps. The tile reads
+   from `PermissionService.instance.statuses` (a
+   `ValueNotifier<Map<PermissionKind, PermissionResult?>>`
+   populated by `init()` and refreshed by every
+   `requestX()` call) and shows one `ListTile` per
+   permission with the current status text. A
+   "Settings" `TextButton` is rendered only on
+   `permanentlyDenied` rows; tapping it deep-links
+   to the system app-settings page via
+   `PermissionService.openAppSettings()`.
+5. The order is the ADR-014 order:
+   `POST_NOTIFICATIONS` → `READ_CONTACTS` →
+   `SCHEDULE_EXACT_ALARM` → backup folder. Adding
+   a new step is appending to the `_steps` list and
+   adding a new `requestX()` method.
+
+**Consequences.**
+
+- The `StreakCalculator` / `StreakService` /
+  `StreakSnapshot` identifiers are not affected —
+  they are feature-level names that describe the
+  *consecutive-day tracking* feature, not the app's
+  brand.
+- The 9 new `PermissionService` tests in
+  `test/services/permission_service_test.dart` pin
+  the sealed result branches (granted / denied /
+  permanentlyDenied for each of the three runtime
+  permissions; picked / cancelled / error for
+  backupFolder; idempotent init; platform-error
+  swallow). The 6 new `OnboardingScreen`
+  permission-wiring tests in
+  `test/screens/onboarding_permission_wiring_test.dart`
+  pin the call-and-advance behavior. The 4 new
+  `Settings → Permissions` tests in
+  `test/screens/settings_permissions_test.dart` pin
+  the recovery tile.
+- The `package:permission_handler` import is now in
+  the `lib/services/` tree, not the widget tree.
+  The widget layer imports
+  `package:doit/services/permission_service.dart`
+  and `package:doit/services/permission_result.dart`
+  and pattern-matches on the sealed class.
+- The `open_questions.md` items #5 (READ_CONTACTS
+  revocation) and #6 (SAF URI revocation) are
+  closed by the v0.5d wiring: both surfaces have
+  an in-app recovery affordance now
+  (Settings → Permissions tile, deep-link to
+  system app-settings on `permanentlyDenied`).
+- `docs/v_model/notification_reliability.md` is
+  updated: the line "On first scheduling of a
+  fixed-time habit, the app detects whether the
+  user has granted `SCHEDULE_EXACT_ALARM`" is
+  replaced with: "The app probes
+  `SCHEDULE_EXACT_ALARM` at onboarding step 2
+  (SYS-065) and surfaces the result on the home
+  screen reliability banner. If the user denies,
+  the `Reliability.degraded` path activates and
+  the Settings → Permissions tile is the recovery
+  affordance." The "may be late" copy at lines
+  60, 69, 199-200 is updated to point at the
+  on-demand probe, not the first-schedule
+  trigger.
+- The "v0.1 onboarding is a visual walkthrough"
+  caveat in `lib/screens/onboarding.dart`'s
+  file-level comment is updated: the new comment
+  block is "Onboarding screen — permission-first
+  UX for first launch. v0.5 wires the four
+  runtime permission requests to
+  `PermissionService`. The order follows
+  ADR-014 / ADR-016: `POST_NOTIFICATIONS`,
+  `READ_CONTACTS`, `SCHEDULE_EXACT_ALARM`,
+  backup folder (SAF). Each step's CTA calls the
+  corresponding `requestX()` method and advances
+  on `granted`. The `Skip` button remains as a
+  user choice."
+- `PRIVACY.md` "Honest caveats" section (added in
+  v0.5e) is updated to reflect the new reality:
+  the four runtime permissions are requested in
+  the ADR-014 order with a rationale screen for
+  each, and denial is graceful (the Settings →
+  Permissions tile is the recovery affordance for
+  one-shot and permanent denials; `SCHEDULE_EXACT_ALARM`
+  is a system policy permission on Android 12+ and
+  is granted via the Android system settings with
+  a deep-link from the tile).
+
+**SYS-IDs affected:** SYS-025 (closure — the rationale
+UI is now backed by a real runtime call),
+SYS-063, SYS-064, SYS-065, SYS-066.
+
+**Workflows affected:** WF-001 (First-run onboarding),
+WF-012 (Auto backup — `_BackupFolderTile`).
+
+**Lessons (project-wide).**
+
+- A rationale UI without a runtime call is a
+  half-shipped feature. The v0.1 onboarding was
+  reviewed and merged because the rationale text
+  was there and the buttons were there; the
+  absence of a `request()` call on the CTA's
+  `onPressed` was missed because the tests
+  asserted the UI, not the behavior. v0.5c's test
+  pattern (`'tapping Allow on step 0 calls
+  requestNotifications and advances on granted'`)
+  asserts the call — the test would have failed
+  on the v0.1 stub because the channel saw zero
+  calls.
+- A "skippable" permission is a real product
+  decision, not a permission-system default. The
+  backup folder is skippable because it is a
+  user convenience, not a hard requirement
+  (ADR-015). The runtime permission status enum
+  has no `skippable` field; the seam
+  (`BackupFolderResult`) is a separate sealed
+  class that the dispatch in `_handleStepCta`
+  matches on.
+- The recovery affordance for "Don't ask again"
+  is a Settings tile, not a hidden menu. v0.5d's
+  `_PermissionsRow` is a single-glance surface
+  that the user can find in 1 tap from the home
+  screen. The deep-link to the system
+  app-settings page is the only recovery path
+  for `permanentlyDenied`; the tile is the only
+  place it is exposed.

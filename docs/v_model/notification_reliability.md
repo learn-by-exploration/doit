@@ -123,12 +123,17 @@ The app cannot force the OS to keep its alarms alive. It can
 ask the user to help. There are three asks:
 
 1. **`SCHEDULE_EXACT_ALARM` permission.** On Android 12+, the
-   app must request this. On first scheduling of a fixed-time
-   habit, the app checks `AlarmManager.canScheduleExactAlarms()`.
-   If false, it shows a screen with a one-tap deep link to
-   `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`. If the user denies,
-   the app falls back to WorkManager and shows the "may be
-   late" badge.
+   app must request this. The app probes
+   `SCHEDULE_EXACT_ALARM` at onboarding step 2 (SYS-065) and
+   surfaces the result on the home screen reliability banner.
+   If the user denies, the `Reliability.degraded` path
+   activates and the Settings → Permissions tile is the
+   recovery affordance — it deep-links to
+   `ACTION_REQUEST_SCHEDULE_EXACT_ALARM` on
+   `permanentlyDenied`. (v0.5d / ADR-016 — pre-v0.5 the probe
+   was triggered on the first fixed-time-habit schedule,
+   which left users who declined without a recovery
+   affordance for the lifetime of the install.)
 
 2. **Battery optimization.** On first scheduling, the app checks
    `PowerManager.isIgnoringBatteryOptimizations(packageName)`.
