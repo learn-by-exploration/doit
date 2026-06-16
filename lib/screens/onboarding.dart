@@ -1,26 +1,34 @@
 // Onboarding screen — permission-first UX for first launch.
 //
 // Per WF-001. The screen requests, in order:
-//   1. POST_NOTIFICATIONS (Android 13+).
-//   2. READ_CONTACTS (cadence-style habits).
+//   1. POST_NOTIFICATIONS (Android 13+). SYS-063.
+//   2. READ_CONTACTS (cadence-style habits). SYS-064.
 //   3. SCHEDULE_EXACT_ALARM (best-effort; gracefully degrades).
-//   4. The backup folder (SAF — Phase 6).
+//      SYS-065.
+//   4. The backup folder (SAF). SYS-066.
 //   5. The anchor mode selection.
 //
-// v0.1 ships this screen as a visual walkthrough; the actual
-// platform-channel permission requests land in Phase 6 once
-// the SAF + WorkManager plumbing is wired. The screen is
-// skippable (it can be re-opened from Settings in v0.2).
+// v0.5c (ADR-016) wires the four runtime permission
+// requests to `PermissionService`. The order follows
+// ADR-014. Each step's CTA calls the corresponding
+// `requestX()` method and advances on `granted`. The
+// `Skip` button remains as a user choice.
 //
 // Layer rules (per .claude/rules/lib-screens.md): no platform
-// calls in widgets — `requestPermission` is invoked through a
-// future service seam (`PermissionService`); for v0.1 the
-// `requestX` methods are no-op stubs that return `true` and
-// the screen is a presentational walkthrough.
+// calls in widgets — every `requestX` goes through the
+// `PermissionService` seam, never directly to
+// `permission_handler` or `file_picker`. The service
+// returns a sealed `PermissionResult` (or
+// `BackupFolderResult`) which the screen pattern-matches
+// on to decide whether to advance, show a one-shot
+// re-ask affordance, or surface a "Go to Android
+// Settings" deep-link for the `permanentlyDenied` case.
 
 import 'package:flutter/material.dart';
 
 import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/services/permission_result.dart';
+import 'package:doit/services/permission_service.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/settings_service.dart';
 import 'package:doit/theme/app_theme.dart';
@@ -37,6 +45,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _step = 0;
   AnchorMode _anchorMode = AnchorMode.manual;
   ThemeMode _themeMode = ThemeMode.dark;
+
+  // v0.5c (ADR-016) state for the permission-step UX.
+  // - `_inFlight` blocks double-taps while a system dialog or
+  //   SAF picker is open. The CTA's `onPressed` consults
+  //   this so the user can't fire a second `requestX` while
+  //   the first is awaiting.
+  // - `_rationaleText` is the inline message shown after a
+  //   `denied` / `permanentlyDenied` result, or after a
+  //   `BackupFolderError`. `null` when the step is at rest.
+  // - `_goToSettingsVisible` drives the secondary "Open
+  //   Android settings" `FilledButton.tonal`. It is `true`
+  //   whenever the service reports `canOpenSettings: true`
+  //   AND the user has not yet granted the permission.
+  bool _inFlight = false;
+  String? _rationaleText;
+  bool _goToSettingsVisible = false;
 
   static const _steps = <_OnboardingStep>[
     _OnboardingStep(
@@ -105,10 +129,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 const Spacer(),
                 FilledButton(
                   key: const ValueKey('onboarding.next'),
-                  onPressed: () => setState(() => _step++),
+                  onPressed: _inFlight ? null : _handleStepCta,
                   child: Text(s.cta),
                 ),
                 const SizedBox(height: Spacing.sm),
+                if (_rationaleText != null) ...[
+                  Text(
+                    _rationaleText!,
+                    key: const ValueKey('onboarding.rationale'),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: Spacing.sm),
+                ],
+                if (_goToSettingsVisible) ...[
+                  FilledButton.tonal(
+                    key: const ValueKey('onboarding.openAndroidSettings'),
+                    onPressed: _inFlight ? null : _openAndroidSettings,
+                    child: const Text('Open Android settings'),
+                  ),
+                  const SizedBox(height: Spacing.sm),
+                ],
                 TextButton(onPressed: widget.onDone, child: const Text('Skip')),
               ],
             ),
@@ -185,6 +226,99 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
       ),
     );
+  }
+
+  /// Dispatch the per-step CTA to the right `requestX` method
+  /// on [PermissionService]. The order is fixed by ADR-014 /
+  /// ADR-016 and matches the `_steps` order:
+  ///
+  ///   _step == 0  → [PermissionService.requestNotifications]   (SYS-063)
+  ///   _step == 1  → [PermissionService.requestContacts]        (SYS-064)
+  ///   _step == 2  → [PermissionService.requestExactAlarm]      (SYS-065)
+  ///   _step == 3  → [PermissionService.requestBackupFolder]    (SYS-066)
+  ///
+  /// The `_inFlight` guard at the top blocks double-taps
+  /// while a system dialog or SAF picker is open. On
+  /// [PermissionResultGranted] the step advances; on
+  /// [PermissionResultDenied] / [PermissionResultPermanentlyDenied]
+  /// the inline rationale text and the "Open Android
+  /// settings" button (when `canOpenSettings` is `true`) are
+  /// revealed. For the backup-folder step,
+  /// [BackupFolderPicked] persists the treeUri to
+  /// [SettingsService.setBackupFolderUri] and advances;
+  /// [BackupFolderCancelled] advances without persisting
+  /// (per ADR-014 step 6: the backup folder is skippable);
+  /// [BackupFolderError] surfaces the message and stays on
+  /// the step.
+  Future<void> _handleStepCta() async {
+    if (_inFlight) return;
+    setState(() {
+      _inFlight = true;
+      _rationaleText = null;
+      _goToSettingsVisible = false;
+    });
+    final service = PermissionService.instance;
+    if (_step < 3) {
+      final PermissionResult result = switch (_step) {
+        0 => await service.requestNotifications(),
+        1 => await service.requestContacts(),
+        // The `_step < 3` guard above guarantees this is
+        // reachable only for `_step == 2`.
+        _ => await service.requestExactAlarm(),
+      };
+      if (!mounted) return;
+      setState(() {
+        _inFlight = false;
+        switch (result) {
+          case PermissionResultGranted():
+            _step++;
+          case PermissionResultDenied(:final canOpenSettings):
+            _rationaleText =
+                'You can grant this later — tap Allow again, or '
+                'open Android settings.';
+            _goToSettingsVisible = canOpenSettings;
+          case PermissionResultPermanentlyDenied():
+            _rationaleText =
+                "You've blocked this permission. Open Android "
+                'settings to grant it.';
+            _goToSettingsVisible = true;
+        }
+      });
+      return;
+    }
+    // _step == 3: backup folder (SYS-066). The dispatch is
+    // intentionally outside the switch above because the
+    // return type changes (`BackupFolderResult` instead of
+    // `PermissionResult`).
+    final BackupFolderResult folderResult = await service.requestBackupFolder();
+    if (!mounted) return;
+    setState(() {
+      _inFlight = false;
+      switch (folderResult) {
+        case BackupFolderPicked(:final path):
+          SettingsService.instance.setBackupFolderUri(path);
+          _step++;
+        case BackupFolderCancelled():
+          // Per ADR-014 step 6: the backup folder is
+          // skippable. Advance without persisting so the
+          // user can still proceed to the anchor-mode step.
+          _step++;
+        case BackupFolderError(:final message):
+          _rationaleText = 'Folder picker error: $message';
+      }
+    });
+  }
+
+  /// Open the system app-settings page so the user can grant
+  /// a permission they previously denied. Called from the
+  /// "Open Android settings" `FilledButton.tonal` shown
+  /// after a `denied(canOpenSettings: true)` or
+  /// `permanentlyDenied` result. The result is observed
+  /// implicitly — when the user returns from the system
+  /// settings and re-taps the CTA, the service re-probes
+  /// and advances if the grant succeeded.
+  Future<void> _openAndroidSettings() async {
+    await PermissionService.instance.openAppSettings();
   }
 
   void _finish() {

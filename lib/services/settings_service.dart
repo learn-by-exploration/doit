@@ -46,6 +46,19 @@ class SettingsService extends ChangeNotifier {
   /// reinstall.
   final ValueNotifier<bool> firstLaunchCompleted = ValueNotifier<bool>(false);
 
+  /// The Android SAF tree URI the user picked for nightly
+  /// auto-backups. `null` means "no folder picked yet" —
+  /// the onboarding step 3 (SYS-066) sets it via
+  /// [setBackupFolderUri] and the Settings → Restore
+  /// screen re-picks on revocation. v0.5c / ADR-016.
+  ///
+  /// In-memory only for v0.5c; persistence to
+  /// `SharedPreferences` lands with the v0.5d Settings
+  /// tile that reads the URI at backup time. The
+  /// `BackupService` reads this notifier at backup
+  /// dispatch (a future commit).
+  final ValueNotifier<String?> backupFolderUri = ValueNotifier<String?>(null);
+
   /// Init gate (`Completer<void> _ready`). Public reads wait on
   /// this before touching the underlying [SharedPreferences]
   /// instance. Pattern: see .claude/rules/lib-services.md §2.
@@ -80,6 +93,20 @@ class SettingsService extends ChangeNotifier {
     await _prefs.setBool(_kFirstLaunchCompletedKey, true);
   }
 
+  /// Set the Android SAF tree URI the user picked for nightly
+  /// auto-backups. v0.5c / ADR-016. The widget layer calls
+  /// this from the onboarding step 3 success branch
+  /// (SYS-066) and from the Settings → Restore screen when
+  /// the user re-picks on revocation. Passing `null` clears
+  /// the URI (revocation path).
+  ///
+  /// In-memory only for v0.5c; persistence to
+  /// `SharedPreferences` lands with the v0.5d Settings tile
+  /// that reads the URI at backup time.
+  void setBackupFolderUri(String? uri) {
+    backupFolderUri.value = uri;
+  }
+
   /// Test helper. Resets the singleton's in-memory state so the
   /// next [init()] re-loads from the `SharedPreferences` backing
   /// store. Does **not** touch the backing store itself; tests
@@ -91,6 +118,7 @@ class SettingsService extends ChangeNotifier {
   void resetForTesting() {
     themeMode.value = ThemeMode.dark;
     firstLaunchCompleted.value = false;
+    backupFolderUri.value = null;
     // Allow a subsequent init() to re-load from the backing
     // store. Re-creating the completer is the standard pattern
     // when the gate has not yet been awaited in tests.
