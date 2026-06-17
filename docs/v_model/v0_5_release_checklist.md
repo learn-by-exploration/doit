@@ -106,6 +106,23 @@ grep -rn "streak" --include="*.dart" --include="*.kts" \
 returns zero. The `Streak*` identifiers are feature-level,
 intentionally kept.
 
+**Regression-guard grep (v0.5e-fix, ADR-017):**
+```
+grep -rn "com.doit.package" --include="*.dart" --include="*.kts" \
+  --include="*.kt" --include="*.xml" --include="*.md" \
+  android/ test/ docs/ CHANGELOG.md AGENTS.md | wc -l
+```
+returns zero. The `com.doit.package` namespace is
+invalid (`package` is a Java reserved keyword, JLS
+§3.9) and must not appear anywhere in build artifacts,
+tests, or docs. The new
+`expect(build, isNot(contains('com.doit.package')))`
+assertion in `test/release_signing_test.dart` is the
+test-side guard; this grep is the manual verification
+the user can run before pushing. The `docs/` and
+`*.md` paths are included so a stale doc fix does not
+silently re-introduce the bad value.
+
 ### v0.5b — `PermissionService` singleton + sealed result
 
 - `lib/services/permission_service.dart` is a singleton with
@@ -294,6 +311,103 @@ table below.
   Settings → Permissions tile).
 - `docs/v_model/implementation_status.md` has a v0.5f row.
 
+### v0.5e-fix (ADR-017) — `com.doit.package` is an invalid Java namespace
+
+- The v0.5a draft picked `applicationId = "com.doit.package"`
+  and `namespace = "com.doit.package"` (mirroring the Dart
+  package name `doit` with `package` as a namespace
+  segment). The 3-gate was green at v0.5a (407 / 407) and
+  the v0.5a pin tests asserted the value *exactly*.
+- At v0.5e, `flutter build appbundle --release` failed:
+  `Namespace 'com.doit.package' is not a valid Java
+  package name as 'package' is a Java reserved keyword`
+  (JLS §3.9).
+- **The fix** (commit `ce6dd83` for the code + commit
+  `202532e` for the doc-only follow-up, both local —
+  push to `main` needs user approval because of the
+  auto-classifier default-branch SOFT BLOCK):
+  - `android/app/build.gradle.kts`:
+    `namespace = "com.doit"`, `applicationId = "com.doit"`.
+  - `android/app/src/main/AndroidManifest.xml`:
+    `<action android:name="com.doit.FIRE_ALARM" />`
+    (was `com.doit.package.FIRE_ALARM`).
+  - `android/app/src/main/kotlin/com/doit/package/` →
+    `android/app/src/main/kotlin/com/doit/`
+    via `git mv` with intermediate name `doit_tmp`
+    (because the target parent `com/doit/` already
+    existed; `git mv` cannot replace an existing
+    directory in one step). Every `.kt` file's
+    `package` declaration is updated to `package
+    com.doit`.
+  - `test/release_signing_test.dart` — the v0.5a pin
+    test is rewritten to assert `applicationId ==
+    "com.doit"` and `namespace == "com.doit"`. A new
+    regression-guard assertion is added:
+    `expect(build, isNot(contains('com.doit.package')),
+    reason: 'v0.5e-fix: com.doit.package is an
+    invalid Java namespace ...')`. A future revert of
+    either the applicationId or namespace value (or a
+    "fix" that re-picks the bad value) fails the test
+    *before* the release build runs.
+  - The four affected doc files
+    (`docs/v_model/v0_1_baseline.md`,
+    `docs/v_model/v0_5_release_baseline.md`, this file,
+    `docs/v_model/implementation_status.md`) plus
+    `CHANGELOG.md`, `AGENTS.md`, and
+    `docs/v_model/open_questions.md` (item #21 is
+    closed by ADR-017) are updated to record the
+    history with a parenthetical.
+  - `decision_record.md` — ADR-017 is appended: "v0.5e-fix:
+    `com.doit.package` is an invalid Java namespace;
+    rename to `com.doit`". The ADR includes the full
+    post-mortem, the JLS §3.9 reserved-keyword list,
+    and the lessons (a green 3-gate does not mean a
+    green build; pin tests for *invalid* values matter
+    as much as pin tests for *exact* values; stylistic
+    redundancy in identifiers is a smell, not a
+    virtue).
+- **Release artifacts** (rebuilt 2026-06-16 22:29):
+  - AAB: `build/app/outputs/bundle/release/app-release.aab`
+    — 61,030,985 bytes (61.0 MB).
+  - APK: `build/app/outputs/flutter-apk/app-release.apk`
+    — 69,843,828 bytes (69.8 MB).
+  - Both are signed with the **debug** key
+    (`android/key.properties` is absent on this machine
+    — release-signing falls back to debug per the
+    v0.3b defensive design). Installable and
+    testable; for a Play Store upload, copy
+    `android/key.properties` to this machine and
+    rebuild.
+- **3-gate** at `ce6dd83`:
+  - `dart format --output=none --set-exit-if-changed .`:
+    clean (0 changed).
+  - `flutter analyze --fatal-infos`: clean
+    (41, matches v0.4 baseline — no new analyzer hits
+    from the v0.5e-fix).
+  - `flutter test`: 407 / 407 (406 prior; the v0.5a
+    pin test is rewritten in place; the regression
+    guard is a new `expect` inside the same test
+    body).
+- **On-device verification (v0.5e, pending)** — the
+  user's hands-on step. The launch command is
+  `adb -s RZCW118521F shell monkey -p com.doit -c
+  android.intent.category.LAUNCHER 1` (the
+  `com.doit.package` v0.5a-draft launch command was
+  never executed because the build failed first; the
+  post-fix command targets the new applicationId).
+  The seven-step on-device verification (POST_NOTIFICATIONS,
+  READ_CONTACTS, SCHEDULE_EXACT_ALARM with deep-link,
+  backup folder, anchor/theme Done, Settings → Permissions
+  tile check, `adb logcat -b crash` clean) is the
+  v0.5e right-side gate.
+- **Commit `ce6dd83` is local; push to `main` is
+  blocked** by the Claude Code auto-classifier
+  ("Pushing commits directly to the `main` branch
+  bypasses pull request review"). The v0.5e on-device
+  verification is also still pending the user
+  attaching the SM-S918B (`adb devices` shows no
+  device attached).
+
 ## 3-gate log (every commit during v0.5)
 
 Every commit on `main` during v0.5 must pass the 3-gate
@@ -302,11 +416,13 @@ milestone is paused until it is backfilled.
 
 | SHA | `dart format` | `flutter analyze` | `flutter test` (count) | Notes |
 |-----|---------------|-------------------|------------------------|-------|
-| `<v0.5a>` | clean (0 changed) | clean (41, matches v0.4 baseline) | 381 / 381 (377 prior + 4 new: applicationId pin, MethodChannel pin, channel id pin, task name pin) | v0.5a: rename to "do it" (app-level). |
+| `<v0.5a>` | clean (0 changed) | clean (41, matches v0.4 baseline) | 381 / 381 (377 prior + 4 new: applicationId pin, MethodChannel pin, channel id pin, task name pin) | v0.5a: rename to "do it" (app-level). The v0.5a draft picked `com.doit.package` for `applicationId` / `namespace`; this is invalid (see `ce6dd83` row). |
 | `<v0.5b>` | clean (0 changed) | clean (41, matches v0.4 baseline) | 390 / 390 (381 prior + 9 new: 9 permission_service tests) | v0.5b: `PermissionService` + sealed result. |
 | `<v0.5c>` | clean (0 changed) | clean (41, matches v0.4 baseline) | 399 / 399 (390 prior + 3 settings_backup_uri + 6 onboarding_wiring) | v0.5c: wire onboarding CTAs. |
 | `a04e392` | clean (0 changed) | clean (41, matches v0.4 baseline) | 406 / 406 (399 prior + 4 settings_permissions + 3 settings_test header) | v0.5d: Settings → Permissions tile + ADR-016 + notification_reliability copy. |
-| `<v0.5e>` | _tbd_ | _tbd_ | _tbd_ | v0.5e: release APK + on-device verification. |
+| `ce6dd83` (v0.5e-fix, ADR-017) | clean (0 changed) | clean (41, matches v0.4 baseline) | 407 / 407 (406 prior; the v0.5a pin test was rewritten in place — `applicationId` / `namespace` are now `com.doit` — and a new regression-guard assertion `isNot(contains('com.doit.package'))` was added inside the same test body) | v0.5e-fix: the v0.5a draft picked `com.doit.package` for `applicationId` / `namespace`; `flutter build appbundle --release` failed with "Namespace 'com.doit.package' is not a valid Java package name as 'package' is a Java reserved keyword". Five surgical changes: `build.gradle.kts` (`com.doit` / `com.doit`), `AndroidManifest.xml` (`com.doit.FIRE_ALARM`), `kotlin/com/doit/package/` → `kotlin/com/doit/` via `git mv` (with intermediate name `doit_tmp`), `test/release_signing_test.dart` rewrite + regression guard, four doc files. Release AAB (61.0 MB) and APK (69.8 MB) rebuilt successfully (2026-06-16 22:29). Commit is local; push to `main` is blocked by the auto-classifier and needs user approval. See `decision_record.md` ADR-017 for the full post-mortem. |
+| `202532e` (v0.5e-fix docs) | clean (0 changed) | clean (41, matches v0.4 baseline) | 407 / 407 (no new tests; doc-only) | Doc-only commit that records the v0.5e-fix across 11 doc files: ADR-017 appended to `decision_record.md`; `implementation_status.md` gets a v0.5e-fix row + decision_record status updated to "Done (17 ADRs)"; `open_questions.md` item #21 (closed by ADR-017) added; `CHANGELOG.md` gets a v0.5e-fix subsection under [Unreleased]; `architecture_options.md` gets an "App identity (v0.5a, v0.5e-fix)" section; `plan.md` gets a "Milestone 6 — v0.5e-fix (ADR-017)" section; `v0_1_baseline.md`, `v0_5_release_baseline.md`, `v0_5_release_checklist.md` (3-gate log + per-phase + Sign-off + Traceability) updated; `PRIVACY.md` fixes stale `com.common_games.streak` / `streak.reminders` references + new ADR-017 bullet; `README.md` Status section refreshed to v0.5d + v0.5e-fix. 11 files changed, 584 insertions. |
+| `<v0.5e>` | _tbd_ | _tbd_ | _tbd_ | v0.5e: `adb uninstall com.doit` (post-v0.5e-fix applicationId) + `adb install build/app/outputs/flutter-apk/app-release.apk` + `adb shell monkey -p com.doit -c android.intent.category.LAUNCHER 1` + the seven-step on-device verification on a real SM-S918B device. The user is the executor. |
 | `<v0.5f>` | _tbd_ | _tbd_ | _tbd_ | v0.5f: sign-off + CHANGELOG [0.5.0] + open-question closures. |
 
 _(Append a row for each v0.5 commit.)_
@@ -339,13 +455,27 @@ The v0.5 release is closed by a single line:
 Accepted on YYYY-MM-DD by <user>. Final SHA: <git rev-parse HEAD>.
 ```
 
-The v0.5d commit is `a04e392`. The release is _in flight_
-until the user runs the seven-step on-device verification
-on a real SM-S918B device (or emulator) — the checklist is
-not signed off below until that step is recorded.
+The v0.5d commit is `a04e392`. The v0.5e-fix commits
+are `ce6dd83` (the code fix: `applicationId` /
+`namespace` → `com.doit`, Kotlin tree rename, test
+guard, four doc files) and `202532e` (the doc-only
+follow-up: ADR-017, 11 doc files updated, no new
+tests). Both are **local** and pending push (the
+auto-classifier blocks direct-to-`main` pushes).
+The release is _in flight_ until the user:
+
+1. Pushes `ce6dd83` and `202532e` to `main`.
+2. Runs the seven-step on-device verification on a
+   real SM-S918B device (or emulator) — the
+   checklist is not signed off below until that
+   step is recorded.
 
 ```
-Pending. Awaiting user's hands-on on-device verification (v0.5e).
+Pending. Awaiting user's hands-on push of ce6dd83 and
+on-device verification (v0.5e). The v0.5e-fix doc
+landed in this commit; the test guard, the four doc
+updates, and the ADR-017 post-mortem are the
+documentation half of the fix.
 ```
 
 If rejected, append a v0.6-pre fix-loop plan link instead.
@@ -361,7 +491,7 @@ If rejected, append a v0.6-pre fix-loop plan link instead.
 | `lib/screens/onboarding.dart` | SYS-063..066 rows 1-4. |
 | `lib/screens/settings.dart` | SYS-063..066 rows 1-4. |
 | `docs/v_model/notification_reliability.md` | SYS-065 row 3 — copy update. |
-| `decision_record.md` ADR-014, ADR-015, ADR-016 | Architecture decisions for v0.5. |
+| `decision_record.md` ADR-014, ADR-015, ADR-016, ADR-017 | Architecture decisions for v0.5. ADR-017 is the v0.5e-fix post-mortem. |
 | `pubspec.yaml` + `lib/build_info.dart` | Row 5 (app identity). |
 | `android/app/build.gradle.kts` + `AndroidManifest.xml` | Row 5 (app identity). |
 | `lib/reminders/reminder_bridge.dart` + `lib/services/notification_service.dart` + `lib/services/backup_scheduler.dart` + `lib/services/reminder_service.dart` | Row 5 (channel + task + test reminder rename). |

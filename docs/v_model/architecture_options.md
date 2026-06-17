@@ -69,6 +69,24 @@ for v0.1.
 | **UI shell** | Navigation, theme, onboarding, home, widget-host activity | `lib/screens/`, `lib/main.dart` |
 | **Services (singleton)** | `AppStateService`, `HabitRepository`, `PersonRepository`, `CompletionLogService`, `StreakService`, `BackupService`, `StatsService`, `NotificationService`, `AlarmScheduler`, `AnchorDetector` | `lib/services/` |
 
+## App identity (v0.5a, v0.5e-fix)
+
+- **Dart package name:** `doit` (was `common_games` pre-v0.5a).
+- **Android `applicationId` / AGP `namespace`:** `com.doit`
+  (was `com.common_games.streak` pre-v0.5a; the v0.5a
+  draft picked `com.doit.package` — v0.5e-fix renames to
+  `com.doit` because `package` is a Java reserved
+  keyword, JLS §3.9). The applicationId is the install
+  boundary on the user's device; an applicationId change
+  forces `adb uninstall` + `adb install`. See
+  [`decision_record.md` ADR-017](decision_record.md#adr-017--v0_5e-fix_comdoitpackage_is_an_invalid_java_namespace_rename_to_comdoit).
+- **Kotlin tree:** `android/app/src/main/kotlin/com/doit/`
+  (was `com/common_games/streak/` pre-v0.5a; the v0.5a
+  draft picked `com/doit/package/` — v0.5e-fix renames
+  to `com/doit/`).
+- **Launcher label (`android:label`):** "do it" (was "Streak"
+  pre-v0.5a).
+
 ## Permission Baseline (`AndroidManifest.xml` v0.1)
 
 ```xml

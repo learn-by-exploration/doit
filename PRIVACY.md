@@ -102,10 +102,10 @@ place the call for you.
 
 | Data | Where | Lifetime | Wiped on uninstall? |
 |------|-------|----------|---------------------|
-| Drift database | App's private storage (`/data/data/com.common_games.streak/`) | Until uninstall | Yes |
+| Drift database | App's private storage (`/data/data/com.doit/`) | Until uninstall | Yes |
 | SAF backup file | The folder you chose in onboarding | Until you delete the file | **No** (it is in your shared-storage folder) |
 | In-memory services | Process RAM | Process lifetime | Yes (with the process) |
-| Notification channel `streak.reminders` | System settings | Until the app is uninstalled or the user clears it | Yes |
+| Notification channel `doit.reminders` | System settings | Until the app is uninstalled or the user clears it | Yes |
 
 ## Honest caveats
 
@@ -170,6 +170,18 @@ of the v0.3 release:
   permissions at call time and gracefully degrade if
   the user has not granted them — do it never crashes
   on a denied permission.
+- The Android `applicationId` and AGP `namespace` are
+  `com.doit` (was `com.common_games.streak` pre-v0.5).
+  The v0.5a draft picked `com.doit.package`; v0.5e-fix
+  renames to `com.doit` because `package` is a Java
+  reserved keyword (JLS §3.9) and AGP rejected the
+  namespace at release-build time. See
+  [ADR-017](docs/v_model/decision_record.md#adr-017--v0_5e-fix_comdoitpackage_is_an_invalid_java_namespace_rename_to_comdoit)
+  for the post-mortem. The `test/release_signing_test.dart`
+  v0.5a pin tests now include a regression guard
+  `isNot(contains('com.doit.package'))` so a future
+  re-pick of the bad value fails CI before the release
+  build runs.
 
 ## Reporting a privacy concern
 

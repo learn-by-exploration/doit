@@ -1165,3 +1165,214 @@ WF-012 (Auto backup — `_BackupFolderTile`).
   app-settings page is the only recovery path
   for `permanentlyDenied`; the tile is the only
   place it is exposed.
+
+## ADR-017 — v0.5e-fix: `com.doit.package` is an invalid Java namespace; rename to `com.doit`
+
+**Date:** 2026-06-16.
+**Status:** Accepted.
+**Supersedes:** The v0.5a applicationId / namespace pick of
+`com.doit.package`. The earlier choice looked
+stylistically right ("com.doit" + the Dart package
+name "doit" as a redundant suffix) but is a build
+defect: AGP rejected the namespace at release-build
+time because `package` is a Java reserved keyword.
+
+**Context.** The v0.5a rename commit picked the
+applicationId and namespace as
+`com.doit.package`, mirroring the v0.5a Dart
+package name `doit` with `package` as a
+"namespace segment". The earlier values were
+`com.common_games.streak`, the v0.1 through
+v0.4b scaffolding. The 3-gate (format / analyze /
+test, 407 / 407) was green and the v0.5a pin
+tests in `test/release_signing_test.dart`
+asserted `applicationId == "com.doit.package"`
+and `namespace == "com.doit.package"`.
+
+At v0.5e, `flutter build appbundle --release`
+failed with:
+
+```
+* What went wrong:
+Execution failed for task ':app:processReleaseResources'.
+> A failure occurred while executing com.android.build.gradle.internal.res.LinkApplicationAndroidResources$TaskAction
+> Android resource linking failed
+ERROR:/.../com.doit.package/app-release-unsigned.ap_:
+Namespace 'com.doit.package' is not a valid Java package
+name as 'package' is a Java reserved keyword
+```
+
+**Why the v0.5a pick was wrong.** `package` is a
+Java reserved keyword (JLS §3.9). It cannot
+appear as a segment of a Java package name —
+which means it cannot appear as a segment of an
+AGP `namespace` or `applicationId`. The defect
+was missed at v0.5a review because:
+
+- The 3-gate did not include
+  `flutter build appbundle --release`. The v0.4
+  right-side gate is format / analyze / test;
+  the release build is the user's hands-on
+  step (ADR-013's lesson: the release AOT path
+  is not testable in `flutter test`).
+- The v0.5a pin tests asserted the
+  `applicationId` and `namespace` were *exactly*
+  `com.doit.package`. A wrong-but-consistent
+  value passes the test.
+- `com.doit.package` *looks* fine in a code
+  review — it reads as a stylistic choice
+  ("the package for the doit app"). The Java
+  reserved-keyword check is invisible to
+  anyone who does not know the JLS keyword
+  list by heart.
+
+**The fix (v0.5e-fix).** Five surgical changes,
+all in a single fix commit:
+
+1. `android/app/build.gradle.kts` —
+   `namespace = "com.doit"`,
+   `applicationId = "com.doit"`. The
+   explanatory comment is updated to mention
+   the v0.5e-fix history without naming the
+   bad value literally (the regression guard
+   in test 2 below rejects the literal
+   `com.doit.package` string).
+2. `android/app/src/main/AndroidManifest.xml`
+   — `<action android:name="com.doit.FIRE_ALARM" />`
+   (was `com.doit.package.FIRE_ALARM`).
+3. `android/app/src/main/kotlin/com/doit/package/`
+   → `android/app/src/main/kotlin/com/doit/`
+   via `git mv` (with an intermediate name,
+   `doit_tmp`, because the target parent
+   directory already exists). Every
+   `package com.doit.package` declaration in
+   the four `.kt` files becomes
+   `package com.doit`.
+4. `test/release_signing_test.dart` — the
+   v0.5a pin test is rewritten to assert
+   `applicationId == "com.doit"` and
+   `namespace == "com.doit"`. A new
+   regression-guard assertion is added:
+   `expect(build, isNot(contains('com.doit.package')),
+   reason: 'v0.5e-fix: com.doit.package is an
+   invalid Java namespace ...')`. A future
+   revert of either the applicationId or
+   namespace value (or a "fix" that picks
+   `com.doit.package` again) fails the test.
+5. The four affected doc files
+   (`v0_1_baseline.md`, `v0_5_release_baseline.md`,
+   `v0_5_release_checklist.md`,
+   `implementation_status.md`, plus `CHANGELOG.md`
+   and `AGENTS.md`) are updated to record the
+   v0.5e-fix history with a parenthetical
+   "(earlier draft picked
+   `com.doit.package`; v0.5e-fix renames to
+   `com.doit`)".
+
+The release AAB (61.0 MB) and APK (69.8 MB)
+rebuild successfully and the 3-gate returns
+to 407 / 407 (the test count went from 18
+to 18 in `release_signing_test.dart` — the
+v0.5a pin test is rewritten in place; the
+regression-guard assertion is a new
+`expect` inside the same test body).
+
+**Consequences.**
+
+- The applicationId is `com.doit`. The launch
+  command becomes `adb shell monkey -p
+  com.doit -c android.intent.category.LAUNCHER
+  1`. The `adb uninstall com.doit` + `adb
+  install` cycle replaces the v0.4b uninstall
+  of `com.common_games.streak`. The install
+  boundary is unchanged from the v0.5a
+  plan.
+- `com.doit` is shorter than the v0.5a
+  pick, and the v0.5a "stylish redundancy"
+  (`com.doit.package` repeating the Dart
+  package name) is gone. The user-facing
+  launcher label is unchanged ("do it").
+- The `test/release_signing_test.dart`
+  regression guard is the project's first
+  static-analysis test for *invalid* values
+  (the existing v0.4b-release-fix-2 tests
+  pin the absence of R8 / minify). The shape
+  — `expect(build, isNot(contains('X')))`
+  with a `reason:` — is reusable for future
+  defects of the form "this string must
+  never appear in the build output".
+- The v0.5e-fix is the third post-`flutter
+  build appbundle` defect in this project
+  (after v0.4b-release-fix and
+  v0.4b-release-fix-2). The pattern is
+  consistent: the 3-gate is necessary but
+  not sufficient; the release-build step is
+  the only way to catch these defects, and
+  it must run *before* the on-device
+  verification.
+
+**SYS-IDs affected:** None. The applicationId
+and namespace are build-config, not
+requirements. (SYS-025 is the rationale-UI
+contract; SYS-063..066 are the runtime
+permission contracts; none of them pin the
+Java package name.)
+
+**Workflows affected:** None. The v0.5e
+on-device verification (WF-001) is unchanged.
+
+**Lessons (project-wide).**
+
+- A green 3-gate does not mean a green
+  build. The v0.5e-fix, like the
+  v0.4b-release-fix and the
+  v0.4b-release-fix-2, was caught only by
+  running `flutter build appbundle --release`.
+  CI does not run the release build by
+  default (the four `ANDROID_*` GitHub
+  Secrets are not present in forks); the
+  release build is a local-user step.
+- Pin tests for *invalid* values matter.
+  The v0.5a pin tests asserted the
+  `applicationId` was `com.doit.package`
+  *exactly*. A future change that re-picks
+  the bad value would have passed the test.
+  The v0.5e-fix regression guard
+  (`isNot(contains('com.doit.package'))`)
+  is the negative-space pin the project
+  needed.
+- "Stylistic redundancy" in identifiers is
+  a smell, not a virtue. The v0.5a
+  rationale for `com.doit.package` was
+  "the applicationId matches the Dart
+  package name". The cost of the
+  redundancy is a longer string to type
+  and review, and the v0.5e-fix
+  demonstrates that the redundancy can
+  hide a defect: a reviewer is more
+  likely to approve a string that *looks
+  intentional*. The shorter `com.doit`
+  is harder to misread.
+- The Java reserved-keyword list
+  (JLS §3.9) is a *small, fixed* list
+  worth knowing by heart for Android
+  package work: `abstract`, `assert`,
+  `boolean`, `break`, `byte`, `case`,
+  `catch`, `char`, `class`, `const`,
+  `continue`, `default`, `do`, `double`,
+  `else`, `enum`, `extends`, `final`,
+  `finally`, `float`, `for`, `goto`, `if`,
+  `implements`, `import`, `instanceof`,
+  `int`, `interface`, `long`, `native`,
+  `new`, `package`, `private`,
+  `protected`, `public`, `return`,
+  `short`, `static`, `strictfp`, `super`,
+  `switch`, `synchronized`, `this`,
+  `throw`, `throws`, `transient`, `true`,
+  `false`, `try`, `void`, `volatile`,
+  `while`, `_` (and the contextual
+  keywords `var`, `yield`, `record`,
+  `sealed`, `permits`, `non-sealed`).
+  `package` is the only one likely to
+  appear in an Android applicationId
+  *or* namespace segment.

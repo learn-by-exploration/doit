@@ -111,3 +111,61 @@ When a doc changes, the doc on the opposite side of the V is suspect:
 If you ship a PR that changes a left-side doc but not its right-side
 verification (or vice versa), say so in the commit message — the V is
 intentionally incomplete for that slice.
+
+## Milestone 6 — v0.5e-fix (ADR-017): the v0.5 release namespace defect
+
+- **Date:** 2026-06-16.
+- **Status:** accepted; commit `ce6dd83` is local; push
+  to `main` is pending user approval.
+- **The defect.** The v0.5a rename commit picked
+  `applicationId = "com.doit.package"` and
+  `namespace = "com.doit.package"` for the v0.5 release
+  (mirroring the Dart package name `doit` with `package`
+  as a namespace segment). The 3-gate was green (407/407)
+  and the v0.5a pin tests asserted the value *exactly*. At
+  v0.5e, `flutter build appbundle --release` failed:
+  `Namespace 'com.doit.package' is not a valid Java
+  package name as 'package' is a Java reserved keyword`
+  (JLS §3.9).
+- **The fix (commit `ce6dd83`, ADR-017).** Five surgical
+  changes — `android/app/build.gradle.kts` (`com.doit` /
+  `com.doit`), `AndroidManifest.xml`
+  (`com.doit.FIRE_ALARM`),
+  `android/app/src/main/kotlin/com/doit/package/` →
+  `android/app/src/main/kotlin/com/doit/` via `git mv`
+  with intermediate name `doit_tmp` (the target parent
+  already exists), `test/release_signing_test.dart`
+  rewrite + new regression-guard
+  `isNot(contains('com.doit.package'))`, four doc files
+  updated. The release AAB (61.0 MB) and APK (69.8 MB)
+  rebuild successfully.
+- **Lessons (project-wide).**
+  - A green 3-gate does not mean a green build. The 3-gate
+    is `dart format` + `flutter analyze --fatal-infos` +
+    `flutter test`; the release AOT build is the user's
+    hands-on step (ADR-013's lesson, restated). The
+    v0.5e-fix is the third post-`flutter build appbundle`
+    defect in this project (after v0.4b-release-fix and
+    v0.4b-release-fix-2).
+  - Pin tests for *invalid* values matter as much as pin
+    tests for *exact* values. The v0.5a pin tests asserted
+    `applicationId == "com.doit.package"` *exactly*; a
+    future re-pick of the bad value would have passed the
+    test. The v0.5e-fix regression guard
+    (`isNot(contains('com.doit.package'))`) is the
+    negative-space pin the project needed.
+  - "Stylistic redundancy" in identifiers is a smell, not
+    a virtue. The v0.5a rationale for `com.doit.package`
+    was "the applicationId matches the Dart package name".
+    The cost of the redundancy is a longer string to type
+    and review, and the redundancy can hide a defect: a
+    reviewer is more likely to approve a string that
+    *looks intentional*. The shorter `com.doit` is harder
+    to misread.
+  - The Java reserved-keyword list (JLS §3.9) is a small,
+    fixed list. `package` is the only one likely to
+    appear in an Android `applicationId` or `namespace`
+    segment. See ADR-017 for the full list.
+- **Right-side gate.** `docs/v_model/v0_5_release_checklist.md`
+  is updated; the v0.5e on-device verification is still
+  pending the user attaching the SM-S918B.

@@ -162,6 +162,27 @@ Three ADRs are appended to
   (`_PermissionsRow` + `_PermissionTile` +
   `_BackupFolderTile`) is the recovery affordance for
   users who hit "Don't ask again".
+- **ADR-017** — v0.5e-fix: `com.doit.package` is an invalid
+  Java namespace; rename to `com.doit`. The v0.5a draft
+  picked `com.doit.package` for `applicationId` and
+  `namespace` (mirroring the Dart package name `doit` with
+  `package` as a namespace segment). The 3-gate was green
+  (407/407) and the v0.5a pin tests asserted the value
+  *exactly*. At v0.5e, `flutter build appbundle --release`
+  failed: `package` is a Java reserved keyword (JLS §3.9)
+  and cannot appear as a segment of a Java package name.
+  Five surgical changes: `build.gradle.kts`
+  (`com.doit` / `com.doit`), `AndroidManifest.xml`
+  (`com.doit.FIRE_ALARM`), `kotlin/com/doit/package/` →
+  `kotlin/com/doit/` via `git mv`, `release_signing_test`
+  rewrite + regression-guard
+  `isNot(contains('com.doit.package'))`, four doc files
+  updated. The release AAB (61.0 MB) and APK (69.8 MB)
+  rebuild successfully. Lesson: a green 3-gate does not
+  mean a green build; pin tests for *invalid* values
+  matter as much as pin tests for *exact* values;
+  stylistic redundancy in identifiers is a smell, not a
+  virtue.
 
 ## Approval status
 

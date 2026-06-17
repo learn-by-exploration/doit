@@ -177,6 +177,76 @@ steps needs an in-app recovery path. v0.5d adds it:
   closed by v0.5d (ADR-016) — both surfaces now have an
   in-app recovery affordance.
 
+### v0.5e-fix (ADR-017) — `com.doit.package` is not a valid Java namespace
+
+`flutter build appbundle --release` failed at v0.5e with:
+"Namespace 'com.doit.package' is not a valid Java package
+name as 'package' is a Java reserved keyword". The v0.5a
+rename picked `com.doit.package` for `applicationId` and
+`namespace` (mirroring the Dart package name `doit` with
+`package` as a namespace segment). The 3-gate was green
+(407 / 407) and the v0.5a pin tests asserted the value
+*exactly* — the defect was invisible until the release
+AOT build ran. The fix is five surgical changes, all in
+one commit:
+
+- **`android/app/build.gradle.kts`** — `namespace = "com.doit"`,
+  `applicationId = "com.doit"`. (Was `com.doit.package`.)
+- **`android/app/src/main/AndroidManifest.xml`** —
+  `<action android:name="com.doit.FIRE_ALARM" />`.
+  (Was `com.doit.package.FIRE_ALARM`.)
+- **`android/app/src/main/kotlin/com/doit/package/` →
+  `android/app/src/main/kotlin/com/doit/`** via `git mv`
+  with an intermediate name (`doit_tmp` — the parent
+  `com/doit/` already existed, so the rename had to go
+  through a detour). Every `.kt` file's `package`
+  declaration is now `package com.doit`. (Was
+  `package com.doit.package`.)
+- **`test/release_signing_test.dart`** — the v0.5a pin
+  test is rewritten to assert `applicationId == "com.doit"`
+  and `namespace == "com.doit"`. A new
+  regression-guard assertion is added:
+  `expect(build, isNot(contains('com.doit.package')),
+  reason: 'v0.5e-fix: com.doit.package is an invalid
+  Java namespace ...')`. A future revert of either the
+  applicationId or namespace value (or a re-pick of the
+  bad value) fails CI before the release build runs.
+- **Four doc files** updated:
+  `v0_1_baseline.md`, `v0_5_release_baseline.md`,
+  `v0_5_release_checklist.md`,
+  `implementation_status.md`, plus `CHANGELOG.md` (this
+  entry), `AGENTS.md`, and `docs/v_model/open_questions.md`
+  item #21 (closed by ADR-017). ADR-017 is appended to
+  `decision_record.md` with the full post-mortem and
+  the JLS §3.9 reserved-keyword list.
+- **Release AAB (61.0 MB) and APK (69.8 MB) are rebuilt
+  successfully** (2026-06-16 22:29). The 3-gate is
+  green at 407 / 407 (the test count is unchanged — the
+  v0.5a pin test is rewritten in place; the
+  regression-guard assertion is a new `expect` inside
+  the same test body).
+- **The launch command is `adb shell monkey -p com.doit
+  -c android.intent.category.LAUNCHER 1`** (was
+  `-p com.doit.package` in the v0.5a draft; the v0.5a
+  draft's launch command was not executed because the
+  build failed first). The user's v0.5e on-device
+  verification on a real SM-S918B device is still
+  pending the user attaching the phone.
+
+**Lesson (project-wide).** A green 3-gate does not mean
+a green build. The 3-gate is `dart format` +
+`flutter analyze --fatal-infos` + `flutter test`; the
+release AOT build is the user's hands-on step
+(ADR-013's lesson, restated). The v0.5e-fix is the
+third post-`flutter build appbundle` defect in this
+project (after v0.4b-release-fix and
+v0.4b-release-fix-2). Pin tests for *invalid* values
+matter as much as pin tests for *exact* values. The
+"com.doit.package" pick was stylish-looking but
+redundant — the redundancy hid a defect that a
+shorter, plainer `com.doit` would not have. See
+`decision_record.md` ADR-017 for the full post-mortem.
+
 ## [0.4.0] — 2026-06-15 — Contract closure
 
 Six work items that close the v0.3 contract items the v0.3 docs

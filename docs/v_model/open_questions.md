@@ -111,3 +111,38 @@ or shape if answered differently.
       separate `RELEASE_NOTES.md`); the per-release
       `v*_<version>_baseline.md` and `v*_<version>_release_checklist.md`
       are the engineering release notes.
+21. **What identifiers should the v0.5 rename use for the
+    Android `applicationId` and AGP `namespace`?**
+    - The v0.1 baseline used `com.common_games.streak` (the
+      Flutter project's `--org com.common_games --project-name
+      streak` defaults). v0.5 wants to drop the `streak` and
+      the `common_games` org and pick something that names
+      the new "do it" app.
+    - v0.5a draft: `com.doit.package` (mirroring the Dart
+      package name `doit` with `package` as a namespace
+      segment). The 3-gate was green (407/407) and the v0.5a
+      pin tests asserted the value exactly. At v0.5e
+      (`flutter build appbundle --release`) AGP rejected
+      the namespace: `package` is a Java reserved keyword
+      (JLS §3.9) and cannot appear as a segment of a
+      Java package name.
+    - **Closed 2026-06-16 (v0.5e-fix, ADR-017).** The
+      applicationId and namespace are now `com.doit`. The
+      release AAB (61.0 MB) and APK (69.8 MB) rebuild
+      successfully. A new regression-guard assertion in
+      `test/release_signing_test.dart` rejects the literal
+      `com.doit.package` string so a future re-pick of the
+      bad value fails CI before reaching the release build.
+      The Kotlin tree is `com/doit/` (was
+      `com/doit/package/`); every `.kt` file's `package`
+      declaration is `package com.doit` (was
+      `package com.doit.package`). See
+      [`decision_record.md` ADR-017](decision_record.md#adr-017--v0_5e-fix_comdoitpackage_is_an_invalid_java_namespace_rename_to_comdoit)
+      for the post-mortem. **Lesson:** the 3-gate
+      (`dart format` + `flutter analyze --fatal-infos` +
+      `flutter test`) does not run the release AOT build;
+      the only way to catch an invalid Java namespace is
+      to run `flutter build appbundle --release` (or the
+      equivalent APK build). Pin tests for *invalid*
+      values matter as much as pin tests for *exact*
+      values.

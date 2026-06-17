@@ -15,7 +15,11 @@ The package id is `com.doit`. The display name in the
 launcher is "do it". (The earlier v0.5a draft picked
 `com.doit.package` but `package` is a Java reserved keyword;
 v0.5e-fix renames the applicationId and namespace to
-`com.doit`.)
+`com.doit`. See
+[`decision_record.md` ADR-017](decision_record.md#adr-017--v0_5e-fix_comdoitpackage_is_an_invalid_java_namespace_rename_to_comdoit)
+for the post-mortem. The release AAB (61.0 MB) and APK
+(69.8 MB) rebuild successfully at SHA `ce6dd83` (local;
+push to `main` is pending user approval).)
 
 ## Prototype Strategy
 

@@ -52,9 +52,20 @@ The V-model artifacts live in [`docs/v_model/`](docs/v_model/):
 
 ## Status
 
-Implementation in flight. v0.1 is feature-complete and the 14-day real-device
-run is running on the user's primary phone; v0.2 (events, groups, time
-windows, edit, pause, test reminder, bulk complete) is also in flight on the
-same phone. See [`docs/v_model/implementation_status.md`](docs/v_model/implementation_status.md)
-for the current slice. The v0.3 sideload-to-friends release plan is at
-[`docs/v_model/v0_3_release_baseline.md`](docs/v_model/v0_3_release_baseline.md).
+Implementation in flight. v0.1 (scaffolding + 14-day real-device
+run) and v0.2 (events, groups, time windows, edit, pause, test
+reminder, bulk complete) are closed. v0.3 (sideload-to-friends
+release), v0.4 (CHANGELOG, `firstLaunch` persisted flag, WorkManager
+periodic backup, AES-256-GCM backup encryption at rest, TalkBack /
+a11y static review, the v0.4b-release-fix-2 cold-start crash fix)
+are also closed. v0.5 (rename to "do it" + wire real Android
+permissions into onboarding) is in flight; the v0.5d commit
+(`a04e392`) and the v0.5e-fix commit (`ce6dd83`, ADR-017 — the
+`com.doit.package` invalid Java namespace defect) are local;
+the v0.5e on-device verification is pending the user attaching
+the SM-S918B device. See
+[`docs/v_model/implementation_status.md`](docs/v_model/implementation_status.md)
+for the current slice. The v0.5 release baseline is at
+[`docs/v_model/v0_5_release_baseline.md`](docs/v_model/v0_5_release_baseline.md);
+the right-side gate is
+[`docs/v_model/v0_5_release_checklist.md`](docs/v_model/v0_5_release_checklist.md).
