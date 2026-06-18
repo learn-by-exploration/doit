@@ -270,6 +270,46 @@ void main() {
     );
   });
 
+  test(
+    'requestIgnoreBatteryOptimizations maps granted → granted (SYS-068)',
+    () async {
+      await PermissionService.instance.init();
+      requestScriptedStatuses[Permission.ignoreBatteryOptimizations.value] =
+          PermissionStatus.granted;
+      final result = await PermissionService.instance
+          .requestIgnoreBatteryOptimizations();
+      expect(result, isA<PermissionResultGranted>());
+      expect(
+        PermissionService.instance.statuses.value[PermissionKind
+            .batteryOptimization],
+        isA<PermissionResultGranted>(),
+      );
+    },
+  );
+
+  test('init() probes the four runtime permissions including '
+      'battery-optimization (SYS-068)', () async {
+    await PermissionService.instance.init();
+    final probes = permissionsCalls
+        .where((c) => c.method == 'checkPermissionStatus')
+        .map((c) => (c.arguments as int))
+        .toList();
+    expect(
+      probes,
+      contains(Permission.ignoreBatteryOptimizations.value),
+      reason:
+          'init() must probe battery-optimization alongside the v0.5d '
+          'three (notification, contacts, scheduleExactAlarm).',
+    );
+    expect(
+      probes.length,
+      4,
+      reason:
+          'init() must probe exactly four runtime permissions exactly '
+          'once total.',
+    );
+  });
+
   // ── requestBackupFolder → sealed BackupFolderResult mapping ──
 
   test('requestBackupFolder returns BackupFolderPicked on a non-null SAF '
@@ -314,12 +354,12 @@ void main() {
         .toList();
     expect(
       probes.length,
-      3,
+      4,
       reason:
-          'init() must probe exactly the three runtime permissions '
-          '(`notification`, `contacts`, `scheduleExactAlarm`) exactly '
-          'once total. A second call must short-circuit on the '
-          'completed gate.',
+          'init() must probe exactly the four runtime permissions '
+          '(`notification`, `contacts`, `scheduleExactAlarm`, '
+          '`ignoreBatteryOptimizations`) exactly once total. A second '
+          'call must short-circuit on the completed gate.',
     );
   });
 

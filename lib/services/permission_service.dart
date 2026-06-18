@@ -10,6 +10,14 @@
 // from to render "Granted" / "Not granted" status text and
 // the deep-link to the Android system settings.
 //
+// v0.6 (ADR-018) adds:
+//   - The `batteryOptimization` kind (SYS-068) — the
+//     whitelist probe + the per-kind deep-link to
+//     `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`.
+//   - The on-demand `ensure(kind)` helper that the
+//     [PermissionSheet] widget uses to short-circuit when the
+//     permission is already granted.
+//
 // Layer rules (per .claude/rules/lib-services.md):
 // - Singleton with `Completer<void> _ready`.
 // - `init()` is idempotent.
@@ -17,7 +25,8 @@
 //
 // The service depends on `package:permission_handler` (for
 // `Permission.notification`, `Permission.contacts`,
-// `Permission.scheduleExactAlarm`) and
+// `Permission.scheduleExactAlarm`,
+// `Permission.ignoreBatteryOptimizations`) and
 // `package:file_picker` (for `FilePicker.platform.getDirectoryPath`
 // which uses `ACTION_OPEN_DOCUMENT_TREE` on Android). It
 // returns a sealed [PermissionResult] / [BackupFolderResult]
@@ -42,12 +51,14 @@ import 'package:permission_handler_platform_interface/permission_handler_platfor
 
 import 'package:doit/services/permission_result.dart';
 
-/// Identifiers for the four runtime permissions / pickers
-/// the service manages. Used as keys in [PermissionService.statuses]
+/// Identifiers for the runtime permissions / pickers the
+/// service manages. Used as keys in [PermissionService.statuses]
 /// and as the dispatch key in tests. Mirrors the
 /// onboarding-screen step order in
 /// [lib/screens/onboarding.dart]: notifications, contacts,
-/// exact alarms, backup folder.
+/// exact alarms, backup folder, plus the v0.6
+/// battery-optimization kind surfaced in the Settings →
+/// Permissions tile (SYS-068).
 enum PermissionKind {
   /// `POST_NOTIFICATIONS`. SYS-063.
   notifications,
@@ -62,6 +73,15 @@ enum PermissionKind {
   /// is `null` (the picker is not a permission; the picked
   /// path lives in `SettingsService.backupFolderUri`).
   backupFolder,
+
+  /// `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (the whitelist
+  /// probe, not a runtime grant). SYS-068 / v0.6 (ADR-018).
+  /// On Android the system Settings surface is the only
+  /// place the user can toggle this; the deep-link target
+  /// is `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`,
+  /// routed through [ReminderBridge.openIgnoreBatteryOptimizations]
+  /// on the Kotlin side.
+  batteryOptimization,
 }
 
 /// Singleton holder for the permission / SAF seam. The
@@ -81,11 +101,12 @@ class PermissionService {
   Completer<void> _ready = Completer<void>();
   Future<void> get ready => _ready.future;
 
-  /// Current status of the three runtime permissions
-  /// (notifications, contacts, exact alarms). Populated by
-  /// [init] and refreshed by every `requestX` call. The
-  /// `backupFolder` entry is always `null` — the SAF picker
-  /// is not a permission; the picked path lives in
+  /// Current status of the runtime permissions
+  /// (notifications, contacts, exact alarms, battery
+  /// optimization). Populated by [init] and refreshed by
+  /// every `requestX` call. The `backupFolder` entry is
+  /// always `null` — the SAF picker is not a permission;
+  /// the picked path lives in
   /// `SettingsService.backupFolderUri`.
   ///
   /// The Settings → Permissions tile (v0.5d) binds to this
@@ -103,9 +124,12 @@ class PermissionService {
           canOpenSettings: true,
         ),
         PermissionKind.backupFolder: null,
+        PermissionKind.batteryOptimization: const PermissionResultDenied(
+          canOpenSettings: true,
+        ),
       });
 
-  /// Idempotent. Probes the three runtime permissions and
+  /// Idempotent. Probes the four runtime permissions and
   /// stores the mapped [PermissionResult] in [statuses].
   /// A platform-channel error (missing plugin, restricted
   /// device, etc.) is swallowed — the v0.4b-release-fix
@@ -125,6 +149,9 @@ class PermissionService {
         canOpenSettings: true,
       ),
       PermissionKind.backupFolder: null,
+      PermissionKind.batteryOptimization: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
     };
     try {
       next[PermissionKind.notifications] = _mapStatus(
@@ -135,6 +162,9 @@ class PermissionService {
       );
       next[PermissionKind.exactAlarm] = _mapStatus(
         await Permission.scheduleExactAlarm.status,
+      );
+      next[PermissionKind.batteryOptimization] = _mapStatus(
+        await Permission.ignoreBatteryOptimizations.status,
       );
     } catch (_) {
       // v0.4b-release-fix / ADR-013 follow-up: a thrown
@@ -182,6 +212,41 @@ class PermissionService {
     await ready;
     final raw = await Permission.scheduleExactAlarm.request();
     return _recordAndReturn(PermissionKind.exactAlarm, raw);
+  }
+
+  /// Probe whether the app is whitelisted from battery
+  /// optimizations
+  /// (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`). The system
+  /// Settings surface is the only place the user can toggle
+  /// this; the deep-link target
+  /// (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`) is
+  /// routed through [ReminderBridge.openIgnoreBatteryOptimizations]
+  /// on the Kotlin side. SYS-068 / v0.6 (ADR-018).
+  ///
+  /// Unlike the other `requestX` methods, this call does
+  /// not show a system dialog. `permission_handler` returns
+  /// `granted` if the app is whitelisted, `denied`
+  /// otherwise. The widget layer is expected to surface
+  /// the deep-link as the only recovery affordance.
+  Future<PermissionResult> requestIgnoreBatteryOptimizations() async {
+    await ready;
+    final raw = await Permission.ignoreBatteryOptimizations.request();
+    return _recordAndReturn(PermissionKind.batteryOptimization, raw);
+  }
+
+  /// On-demand check used by [PermissionSheet.show]. Returns
+  /// the cached [PermissionResult] for [kind] without
+  /// re-prompting the user. The result drives the
+  /// short-circuit logic in the sheet — if the permission
+  /// is already `granted`, the sheet is not shown at all.
+  Future<PermissionResult> ensure(PermissionKind kind) async {
+    await ready;
+    final cached = statuses.value[kind];
+    if (cached != null) return cached;
+    // SAF picker case (SYS-066): the picker is not a
+    // permission; return a synthetic `granted` so the
+    // feature-consumption site can proceed.
+    return const PermissionResultGranted();
   }
 
   /// Open the Android SAF folder picker
@@ -287,6 +352,9 @@ class PermissionService {
         canOpenSettings: true,
       ),
       PermissionKind.backupFolder: null,
+      PermissionKind.batteryOptimization: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
     };
   }
 }

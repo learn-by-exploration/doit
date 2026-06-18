@@ -364,6 +364,12 @@ class _PermissionTile extends StatelessWidget {
         await service.requestContacts();
       case PermissionKind.exactAlarm:
         await service.requestExactAlarm();
+      case PermissionKind.batteryOptimization:
+        // SYS-068: battery-opt whitelist probe. Unlike the
+        // other runtime permissions, this does not show a
+        // system dialog — it just re-reads the current
+        // whitelist state.
+        await service.requestIgnoreBatteryOptimizations();
       case PermissionKind.backupFolder:
         // The backup folder is not a runtime permission;
         // it's a SAF picker. The re-pick is handled in
