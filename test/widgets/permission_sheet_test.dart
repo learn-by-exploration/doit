@@ -71,6 +71,20 @@ class _RecordingBridge implements ReminderBridge {
   @override
   Future<Reliability> probeReliability() async => Reliability.optimal;
 
+  @override
+  Future<int> setExactAlarm({
+    required int alarmId,
+    required int epochMs,
+  }) async =>
+      alarmId;
+
+  @override
+  Future<void> cancelAlarm(int alarmId) async {}
+
+  @override
+  Future<void> showFullScreen(String habitId) async {}
+
+  @override
   Future<void> openIgnoreBatteryOptimizations() async {
     openIgnoreBatteryOptimizationsCalls++;
   }

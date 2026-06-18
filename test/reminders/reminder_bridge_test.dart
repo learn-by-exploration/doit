@@ -48,6 +48,44 @@ void main() {
       b.reliability = Reliability.unknown;
       expect(await b.probeReliability(), Reliability.unknown);
     });
+
+    test('setExactAlarm records the call and returns the id by default',
+        () async {
+      final b = FakeReminderBridge();
+      final epochMs = DateTime(2026, 6, 18, 7, 30).millisecondsSinceEpoch;
+      final id = await b.setExactAlarm(alarmId: 7, epochMs: epochMs);
+      expect(id, 7);
+      expect(b.setExactAlarmCalls, [(alarmId: 7, epochMs: epochMs)]);
+    });
+
+    test('setExactAlarm respects a custom result (degraded fallback)',
+        () async {
+      final b = FakeReminderBridge();
+      b.setExactAlarmResult = (id) => id * 100;
+      final id = await b.setExactAlarm(
+        alarmId: 3,
+        epochMs: DateTime(2026, 6, 18, 8).millisecondsSinceEpoch,
+      );
+      expect(id, 300);
+    });
+
+    test('cancelAlarm records the id', () async {
+      final b = FakeReminderBridge();
+      await b.cancelAlarm(42);
+      expect(b.cancelAlarmCalls, [42]);
+    });
+
+    test('showFullScreen records the habitId', () async {
+      final b = FakeReminderBridge();
+      await b.showFullScreen('h_abc');
+      expect(b.showFullScreenCalls, ['h_abc']);
+    });
+
+    test('openIgnoreBatteryOptimizations increments the counter', () async {
+      final b = FakeReminderBridge();
+      await b.openIgnoreBatteryOptimizations();
+      expect(b.openIgnoreBatteryOptimizationsCalls, 1);
+    });
   });
 
   group('PlatformReminderBridge', () {
@@ -181,6 +219,59 @@ void main() {
       // result side; we don't decode it here, just confirm the
       // dispatcher didn't throw synchronously.
       expect(caught, isNull);
+    });
+
+    test('setExactAlarm passes alarmId and epochMs and returns the id',
+        () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        log.add(call);
+        if (call.method == 'setExactAlarm') return 17;
+        return null;
+      });
+      final b = PlatformReminderBridge();
+      final epochMs = DateTime(2026, 6, 18, 7, 30).millisecondsSinceEpoch;
+      final id = await b.setExactAlarm(alarmId: 5, epochMs: epochMs);
+      expect(id, 17);
+      expect(log.length, 1);
+      expect(log.first.method, 'setExactAlarm');
+      final args = log.first.arguments as Map;
+      expect(args['alarmId'], 5);
+      expect(args['epochMs'], epochMs);
+    });
+
+    test('setExactAlarm falls back to alarmId when the platform returns null',
+        () async {
+      final b = PlatformReminderBridge();
+      final id = await b.setExactAlarm(
+        alarmId: 9,
+        epochMs: DateTime(2026, 6, 18).millisecondsSinceEpoch,
+      );
+      expect(id, 9);
+    });
+
+    test('cancelAlarm passes the id', () async {
+      final b = PlatformReminderBridge();
+      await b.cancelAlarm(11);
+      expect(log.length, 1);
+      expect(log.first.method, 'cancelAlarm');
+      expect((log.first.arguments as Map)['alarmId'], 11);
+    });
+
+    test('showFullScreen passes the habitId', () async {
+      final b = PlatformReminderBridge();
+      await b.showFullScreen('h_xyz');
+      expect(log.length, 1);
+      expect(log.first.method, 'showFullScreen');
+      expect((log.first.arguments as Map)['habitId'], 'h_xyz');
+    });
+
+    test('openIgnoreBatteryOptimizations invokes the channel', () async {
+      final b = PlatformReminderBridge();
+      await b.openIgnoreBatteryOptimizations();
+      expect(log.length, 1);
+      expect(log.first.method, 'openIgnoreBatteryOptimizations');
+      expect(log.first.arguments, isNull);
     });
   });
 }

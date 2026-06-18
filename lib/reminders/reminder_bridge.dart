@@ -40,6 +40,32 @@ abstract class ReminderBridge {
 
   /// Probe the platform for the current reliability state.
   Future<Reliability> probeReliability();
+
+  /// Arm an exact alarm at [epochMs] (Unix milliseconds).
+  /// The platform calls `AlarmManager.setExactAndAllowWhileIdle`
+  /// (or `setExact` outside Doze) and returns the assigned
+  /// alarm id. On `Reliability.degraded` the platform falls
+  /// back to `WorkManager` and returns a non-zero id whose
+  /// exact value is platform-defined. v0.6 / ADR-018 / SYS-065.
+  Future<int> setExactAlarm({required int alarmId, required int epochMs});
+
+  /// Cancel the alarm with [alarmId] (no-op if not armed).
+  /// v0.6 / ADR-018.
+  Future<void> cancelAlarm(int alarmId);
+
+  /// Launch the full-screen mission activity for [habitId].
+  /// The platform opens `FullScreenActivity` (a thin Kotlin
+  /// shell that hosts a Flutter route). Out-of-scope for
+  /// v0.6; the Dart side calls this for strong-mode habits.
+  Future<void> showFullScreen(String habitId);
+
+  /// Open the system battery-optimization whitelist page
+  /// (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`). The
+  /// platform starts the activity synchronously; the result
+  /// of the user's choice is re-probed via
+  /// [PermissionService.requestIgnoreBatteryOptimizations]
+  /// (SYS-068).
+  Future<void> openIgnoreBatteryOptimizations();
 }
 
 /// Inbound callbacks from Kotlin to Dart. The Dart side
@@ -116,13 +142,51 @@ class PlatformReminderBridge implements ReminderBridge {
         return Reliability.unknown;
     }
   }
+
+  @override
+  Future<int> setExactAlarm({
+    required int alarmId,
+    required int epochMs,
+  }) async {
+    final result = await _channel.invokeMethod<int>('setExactAlarm', {
+      'alarmId': alarmId,
+      'epochMs': epochMs,
+    });
+    return result ?? alarmId;
+  }
+
+  @override
+  Future<void> cancelAlarm(int alarmId) async {
+    await _channel.invokeMethod<void>('cancelAlarm', {'alarmId': alarmId});
+  }
+
+  @override
+  Future<void> showFullScreen(String habitId) async {
+    await _channel.invokeMethod<void>('showFullScreen', {'habitId': habitId});
+  }
+
+  @override
+  Future<void> openIgnoreBatteryOptimizations() async {
+    await _channel.invokeMethod<void>('openIgnoreBatteryOptimizations');
+  }
 }
 
 /// Test bridge — records every call.
 class FakeReminderBridge implements ReminderBridge {
   final List<DateTime> anchors = <DateTime>[];
+  final List<({int alarmId, int epochMs})> setExactAlarmCalls =
+      <({int alarmId, int epochMs})>[];
+  final List<int> cancelAlarmCalls = <int>[];
+  final List<String> showFullScreenCalls = <String>[];
+  int openIgnoreBatteryOptimizationsCalls = 0;
   int rescheduleCount = 0;
   Reliability reliability = Reliability.optimal;
+
+  /// What the next [setExactAlarm] call returns. Defaults
+  /// to the `alarmId` passed in (mirrors the platform's
+  /// identity-mapping behavior). Tests override this to
+  /// simulate a platform-assigned id or a degraded fallback.
+  int Function(int alarmId)? setExactAlarmResult;
 
   @override
   Future<void> rescheduleAll() async {
@@ -136,4 +200,28 @@ class FakeReminderBridge implements ReminderBridge {
 
   @override
   Future<Reliability> probeReliability() async => reliability;
+
+  @override
+  Future<int> setExactAlarm({
+    required int alarmId,
+    required int epochMs,
+  }) async {
+    setExactAlarmCalls.add((alarmId: alarmId, epochMs: epochMs));
+    return setExactAlarmResult?.call(alarmId) ?? alarmId;
+  }
+
+  @override
+  Future<void> cancelAlarm(int alarmId) async {
+    cancelAlarmCalls.add(alarmId);
+  }
+
+  @override
+  Future<void> showFullScreen(String habitId) async {
+    showFullScreenCalls.add(habitId);
+  }
+
+  @override
+  Future<void> openIgnoreBatteryOptimizations() async {
+    openIgnoreBatteryOptimizationsCalls++;
+  }
 }
