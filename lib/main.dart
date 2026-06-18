@@ -17,6 +17,7 @@ import 'package:doit/screens/onboarding.dart';
 import 'package:doit/services/backup_scheduler.dart';
 import 'package:doit/services/backup_service.dart';
 import 'package:doit/services/db.dart';
+import 'package:doit/services/permission_service.dart';
 import 'package:doit/services/platform_alarm_scheduler.dart';
 import 'package:doit/services/platform_full_screen_intent.dart';
 import 'package:doit/services/platform_notification_service.dart';
@@ -51,11 +52,22 @@ Future<void> main() async {
   //    after the SharedPreferences read has completed.
   await SettingsService.instance.init();
 
-  // 4. Init the backup service so the restore screen can
+  // 4. Init the permission service. This probes the three
+  //    runtime permissions (POST_NOTIFICATIONS, READ_CONTACTS,
+  //    SCHEDULE_EXACT_ALARM) and populates the
+  //    [PermissionService.statuses] ValueNotifier that the
+  //    v0.5d Settings → Permissions tile binds to. Without
+  //    this call, the singleton's `_ready` Completer would
+  //    never complete and every `requestX()` call (including
+  //    the onboarding "Allow" buttons) would block on
+  //    `await ready` indefinitely.
+  await PermissionService.instance.init();
+
+  // 5. Init the backup service so the restore screen can
   //    export / import JSON snapshots of the local DB.
   await BackupService.instance.init();
 
-  // 5. Init the WorkManager-backed nightly backup scheduler
+  // 6. Init the WorkManager-backed nightly backup scheduler
   //    (v0.4b / SYS-060). The schedule itself is registered
   //    later, from the settings screen, so users can opt out.
   //
