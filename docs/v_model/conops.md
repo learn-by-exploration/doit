@@ -135,6 +135,43 @@ modes.
     "leaving work" reminder fires at 17:30 as the user exits the
     office geofence.
 
+### Templates (v1.0/Phase B)
+
+The home FAB exposes a "Browse templates" tile alongside the
+"Create blank" choices (Do / Person / Event). The catalog is an
+opt-in affordance — a user who never opens it sees no template
+UX in the rest of the app. Templates that ship:
+
+- **12 Do templates** — "Drink water" (interval, Auto),
+  "Read 20 min" (fixed evening, Soft), "Stretch break"
+  (interval workday, Soft), "Morning walk" (fixed morning,
+  Strong), "Journal" (fixed bedtime, Soft), "Meditate" (fixed,
+  Soft), "Take vitamins" (fixed, Soft), "Practice guitar"
+  (interval evening, Soft), "Weekly review" (fixed Sunday,
+  Soft), "Inbox zero" (fixed weekday evening, Soft),
+  "Languages lesson" (interval, Soft), "Wind down" (fixed
+  late evening, Soft).
+- **3 Person templates** — "Call Mom" (weekly, dialer),
+  "Text Sam" (every 3 days, WhatsApp), "Check in on a friend"
+  (weekly, SMS).
+- **4 Event templates** — "Pay rent" (monthly 1st, 1-day lead),
+  "Doctor appointment" (one-off, 1-h lead), "Anniversary"
+  (yearly, 1-week lead), "Tax deadline" (yearly, 1-day lead).
+- **6 Routine templates** — visible with a "Coming in v1.1"
+  badge in Phase B; the apply UX lands in Phase F
+  (`add_routine.dart`).
+
+The user can also save any configured Do / Event / Person as a
+user template via the AppBar overflow → "Save as template". The
+catalog shows user templates alongside built-ins. Built-ins
+are read-only; user templates are deletable via long-press.
+
+Templates restore automatically via the existing backup service
+because they are a regular Drift table — no backup-format bump
+is required. Phase B ships the data layer, the UI layer, and the
+V-Model doc sync; the master plan's quota of 25 curated
+templates is met across Phase B + Phase F (19 + 6).
+
 ## Constraints
 
 - **No cloud, no account, no telemetry.** Personal use.

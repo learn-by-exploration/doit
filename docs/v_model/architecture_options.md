@@ -67,7 +67,20 @@ for v0.1.
 | **Backup** | Auto backup, restore, file picker integration | `lib/services/backup_service.dart`, `lib/screens/settings_restore.dart` |
 | **Settings** | Permissions, exact-alarm, Doze prompt, OEM guide, theme, sound | `lib/screens/settings.dart` |
 | **UI shell** | Navigation, theme, onboarding, home, widget-host activity | `lib/screens/`, `lib/main.dart` |
-| **Services (singleton)** | `AppStateService`, `HabitRepository`, `PersonRepository`, `CompletionLogService`, `StreakService`, `BackupService`, `StatsService`, `NotificationService`, `AlarmScheduler`, `AnchorDetector` | `lib/services/` |
+| **Templates (v1.0/Phase B)** | Curated library of 25 templates (Do / Event / Person / Routine), `Template` model, `kTemplateFormatVersion = 1` JSON envelope, repository, catalog screen, save-as-template affordance on add screens | `lib/templates/`, `lib/services/template_repository.dart`, `lib/screens/templates.dart` |
+| **Services (singleton)** | `AppStateService`, `HabitRepository`, `PersonRepository`, `CompletionLogService`, `StreakService`, `BackupService`, `StatsService`, `NotificationService`, `AlarmScheduler`, `AnchorDetector`, `TemplateRepository` | `lib/services/` |
+
+### Format-version pins
+
+The app keeps a small set of version pins for forward-compatible
+file / payload formats. A mismatch (lower-than-supported) is
+migrated forward; a higher-than-supported mismatch is rejected
+with a sealed exception.
+
+| Constant | Value | Location | On mismatch |
+| --- | --- | --- | --- |
+| `kBackupFormatVersion` | 2 | `lib/services/backup_service.dart` | Forward-migrate via `lib/services/db/migrations/`; reject `version > 2` with `BackupFormatTooNew` |
+| `kTemplateFormatVersion` | 1 | `lib/templates/template_library.dart` | Reject `k != 1` with `TemplateValidationException` (no forward migration path in Phase B; future bumps follow the same envelope pattern as `kBackupFormatVersion`) |
 
 ## App identity (v0.5a, v0.5e-fix)
 

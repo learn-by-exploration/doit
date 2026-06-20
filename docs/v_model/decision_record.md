@@ -1394,12 +1394,153 @@ template store). When the Templates PR lands it will
 take this slot; if a smaller ADR arrives first the
 reservation will be renumbered.
 
-## ADR-020 (reserved)
+## ADR-020 — v1.0/Phase B: Template model + JSON envelope
 
-Reserved for the template-JSON-shape decision
-(ADR-candidate: `payloadJson` blob per template,
-versioned with `kTemplateFormatVersion`, mirroring
-`kBackupFormatVersion`).
+**Date:** 2026-06-20.
+**Status:** Accepted (lands across three PRs: data
+layer + migration + library, UI layer, doc sync).
+**Supersedes:** none.
+
+**Context.** v1.0/Phase B introduces a curated library
+of 25 templates (Do / Event / Person / Routine) that
+the user can pick to pre-fill the existing add screens,
+plus a "Save as template" action on those add screens so
+users can capture their own configurations for reuse
+(see SYS-067, SYS-068, WF-032, WF-033).
+
+The first open question is the **shape of a Template**.
+Two candidates:
+
+- **Sealed `Template` hierarchy** with
+  `TemplateDo / TemplateEvent / TemplatePerson /
+  TemplateRoutine` subclasses. Strongly typed; each
+  subclass carries its own typed payload. The catalog
+  UI needs four `when` branches.
+- **Single `Template` class with an `entityType`
+  discriminator enum**, storing the typed payload as a
+  `String payloadJson` blob. Mirrors the existing
+  `Do.scheduleType` discriminator pattern
+  (`tables.dart`) and the `MissionChain` JSON-on-row
+  pattern (`do_repository.dart:317`). The catalog is one
+  `GridView`.
+
+The second open question is **how the payload is
+serialized**. Two candidates:
+
+- **Hand-rolled `dart:convert` JSON envelope** with a
+  version pin (`kTemplateFormatVersion = 1`), mirroring
+  `kBackupFormatVersion` (`backup_service.dart:76`).
+- **`freezed` + `json_serializable` codegen.** Matches
+  `freezed` is not currently used in this codebase;
+  `do_repository.dart:320` uses `jsonEncode` directly,
+  and `backup_service.dart:96-104, 124-138` uses
+  `dart:convert` for the envelope.
+
+The third open question is **how built-ins are
+seeded**. Two candidates:
+
+- **`AppDatabaseService.init()` calls a `seedInto(db)`
+  function that runs `INSERT OR IGNORE` keyed on
+  `id`**, idempotent.
+- **Migration-bound seed inside `migrateV2ToV3`**.
+  Bundling a seed with a migration couples a schema
+  change to a content change; downgrades are awkward.
+
+**Decision.**
+
+1. **Single-class `Template` with `entityType`
+   discriminator.** Mirrors `Do.scheduleType`. The
+   `TemplatePayload` (the inner payload map) is the
+   strongly-typed concept; the `Template` row is the
+   catalog row. The 25 templates share one table, one
+   repository, and one catalog grid; the inner payload
+   type is validated at apply time per `entityType`.
+2. **Hand-rolled `dart:convert` JSON envelope,
+   `kTemplateFormatVersion = 1`.** Mirrors
+   `kBackupFormatVersion`. Format:
+   `{"k":1,"<entityType>":{...inner fields...}}`. A
+   mismatch (missing `k`, unknown `k`, or wrong inner
+   key) throws `TemplateValidationException` (sealed,
+   mirror of `EventValidationException`).
+3. **Seed in `AppDatabaseService.init()` AFTER the
+   migration runs**, gated on `from < 3` so existing v3
+   users do not re-seed. The seed is idempotent:
+   `INSERT OR IGNORE` keyed on the built-in `id`
+   (`t_builtin_01`..`t_builtin_25`). A user that
+   deletes a built-in does NOT get it re-seeded on the
+   next launch (idempotency, not "always-present").
+4. **Built-ins are read-only.** `TemplateRepository
+   .deleteById(id)` refuses `isBuiltIn: true` with
+   `TemplateIsBuiltIn`; the catalog's "Your templates"
+   tab is the only place a delete affordance lives.
+5. **Dart reserved-keyword workaround.** `enum
+   TemplateEntityType { doEntity('do'), event('event'),
+   person('person'), routine('routine') }`. The enum
+   constant is `doEntity` because `do` would shadow the
+   imported `Do` model. The wire value is `'do'`,
+   matching the `entityType` column in the `Templates`
+   table.
+6. **Routine entityType is shipped in the schema, not
+   in the seed.** Phase B seeds 19 templates (Do +
+   Event + Person). The 6 routine templates from the
+   master plan are deferred to Phase F
+   (`add_routine.dart` does not exist yet). The data
+   model already supports `entityType: 'routine'`,
+   so Phase F is a seed-only add (no schema change).
+
+**Phasing.**
+
+- **PR 1 (data).** Drift schema v2→v3, `Template`
+  model, `kTemplateFormatVersion = 1`, 19-template
+  library, `TemplateRepository`. Verification:
+  `flutter test test/db/migration_test.dart
+  test/services/template_repository_test.dart
+  test/templates/`.
+- **PR 2 (UI).** `TemplatesScreen` catalog with filter
+  chips (Do / Event / Person / Routine), `initialPayload`
+  pre-fill on `AddHabitScreen` / `AddPersonScreen` /
+  `AddEventScreen` (extracted from `events.dart` into
+  its own file), AppBar "Save as template" action on
+  all three add screens. Verification:
+  `flutter test test/screens/templates_test.dart
+  test/screens/home_test.dart
+  test/screens/add_habit_test.dart
+  test/screens/add_person_test.dart
+  test/screens/add_event_test.dart`.
+- **PR 3 (docs, this ADR plus SYS-067/068, WF-032/033,
+  the conops Templates section, the architecture
+  options Templates layer, and the CHANGELOG).
+  Doc-only PR; closes the V right-side.**
+
+**Consequences.**
+
+- **Templates restore automatically** via the existing
+  backup service (`backup_service.dart`) because they
+  are a regular Drift table. No `kBackupFormatVersion`
+  bump is needed in Phase B. Phase F's routine
+  templates will be backward-compatible at the DB
+  level (column already exists in v3).
+- **Routine templates in Phase B are visible but
+  disabled** with a "Coming in v1.1" badge. The card
+  tap shows a `SnackBar` ("Routines land in v1.1.").
+  Phase F wires up the `AddRoutineScreen` apply path
+  and swaps the badge for the "Use this" button.
+- **Routine templates' `payloadJson` is not validated
+  in Phase B.** The repository validates the envelope
+  shape (`k` + inner key) but the inner routine
+  payload is opaque until Phase F. Phase F will add
+  the `RoutineTemplatePayload` decoder.
+- **Catalog grid is 2-column, not 4-column.** The
+  existing 64-icon `icon_picker.dart` is 4-column
+  because each tile is icon-only. Template cards carry
+  name + description, so 2-column is the readable
+  width on a phone screen.
+- **`TemplatesScreen` is reached from the home FAB's
+  bottom sheet** ("Browse templates" tile), NOT from
+  the home screen's tab bar. Templates are an
+  opt-in affordance — a user who never opens the
+  catalog never sees it. This mirrors the "blank
+  add" vs "browse templates" choice the plan calls out.
 
 ## ADR-021 (reserved)
 

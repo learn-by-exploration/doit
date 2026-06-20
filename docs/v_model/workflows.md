@@ -826,3 +826,131 @@ The workflows below are part of v0.2. The proposal is at
   canonical icon.
 
 **Requirements covered:** SYS-045, SYS-046.
+
+---
+
+## WF-032 — Pick a template from the curated library
+
+**Preconditions:**
+- The user is on the home screen.
+- The user has tapped the home FAB.
+- The user has picked "Browse templates" from the FAB
+  bottom sheet.
+
+**Main flow:**
+1. `TemplatesScreen` opens with a `TabBar` at the top
+   (Curated / Your templates — collapsed to a flat list
+   per `ADR-020` § decision 4: built-ins + user-saved
+   in one grid, with filter chips for Do / Event /
+   Person / Routine).
+2. The catalog `FutureBuilder` shows a
+   `CircularProgressIndicator` while
+   `TemplateLibrary.seedBuiltIns(TemplateRepository.instance)`
+   finishes; on completion the grid renders 25 cards
+   (12 Do + 3 Person + 4 Event + 6 Routine). Routine
+   cards render a "Coming in v1.1" badge instead of
+   the "Use this" button (the routine apply UX lands
+   in Phase F).
+3. The user can tap a filter chip (Do / Event / Person
+   / Routine) to narrow the grid by `entityType`.
+4. The user taps a Do card → `AddHabitScreen(initialPayload:
+   template.payload)` opens with `name`, schedule
+   type, weekdays, hour, minute, proof mode, category,
+   icon, and color all pre-filled. The user reviews,
+   edits, and saves. The persisted do has its own `id`
+   (the template's id is not reused).
+5. Event card → `AddEventScreen(initialPayload: ...)`
+   with name, lead-time, recurrence, day-of-month, and
+   month-of-year pre-filled (the `recurrence` string
+   is mapped onto `EventRecurrence`; 'monthly' and
+   'yearly' both → `annually`).
+6. Person card → `AddPersonScreen(initialPayload: ...)`
+   with display name, cadence, channel, and any
+   mission-chain pre-filled.
+7. The user saves → the add screen pops, and the new
+   entity is visible on the home screen.
+
+**Postconditions:**
+- The matching add screen pre-fills from the
+  template's `payloadJson` inner envelope (see
+  `ADR-020` § decision 2 for the envelope shape).
+- The new entity has its own `id`; the template row
+  is not modified by the apply.
+- The catalog can be opened again and the same
+  template is still listed (built-ins are
+  read-only — `WF-033` shows how a user can save
+  their own variation).
+
+**Failure modes:**
+- A `payloadJson` that fails to decode → the add
+  screen falls back to a blank form (the
+  `TemplatesScreen._payloadFor` helper tolerates a
+  malformed envelope, mirroring the repository's
+  "validate at save time, tolerate at apply time"
+  posture).
+- A user template that was deleted from the catalog
+  before the apply → already gone from the screen;
+  no apply path runs.
+- Routine apply → `SnackBar("Routines land in v1.1.")`
+  (Phase F wires `AddRoutineScreen`).
+
+**Requirements covered:** SYS-067.
+
+---
+
+## WF-033 — Save a configured do / event / person as a user template
+
+**Preconditions:**
+- The user is on `AddHabitScreen` / `AddEventScreen` /
+  `AddPersonScreen`.
+- The form has at least the `name` field filled in
+  (a blank name fails fast — the dialog asks the user
+  to give the do/event/person a name first).
+
+**Main flow:**
+1. The user taps the AppBar overflow → "Save as
+   template".
+2. A modal dialog opens with a single `TextField`
+   pre-filled with the form's current name plus the
+   suffix "template" (e.g., a configured do named
+   "Drink water" opens with the default
+   "Drink water template").
+3. The user can rename (the field is editable) and
+   taps Save.
+4. `TemplateRepository.instance.save` runs:
+   - Validates the envelope (the `payloadJson` is
+     built from the current form state, not from the
+     persisted row — templates are about reuse, not
+     history).
+   - Inserts a row with `isBuiltIn: false`,
+     `entityType` matching the form (Do / Event /
+     Person), and a fresh `id` (auto-assigned
+     `t_<millis>`).
+   - `TemplateValidationException` → a `SnackBar`
+     surfaces the message and the row is NOT written.
+5. `TemplatesScreen` is opened (from the home FAB →
+   "Browse templates") and the new user template is
+   visible in the grid alongside the built-ins.
+
+**Postconditions:**
+- A new row in the `Templates` table with
+  `isBuiltIn: false`.
+- The original entity (Do / Event / Person) is NOT
+  saved by this flow — the user goes through the
+  normal Save button on the add screen to persist
+  the entity itself. "Save as template" is purely a
+  reuse capture.
+- The catalog can apply the user template (same flow
+  as `WF-032` step 4-6) to bootstrap a new entity.
+
+**Failure modes:**
+- Blank name on the add screen → the action surfaces
+  a `SnackBar("Give the do / event / person a name
+  first.")` and does not open the dialog.
+- Empty template name in the dialog → the dialog
+  returns `null` and nothing is written.
+- Malformed payload (e.g., a custom form field with
+  a bad enum value) → `TemplateValidationException`
+  → `SnackBar` with the message.
+
+**Requirements covered:** SYS-068.

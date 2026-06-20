@@ -9,6 +9,64 @@ V-Model artifacts are the engineering contract.
 
 ## [Unreleased]
 
+### v1.0/Phase B — Templates (curated library + save-as-template)
+
+Templates are a curated, opt-in way to bootstrap a new do / event /
+person from a pre-filled configuration. Templates ship locally (no
+network); they restore automatically via the existing backup service.
+
+**What's new**
+
+- **`TemplatesScreen` (catalog).** Reached from the home FAB →
+  "Browse templates". Two-column grid of 25 cards (12 Do + 3
+  Person + 4 Event + 6 Routine), with filter chips for Do /
+  Event / Person / Routine. Routine cards render a "Coming in
+  v1.1" badge — the routine apply UX lands in Phase F.
+- **`initialPayload` pre-fill** on `AddHabitScreen`,
+  `AddPersonScreen`, and `AddEventScreen` (extracted from
+  `events.dart` into its own file). Tapping a template card
+  opens the matching add screen with name, schedule, cadence,
+  proof mode, category, icon, color, lead time, and
+  recurrence all pre-filled. The user reviews and saves.
+- **"Save as template"** AppBar overflow action on all three
+  add screens (Do / Event / Person) — captures the current
+  form state (not the persisted row) as a new user template.
+  Built-ins are read-only; user templates are deletable via
+  long-press in the catalog.
+
+**Data layer**
+
+- Drift schema bumped **v2 → v3**; `Templates` table added
+  (id, name, description, iconName, entityType, payloadJson,
+  isBuiltIn, createdAtMillis, lastUsedAtMillis).
+- `Template` model with `entityType` discriminator
+  (`doEntity / event / person / routine`); `payloadJson` is a
+  versioned envelope `{"k":1,"<entityType>":{...}}` with
+  `kTemplateFormatVersion = 1`. Hand-rolled `dart:convert`
+  (no codegen) — matches the codebase convention.
+- 19 hand-crafted built-in templates shipped in Phase B
+  (12 Do + 3 Person + 4 Event). Phase F adds the 6 routine
+  templates to reach the master-plan quota of 25. The data
+  model already supports `entityType: 'routine'`, so Phase F
+  is a seed-only add (no schema change).
+- `TemplateRepository` singleton with `_ready` gate (matches
+  the rest of `lib/services/`): `save`, `getById`, `listAll`,
+  `deleteById` (refuses built-ins), `seedBuiltIns` (idempotent).
+- Built-in seed runs from `AppDatabaseService.init()` AFTER
+  the v2→v3 migration, guarded by `from < 3` so existing v3
+  users do not re-seed.
+
+**V-Model doc sync (this release):** ADR-020 (template model +
+JSON envelope), SYS-067 (≥25 curated templates), SYS-068
+(save-as-template), WF-032 (pick from library), WF-033 (save
+configured do as user template), a Templates section in the
+`conops.md` operational scenario, a Templates layer row + a
+format-version table entry in `architecture_options.md`. Doc-
+only PR; closes the V right-side.
+
+**Not in this release:** routine apply UX (Phase F), template
+search / categories / sharing (v1.1+).
+
 ### v0.5a — rename to "do it"
 
 App-level rename. The app's display name, package id, directory,
