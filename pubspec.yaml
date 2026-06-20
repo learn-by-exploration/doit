@@ -77,6 +77,18 @@ dependencies:
   # PBKDF2 with ≥ 100,000 iterations + 16-byte random salt.
   cryptography: ^2.9.0
 
+  # Geofence position stream (v1.0 / Phase C PR 2 / ADR-021).
+  # GeofenceService consumes Geolocator.getPositionStream() and
+  # runs Dart-side matching against the registered
+  # TriggerLocation set; the matched events are exposed as a
+  # broadcast Stream<GeofenceEvent> that RoutineExecutor
+  # subscribes to. Geolocator is the only platform dep we add
+  # for the geofence layer — see ADR-021 for the library-choice
+  # rationale (flutter_geofence is stale; geofence_service
+  # overlaps responsibility and forces its own permission
+  # model).
+  geolocator: ^13.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

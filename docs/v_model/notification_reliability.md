@@ -157,6 +157,108 @@ ask the user to help. There are three asks:
   a 1-minute-out reminder; observe it fires within 1 minute
   (exact alarm).
 
+## Trigger reliability (v1.0 / Phase C–F)
+
+The time-of-day layers above cover the AlarmScheduler path. A
+different surface owns the non-time triggers added in v1.0 —
+`TriggerLocationEnter` / `TriggerLocationExit`
+(Phase C PR 2 / ADR-021), `TriggerDeviceState` (Phase D),
+`TriggerCalendarEvent` (Phase E), and `TriggerCallIncoming`
+(Phase F). Each trigger has its own reliability story.
+
+### Geofence (Phase C PR 2 — `geolocator`)
+
+`GeofenceService` is a thin `Geolocator.getPositionStream(...)`
+adapter. The match itself is a pure-Dart Haversine comparison
+in `computeTransitions(...)` (see
+`lib/services/geofence_service.dart`). The platform gives us
+a position every ~25m of travel (the `distanceFilter: 25`
+setting in `_GeolocatorPositionSource`).
+
+- **Accuracy:** ±30m in cities with the coarse-location fix
+  (city-block). The 50m..5000m radius bound in
+  `TriggerLocation.validate()` is well above the noise floor
+  of a single fix; a 200m "home" geofence is comfortably
+  matched by a 30m-accurate position.
+- **Latency:** enter/exit transitions fire on the next fix
+  after the device crosses the boundary. In practice this is
+  < 30s of travel; on a stopped device it fires on the next
+  cold start of the position stream.
+- **Doze behavior:** the position stream is throttled in Doze
+  (the OS treats it like a sensor). When the device wakes
+  for any other reason, the next fix is delivered and
+  accumulated transitions fire together. This is the v0.1
+  behavior; the Phase D device-state debug screen surfaces
+  "stream throttled" copy when it detects the gap.
+- **Permission revoke:** if the user revokes
+  `ACCESS_COARSE_LOCATION` mid-flight, the platform stream
+  emits a `PositionServiceException` on
+  `_onPositionError(...)`. The service logs and continues —
+  the next re-grant resumes the stream. A routine whose
+  trigger would have fired is silently dropped; we do not
+  queue. The home-screen reliability banner
+  (`Reliability.degraded`) flips on when the user has at
+  least one `TriggerLocation*` automation registered and
+  the permission is denied, with a one-tap deep link to
+  the permission settings.
+
+### Device-state (Phase D — planned)
+
+The `DeviceStateProbe` Kotlin channel emits reactive
+broadcasts for charging state and ringer mode (the two
+`Intent.ACTION_*` broadcasts the OS actually fires), and
+polls the rest at 60-second cadence (ADR-022). Polling for
+battery range / BT device / Wi-Fi SSID / headphones / app
+foreground is acceptable because every state change is
+persisted as a snapshot; the polling loop is the heartbeat
+that detects missed reactive broadcasts.
+
+- **Latency budget:** reactive events fire within ±5s of
+  the OS broadcast; polled events within ±65s of the
+  actual state change.
+- **Doze behavior:** reactive broadcasts (charging, ringer
+  mode) fire even in Doze; polled states are sampled when
+  Doze releases a maintenance window, so a 60s cadence can
+  stretch to 15 minutes in Doze. The debug screen surfaces
+  "polling paused for Doze" copy.
+- **Permission revoke:** `BLUETOOTH_CONNECT` is the only
+  runtime permission Phase D adds. A revoke surfaces the
+  same banner pattern as coarse-location (SYS-077).
+
+### Calendar (Phase E — planned)
+
+The `CalendarProbe` polls the local
+`CalendarContract.Instances` view every 5 minutes for the
+next 24-hour window. Calendar changes propagate within one
+poll cycle; the user can force a refresh from the debug
+screen.
+
+- **Latency budget:** ±2 minutes of the event boundary
+  (5-minute poll, plus the OS's own calendar sync
+  freshness — Google Calendar sync runs every ~15
+  minutes).
+- **Permission revoke:** `READ_CALENDAR` revoke pauses
+  the poll; the next re-grant resumes from the current
+  window. The banner pattern is the same as the other
+  permissions.
+
+### Call-screening (Phase F — planned)
+
+`CallInterceptor` is a `CallScreeningService` — the OS
+hands the call event to the service in real time, before
+the dialer sees it. Reliability is bounded by the OS, not
+by us.
+
+- **Latency budget:** synchronous; the call event is
+  delivered to the service before it is delivered to the
+  dialer, so the routine can snap the ringer and launch
+  the full-screen UI in time.
+- **Permission revoke:** the call-screening role is a
+  user-granted role (not a runtime permission). The
+  Settings → Permissions tile surfaces a "Role not
+  granted" banner with a one-tap deep link to
+  `RoleManager.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING)`.
+
 ## Timezone and DST
 
 `flutter_local_notifications` and `android_alarm_manager_plus`

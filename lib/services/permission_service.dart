@@ -82,6 +82,15 @@ enum PermissionKind {
   /// routed through [ReminderBridge.openIgnoreBatteryOptimizations]
   /// on the Kotlin side.
   batteryOptimization,
+
+  /// `ACCESS_COARSE_LOCATION` (v1.0 / Phase C PR 2 / ADR-021 /
+  /// SYS-076). Used by `GeofenceService` to subscribe to the
+  /// device position stream and match against registered
+  /// `TriggerLocation` circles. Coarse (city-block accuracy)
+  /// is sufficient for geofence radius ≥ 50m; fine location
+  /// stays out of scope per the v0.1 carve-out (see
+  /// `docs/v_model/architecture_options.md`).
+  location,
 }
 
 /// Singleton holder for the permission / SAF seam. The
@@ -127,6 +136,9 @@ class PermissionService {
         PermissionKind.batteryOptimization: const PermissionResultDenied(
           canOpenSettings: true,
         ),
+        PermissionKind.location: const PermissionResultDenied(
+          canOpenSettings: true,
+        ),
       });
 
   /// Idempotent. Probes the four runtime permissions and
@@ -152,6 +164,9 @@ class PermissionService {
       PermissionKind.batteryOptimization: const PermissionResultDenied(
         canOpenSettings: true,
       ),
+      PermissionKind.location: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
     };
     try {
       next[PermissionKind.notifications] = _mapStatus(
@@ -165,6 +180,9 @@ class PermissionService {
       );
       next[PermissionKind.batteryOptimization] = _mapStatus(
         await Permission.ignoreBatteryOptimizations.status,
+      );
+      next[PermissionKind.location] = _mapStatus(
+        await Permission.location.status,
       );
     } catch (_) {
       // v0.4b-release-fix / ADR-013 follow-up: a thrown
@@ -232,6 +250,21 @@ class PermissionService {
     await ready;
     final raw = await Permission.ignoreBatteryOptimizations.request();
     return _recordAndReturn(PermissionKind.batteryOptimization, raw);
+  }
+
+  /// Request `ACCESS_COARSE_LOCATION` (v1.0 / Phase C PR 2 /
+  /// ADR-021 / SYS-076). Used by `GeofenceService` to start
+  /// the position stream that drives `TriggerLocationEnter`
+  /// and `TriggerLocationExit`. On Android 10+ the user can
+  /// downgrade to "approximate" (still granted at coarse
+  /// level); on older versions the single runtime prompt
+  /// covers both. The widget layer is expected to surface
+  /// the deep-link as the recovery affordance on
+  /// permanently-denied.
+  Future<PermissionResult> requestLocation() async {
+    await ready;
+    final raw = await Permission.location.request();
+    return _recordAndReturn(PermissionKind.location, raw);
   }
 
   /// On-demand check used by [PermissionSheet.show]. Returns
@@ -353,6 +386,9 @@ class PermissionService {
       ),
       PermissionKind.backupFolder: null,
       PermissionKind.batteryOptimization: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
+      PermissionKind.location: const PermissionResultDenied(
         canOpenSettings: true,
       ),
     };

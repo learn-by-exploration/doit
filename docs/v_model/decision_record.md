@@ -1542,10 +1542,127 @@ seeded**. Two candidates:
   catalog never sees it. This mirrors the "blank
   add" vs "browse templates" choice the plan calls out.
 
-## ADR-021 (reserved)
+## ADR-021 — v1.0/Phase C PR 2: geofence library choice (`geolocator` over `flutter_geofence` / `geofence_service`)
 
-Reserved for the geofence library choice
-(`flutter_geofence` vs `geofencing` vs platform-channel native).
+**Date:** 2026-06-20.
+**Status:** Accepted (lands in Phase C PR 2).
+**Drives:** SYS-072 (geofence triggers), SYS-076
+(`PermissionKind.location`), and the `GeofenceService`
+singleton at `lib/services/geofence_service.dart`.
+
+**Context.** Phase C adds two trigger shapes —
+`TriggerLocationEnter` and `TriggerLocationExit` — to the
+sealed `Trigger` hierarchy. The trigger must subscribe to a
+position stream, run Dart-side geofence matching against
+the registered circles, and emit
+`GeofenceEntered` / `GeofenceExited` events on a broadcast
+stream. The matcher itself is a pure-Dart Haversine
+comparison; the only platform dependency is the position
+stream. We evaluated three options.
+
+**Option A — `flutter_geofence` (the obvious choice).** A
+purpose-built plugin wrapping the Android `Geofence` API.
+The pitch is "the OS does the matching" — you register a
+geofence and the OS calls you back when you cross its
+boundary.
+
+- Pro: zero Dart-side matcher; the OS does the work.
+- Pro: well-documented; many tutorials.
+- Con: **stale**. The last meaningful release on pub.dev is
+  `0.0.5` (mid-2022), predating the
+  `com.doit.package`-fix AGP 8 / Kotlin 2 namespace work
+  and the Android 14+ background-location restrictions
+  that now apply to `Geofence` registrations without a
+  foreground service.
+- Con: the OS-side `Geofence` API requires fine-location
+  and is capped at 100 active geofences per app, which
+  complicates the v1.0 "register one geofence per Do with
+  an automation" model — power users will hit the cap
+  with no warning.
+- Con: pull-in brings a transitive `play-services-location`
+  dependency we don't otherwise need.
+
+**Option B — `geofence_service`.** A higher-level wrapper
+that does its own position polling, foreground-service
+keepalive, and Dart-side state machine. Aims to be a
+"batteries-included" replacement for `flutter_geofence`.
+
+- Pro: actively maintained (last release 2026-Q1).
+- Pro: a built-in foreground service handles background
+  reliability.
+- Con: **overlaps responsibility** with our own
+  `RoutineExecutor`. The library wants to own the position
+  stream AND the geofence state machine AND fire user
+  callbacks when the user crosses a boundary. We already
+  have a `RoutineExecutor` that owns dispatch (Phase C
+  PR 1) and a `Reliability` enum that owns degraded-mode
+  copy (v0.5d). Layering `geofence_service` underneath
+  would either (a) split the dispatch model across two
+  patterns or (b) require us to use the library purely as
+  a position-source adapter — at which point we are not
+  using its value-add.
+- Con: its foreground service would conflict with the v0.2
+  heartbeat pattern documented in
+  `notification_reliability.md` Layer 4.
+
+**Option C — `geolocator` (chosen).** A thin position-stream
+adapter. We run Dart-side geofence matching in our own
+`GeofenceService` and publish `GeofenceEntered` /
+`GeofenceExited` events on a broadcast stream that
+`RoutineExecutor` subscribes to.
+
+- Pro: **one dep**, no transitive `play-services-*`.
+- Pro: the only API surface we need is
+  `Geolocator.getPositionStream(...)` — a thin wrapper
+  over `FusedLocationProviderClient`. We do not get a
+  state machine we don't want.
+- Pro: matches the project's "thin platform adapters,
+  pure-Dart matchers" convention (mirrors the streak
+  calculator, the math problem generator, the memory
+  game, the shake detector).
+- Pro: coarse-only (city-block) is sufficient for the
+  50m..5000m radius bounds the trigger model enforces,
+  which keeps us under the v0.1
+  `ACCESS_FINE_LOCATION`-out-of-scope carve-out
+  (`architecture_options.md` § Permission Baseline). The
+  `geolocator` API does not require fine-location for
+  the stream; `LocationAccuracy.low` + a 25m
+  `distanceFilter` is enough.
+- Con: we own the foreground-service / Doze story. This
+  is mitigated by the existing
+  `notification_reliability.md` Layer 2 (WorkManager
+  fallback) and the v0.5d `Reliability` enum
+  (`Reliability.degraded` already covers "may be late"
+  copy for any time-based reminder; the same badge can
+  fire when position updates are throttled).
+
+**Decision.** `geolocator` ^13.0.1 (Option C). The
+`GeofenceService` singleton is the thin platform adapter;
+`computeTransitions(...)` in the same file is the pure
+matcher. The `PositionSource` abstract class
+(`_GeolocatorPositionSource` production,
+`ScriptedPositionSource` test) keeps the platform side
+mockable; the matcher is exposed `@visibleForTesting` so
+unit tests can drive it without going through the
+service's `register` path.
+
+**Consequences.**
+
+- `lib/services/geofence_service.dart` is the only
+  geofence-aware file. A new `PositionSource` is a 20-line
+  change; a new matcher is a 5-line change.
+- The 50m..5000m radius bound (enforced by
+  `TriggerLocation.validate()`) keeps the
+  `ACCESS_COARSE_LOCATION` accuracy floor honest — we
+  cannot claim to need fine location at any radius the
+  user can pick.
+- The v0.1 carve-out for `ACCESS_FINE_LOCATION` stays
+  intact. Re-evaluating it is a separate ADR when (and
+  if) a feature needs sub-50m accuracy.
+- `Reliability.degraded` copy on the home-screen banner
+  extends to cover the "position stream is throttled"
+  case in Phase D when `DeviceStateProbe` ships its
+  settings → triggers debug screen.
 
 ## ADR-022 (reserved)
 

@@ -370,6 +370,11 @@ class _PermissionTile extends StatelessWidget {
         // system dialog — it just re-reads the current
         // whitelist state.
         await service.requestIgnoreBatteryOptimizations();
+      case PermissionKind.location:
+        // SYS-076: coarse-location runtime permission
+        // (Phase C PR 2 / ADR-021). The re-prompt flow
+        // matches the other runtime kinds.
+        await service.requestLocation();
       case PermissionKind.backupFolder:
         // The backup folder is not a runtime permission;
         // it's a SAF picker. The re-pick is handled in

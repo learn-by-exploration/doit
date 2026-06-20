@@ -13,6 +13,15 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 
+    <!-- v1.0 / Phase C PR 2 / ADR-021: coarse location for
+         geofence triggers (TriggerLocationEnter/Exit).
+         ACCESS_FINE_LOCATION stays out of scope per the v0.1
+         carve-out (see docs/v_model/architecture_options.md §
+         Permission Baseline). The user's location is never
+         stored or transmitted — geofences are matched in
+         Dart on the local position stream. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"

@@ -82,6 +82,14 @@ const Map<PermissionKind, _KindMeta> _meta = <PermissionKind, _KindMeta>{
         'Allowing do it to run in the background ensures your '
         'reminders fire on time, even when your phone is in Doze mode.',
   ),
+  PermissionKind.location: _KindMeta(
+    title: 'Location',
+    icon: Icons.location_on_outlined,
+    rationale:
+        'do it uses your approximate location to fire "do X when I '
+        'arrive at Y" routines. City-block accuracy is enough — '
+        'your location is never stored or sent off the device.',
+  ),
 };
 
 /// Public surface. Returns `true` when the permission is
@@ -174,6 +182,9 @@ class _PermissionSheetBodyState extends State<_PermissionSheetBody> {
         result = await PermissionService.instance
             .requestIgnoreBatteryOptimizations();
         break;
+      case PermissionKind.location:
+        result = await PermissionService.instance.requestLocation();
+        break;
       case PermissionKind.backupFolder:
         // The SAF picker is handled by `requestBackupFolder`;
         // the sheet is never shown for this kind because
@@ -230,6 +241,9 @@ class _PermissionSheetBodyState extends State<_PermissionSheetBody> {
         break;
       case PermissionKind.batteryOptimization:
         result = await svc.requestIgnoreBatteryOptimizations();
+        break;
+      case PermissionKind.location:
+        result = await svc.requestLocation();
         break;
       case PermissionKind.backupFolder:
         result = const PermissionResultGranted();

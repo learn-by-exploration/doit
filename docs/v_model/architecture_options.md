@@ -68,6 +68,9 @@ for v0.1.
 | **Settings** | Permissions, exact-alarm, Doze prompt, OEM guide, theme, sound | `lib/screens/settings.dart` |
 | **UI shell** | Navigation, theme, onboarding, home, widget-host activity | `lib/screens/`, `lib/main.dart` |
 | **Templates (v1.0/Phase B)** | Curated library of 25 templates (Do / Event / Person / Routine), `Template` model, `kTemplateFormatVersion = 1` JSON envelope, repository, catalog screen, save-as-template affordance on add screens | `lib/templates/`, `lib/services/template_repository.dart`, `lib/screens/templates.dart` |
+| **Triggers / Conditions / Actions (v1.0/Phase C)** | Sealed `Trigger` (time-of-day, location enter/exit, device-state, calendar, call-incoming), sealed `Condition` (time-window, day-of-week, calendar-busy, battery-range, silent-mode, AND/OR boolean tree), sealed `Action` (notify, fullscreen, call-intercept, override-silent, open-app). Each entity's optional `List<Automation>` field is the attachment point. | `lib/triggers/`, `lib/actions/action.dart`, `lib/routines/routine.dart` |
+| **Routines (v1.0/Phase C PR 1)** | The `RoutineExecutor` singleton that consumes non-time triggers and dispatches the matching `Action`. The executor subscribes to `GeofenceService.events` (Phase C PR 2) and will subscribe to `DeviceStateProbe` (Phase D), `CalendarProbe` (Phase E), and `CallInterceptor` (Phase F). | `lib/routines/routine_executor.dart` |
+| **Geofence (v1.0/Phase C PR 2)** | `GeofenceService` singleton — thin position-stream adapter (`geolocator` ^13.0.1, ADR-021) with a pure-Dart Haversine matcher. Emits `GeofenceEntered` / `GeofenceExited` on a broadcast `Stream<GeofenceEvent>`. `PositionSource` is the platform seam (production: `_GeolocatorPositionSource`; test: `ScriptedPositionSource`). | `lib/services/geofence_service.dart` |
 | **Services (singleton)** | `AppStateService`, `HabitRepository`, `PersonRepository`, `CompletionLogService`, `StreakService`, `BackupService`, `StatsService`, `NotificationService`, `AlarmScheduler`, `AnchorDetector`, `TemplateRepository` | `lib/services/` |
 
 ### Format-version pins
@@ -100,7 +103,7 @@ with a sealed exception.
 - **Launcher label (`android:label`):** "do it" (was "Streak"
   pre-v0.5a).
 
-## Permission Baseline (`AndroidManifest.xml` v0.1)
+## Permission Baseline (`AndroidManifest.xml`)
 
 ```xml
 <!-- Notifications and exact alarm for reliable reminders -->
@@ -115,6 +118,13 @@ with a sealed exception.
 <!-- Contacts for "call Mom" / "message Sam" presets -->
 <uses-permission android:name="android.permission.READ_CONTACTS" />
 
+<!-- Coarse location for TriggerLocationEnter / TriggerLocationExit
+     (geofence triggers). v1.0 / Phase C PR 2 / SYS-072 / SYS-076 /
+     ADR-021. City-block accuracy is sufficient for the 50m..5000m
+     radius the trigger model enforces. ACCESS_FINE_LOCATION stays
+     out of scope (see below). -->
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
 <!-- Camera permission only requested at the moment a photo-based mission
      is enabled in v0.2. Not in v0.1. -->
 ```
@@ -125,8 +135,11 @@ with a sealed exception.
 - `INTERNET` — local-only data, no network.
 - `READ_CALL_LOG` — cadence is configured manually or per-person, not
   derived from the call log.
-- `ACCESS_FINE_LOCATION` — out of scope; location-anchored habits are
-  v0.2.
+- `ACCESS_FINE_LOCATION` — out of scope; coarse location is
+  sufficient for the 50m..5000m radius bounds the geofence
+  trigger model enforces (`TriggerLocation.validate()` rejects
+  radii outside that range). Re-evaluated only if a future
+  feature needs sub-50m accuracy. v1.0 / Phase C PR 2 / ADR-021.
 - `READ_EXTERNAL_STORAGE` / `WRITE_EXTERNAL_STORAGE` — backup uses SAF
   with a user-chosen folder; no broad storage access.
 - `RECORD_AUDIO` — out of scope.

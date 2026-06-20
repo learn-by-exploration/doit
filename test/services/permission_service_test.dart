@@ -287,8 +287,8 @@ void main() {
     },
   );
 
-  test('init() probes the four runtime permissions including '
-      'battery-optimization (SYS-068)', () async {
+  test('init() probes the five runtime permissions including '
+      'battery-optimization (SYS-068) and location (SYS-076)', () async {
     await PermissionService.instance.init();
     final probes = permissionsCalls
         .where((c) => c.method == 'checkPermissionStatus')
@@ -299,13 +299,19 @@ void main() {
       contains(Permission.ignoreBatteryOptimizations.value),
       reason:
           'init() must probe battery-optimization alongside the v0.5d '
-          'three (notification, contacts, scheduleExactAlarm).',
+          'three (notification, contacts, scheduleExactAlarm) plus the '
+          'v1.0 location kind (SYS-076 / Phase C PR 2 / ADR-021).',
+    );
+    expect(
+      probes,
+      contains(Permission.location.value),
+      reason: 'init() must probe coarse-location for geofence triggers.',
     );
     expect(
       probes.length,
-      4,
+      5,
       reason:
-          'init() must probe exactly four runtime permissions exactly '
+          'init() must probe exactly five runtime permissions exactly '
           'once total.',
     );
   });
@@ -354,12 +360,12 @@ void main() {
         .toList();
     expect(
       probes.length,
-      4,
+      5,
       reason:
-          'init() must probe exactly the four runtime permissions '
+          'init() must probe exactly the five runtime permissions '
           '(`notification`, `contacts`, `scheduleExactAlarm`, '
-          '`ignoreBatteryOptimizations`) exactly once total. A second '
-          'call must short-circuit on the completed gate.',
+          '`ignoreBatteryOptimizations`, `location`) exactly once total. '
+          'A second call must short-circuit on the completed gate.',
     );
   });
 
