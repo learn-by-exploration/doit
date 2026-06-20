@@ -16,6 +16,7 @@ import 'package:doit/screens/home.dart';
 import 'package:doit/screens/onboarding.dart';
 import 'package:doit/services/backup_scheduler.dart';
 import 'package:doit/services/backup_service.dart';
+import 'package:doit/services/call_interceptor.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/geofence_service.dart';
 import 'package:doit/services/permission_service.dart';
@@ -86,10 +87,21 @@ Future<void> main() async {
   //     [PermissionSheet.show] first.
   await GeofenceService.instance.init();
 
-  // 4b. v1.0 Phase C PR 1/2 (SYS-069..072): init the
-  //     routine executor. The executor subscribes to
-  //     [GeofenceService.events]; the actual automations
-  //     are registered by the add-* screens via
+  // 4b. v1.0 Phase F PR 1 (SYS-075 / ADR-019): init the
+  //     call-interceptor service. The service installs the
+  //     `doit/call_interceptor` method-channel handler and
+  //     primes the source. The screening service itself is
+  //     bound by the OS — `init()` is a no-op on the
+  //     Kotlin side; the Dart side just subscribes to the
+  //     future `onCallEvent` pushes. Idempotent.
+  await CallInterceptorService.instance.init();
+
+  // 4c. v1.0 Phase C PR 1/2 (SYS-069..072) + Phase F PR 1
+  //     (SYS-075): init the routine executor. The executor
+  //     subscribes to [GeofenceService.events],
+  //     [CalendarService.events], and
+  //     [CallInterceptorService.events]; the actual
+  //     automations are registered by the add-* screens via
   //     [RoutineExecutor.register] when a Do/Event/Person
   //     is saved. Idempotent.
   await RoutineExecutor.instance.init();

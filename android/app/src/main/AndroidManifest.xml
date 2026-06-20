@@ -32,6 +32,17 @@
          transmitted off-device. -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
 
+    <!-- v1.0 / Phase F PR 1 / ADR-019: call-screening for
+         the Japan silent-mode routine (SYS-075). The
+         CallScreeningService is bound by the system with
+         the signature-protected BIND_SCREENING_SERVICE
+         permission (declared on the <service> element, not
+         here). No new user-facing runtime permission is
+         required; READ_PHONE_STATE stays out of scope per
+         the privacy policy and the v0.2f deferral. -->
+    <!-- (no <uses-permission> for call screening — see <service>
+         below for the BIND_SCREENING_SERVICE attribute.) -->
+
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
@@ -87,6 +98,27 @@
                 <action android:name="com.doit.FIRE_ALARM" />
             </intent-filter>
         </receiver>
+
+        <!-- v1.0 / Phase F PR 1 / ADR-019 / SYS-075: the
+             call-screening service for the Japan silent-mode
+             routine. The OS invokes onScreenCall(Call.Details)
+             for every incoming call before the dialer rings;
+             we return a CallResponse (allow / silence /
+             disconnect) and (when the contact matches the
+             configured list) override the ringer to
+             RINGER_MODE_NORMAL. The bound permission is the
+             signature-protected BIND_SCREENING_SERVICE,
+             granted automatically by the system at install
+             time. No READ_PHONE_STATE — see ADR-019. -->
+        <service
+            android:name=".CallInterceptor"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.BIND_SCREENING_SERVICE">
+            <intent-filter>
+                <action android:name="android.telecom.CallScreeningService" />
+            </intent-filter>
+        </service>
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
@@ -147,6 +179,16 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- v1.0 / Phase F PR 1 / ADR-019: query the dialer
+             for the ANSWER intent. The CallInterceptor's
+             restorePriorRinger() path launches the dialer's
+             answer screen so the user can pick up a ringing
+             call once the ringer has been snapped back to
+             NORMAL. Android 11+ package-visibility requires
+             us to declare the intent we resolve against. -->
+        <intent>
+            <action android:name="android.intent.action.ANSWER" />
         </intent>
     </queries>
 </manifest>

@@ -34,17 +34,21 @@ import 'dart:async';
 import 'dart:collection';
 
 import 'package:doit/routines/routine.dart';
+import 'package:doit/services/call_interceptor.dart';
 import 'package:doit/services/calendar_service.dart';
 import 'package:doit/services/device_state_probe.dart';
 import 'package:doit/services/geofence_service.dart';
+import 'package:doit/triggers/action.dart';
 import 'package:doit/triggers/trigger.dart'
     show
+        SilentMode,
         TriggerBatteryFull,
         TriggerBatteryLow,
         TriggerCalendarEvent,
         TriggerCalendarEventEnd,
         TriggerCalendarEventStart,
         TriggerCalendarReminder,
+        TriggerCallIncoming,
         TriggerChargingStarted,
         TriggerChargingStopped,
         TriggerDeviceState,
@@ -83,6 +87,7 @@ class RoutineExecutor {
   StreamSubscription<GeofenceEvent>? _geofenceSub;
   StreamSubscription<DeviceStateSnapshot>? _deviceStateSub;
   StreamSubscription<CalendarEvent>? _calendarSub;
+  StreamSubscription<CallEvent>? _callSub;
 
   /// Most recent device-state snapshot. Edge-trigger leaves
   /// (`TriggerChargingStarted`, `TriggerScreenOff`, ...)
@@ -101,14 +106,16 @@ class RoutineExecutor {
   /// Initialize the executor. Idempotent; multiple calls
   /// resolve the same `ready` future. On the first init,
   /// subscribes to `GeofenceService.instance.events`,
-  /// `DeviceStateService.instance.events`, and
-  /// `CalendarService.instance.events` so the matching
-  /// automations are dispatched.
+  /// `DeviceStateService.instance.events`,
+  /// `CalendarService.instance.events`, and
+  /// `CallInterceptorService.instance.events` so the
+  /// matching automations are dispatched.
   Future<void> init() async {
     if (_ready.isCompleted) return;
     _geofenceSub = GeofenceService.instance.events.listen(_onGeofence);
     _deviceStateSub = DeviceStateService.instance.events.listen(_onDeviceState);
     _calendarSub = CalendarService.instance.events.listen(_onCalendar);
+    _callSub = CallInterceptorService.instance.events.listen(_onCall);
     _ready.complete();
   }
 
@@ -131,6 +138,8 @@ class RoutineExecutor {
     _deviceStateSub = null;
     _calendarSub?.cancel();
     _calendarSub = null;
+    _callSub?.cancel();
+    _callSub = null;
     lastDeviceState = null;
     lastIsBusy = null;
     _registry.clear();
@@ -407,4 +416,110 @@ class RoutineExecutor {
         return previousIsBusy == true;
     }
   }
+
+  /// Call-event stream handler. Iterates the registry and
+  /// fires every automation whose `TriggerCallIncoming`
+  /// matches the event (delegated to the pure predicate
+  /// in `lib/services/call_interceptor.dart`'s
+  /// `callMatches`).
+  ///
+  /// Each automation's [shouldFire] call is wrapped in a
+  /// try/catch so a single invalid automation does not break
+  /// the chain and silently cancel the broadcast listener.
+  void _onCall(CallEvent event) {
+    final now = DateTime.now();
+    _registry.forEach((entityId, automations) {
+      for (final a in automations) {
+        if (!a.enabled) continue;
+        final trigger = a.trigger;
+        if (trigger is! TriggerCallIncoming) continue;
+        try {
+          if (!shouldFire(a, now)) continue;
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint(
+              'RoutineExecutor._onCall: skipped invalid automation '
+              'on $entityId: $e',
+            );
+          }
+          continue;
+        }
+        if (!callMatches(
+          trigger,
+          event,
+          contactIds: CallInterceptorService.instance.contactIds,
+        )) {
+          continue;
+        }
+        _controller.add(AutomationFired(automation: a, at: now));
+        // Phase F PR 1 wires `ActionCallIntercept` and
+        // `ActionOverrideSilent` to the live
+        // [CallInterceptorService] side-effects. The two
+        // action leaves are dispatched inline (in addition
+        // to the AutomationFired event for any debug
+        // subscribers) so a configured Japan routine
+        // actually does something at runtime.
+        unawaited(_dispatchCallAction(a));
+      }
+    });
+  }
+
+  /// Pure predicate: does [trigger] match [event] given
+  /// the service's configured [contactIds]? Exposed
+  /// `@visibleForTesting` so unit tests can drive the
+  /// matching logic without going through the stream.
+  /// Delegates to the `callMatches` top-level in
+  /// `lib/services/call_interceptor.dart`.
+  @visibleForTesting
+  bool callMatchesFor(TriggerCallIncoming trigger, CallEvent event) =>
+      callMatches(
+        trigger,
+        event,
+        contactIds: CallInterceptorService.instance.contactIds,
+      );
+
+  /// Dispatch a call-related action's side-effect. The
+  /// matching engine already emitted an `AutomationFired`
+  /// event on the broadcast stream; this method is the
+  /// actual platform invocation.
+  ///
+  ///   - `ActionOverrideSilent` snaps the ringer to the
+  ///     configured target mode.
+  ///   - `ActionCallIntercept` is currently a no-op on
+  ///     the executor side (the Kotlin `CallScreeningService`
+  ///     already routed the call); it exists so the
+  ///     routine UI can light up a "Japan routine fired"
+  ///     affordance. Phase F PR 2 wires the dismiss
+  ///     → `restorePriorRinger()` path.
+  Future<void> _dispatchCallAction(Automation a) async {
+    final action = a.action;
+    if (action is ActionOverrideSilent) {
+      try {
+        await CallInterceptorService.instance.setRingerMode(
+          _toRingerMode(action.targetMode),
+        );
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint(
+            'RoutineExecutor._dispatchCallAction: '
+            'setRingerMode failed: $e',
+          );
+        }
+      }
+    }
+    // ActionCallIntercept is a no-op on the executor side:
+    // the Kotlin service already routed the call. The
+    // matching engine's AutomationFired event drives the
+    // UI feedback (a debug "Japan routine fired" chip on
+    // the home screen / settings debug screen).
+  }
+
+  /// Map the model's `SilentMode` enum to the
+  /// `CallInterceptorService.RingerMode` enum. Kept in one
+  /// place so the model stays decoupled from the service.
+  static RingerMode _toRingerMode(SilentMode m) => switch (m) {
+    SilentMode.silent => RingerMode.silent,
+    SilentMode.vibrate => RingerMode.vibrate,
+    SilentMode.normal => RingerMode.normal,
+  };
 }

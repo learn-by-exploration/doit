@@ -23,9 +23,21 @@ class MainActivity : FlutterActivity() {
         // matches a registered TriggerCalendarEvent.
         CalendarChannel.setAppContext(applicationContext)
         CalendarChannel.attach(flutterEngine)
+        // v1.0 / Phase F PR 1 / ADR-019: call-screening
+        // channel + CallScreeningService. The OS invokes
+        // CallInterceptor.onScreenCall(...) for every
+        // incoming call; the service returns a synchronous
+        // CallResponse and forwards the event to Dart via
+        // the doit/call_interceptor MethodChannel. The
+        // matching engine (RoutineExecutor) dispatches the
+        // Japan-routine automations based on the configured
+        // contact list and ringer state.
+        CallInterceptor.setAppContext(applicationContext)
+        CallInterceptor.attach(flutterEngine)
     }
 
     override fun onDestroy() {
+        CallInterceptor.detach()
         CalendarChannel.detach()
         DeviceStateChannel.detach()
         ReminderChannelProxy.detach()

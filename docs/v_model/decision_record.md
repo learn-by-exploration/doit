@@ -1386,13 +1386,139 @@ ADR-014..017 and a 013 follow-up. v1.0 keeps the next number free for
 the next naming-breaking refactor; this ADR is therefore a placeholder
 and not a decision.)
 
-## ADR-019 (reserved)
+## ADR-019 — v1.0/Phase F PR 1: call-screening implementation — `CallScreeningService` over `PhoneAccount`
 
-Reserved. v1.0 has two new templates features on the
-roadmap (a curated 25-template library + a user-saveable
-template store). When the Templates PR lands it will
-take this slot; if a smaller ADR arrives first the
-reservation will be renumbered.
+**Date:** 2026-06-20.
+**Status:** Accepted (v1.0 / Phase F PR 1 / SYS-075).
+
+**Context.** v1.0 Phase F wires the "Japan silent-mode"
+routine (SYS-075): when an incoming call matches a
+configured contact AND the device ringer is silent, the
+app (a) snaps the ringer to `RINGER_MODE_NORMAL`,
+(b) plays the contact's ringtone at max volume,
+(c) launches the existing full-screen `FullScreenActivity`
+with the caller's name + photo, and (d) on dismiss
+restores the prior ringer mode. The implementation needs
+three capabilities:
+
+1. **Per-call interception.** The OS hands each incoming
+   call to a callback before the dialer rings. The
+   callback returns a `CallResponse` (allow / silence /
+   reject) that the dialer honors.
+2. **Per-call metadata.** The callback receives the
+   caller's number (E.164), and a `ContactsContract.PhoneLookup`
+   lookup is cheap enough to resolve the contact's
+   display name and photo URI inline.
+3. **Ringer override + restore.** A snapshot of the
+   current `AudioManager.RINGER_MODE_NORMAL/SILENT/VIBRATE`
+   is taken at the moment of interception and restored
+   on dismiss.
+
+The two Android-native surfaces that meet these
+capabilities are:
+
+| Surface | Notes |
+|---|---|
+| `CallScreeningService` (API 24+) | OS-routed callback. Each incoming call invokes `onScreenCall(Call.Details)`. The service returns a `CallResponse` (disconnect / silence / skip). The OS then routes the call to the dialer per the response. No `READ_PHONE_STATE` needed; only `BIND_SCREENING_SERVICE` (a signature-protected system permission granted at install time). |
+| `PhoneAccount` + `Connection` (API 26+ via Telecom) | Register a self-managed `PhoneAccountHandle`; the OS routes all calls through our `ConnectionService`. Lets us implement UI on top of the call, mute / unmute, hang up, etc. Requires the user to enable our `PhoneAccount` in the system dialer settings — a two-step opt-in the user rarely completes. Also requires `MANAGE_OWN_CALLS` and (for connection-level control) `READ_PHONE_STATE`. |
+
+**Decision.** `CallScreeningService` over a thin
+`doit/call_interceptor` method channel. The Kotlin side
+lives at
+`android/app/src/main/kotlin/com/doit/CallInterceptor.kt`;
+the matching Dart singleton is
+`lib/services/call_interceptor.dart`. The bridge mirrors
+the Phase D `DeviceStateChannel` pattern: Kotlin owns the
+screening service and the channel, Dart owns the matching
+engine and the action dispatch.
+
+**Rationale.**
+
+- **Zero new user-facing permission.** `CallScreeningService`
+  needs `BIND_SCREENNING_SERVICE` only, which is a
+  signature-or-system permission automatically granted
+  at install time. `PhoneAccount` requires the user to
+  enable our `PhoneAccount` in the dialer settings (a
+  step most users skip) plus `MANAGE_OWN_CALLS` and
+  potentially `READ_PHONE_STATE`. The `READ_PHONE_STATE`
+  permission was previously deferred to v0.2f
+  (`acceptance_run_v2.md`) — going `PhoneAccount` would
+  force it into v1.0. `CallScreeningService` keeps it out.
+- **Synchronous interception is exactly the model we want.**
+  The screening service's `onScreenCall` runs on the main
+  thread before the dialer rings; the `CallResponse`
+  return value is honored by the OS. By contrast
+  `PhoneAccount` requires us to build a `Connection` and
+  present our own UI for the entire call — we do not
+  need to replace the dialer, we just need to silence
+  the dialer's ring for a specific contact.
+- **Ringer override + restore is straightforward.**
+  `AudioManager.getRingerMode()` returns the current
+  mode (we cache it), `setRingerMode(RINGER_MODE_NORMAL)`
+  snaps to ring, and on the user's dismiss we restore
+  the cached value. The `CallScreeningService` does not
+  own the lifecycle of the dismiss — the routine's
+  `ActionCallIntercept` calls back into the bridge with
+  a `restorePriorRinger()` method when the user dismisses
+  the full-screen activity.
+- **Reactive-first, no polling.** The screening service
+  is invoked exactly when the OS has a call for us. No
+  timer, no observer, no background service. Same
+  reactive-first principle as ADR-021 (geofence),
+  ADR-022 (device-state), ADR-023 (calendar).
+
+**Permission.** No new user-facing permission. The
+manifest declares the `<service>` for the screening
+service with `android:permission="android.permission.BIND_SCREENING_SERVICE"`
+and the intent-filter for
+`android.telecom.CallScreeningService`. A `<queries>`
+entry for `android.intent.action.ANSWER` (Android 11+
+package-visibility fix) lets the screening service call
+into the dialer for the dismiss flow. `READ_PHONE_STATE`
+stays out of scope; the privacy policy's existing
+"out-of-scope" disclosure for it is unchanged.
+
+**Reliability.** The screening service runs in the app
+process. When the OS routes an incoming call to it the
+app process is started (cold start) if needed; a warm
+process is preferred. The screening service returns its
+`CallResponse` synchronously — the dialer honors it
+before ringing. The dismiss → restore flow goes via a
+Dart-side `restorePriorRinger()` call; on cold-start
+misses (the user dismissed the call before our process
+was up) the ringer is NOT overridden (the screening
+service returns `SKIP_CALL` for unknown contact ids).
+The home screen surfaces a "Japan routine unavailable"
+banner if the screening role is not granted.
+
+**Consequences.**
+
+- The Kotlin side is a `CallScreeningService` +
+  `MethodChannel` (~210 lines). No third-party
+  dependency; the Android `android.telecom` API has been
+  stable since API 24 and is documented in the official
+  "Build a call-screening app" guide.
+- The Dart side is the `CallSource` seam +
+  `CallInterceptorService` singleton + the
+  matching / dispatch arms in `RoutineExecutor`. Tests
+  use `ScriptedCallSource` to drive the stream
+  deterministically.
+- `ActionCallIntercept` and `ActionOverrideSilent` (the
+  two Phase F action leaves) are now wired: the executor
+  switches on the action runtime type and invokes the
+  bridge methods (`setCallInterceptorEnabled`,
+  `setCallInterceptorContactIds`, `setRingerMode`,
+  `restorePriorRinger`) for each. No `UnimplementedError`
+  fallthroughs remain in the dispatch path.
+- `TriggerCallIncoming.fromContacts` (the spec text in
+  SYS-075) is implemented as
+  `TriggerCallIncomingKnownContact` (the existing model
+  leaf at `lib/triggers/trigger.dart` line 373). The two
+  names describe the same trigger; the model leaf wins
+  on code reuse. The ADR notes the rename so future
+  readers do not hunt for a `fromContacts` class.
+
+**SYS-IDs affected.** SYS-075 (Japan routine).
 
 ## ADR-020 — v1.0/Phase B: Template model + JSON envelope
 
