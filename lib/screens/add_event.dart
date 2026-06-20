@@ -47,6 +47,7 @@ import 'package:doit/templates/template.dart';
 import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/trigger.dart';
+import 'package:doit/widgets/calendar_picker.dart';
 import 'package:doit/widgets/location_picker.dart';
 
 class AddEventScreen extends StatefulWidget {
@@ -286,6 +287,25 @@ class _AddEventScreenState extends State<AddEventScreen> {
     });
   }
 
+  /// Open the [CalendarPicker] modal and append the result
+  /// to [_automations]. v1.0 / Phase E PR 2 / SYS-074.
+  /// Calendar triggers are matched by `RoutineExecutor`
+  /// against the `CalendarService.events` stream — there is
+  /// no per-trigger platform registration the way
+  /// `GeofenceService.register` exists for locations, so we
+  /// just append the result and the save path re-registers
+  /// the automation set with the executor.
+  Future<void> _addCalendarRoutine() async {
+    final auto = await CalendarPicker.show(context);
+    if (auto == null || !mounted) return;
+    setState(() {
+      _automations = List<Automation>.unmodifiable(<Automation>[
+        ..._automations,
+        auto,
+      ]);
+    });
+  }
+
   /// Re-register every location-triggered automation with
   /// the [GeofenceService]. Called after a successful save
   /// so the platform side knows which circles to watch.
@@ -442,6 +462,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
             _RoutinesSection(
               automations: _automations,
               onAddLocation: _addLocationRoutine,
+              onAddCalendar: _addCalendarRoutine,
               onRemove: (idx) => setState(
                 () => _automations = List.of(_automations)..removeAt(idx),
               ),
@@ -519,11 +540,13 @@ class _RoutinesSection extends StatelessWidget {
   const _RoutinesSection({
     required this.automations,
     required this.onAddLocation,
+    required this.onAddCalendar,
     required this.onRemove,
   });
 
   final List<Automation> automations;
   final VoidCallback onAddLocation;
+  final VoidCallback onAddCalendar;
   final ValueChanged<int> onRemove;
 
   @override
@@ -536,7 +559,9 @@ class _RoutinesSection extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
             child: Text(
               'No routines yet. Add one to fire this event when you '
-              'arrive at or leave a place.',
+              'arrive at or leave a place, or when a calendar '
+              'event starts, ends, hits its reminder, or '
+              'changes your busy status.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           )
@@ -549,11 +574,23 @@ class _RoutinesSection extends StatelessWidget {
         const SizedBox(height: Spacing.sm),
         Align(
           alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: const ValueKey('add_event.add_location_routine'),
-            onPressed: onAddLocation,
-            icon: const Icon(Icons.add_location_alt_outlined),
-            label: const Text('Add a location routine'),
+          child: Wrap(
+            spacing: Spacing.sm,
+            runSpacing: Spacing.xs,
+            children: [
+              TextButton.icon(
+                key: const ValueKey('add_event.add_location_routine'),
+                onPressed: onAddLocation,
+                icon: const Icon(Icons.add_location_alt_outlined),
+                label: const Text('Add a location routine'),
+              ),
+              TextButton.icon(
+                key: const ValueKey('add_event.add_calendar_routine'),
+                onPressed: onAddCalendar,
+                icon: const Icon(Icons.event_outlined),
+                label: const Text('Add a calendar routine'),
+              ),
+            ],
           ),
         ),
       ],

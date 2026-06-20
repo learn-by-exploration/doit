@@ -955,6 +955,55 @@ The workflows below are part of v0.2. The proposal is at
 
 **Requirements covered:** SYS-068.
 
+## WF-037 — Configure the Japan silent-mode routine (v1.0 / Phase F PR 2)
+
+The user opts in to template #16 ("Japan silent mode") and configures
+which contacts bypass silent mode and to which ringer mode the
+routine snaps the device when a matched contact calls.
+
+**Preconditions:**
+- The user is on `TemplatesScreen` (or a deep-link from the home FAB
+  "Browse templates").
+- The call-screening role is OPTIONAL — the workflow runs end-to-end
+  without it. If the role is not held, the routine silently no-ops
+  at runtime; the Settings → Call-screening tile shows the path to
+  grant it.
+
+**Steps:**
+1. The user taps template #16 in the catalog. The catalog
+   short-circuits to `AddRoutineScreen` (the other routine templates
+   still show "Coming in v1.1" — only #16 has an apply UX).
+2. `AddRoutineScreen` opens with the persisted config pre-filled
+   (`SettingsService.japanRoutine.value`). The user toggles
+   **Enable**, picks at least one contact via the platform contact
+   picker (gated by `PermissionSheet.show(contacts)` — same pattern
+   as `AddPersonScreen`), and chooses the **Target mode**
+   (`SilentMode.normal` / `vibrate` / `silent`).
+3. The user taps **Save**. The screen persists the config via
+   `SettingsService.setJapanRoutine(...)` and pushes the contact
+   list to `CallInterceptorService.configure(enabled, contactIds)`
+   so the screening service matches the new list on the next
+   incoming call.
+4. **Optional** — the user grants the call-screening role via
+   Settings → Permissions → Call-screening → Grant (or via the
+   onboarding step 4 if it is a first-launch install). The OS
+   dialog appears; granting it enables the runtime interception
+   path. Declining it leaves the routine configured but inert;
+   the home screen's reliability banner shows "Japan routine
+   unavailable — grant the call-screening role in Settings".
+5. With the routine enabled AND the role held AND the phone on
+   silent AND a configured contact calls: the `CallScreeningService`
+   intercepts the call (the OS invokes it before the dialer rings),
+   snaps the ringer to the target mode, and plays the contact's
+   ringtone. On dismiss the prior ringer mode is restored.
+
+**Verification:** widget test (`test/screens/add_routine_test.dart`)
+covers form interactions + save path. Settings tile test covers the
+role-hold probe + the OS request flow. Routine dispatch test
+(`test/routines/call_dispatch_test.dart`) covers the side-effect path.
+
+---
+
 ## WF-034 — Add a location-triggered do / event / person (v1.0/Phase C PR 2)
 
 The user configures an automation that fires a notification when
@@ -1039,3 +1088,113 @@ ADR-021.
 **Requirements covered:** SYS-069 (Trigger),
 SYS-072 (geofence trigger), SYS-076 (PermissionKind.location
 + rationale).
+
+## WF-035 — Add a calendar-triggered do / event / person (v1.0/Phase E PR 2)
+
+The user configures an automation that fires a notification when
+a calendar event on the device starts, ends, hits its reminder,
+or transitions the user between free and busy. The routine is
+tied to a do / event / person via the add screens' "Routines"
+section, mirroring WF-034's location-trigger shape.
+
+**Preconditions:**
+- The user is on `AddHabitScreen` (do) / `AddEventScreen`
+  (event) / `AddPersonScreen` (person).
+- `READ_CALENDAR` has been granted (the picker gates on
+  `PermissionSheet.show(PermissionKind.calendar)`; the
+  first tap surfaces the rationale + system dialog).
+
+**Main flow:**
+1. The user fills in the entity — same shape as
+   WF-002 / WF-017 / WF-003.
+2. In the "Routines" section, the user taps
+   "Add a calendar routine" (`add_<entity>.add_calendar_routine`
+   key — sits next to "Add a location routine" in a
+   `Wrap`, so both buttons are reachable on a narrow
+   viewport). The empty-state copy mentions "arrive at or
+   leave a place, or when a calendar event starts, ends,
+   hits its reminder, or changes your busy status".
+3. The `CalendarPicker` bottom sheet opens (gated by
+   `PermissionSheet.show(PermissionKind.calendar)` →
+   granted → modal sheet).
+4. The user enters:
+   - `label` (required, used as the trigger label and as
+     the notification title)
+   - `event title filter` (optional; empty = match any
+     title)
+   - `calendar account` (optional dropdown populated by
+     `CalendarService.listAccounts()` on tap of
+     `Refresh`; the "Any calendar" default maps to
+     `calendarId: ''`, which the executor's
+     `_calendarMatches` predicate treats as "match any
+     calendar")
+   - `event kind` radio group with four leaves:
+     `Event start` (default), `Event end`, `Reminder`,
+     `Free/busy change` — corresponds 1:1 to the four
+     `TriggerCalendarEvent*` leaves in
+     `lib/triggers/trigger.dart`.
+5. The user taps Save. The sheet pops an `Automation`
+   with `trigger: TriggerCalendarEventStart |
+   TriggerCalendarEventEnd | TriggerCalendarReminder |
+   TriggerFreeBusy` (carrying the picked `calendarId`
+   and `eventTitle`) and `action: ActionNotify(title:
+   <label>, body: 'Routine fired: <label>')`. The new
+   routine appears in the Routines section as an enabled
+   row.
+6. The user saves the entity. `automationsJson` on the
+   row carries the envelope
+   `{"k":1,"automations":[<Automation>...]}` (or empty
+   when no routines are added).
+
+**Postconditions:**
+- `CalendarService.instance` has been initialized (one
+  subscription at app start — the executor subscribes to
+  the broadcast `events` stream once and matches each
+  transition against the registered automation set; see
+  `lib/routines/routine_executor.dart`'s
+  `_calendarMatches` predicate).
+- The matching `TriggerCalendarEvent*` leaf is
+  registered with the executor via
+  `RoutineExecutor.instance.register(entityId,
+  automations)` (the same call location as
+  `TriggerLocation*`).
+- A notification fires when a calendar event on the
+  picked (or any) account starts, ends, hits its
+  reminder, or transitions busy — per the kind radio.
+- The routine round-trips through backup / restore
+  (the envelope is plain JSON in the existing backup
+  format; no schema bump needed).
+
+**Failure modes:**
+- Permission denied at the gate → the sheet pops
+  `null` and no routine is added.
+- `listAccounts` failure (e.g., `READ_CALENDAR`
+  revoked between the gate and the Refresh tap) →
+  inline error renders "Could not load calendars: …";
+  the Save button is unaffected (the user can still
+  save an "any calendar / any event" trigger).
+- User cancels the sheet → returns `null`; the
+  Routines section remains in the empty state.
+- User revokes `READ_CALENDAR` mid-flight → the
+  calendar source emits a `PlatformException` on the
+  next event; `CalendarService` logs and continues
+  (matches `_onError`); pending routines silently miss.
+  There is no per-automation reliability badge for
+  calendar triggers today (a v1.1 follow-up; the
+  home-screen reliability banner stays driven by
+  location + exact-alarm).
+
+**Why no map / no event-picker:** Phase E PR 2 ships
+the minimum-viable calendar-trigger UX. The picker
+takes an optional `eventTitle` text filter and an
+optional calendar account; a richer "pick this event"
+flow (event-list drill-down) is a v1.1 follow-up. The
+calendar-list accounts are queried lazily on Refresh
+so the picker never blocks the sheet slide-up
+animation. Documented in ADR-023.
+
+**Requirements covered:** SYS-074 (TriggerCalendarEvent
+leaves + `READ_CALENDAR` rationale), SYS-069 (Trigger
+sealed hierarchy), SYS-072 (RoutineExecutor
+dispatching `TriggerCalendarEvent*`).
+

@@ -9,6 +9,56 @@ V-Model artifacts are the engineering contract.
 
 ## [Unreleased]
 
+### v1.0/Phase E — Calendar-event triggers (calendar trigger kind + on-demand permission + picker UX)
+
+Calendar events become a first-class routine trigger. The
+executor subscribes once at app start to the native
+`CalendarContract.Instances` stream via `CalendarService`,
+matches each transition (event-start, event-end, reminder,
+free-busy change) against the registered automation set,
+and dispatches the matching `Action`. The user-facing
+entry point is the new `CalendarPicker` bottom sheet, a
+"Add a calendar routine" button in the add-do /
+add-event / add-person screens' "Routines" section, and a
+Settings → Permissions → Calendar tile.
+
+PR 1 (`f61b718`) shipped the platform side: `CalendarService`,
+`CalendarChannel.kt` reading `CalendarContract.Instances`,
+`PermissionKind.calendar` + `PermissionSheet` arm + the
+`READ_CALENDAR` `AndroidManifest` entry, the executor's
+`_calendarMatches` predicate, the matching engine arm,
+and ADR-023 (library choice: native over `device_calendar`).
+
+#### v1.0/Phase E PR 2 — `CalendarPicker` + Routines section (user-facing)
+
+- New widget `lib/widgets/calendar_picker.dart` (mirror of
+  `LocationPicker`): modal bottom sheet that gates on
+  `PermissionSheet.show(PermissionKind.calendar)` and
+  builds one of the four `TriggerCalendarEvent*` leaves
+  with a default `ActionNotify`. Four fields: label
+  (required), event title filter (optional), calendar
+  account dropdown (populated by
+  `CalendarService.listAccounts()` on tap of `Refresh`),
+  event-kind radio (start / end / reminder / free-busy).
+  Empty `calendarId` is a valid sentinel — the executor's
+  `_calendarMatches` predicate treats it as "match any
+  calendar".
+- Add-do / add-event / add-person screens gain an
+  "Add a calendar routine" button next to the existing
+  "Add a location routine" button (in a `Wrap`). The
+  empty-state copy mentions both location and calendar
+  trigger kinds.
+- V-Model sync: WF-035 added to `workflows.md`; the
+  `## Routines (v1.0/Phase C–F)` section in `conops.md`
+  is extended with Phase E PR 2 detail (calendar UX,
+  reliability note). Closes SYS-074.
+
+**Not in this PR:** the Settings → Permissions → Calendar
+tile was wired in Phase E PR 1 (lands in the app via the
+generic `_PermissionTile` loop); nothing additional
+needed here. Per-automation reliability badges for
+calendar triggers are a v1.1 follow-up.
+
 ### v1.0/Phase C — Location triggers (sealed `Trigger` / `Condition` / `Action` spine + Geofence)
 
 Routines are a first-class field on each entity (do / event /

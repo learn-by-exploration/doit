@@ -130,10 +130,23 @@ modes.
     consecutive-run of 22, overall consecutive-run of 18 (two rest
     days used).
 13. (v1.0+, optional) The user enables the Japan silent-mode
-    template: when a contact calls and the phone is on silent, the
-    ringer restores and the contact's ringtone plays. A location-based
-    "leaving work" reminder fires at 17:30 as the user exits the
-    office geofence.
+    template (template #16): from `TemplatesScreen` they tap the
+    card, the `AddRoutineScreen` opens pre-filled with the persisted
+    config, they pick Mom / Dad / Sibling via the platform contact
+    picker, pick "Vibrate" as the target mode, and Save. The config
+    is persisted as a `JapanRoutineConfig` in `SettingsService` and
+    the contact list is pushed to `CallInterceptorService.configure(
+    enabled: true, contactIds: [...])`. During onboarding (or from
+    Settings → Permissions → Call-screening) they grant the
+    `ROLE_CALL_SCREENING` role via the OS dialog. With the phone
+    on silent, when a configured contact calls: the
+    `CallScreeningService` intercepts before the dialer rings, snaps
+    the ringer to `RINGER_MODE_VIBRATE`, plays the contact's
+    ringtone, and on dismiss restores the prior ringer mode. The
+    home-screen reliability banner shows "Japan routine unavailable
+    — grant the call-screening role in Settings" until the role is
+    held. A location-based "leaving work" reminder fires at 17:30
+    as the user exits the office geofence.
 
 ### Templates (v1.0/Phase B)
 
@@ -209,7 +222,20 @@ alarm-scheduler path keeps working without change.
   range, bluetooth device, Wi-Fi SSID, headphones, silent
   mode, foreground app).
 - **Phase E** adds calendar-event triggers (starts, ends,
-  busy, free).
+  busy, free). PR 1 shipped the platform side
+  (`CalendarService` + `CalendarChannel.kt` reading
+  `CalendarContract.Instances` and pushing events to
+  Dart, plus the executor's `_calendarMatches`
+  predicate) and the Drift + `PermissionKind.calendar`
+  + Settings tile. **PR 2** (the user-facing part) ships
+  the `CalendarPicker` bottom sheet + a second
+  "Add a calendar routine" button in the
+  add-do / add-event / add-person screens' "Routines"
+  section (sitting next to "Add a location routine" in
+  a `Wrap`). The picker gates on
+  `PermissionSheet.show(PermissionKind.calendar)` and
+  builds one of the four `TriggerCalendarEvent*`
+  leaves with a default `ActionNotify`.
 - **Phase F** adds the Japan silent-mode call-screening
   routine (call-intercept + override-silent actions) and
   ships the routine-template apply UX for the 6 routine
@@ -233,6 +259,17 @@ home-screen reliability banner flips to
 `Reliability.degraded` only if the user has at least one
 location routine registered; otherwise the denial is
 invisible. We do not queue dropped routines.
+
+Calendar-event reliability: `CalendarService` subscribes
+once at app start to the native
+`CalendarContract.Instances` stream and matches each
+transition against the registered automation set. A
+revoked `READ_CALENDAR` is a silent miss — there is no
+per-automation reliability badge for calendar triggers
+in v1.0 (a v1.1 follow-up). The `CalendarContract`
+platform side fires on the system-managed event
+boundaries (typically < 5s of the wall-clock event
+start/end); we do not retry dropped calendar edges.
 
 ## Constraints
 

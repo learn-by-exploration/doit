@@ -69,20 +69,27 @@ void main() {
   // test/routines/location_dispatch_test.dart; this test
   // only pins the wiring (the section is present and the
   // button is keyed so the picker can find it).
-  testWidgets('Routines section renders the empty-state and the '
-      'Add a location routine button (SYS-072 / Phase C PR 2)', (tester) async {
+  testWidgets('Routines section renders the empty-state and both '
+      'Add a location routine / Add a calendar routine buttons '
+      '(SYS-072 / Phase C PR 2 + SYS-074 / Phase E PR 2)', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: AddHabitScreen()));
     await tester.pump();
     expect(find.text('Routines'), findsOneWidget);
     expect(
       find.text(
         'No routines yet. Add one to fire this do when you '
-        'arrive at or leave a place.',
+        'arrive at or leave a place, or when a calendar '
+        'event starts, ends, hits its reminder, or '
+        'changes your busy status.',
       ),
       findsOneWidget,
     );
     expect(
       find.byKey(const ValueKey('add_habit.add_location_routine')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('add_habit.add_calendar_routine')),
       findsOneWidget,
     );
   });

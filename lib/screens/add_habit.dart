@@ -37,6 +37,7 @@ import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/action.dart';
 import 'package:doit/triggers/trigger.dart';
 import 'package:doit/widgets/category_chip.dart';
+import 'package:doit/widgets/calendar_picker.dart';
 import 'package:doit/widgets/icon_picker.dart';
 import 'package:doit/widgets/location_picker.dart';
 
@@ -306,6 +307,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             _RoutinesSection(
               automations: _automations,
               onAddLocation: _addLocationRoutine,
+              onAddCalendar: _addCalendarRoutine,
               onRemove: (idx) => setState(
                 () => _automations = List.of(_automations)..removeAt(idx),
               ),
@@ -792,6 +794,32 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     if (trigger is TriggerLocation) {
       await GeofenceService.instance.register(trigger);
     }
+    setState(() {
+      _automations = List<Automation>.unmodifiable(<Automation>[
+        ..._automations,
+        auto,
+      ]);
+    });
+  }
+
+  /// Open the [CalendarPicker] modal and append the result
+  /// to [_automations]. v1.0 / Phase E PR 2 / SYS-074.
+  /// The picker gates on `PermissionKind.calendar` (the
+  /// runtime `READ_CALENDAR` permission) and returns one of
+  /// the four `TriggerCalendarEvent` leaves with a default
+  /// `ActionNotify`.
+  ///
+  /// Calendar triggers are NOT registered with a
+  /// per-trigger platform service the way location
+  /// triggers are — `RoutineExecutor` subscribes to the
+  /// single `CalendarService.events` stream once at init
+  /// and matches each transition against the registered
+  /// automation set (see `_registerRoutines`). So all this
+  /// method needs to do is append to `_automations`; the
+  /// save path does the executor-side registration.
+  Future<void> _addCalendarRoutine() async {
+    final auto = await CalendarPicker.show(context);
+    if (auto == null || !mounted) return;
     setState(() {
       _automations = List<Automation>.unmodifiable(<Automation>[
         ..._automations,
@@ -1289,7 +1317,9 @@ class _PauseRow extends StatelessWidget {
 /// "Routines" section of the Add / Edit habit form (SYS-072).
 /// Renders one [ListTile] per registered automation with a
 /// description of the trigger + action, plus an "Add a
-/// location routine" button that opens [LocationPicker].
+/// location routine" button that opens [LocationPicker]
+/// and an "Add a calendar routine" button that opens
+/// [CalendarPicker] (v1.0 / Phase E PR 2 / SYS-074).
 ///
 /// The widget is intentionally dumb — the parent state owns
 /// the [List<Automation>] and rebuilds on mutation.
@@ -1297,11 +1327,13 @@ class _RoutinesSection extends StatelessWidget {
   const _RoutinesSection({
     required this.automations,
     required this.onAddLocation,
+    required this.onAddCalendar,
     required this.onRemove,
   });
 
   final List<Automation> automations;
   final VoidCallback onAddLocation;
+  final VoidCallback onAddCalendar;
   final ValueChanged<int> onRemove;
 
   @override
@@ -1314,7 +1346,9 @@ class _RoutinesSection extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
             child: Text(
               'No routines yet. Add one to fire this do when you '
-              'arrive at or leave a place.',
+              'arrive at or leave a place, or when a calendar '
+              'event starts, ends, hits its reminder, or '
+              'changes your busy status.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           )
@@ -1327,11 +1361,23 @@ class _RoutinesSection extends StatelessWidget {
         const SizedBox(height: Spacing.sm),
         Align(
           alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: const ValueKey('add_habit.add_location_routine'),
-            onPressed: onAddLocation,
-            icon: const Icon(Icons.add_location_alt_outlined),
-            label: const Text('Add a location routine'),
+          child: Wrap(
+            spacing: Spacing.sm,
+            runSpacing: Spacing.xs,
+            children: [
+              TextButton.icon(
+                key: const ValueKey('add_habit.add_location_routine'),
+                onPressed: onAddLocation,
+                icon: const Icon(Icons.add_location_alt_outlined),
+                label: const Text('Add a location routine'),
+              ),
+              TextButton.icon(
+                key: const ValueKey('add_habit.add_calendar_routine'),
+                onPressed: onAddCalendar,
+                icon: const Icon(Icons.event_outlined),
+                label: const Text('Add a calendar routine'),
+              ),
+            ],
           ),
         ),
       ],
