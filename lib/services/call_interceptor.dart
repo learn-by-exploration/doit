@@ -217,6 +217,25 @@ abstract class CallSource {
   /// at the moment of the most recent override. Idempotent
   /// — a no-op if no override is in flight.
   Future<void> restorePriorRinger();
+
+  /// Phase F PR 2 (SYS-075 / SYS-079). Returns `true` if
+  /// the user has opted into the `ROLE_CALL_SCREENING` role
+  /// via `RoleManager`. `false` on Android < Q (the role
+  /// does not exist), on missing plugin, or when the role
+  /// is not held.
+  Future<bool> isCallScreeningRoleHeld();
+
+  /// Phase F PR 2 (SYS-075 / SYS-079). Fires the OS role
+  /// request flow. Returns `true` if the role was already
+  /// held, or the user just granted it. `false` if the
+  /// role is unavailable (Android < Q, no Activity context,
+  /// missing plugin), or the user declined the dialog.
+  ///
+  /// The OS dialog is asynchronous; this method only fires
+  /// the intent. Callers re-probe via
+  /// [isCallScreeningRoleHeld] when the user returns to the
+  /// Settings screen.
+  Future<bool> requestCallScreeningRole();
 }
 
 /// Production source: talks to the `doit/call_interceptor`
@@ -352,6 +371,30 @@ class _MethodChannelCallSource implements CallSource {
       if (kDebugMode) debugPrint('CallSource.restorePriorRinger: $e');
     }
   }
+
+  @override
+  Future<bool> isCallScreeningRoleHeld() async {
+    try {
+      final held = await _channel.invokeMethod<bool>('isCallScreeningRoleHeld');
+      return held ?? false;
+    } on MissingPluginException catch (e) {
+      if (kDebugMode) debugPrint('CallSource.isCallScreeningRoleHeld: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> requestCallScreeningRole() async {
+    try {
+      final granted = await _channel.invokeMethod<bool>(
+        'requestCallScreeningRole',
+      );
+      return granted ?? false;
+    } on MissingPluginException catch (e) {
+      if (kDebugMode) debugPrint('CallSource.requestCallScreeningRole: $e');
+      return false;
+    }
+  }
 }
 
 /// Test source: a hand-driven [StreamController] the unit
@@ -385,6 +428,18 @@ class ScriptedCallSource implements CallSource {
 
   /// Number of [restorePriorRinger] calls.
   int restorePriorRingerCalls = 0;
+
+  /// What the next [isCallScreeningRoleHeld] call returns.
+  /// Defaults to `false`.
+  bool scriptedRoleHeld = false;
+
+  /// What the next [requestCallScreeningRole] call returns.
+  /// Defaults to `false`. The default mirrors "user declined
+  /// the OS dialog".
+  bool scriptedRoleRequestGranted = false;
+
+  /// Number of [requestCallScreeningRole] calls.
+  int requestCallScreeningRoleCalls = 0;
 
   /// Push an event to listeners. Mirrors the Kotlin
   /// `pushCallEvent` path.
@@ -429,6 +484,15 @@ class ScriptedCallSource implements CallSource {
   @override
   Future<void> restorePriorRinger() async {
     restorePriorRingerCalls++;
+  }
+
+  @override
+  Future<bool> isCallScreeningRoleHeld() async => scriptedRoleHeld;
+
+  @override
+  Future<bool> requestCallScreeningRole() async {
+    requestCallScreeningRoleCalls++;
+    return scriptedRoleRequestGranted;
   }
 }
 
@@ -520,6 +584,24 @@ class CallInterceptorService {
   Future<void> restorePriorRinger() async {
     await ready;
     await _source!.restorePriorRinger();
+  }
+
+  /// Phase F PR 2 (SYS-075 / SYS-079): probe whether the
+  /// user has granted the `ROLE_CALL_SCREENING` role via
+  /// `RoleManager`. Used by the Settings → Call-screening
+  /// tile to render "Held" / "Not held" status.
+  Future<bool> isCallScreeningRoleHeld() async {
+    await ready;
+    return _source!.isCallScreeningRoleHeld();
+  }
+
+  /// Phase F PR 2 (SYS-075 / SYS-079): fire the OS role
+  /// request flow. The OS dialog is asynchronous — callers
+  /// re-probe via [isCallScreeningRoleHeld] when the user
+  /// returns to the Settings screen.
+  Future<bool> requestCallScreeningRole() async {
+    await ready;
+    return _source!.requestCallScreeningRole();
   }
 
   /// Inject a source for tests. The default constructor

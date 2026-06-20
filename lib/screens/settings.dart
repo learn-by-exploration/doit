@@ -29,6 +29,7 @@ import 'package:doit/build_info.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/screens/settings_restore.dart';
+import 'package:doit/services/call_interceptor.dart';
 import 'package:doit/services/permission_result.dart';
 import 'package:doit/services/permission_service.dart';
 import 'package:doit/services/reminder_service.dart';
@@ -303,6 +304,7 @@ class _PermissionsRow extends StatelessWidget {
               title: 'Location',
               result: statuses[PermissionKind.location],
             ),
+            const _CallScreeningTile(),
             const _BackupFolderTile(),
           ],
         );
@@ -482,5 +484,99 @@ class _BackupFolderTile extends StatelessWidget {
           SnackBar(content: Text('Folder picker error: $message')),
         );
     }
+  }
+}
+
+/// Phase F PR 2 (SYS-075 / SYS-079): the call-screening
+/// role tile. Probes
+/// [CallInterceptorService.isCallScreeningRoleHeld] on every
+/// mount; tapping "Change" fires
+/// [CallInterceptorService.requestCallScreeningRole] (the
+/// OS role-request dialog). The probe re-runs after the
+/// user returns from the dialog so the status reflects the
+/// current OS state.
+class _CallScreeningTile extends StatefulWidget {
+  const _CallScreeningTile();
+
+  @override
+  State<_CallScreeningTile> createState() => _CallScreeningTileState();
+}
+
+class _CallScreeningTileState extends State<_CallScreeningTile>
+    with WidgetsBindingObserver {
+  bool? _held;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _probe();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The OS role dialog lives in a separate Activity.
+    // When the user returns from that dialog to do it, the
+    // lifecycle resumes — re-probe so the tile's status
+    // text reflects the actual grant.
+    if (state == AppLifecycleState.resumed) {
+      _probe();
+    }
+  }
+
+  Future<void> _probe() async {
+    final held = await CallInterceptorService.instance
+        .isCallScreeningRoleHeld();
+    if (!mounted) return;
+    setState(() => _held = held);
+  }
+
+  Future<void> _request() async {
+    setState(() => _busy = true);
+    await CallInterceptorService.instance.requestCallScreeningRole();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    // The role dialog is asynchronous — re-probe after a
+    // short delay so the post-grant state shows up if the
+    // user has already accepted. The lifecycle observer
+    // handles the typical case (user returns to the app);
+    // this is the fallback for an instant-grant path.
+    await _probe();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final held = _held;
+    final subtitle = switch (held) {
+      null => 'Checking…',
+      true => 'Held — Japan routine can intercept calls.',
+      false => 'Not held — tap "Change" to grant the role.',
+    };
+    return ListTile(
+      key: const ValueKey('settings.permission.callScreening'),
+      leading: const Icon(Icons.call_outlined),
+      title: const Text('Call-screening role'),
+      subtitle: Text(subtitle),
+      trailing: _busy
+          ? const SizedBox(
+              key: ValueKey('settings.permission.callScreening.busy'),
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : TextButton(
+              key: const ValueKey('settings.permission.callScreening.change'),
+              onPressed: _request,
+              child: Text(held == true ? 'Change' : 'Grant'),
+            ),
+      onTap: _busy ? null : _request,
+    );
   }
 }

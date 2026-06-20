@@ -19,6 +19,9 @@ import 'package:flutter/foundation.dart' show ChangeNotifier, ValueNotifier;
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:doit/services/japan_routine_config.dart';
+import 'package:doit/triggers/trigger.dart' show SilentMode;
+
 /// Singleton holder for user-tweakable settings. The runtime
 /// value lives in a [ValueNotifier] so widgets can listen
 /// without going through a Provider rebuild.
@@ -59,6 +62,16 @@ class SettingsService extends ChangeNotifier {
   /// dispatch (a future commit).
   final ValueNotifier<String?> backupFolderUri = ValueNotifier<String?>(null);
 
+  /// Phase F PR 2 (SYS-075 / SYS-079). The user's Japan
+  /// silent-mode routine configuration. Defaults to
+  /// [JapanRoutineConfig.defaults] (disabled, no contacts,
+  /// silent→normal). The [AddRoutineScreen] writes via
+  /// [setJapanRoutine]; the [CallInterceptorService]
+  /// watches this notifier indirectly (the add screen also
+  /// pushes the contacts via [CallInterceptorService.configure]).
+  final ValueNotifier<JapanRoutineConfig> japanRoutine =
+      ValueNotifier<JapanRoutineConfig>(JapanRoutineConfig.defaults);
+
   /// Init gate (`Completer<void> _ready`). Public reads wait on
   /// this before touching the underlying [SharedPreferences]
   /// instance. Pattern: see .claude/rules/lib-services.md §2.
@@ -71,6 +84,16 @@ class SettingsService extends ChangeNotifier {
   /// write `SharedPreferences` directly (.claude/rules/lib-screens.md §5).
   static const String _kFirstLaunchCompletedKey = 'doit.first_launch_completed';
 
+  /// Persisted keys for the Japan silent-mode routine. Three
+  /// keys under one logical namespace — the bool is the
+  /// master toggle, the string list is the contact-id
+  /// whitelist, the string is the `SilentMode.wireName`.
+  static const String _kJapanRoutineEnabledKey = 'doit.japan_routine.enabled';
+  static const String _kJapanRoutineContactIdsKey =
+      'doit.japan_routine.contact_ids';
+  static const String _kJapanRoutineTargetModeKey =
+      'doit.japan_routine.target_mode';
+
   /// Idempotent init. Loads the persisted values; safe to call
   /// multiple times (the gate is completed on the first call and
   /// subsequent calls are no-ops).
@@ -79,7 +102,30 @@ class SettingsService extends ChangeNotifier {
     _prefs = await SharedPreferences.getInstance();
     firstLaunchCompleted.value =
         _prefs.getBool(_kFirstLaunchCompletedKey) ?? false;
+    japanRoutine.value = _loadJapanRoutine();
     if (!_ready.isCompleted) _ready.complete();
+  }
+
+  /// Decode the three Japan-routine keys into a
+  /// [JapanRoutineConfig]. Missing keys fall back to
+  /// [JapanRoutineConfig.defaults]. An unknown `target_mode`
+  /// string falls back to [SilentMode.normal].
+  JapanRoutineConfig _loadJapanRoutine() {
+    final enabled = _prefs.getBool(_kJapanRoutineEnabledKey) ?? false;
+    final contactIds =
+        _prefs.getStringList(_kJapanRoutineContactIdsKey) ?? const <String>[];
+    final modeWire = _prefs.getString(_kJapanRoutineTargetModeKey);
+    final targetMode = switch (modeWire) {
+      'silent' => SilentMode.silent,
+      'vibrate' => SilentMode.vibrate,
+      'normal' => SilentMode.normal,
+      _ => SilentMode.normal,
+    };
+    return JapanRoutineConfig(
+      enabled: enabled,
+      contactIds: List<String>.unmodifiable(contactIds),
+      targetMode: targetMode,
+    );
   }
 
   /// Mark the first-launch onboarding as complete. Persists the
@@ -107,6 +153,23 @@ class SettingsService extends ChangeNotifier {
     backupFolderUri.value = uri;
   }
 
+  /// Phase F PR 2 (SYS-075 / SYS-079). Persist the Japan
+  /// silent-mode routine configuration. Awaiting this
+  /// guarantees the keys are flushed before the caller
+  /// pushes the contacts to [CallInterceptorService]
+  /// (the screening service must already know about the
+  /// contacts when an incoming call arrives).
+  Future<void> setJapanRoutine(JapanRoutineConfig config) async {
+    await _ready.future;
+    japanRoutine.value = config;
+    await _prefs.setBool(_kJapanRoutineEnabledKey, config.enabled);
+    await _prefs.setStringList(
+      _kJapanRoutineContactIdsKey,
+      List<String>.unmodifiable(config.contactIds),
+    );
+    await _prefs.setString(_kJapanRoutineTargetModeKey, config.targetMode.name);
+  }
+
   /// Test helper. Resets the singleton's in-memory state so the
   /// next [init()] re-loads from the `SharedPreferences` backing
   /// store. Does **not** touch the backing store itself; tests
@@ -119,6 +182,7 @@ class SettingsService extends ChangeNotifier {
     themeMode.value = ThemeMode.dark;
     firstLaunchCompleted.value = false;
     backupFolderUri.value = null;
+    japanRoutine.value = JapanRoutineConfig.defaults;
     // Allow a subsequent init() to re-load from the backing
     // store. Re-creating the completer is the standard pattern
     // when the gate has not yet been awaited in tests.

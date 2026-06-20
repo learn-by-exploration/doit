@@ -27,6 +27,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/services/call_interceptor.dart';
 import 'package:doit/services/permission_result.dart';
 import 'package:doit/services/permission_service.dart';
 import 'package:doit/services/reminder_service.dart';
@@ -94,6 +95,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'folder stays yours.',
       cta: 'Pick folder',
     ),
+    // Phase F PR 2 (SYS-075 / SYS-079). Opt-in to the
+    // call-screening role so the Japan routine can intercept
+    // matched contacts. The role is opt-in on Android Q+;
+    // older OS versions silently skip the grant. The step
+    // is skippable: a user who declines stays on the next
+    // step (anchor mode) and can grant the role later from
+    // Settings.
+    _OnboardingStep(
+      title: 'Call-screening role',
+      body:
+          'Optional: let do it screen incoming calls so the '
+          'Japan routine can ring specific contacts through '
+          'silent mode. Android will ask you to confirm.',
+      cta: 'Grant',
+    ),
   ];
 
   @override
@@ -150,7 +166,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   const SizedBox(height: Spacing.sm),
                 ],
-                TextButton(onPressed: widget.onDone, child: const Text('Skip')),
+                TextButton(onPressed: _handleSkip, child: const Text('Skip')),
               ],
             ),
           ),
@@ -236,6 +252,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   ///   _step == 1  → [PermissionService.requestContacts]        (SYS-064)
   ///   _step == 2  → [PermissionService.requestExactAlarm]      (SYS-065)
   ///   _step == 3  → [PermissionService.requestBackupFolder]    (SYS-066)
+  ///   _step == 4  → call-screening role opt-in                  (SYS-079)
   ///
   /// The `_inFlight` guard at the top blocks double-taps
   /// while a system dialog or SAF picker is open. On
@@ -249,7 +266,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   /// [BackupFolderCancelled] advances without persisting
   /// (per ADR-014 step 6: the backup folder is skippable);
   /// [BackupFolderError] surfaces the message and stays on
-  /// the step.
+  /// the step. The call-screening step (Phase F PR 2) is
+  /// skippable: declining advances without persisting, so
+  /// the user can grant later from Settings.
   Future<void> _handleStepCta() async {
     if (_inFlight) return;
     setState(() {
@@ -286,25 +305,49 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       });
       return;
     }
-    // _step == 3: backup folder (SYS-066). The dispatch is
-    // intentionally outside the switch above because the
-    // return type changes (`BackupFolderResult` instead of
-    // `PermissionResult`).
-    final BackupFolderResult folderResult = await service.requestBackupFolder();
+    if (_step == 3) {
+      // Backup folder (SYS-066). The dispatch is
+      // intentionally outside the switch above because the
+      // return type changes (`BackupFolderResult` instead of
+      // `PermissionResult`).
+      final BackupFolderResult folderResult = await service
+          .requestBackupFolder();
+      if (!mounted) return;
+      setState(() {
+        _inFlight = false;
+        switch (folderResult) {
+          case BackupFolderPicked(:final path):
+            SettingsService.instance.setBackupFolderUri(path);
+            _step++;
+          case BackupFolderCancelled():
+            // Per ADR-014 step 6: the backup folder is
+            // skippable. Advance without persisting so the
+            // user can still proceed to the next step.
+            _step++;
+          case BackupFolderError(:final message):
+            _rationaleText = 'Folder picker error: $message';
+        }
+      });
+      return;
+    }
+    // _step == 4: call-screening role opt-in (Phase F PR 2
+    // / SYS-079). Fire the OS role dialog; advance on
+    // either grant OR decline (the user can grant later
+    // from Settings). On a hard failure (no Activity
+    // context, OS pre-Q, missing plugin) surface an inline
+    // rationale and let the user skip via the Skip button.
+    final granted = await CallInterceptorService.instance
+        .requestCallScreeningRole();
     if (!mounted) return;
     setState(() {
       _inFlight = false;
-      switch (folderResult) {
-        case BackupFolderPicked(:final path):
-          SettingsService.instance.setBackupFolderUri(path);
-          _step++;
-        case BackupFolderCancelled():
-          // Per ADR-014 step 6: the backup folder is
-          // skippable. Advance without persisting so the
-          // user can still proceed to the anchor-mode step.
-          _step++;
-        case BackupFolderError(:final message):
-          _rationaleText = 'Folder picker error: $message';
+      if (granted) {
+        _step++;
+      } else {
+        _rationaleText =
+            "Couldn't open the role dialog. You can grant the "
+            'role later from Settings → Permissions.';
+        _goToSettingsVisible = false;
       }
     });
   }
@@ -319,6 +362,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   /// and advances if the grant succeeded.
   Future<void> _openAndroidSettings() async {
     await PermissionService.instance.openAppSettings();
+  }
+
+  /// Phase F PR 2 (SYS-075 / SYS-079): Skip semantics.
+  /// On the call-screening step (the last `_OnboardingStep`),
+  /// Skip advances to the Last step (the user can grant the
+  /// role later from Settings). On every earlier step, Skip
+  /// exits the onboarding flow entirely — that split is
+  /// regression-tested by `onboarding_permission_wiring_test.dart`.
+  void _handleSkip() {
+    if (_step >= _steps.length - 1) {
+      setState(() => _step++);
+    } else {
+      widget.onDone();
+    }
   }
 
   void _finish() {

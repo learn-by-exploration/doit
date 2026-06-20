@@ -302,9 +302,13 @@ void main() {
           'confirms a folder at step 3.',
     );
     await pumpAndTapNext(tester);
-    // After picking, the step advances to the last-step
-    // screen AND the URI is persisted for the future
-    // `BackupService` to read.
+    // After picking, the step advances to the call-screening
+    // step (the new v1.0/Phase F PR 2 step 4 / SYS-079) AND
+    // the URI is persisted for the future `BackupService` to
+    // read. v1.0 added the call-screening step between
+    // backup-folder and the last-step screen; the SAF
+    // contract is still "step 3 → next step on a non-null
+    // treeUri".
     expect(
       SettingsService.instance.backupFolderUri.value,
       pickedPath,
@@ -313,7 +317,7 @@ void main() {
           'SettingsService so the BackupService (future commit) '
           'and the v0.5d Settings tile can read it.',
     );
-    expect(find.text('Last step'), findsOneWidget);
+    expect(find.text('Call-screening role'), findsOneWidget);
   });
 
   testWidgets('step 3 advances on SAF cancellation and does NOT set '
@@ -335,10 +339,11 @@ void main() {
     expect(find.text('Backup folder'), findsOneWidget);
     await pumpAndTapNext(tester);
     // After cancellation, the step still advances (the
-    // backup folder is skippable per ADR-014 step 6) AND
-    // the notifier stays null so the v0.5d Settings tile
-    // can render the "Pick folder" affordance later.
-    expect(find.text('Last step'), findsOneWidget);
+    // backup folder is skippable per ADR-014 step 6) to
+    // the new call-screening step (SYS-079) AND the
+    // notifier stays null so the v0.5d Settings tile can
+    // render the "Pick folder" affordance later.
+    expect(find.text('Call-screening role'), findsOneWidget);
     expect(
       SettingsService.instance.backupFolderUri.value,
       isNull,

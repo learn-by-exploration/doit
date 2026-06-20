@@ -111,9 +111,22 @@ void main() {
     await _waitForCatalogReady(tester);
     await tester.tap(find.byKey(const ValueKey('templates.filter.routine')));
     await tester.pump();
-    // The grid is lazy: scroll to mount all 6 routine cards
-    // before counting. The badge text is the source of truth
-    // for the routine-vs-other split.
+    // Phase F PR 2 (SYS-075) special-cases template #16
+    // ("Japan silent mode") to a real apply UX (the
+    // AddRoutineScreen), so it now renders a "Use this" button
+    // instead of the "Coming in v1.1" badge. The remaining 5
+    // routine templates (17..21) still carry the badge — their
+    // apply UX lands in v1.1. Verify #16 first (it is at the
+    // top of the routine filter and renders without scrolling),
+    // then scroll to mount and count the remaining 5.
+    expect(
+      find.byKey(const ValueKey('template_card.t_builtin_16.use')),
+      findsOneWidget,
+      reason:
+          'Phase F PR 2 (SYS-075) special-cases template #16 ("Japan '
+          'silent mode") to a real apply UX — it should render a '
+          '"Use this" button instead of the "Coming in v1.1" badge.',
+    );
     final gridFinder = find.byType(GridView);
     final mounted = <String>{};
     for (var scroll = 0; scroll < 30; scroll++) {
@@ -126,13 +139,11 @@ void main() {
           mounted.add(id);
         }
       }
-      if (mounted.length >= 6) break;
+      if (mounted.length >= 5) break;
       await tester.drag(gridFinder, const Offset(0, -600));
       await tester.pump();
     }
-    expect(mounted.length, 6);
-    // No "Use this" buttons in the routine view.
-    expect(find.text('Use this'), findsNothing);
+    expect(mounted.length, 5);
   });
 
   testWidgets('Tapping a do card pushes AddHabitScreen with pre-fill', (

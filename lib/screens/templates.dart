@@ -20,6 +20,7 @@ import 'package:doit/do/category.dart';
 import 'package:doit/screens/add_event.dart';
 import 'package:doit/screens/add_habit.dart';
 import 'package:doit/screens/add_person.dart';
+import 'package:doit/screens/add_routine.dart';
 import 'package:doit/services/template_repository.dart';
 import 'package:doit/templates/template.dart';
 import 'package:doit/templates/template_library.dart';
@@ -239,6 +240,17 @@ class _TemplateCard extends StatelessWidget {
 
   Future<void> _onUse(BuildContext context) async {
     final t = template;
+    // Phase F PR 2 (SYS-075): template #16 ("Japan silent
+    // mode") routes to the dedicated AddRoutineScreen instead
+    // of the generic routine snackbar. Every other routine
+    // template (17..21) keeps the v1.1 badge + snackbar.
+    if (t.id == 't_builtin_16') {
+      if (!context.mounted) return;
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const AddRoutineScreen()));
+      return;
+    }
     switch (t.entityType) {
       case TemplateEntityType.doEntity:
         final payload = _payloadFor(t, 'do');
@@ -305,6 +317,19 @@ class _TrailingAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Phase F PR 2 (SYS-075): template #16 has a real apply
+    // UX (the AddRoutineScreen) — suppress the "Coming in
+    // v1.1" badge and render the "Use this" button instead.
+    if (template.id == 't_builtin_16') {
+      return SizedBox(
+        width: double.infinity,
+        child: FilledButton.tonal(
+          key: ValueKey('template_card.${template.id}.use'),
+          onPressed: onUse,
+          child: const Text('Use this'),
+        ),
+      );
+    }
     if (template.entityType == TemplateEntityType.routine) {
       return Container(
         key: ValueKey('template_card.${template.id}.coming_soon'),

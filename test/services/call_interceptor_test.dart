@@ -337,5 +337,66 @@ void main() {
       expect(r.targetMode, RingerMode.normal);
       await sub.cancel();
     });
+
+    // Phase F PR 2 (SYS-075 / SYS-079). Drive the
+    // production _MethodChannelCallSource end-to-end via
+    // the `doit/call_interceptor` channel. The mock
+    // returns `true` for `isCallScreeningRoleHeld` and
+    // `true` for `requestCallScreeningRole` so the
+    // happy-path code on the Kotlin side is exercised.
+    test(
+      'production source forwards isCallScreeningRoleHeld to the channel',
+      () async {
+        const channel = MethodChannel('doit/call_interceptor');
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              if (call.method == 'isCallScreeningRoleHeld') return true;
+              return null;
+            });
+        addTearDown(() {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, null);
+        });
+        service.resetForTesting();
+        await service.init();
+        final held = await service.isCallScreeningRoleHeld();
+        expect(held, isTrue);
+      },
+    );
+
+    test(
+      'production source forwards requestCallScreeningRole to the channel',
+      () async {
+        const channel = MethodChannel('doit/call_interceptor');
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              if (call.method == 'requestCallScreeningRole') return true;
+              return null;
+            });
+        addTearDown(() {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, null);
+        });
+        service.resetForTesting();
+        await service.init();
+        final granted = await service.requestCallScreeningRole();
+        expect(granted, isTrue);
+      },
+    );
+
+    test('production source returns false when the channel is missing '
+        '(MissingPluginException)', () async {
+      // No mock handler installed — every channel call
+      // throws MissingPluginException. The
+      // _MethodChannelCallSource swallows the exception
+      // and returns false (matches the documented
+      // behavior: "missing plugin → false").
+      service.resetForTesting();
+      await service.init();
+      final held = await service.isCallScreeningRoleHeld();
+      expect(held, isFalse);
+      final granted = await service.requestCallScreeningRole();
+      expect(granted, isFalse);
+    });
   });
 }

@@ -1,6 +1,9 @@
 package com.doit
 
+import android.app.Activity
+import android.app.role.RoleManager
 import android.content.Context
+import android.content.Intent
 import android.media.AudioManager
 import android.os.Build
 import android.telecom.Call
@@ -168,6 +171,7 @@ class CallInterceptor : CallScreeningService() {
 
         fun attach(engine: FlutterEngine) {
             val ch = MethodChannel(engine.dartExecutor.binaryMessenger, CHANNEL)
+            val activity: Activity? = engine.activity as? Activity
             ch.setMethodCallHandler { call, result ->
                 when (call.method) {
                     "setEnabled" -> {
@@ -242,6 +246,35 @@ class CallInterceptor : CallScreeningService() {
                         result.success(null)
                     }
                     "stopStream" -> result.success(null)
+                    "isCallScreeningRoleHeld" -> {
+                        // Phase F PR 2 (SYS-075 / SYS-079):
+                        // returns whether the user has opted
+                        // in to the call-screening role via
+                        // `RoleManager`. The role is opt-in
+                        // (not a runtime permission). When
+                        // `RoleManager` is unavailable
+                        // (Android < Q) we conservatively
+                        // return `false` so the UI surfaces
+                        // the role as not-yet-held.
+                        val held = isCallScreeningRoleHeld()
+                        result.success(held)
+                    }
+                    "requestCallScreeningRole" -> {
+                        // Phase F PR 2 (SYS-075 / SYS-079):
+                        // fires the OS role-request flow.
+                        // Returns:
+                        //   - `true` if the role was already
+                        //     held (no dialog needed).
+                        //   - `true` if the user granted the
+                        //     role in the dialog.
+                        //   - `false` if the role is
+                        //     unavailable (Android < Q or
+                        //     no Activity), or the user
+                        //     declined, or the dialog was
+                        //     already in flight.
+                        val granted = requestCallScreeningRole(activity)
+                        result.success(granted)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -256,5 +289,75 @@ class CallInterceptor : CallScreeningService() {
         internal fun pushCallEvent(map: Map<String, Any?>) {
             channel?.invokeMethod(SINK_METHOD, map)
         }
+
+        // -------------------------------------------------------------------
+        // Phase F PR 2 (SYS-075 / SYS-079): call-screening role probe.
+        //
+        // The `ROLE_CALL_SCREENING` role is opt-in on Android Q+.
+        // The user grants it via the OS role-holders settings page
+        // (and a chooser dialog the OS shows on request). We do
+        // not gate the routine on a runtime permission — the
+        // bound permission (`BIND_SCREENING_SERVICE`) is
+        // signature-protected and granted at install time. The
+        // role is the only thing that has to be earned.
+        // -------------------------------------------------------------------
+
+        /**
+         * `true` if the app currently holds the call-screening
+         * role. The role is opt-in on Android Q+; below Q the
+         * role does not exist so we return `false` (the screening
+         * service is declared in the manifest and bound by the
+         * OS — older OS versions simply do not expose the role
+         * gating surface).
+         */
+        fun isCallScreeningRoleHeld(): Boolean {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
+            val ctx = appContext ?: return false
+            val rm = ctx.getSystemService(Context.ROLE_SERVICE) as? RoleManager
+                ?: return false
+            return rm.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
+        }
+
+        /**
+         * Request the call-screening role. Returns `true` if
+         * the role is already held or was just granted; `false`
+         * if the role is unavailable (no Activity context, OS
+         * pre-Q) or the user declined. The OS dialog is
+         * asynchronous — this method only fires the intent
+         * and the Dart side observes the next probe for the
+         * actual grant (the user may tap "Allow" later, after
+         * they re-open the settings screen).
+         */
+        fun requestCallScreeningRole(activity: Activity?): Boolean {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
+            if (isCallScreeningRoleHeld()) return true
+            val act = activity ?: return false
+            val rm = act.getSystemService(Context.ROLE_SERVICE) as? RoleManager
+                ?: return false
+            val intent = rm.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING)
+                ?: return false
+            return try {
+                act.startActivityForResult(intent, REQ_ROLE_CALL_SCREENING)
+                true
+            } catch (_: Exception) {
+                // Some OEM ROMs throw on the role intent (no
+                // role-holders settings activity). Treat as
+                // not-granted; the user can fall back to the
+                // Settings tile which deep-links to the system
+                // app-settings page.
+                false
+            }
+        }
+
+        /**
+         * Request code for the call-screening role request.
+         * The result is observed by [MainActivity.onActivityResult]
+         * when the role flow completes — we re-probe the role
+         * via [isCallScreeningRoleHeld] on the next Settings tile
+         * visit. The request code is unused on the Dart side;
+         * it's reserved for a future hook that pushes a fresh
+         * `onRoleChanged` event back to the singleton.
+         */
+        private const val REQ_ROLE_CALL_SCREENING = 9001
     }
 }

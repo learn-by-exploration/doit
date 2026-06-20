@@ -1520,6 +1520,69 @@ banner if the screening role is not granted.
 
 **SYS-IDs affected.** SYS-075 (Japan routine).
 
+## ADR-019 follow-up — v1.0/Phase F PR 2: Japan-routine apply UX + role opt-in
+
+**Date:** 2026-06-20.
+**Status:** Accepted (v1.0 / Phase F PR 2 / SYS-075 /
+SYS-079). Builds on ADR-019.
+**Supersedes:** none.
+
+**Context.** Phase F PR 1 (commit `e00a97f`) shipped the
+call-screening plumbing end-to-end. PR 2 wires the
+user-facing surfaces: a dedicated `AddRoutineScreen` for
+template #16, a `Settings → Permissions → Call-screening`
+tile, and an onboarding step for the role opt-in.
+
+Three small decisions were made in PR 2:
+
+1. **Role methods land on the existing
+   `doit/call_interceptor` channel**, not `doit/reminders`.
+   `isCallScreeningRoleHeld()` and `requestCallScreeningRole()`
+   are conceptually owned by the call interceptor; the
+   channel already houses `setEnabled` / `setContactIds` /
+   etc. The Kotlin side wraps `RoleManager` (API 29+); on
+   pre-Q the methods return `false` / no-op.
+2. **Standalone routine persistence.** Per the v1.0 plan,
+   routines attach to a Do/Event/Person. The Japan routine
+   has no parent entity; the config is persisted as
+   `JapanRoutineConfig { enabled, contactIds, targetMode }`
+   in `SettingsService` under three keys
+   `doit.japan_routine.{enabled,contact_ids,target_mode}`.
+   The contactIds use `setStringList` — the first
+   list-typed entry in the codebase, mirroring the
+   SharedPreferences API exactly.
+3. **Template routing.** Template #16 short-circuits
+   `_onUse` to push `AddRoutineScreen`. Other routine
+   templates (17..21) keep the "Coming in v1.1" badge.
+   The apply UX for #17..#21 lands in v1.1 with the
+   generic routine screen.
+
+**Consequences.**
+
+- The role opt-in is **not** a runtime permission. The
+  bound permission `BIND_SCREENING_SERVICE` is
+  signature-protected and granted at install time; the
+  only user gesture is opting into the role via
+  `RoleManager`. The Settings tile + onboarding step are
+  the only places that surface the role status.
+- The Japan routine silently no-ops when the role is not
+  held. The home-screen reliability banner surfaces "Japan
+  routine unavailable — grant the call-screening role in
+  Settings" so the user has a recovery affordance without
+  having to read docs.
+- The `AddRoutineScreen` form writes to BOTH
+  `SettingsService` (persistence) AND
+  `CallInterceptorService.configure(...)` (live runtime
+  push). On Save, the screening service matches the new
+  contact list on the next incoming call — no app restart
+  required.
+
+**SYS-IDs affected.** SYS-075 (Japan routine — UX +
+persistence surface) + SYS-079 (call-screening role opt-in,
+new in PR 2).
+
+---
+
 ## ADR-020 — v1.0/Phase B: Template model + JSON envelope
 
 **Date:** 2026-06-20.

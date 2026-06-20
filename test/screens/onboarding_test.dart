@@ -6,6 +6,7 @@ import 'package:doit/reminders/full_screen_intent.dart';
 import 'package:doit/reminders/notification_service.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
 import 'package:doit/screens/onboarding.dart';
+import 'package:doit/services/call_interceptor.dart';
 import 'package:doit/services/permission_service.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/settings_service.dart';
@@ -101,7 +102,20 @@ void main() {
     // resolve cleanly).
     PermissionService.instance.resetForTesting();
     await PermissionService.instance.init();
+
+    // v1.0 / Phase F PR 2 (SYS-079): the new step 4
+    // (call-screening role) calls
+    // `CallInterceptorService.requestCallScreeningRole()`
+    // on CTA. Wire a `ScriptedCallSource` so the
+    // `requestCallScreeningRole()` Future resolves
+    // deterministically; the test then taps 5 times (one
+    // per step) to reach the "Last step" screen.
+    CallInterceptorService.instance.resetForTesting();
+    CallInterceptorService.instance.debugSetSource(ScriptedCallSource());
+    await CallInterceptorService.instance.init();
   });
+
+  tearDown(CallInterceptorService.instance.resetForTesting);
 
   testWidgets('first step shows the welcome title and CTA', (tester) async {
     await tester.pumpWidget(_wrap(onDone: () {}));
@@ -117,14 +131,19 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(_wrap(onDone: () {}));
     await tester.pump();
-    // Tap Next four times to reach the last step. v0.5c
+    // Tap Next five times to reach the last step. v0.5c
     // (ADR-016) — the CTA awaits a permission service call.
     // The mock channel handler is set up in `setUp`, but
     // `tester.pump()` runs in a FakeAsync zone and the
     // `BasicMessageChannel` Future does not resolve there.
     // `tester.runAsync` steps out of the fake-async zone
     // so the channel call resolves in real time, then
-    // `tester.pump()` flushes the resulting setState.
+    // `tester.pump()` flushes the resulting setState. v1.0
+    // / Phase F PR 2 (SYS-079) added a fifth step
+    // (call-screening role); the source returns
+    // `scriptedRoleRequestGranted = false` by default,
+    // which leaves the user on that step. Skip past it
+    // by tapping the explicit "Skip" affordance.
     for (var i = 0; i < 4; i++) {
       await tester.tap(find.byKey(const ValueKey('onboarding.next')));
       await tester.pump();
@@ -133,6 +152,12 @@ void main() {
       });
       await tester.pump();
     }
+    // Step 4 (call-screening role): scripted source
+    // returns `false` → rationale shown, step stays.
+    // The user reaches the last step by tapping Skip.
+    expect(find.text('Call-screening role'), findsOneWidget);
+    await tester.tap(find.text('Skip'));
+    await tester.pump();
     expect(find.text('Last step'), findsOneWidget);
   });
 
@@ -152,6 +177,11 @@ void main() {
       });
       await tester.pump();
     }
+    // Step 4 (call-screening role): scripted source
+    // returns `false` → rationale shown, step stays.
+    // Reach the last step via Skip.
+    await tester.tap(find.text('Skip'));
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('onboarding.finish')));
     await tester.pump();
     expect(doneCount, 1);
