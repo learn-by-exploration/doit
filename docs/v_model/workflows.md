@@ -10,7 +10,7 @@ cannot be traced to a SYS- ID, the requirement is missing.
 **Notification copy follows the brand voice in
 [`conops.md § Brand voice`](conops.md#brand-voice):** lead with the
 action ("Drink water", "Call Mom", "Submit report"), append the
-streak number only as a secondary line, never use "broke"/"lost"
+consecutive run number only as a secondary line, never use "broke"/"lost"
 (missed/skipped instead), and keep the tone calm and slightly
 stubborn. Avoid the prefix "do it:" — the brand name does the
 work. If a workflow's copy ever drifts from the brand voice, the
@@ -50,7 +50,7 @@ voice wins; the workflow is updated in the same PR.
 **Postconditions:**
 - All permissions either granted or explicitly denied by the user
   (the app must not silently request again).
-- At least one habit is enabled and has its first occurrence
+- At least one do is enabled and has its first occurrence
   scheduled.
 - A backup folder is recorded in `shared_preferences`.
 - The boot receiver is registered.
@@ -68,30 +68,30 @@ voice wins; the workflow is updated in the same PR.
 
 ---
 
-## WF-002 — Add a custom habit
+## WF-002 — Add a custom do
 
 **Preconditions:**
 - App is installed and onboarded.
 
 **Main flow:**
 1. User taps the floating add button on the home screen.
-2. User picks "Habit".
+2. User picks "Do".
 3. User enters a name, an optional icon, and an optional description.
 4. User picks a schedule type (Fixed / Interval / Anchor / Day-of-X).
 5. User configures the schedule parameters.
 6. User picks a proof mode (Soft / Strong / Auto).
 7. If Strong, user picks a mission chain (one or more missions in
    order).
-8. User picks a streak policy (per-day / rest days / per-habit / off).
+8. User picks a consecutive run policy (per-day / skip days / per-do / off).
 9. App validates the configuration (e.g., interval must be ≥5 min,
-   anchor must reference an existing anchor habit).
+   anchor must reference an existing anchor do).
 10. User saves.
 
 **Postconditions:**
-- A habit record is written to the local DB.
+- A do record is written to the local DB.
 - The next occurrence is scheduled via AlarmManager (or
   WorkManager for inexact).
-- A "habit added" snackbar is shown.
+- A "do added" snackbar is shown.
 
 **Failure modes:**
 - Invalid configuration → field-level errors.
@@ -129,10 +129,10 @@ SYS-016, SYS-018, SYS-019.
 - The contact's display name and channel are resolved and cached.
 
 **Failure modes:**
-- Contact deleted from device → habit is paused, a banner says
+- Contact deleted from device → do is paused, a banner says
   "Mom is no longer in your contacts; pick a new person or archive".
 - IM app not installed → channel is greyed out with "install" link.
-- `READ_CONTACTS` revoked → habit is paused.
+- `READ_CONTACTS` revoked → do is paused.
 
 **Requirements covered:** SYS-001, SYS-002, SYS-004.
 
@@ -141,21 +141,21 @@ SYS-016, SYS-018, SYS-019.
 ## WF-004 — Reminder fires (general)
 
 **Preconditions:**
-- A habit is scheduled and its next occurrence is due.
+- A do is scheduled and its next occurrence is due.
 
 **Main flow:**
 1. AlarmManager fires (or WorkManager fallback fires).
-2. The OS surfaces a high-priority notification with the habit's
+2. The OS surfaces a high-priority notification with the do's
    name, due time, and a "Done" / "Open" action.
 3. If the screen is off and the user has enabled full-screen intents,
    a full-screen activity is launched (like Alarmy's alarm screen).
-4. The full-screen activity shows the habit name, the streak at
+4. The full-screen activity shows the do name, the consecutive run at
    stake, and the proof-mode UI.
 5. The user either:
-   - Completes the proof and the habit is marked done.
+   - Completes the proof and the do is marked done.
    - Taps "Snooze" → picks a snooze duration (5, 15, 30 min).
-   - Taps "Skip" → habit is marked skipped, streak is preserved
-     if skip is within rest-day budget.
+   - Taps "Skip" → do is marked skipped, consecutive run is preserved
+     if skip is within skip-day budget.
 
 **Postconditions:**
 - The completion (or snooze / skip) is logged.
@@ -179,24 +179,24 @@ SYS-017, SYS-018, SYS-019, SYS-020.
 ## WF-005 — Complete a Soft-mode reminder
 
 **Preconditions:**
-- The user has tapped the notification for a Soft habit.
+- The user has tapped the notification for a Soft do.
 
 **Main flow:**
-1. The full-screen or in-app screen shows the habit name and a big
+1. The full-screen or in-app screen shows the do name and a big
    "I did it" button.
 2. The user taps the button.
-3. A success animation plays, the completion is logged, the streak
+3. A success animation plays, the completion is logged, the consecutive run
    increments, and the next occurrence is scheduled.
 
 **Postconditions:**
-- The habit is marked done for the current occurrence.
-- The streak counter increments (if applicable).
+- The do is marked done for the current occurrence.
+- The consecutive run counter increments (if applicable).
 - The next occurrence is scheduled.
 
 **Failure modes:**
 - User tapped by accident → an undo snackbar is shown for 5
   seconds.
-- Wrong habit tapped → user can correct in the completion log
+- Wrong do tapped → user can correct in the completion log
   within 24 h.
 
 **Requirements covered:** SYS-005.
@@ -206,7 +206,7 @@ SYS-017, SYS-018, SYS-019, SYS-020.
 ## WF-006 — Complete a Strong-mode reminder (mission chain)
 
 **Preconditions:**
-- The user has tapped the notification for a Strong habit.
+- The user has tapped the notification for a Strong do.
 - The user is on the mission screen.
 
 **Main flow:**
@@ -225,7 +225,7 @@ SYS-017, SYS-018, SYS-019, SYS-020.
      matched in ≤60 s = success.
 2. On success, mission 1 marks complete. If there is a mission 2,
    it animates in.
-3. After the last mission, the completion is logged, streak
+3. After the last mission, the completion is logged, consecutive run
    increments, and the next occurrence is scheduled.
 4. A confirmation toast is shown ("Mission complete. Logged.").
 
@@ -236,9 +236,9 @@ SYS-017, SYS-018, SYS-019, SYS-020.
 - Next occurrence is scheduled.
 
 **Failure modes:**
-- User backs out of the mission → the habit is not marked done;
+- User backs out of the mission → the do is not marked done;
   a re-entry banner says "you started a strong mission; finish it
-  to keep the streak".
+  to keep the consecutive run".
 - Sensor unavailable (emulator, no permission) → mission shows a
   fallback ("shake detection unavailable on this device, use Hold
   instead").
@@ -254,13 +254,13 @@ SYS-011, SYS-012, SYS-020.
 ## WF-007 — Complete an Auto-mode (interval) reminder
 
 **Preconditions:**
-- An interval habit is active (e.g., drink water every 30 min).
+- An interval do is active (e.g., drink water every 30 min).
 - The user is inside a confirmation window.
 
 **Main flow:**
 1. A notification fires (low-priority, no sound) saying "Drink
    water — window open" (brand voice: lead with the action; the
-   streak number is omitted from low-priority interval prompts).
+   consecutive run number is omitted from low-priority interval prompts).
 2. The user taps the notification or the home widget's "I drank"
    button.
 3. The completion is logged with the timestamp.
@@ -274,7 +274,7 @@ SYS-011, SYS-012, SYS-020.
   occurrence is marked missed.
 
 **Failure modes:**
-- Window missed → streak break check runs; rest-day budget is
+- Window missed → consecutive run break check runs; skip-day budget is
   consulted.
 - App was killed → reschedule on next launch via persisted
   schedule.
@@ -286,14 +286,14 @@ SYS-011, SYS-012, SYS-020.
 ## WF-008 — Mark "I'm up" (wake-up anchor)
 
 **Preconditions:**
-- The user has selected an anchor habit (e.g., morning routine).
+- The user has selected an anchor do (e.g., morning routine).
 - Wake-up anchor preference is set to "manual" or "either".
 
 **Main flow (manual):**
 1. The user taps a persistent "I'm up" button on the home
    screen or quick-settings tile (v0.2).
 2. The app records the wake-up timestamp.
-3. All anchored habits are rescheduled relative to this
+3. All anchored dos are rescheduled relative to this
    timestamp.
 
 **Main flow (first-unlock with confirmation):**
@@ -303,11 +303,11 @@ SYS-011, SYS-012, SYS-020.
    HH:MM. Anchor morning routine to this?" (canonical wording
    — see WF-014 for the source).
 3. User taps. The timestamp is recorded.
-4. Anchored habits reschedule.
+4. Anchored dos reschedule.
 
 **Postconditions:**
 - Wake-up timestamp is logged.
-- Anchored habits are rescheduled.
+- Anchored dos are rescheduled.
 - A new wake-up event is suppressed for 4 hours (to avoid
   double-fires).
 
@@ -351,27 +351,27 @@ SYS-011, SYS-012, SYS-020.
 
 ---
 
-## WF-010 — Skip (use a rest day)
+## WF-010 — Skip (use a skip day)
 
 **Preconditions:**
-- The user wants to skip without breaking the streak.
-- A rest-day budget is configured (default 2 / month).
+- The user wants to skip without breaking the consecutive run.
+- A skip-day budget is configured (default 2 / month).
 
 **Main flow:**
 1. User taps "Skip" on the notification.
-2. App shows "Use one of your N rest days this month?"
+2. App shows "Use one of your N skip days this month?"
 3. User confirms.
-4. The occurrence is marked "skipped (rest day)".
-5. The streak is preserved.
+4. The occurrence is marked "skipped (skip day)".
+5. The consecutive run is preserved.
 
 **Postconditions:**
 - Rest-day counter for the month is incremented.
 - The next occurrence is scheduled.
 
 **Failure modes:**
-- Rest-day budget exhausted → "No rest days left; either do it
-  or break the streak."
-- Skip is offered only on habits that have rest-day enabled.
+- Rest-day budget exhausted → "No skip days left; either do it
+  or break the consecutive run."
+- Skip is offered only on dos that have skip-day enabled.
 
 **Requirements covered:** SYS-019, SYS-020.
 
@@ -384,22 +384,22 @@ SYS-011, SYS-012, SYS-020.
 
 **Main flow:**
 1. User opens the Stats tab.
-2. App shows, per habit:
-   - Current streak.
-   - Best streak.
+2. App shows, per do:
+   - Current consecutive run.
+   - Best consecutive run.
    - Completion rate (last 30 / 90 / 365 days).
    - Time-of-day heatmap.
    - Missed-day distribution.
 3. Overall section shows:
-   - Total habits hit today.
+   - Total dos hit today.
    - 30-day overall completion rate.
-   - All-time strongest habit.
+   - All-time strongest do.
 
 **Postconditions:**
 - The user has an honest view of their consistency.
 
 **Failure modes:**
-- No data → "Start a habit to see stats here."
+- No data → "Start a do to see stats here."
 
 **Requirements covered:** SYS-021.
 
@@ -413,7 +413,7 @@ SYS-011, SYS-012, SYS-020.
 
 **Main flow:**
 1. WorkManager fires the nightly backup task.
-2. The app serializes all habits, people, completions, settings
+2. The app serializes all dos, people, completions, settings
    to a versioned JSON file.
 3. The file is written to the user-chosen folder via the
    remembered SAF URI.
@@ -443,14 +443,14 @@ SYS-011, SYS-012, SYS-020.
 1. User opens Settings → Restore.
 2. User picks a backup file via the system file picker.
 3. App validates the file's version and schema.
-4. App shows a preview: "X habits, Y people, Z completions,
+4. App shows a preview: "X dos, Y people, Z completions,
    dated <date>".
 5. User confirms. App wipes the current DB and restores.
 6. App reschedules all reminders from the restored schedule.
 
 **Postconditions:**
 - The DB is the backup's DB.
-- The next occurrence of each habit is scheduled.
+- The next occurrence of each do is scheduled.
 - The boot receiver is re-registered (it should already be).
 
 **Failure modes:**
@@ -527,11 +527,11 @@ detection path specifically.
 **Main flow:**
 1. The OS fires `ACTION_TIMEZONE_CHANGED`.
 2. The app re-computes all schedules in the new zone.
-3. Fixed-time habits fire at the same wall-clock time in the
+3. Fixed-time dos fire at the same wall-clock time in the
    new zone.
-4. Interval habits re-anchor to "next multiple of interval
+4. Interval dos re-anchor to "next multiple of interval
    from now".
-5. Anchor habits reference the last wake-up event, re-mapped
+5. Anchor dos reference the last wake-up event, re-mapped
    to the new zone.
 
 **Postconditions:**
@@ -541,9 +541,9 @@ detection path specifically.
   travel after the fact).
 
 **Failure modes:**
-- DST jump forward → a 02:30 habit is silently dropped (it
+- DST jump forward → a 02:30 do is silently dropped (it
   didn't exist). The user is informed on next launch.
-- DST jump back → a 02:30 habit fires twice (rare; the
+- DST jump back → a 02:30 do fires twice (rare; the
   second one is deduped by occurrence-id).
 
 **Requirements covered:** SYS-016, SYS-017.
@@ -641,13 +641,13 @@ The workflows below are part of v0.2. The proposal is at
 
 ---
 
-## WF-019 — Add a time-window habit (meal, fasting)
+## WF-019 — Add a time-window do (meal, fasting)
 
 **Preconditions:**
 - App is installed and onboarded.
 
 **Main flow:**
-1. User taps add → "Habit" → "Time window".
+1. User taps add → "Do" → "Time window".
 2. User enters a name (e.g., "16:8 fast", "Lunch window").
 3. User picks a start time and an end time.
 4. User picks days of week (default: every day).
@@ -659,7 +659,7 @@ The workflows below are part of v0.2. The proposal is at
 7. User saves.
 
 **Postconditions:**
-- A `HabitTimeWindow` record is written.
+- A `DoTimeWindow` record is written.
 - The home screen shows a live "Fasting, 6h 12m elapsed,
   1h 48m remaining" widget when the window is active.
 - The widget auto-updates every minute via a `Ticker`.
@@ -674,58 +674,58 @@ The workflows below are part of v0.2. The proposal is at
 
 ---
 
-## WF-022 — Edit an existing habit
+## WF-022 — Edit an existing do
 
 **Preconditions:**
-- The habit exists in the local DB.
+- The do exists in the local DB.
 
 **Main flow:**
-1. User long-presses a habit on the home screen (or taps
-   "Edit" on the habit detail screen).
-2. App opens the same `AddHabit` flow, pre-filled with the
-   habit's current fields.
+1. User long-presses a do on the home screen (or taps
+   "Edit" on the do detail screen).
+2. App opens the same `AddDo` flow, pre-filled with the
+   do's current fields.
 3. User changes any field (name, schedule, proof mode, mission
-   chain, streak policy, category, color, icon).
+   chain, consecutive run policy, category, color, icon).
 4. User saves.
 
 **Postconditions:**
-- The habit record is updated in place (id is stable; only
+- The do record is updated in place (id is stable; only
   fields change).
-- The completion log is preserved; the streak is recomputed
+- The completion log is preserved; the consecutive run is recomputed
   from the log.
 - The next occurrence is rescheduled.
 
 **Failure modes:**
 - Schedule change would invalidate past completions → log
   with a warning; the user can confirm "yes, change anyway".
-- Anchor references a now-archived anchor habit → reject
+- Anchor references a now-archived anchor do → reject
   with a "pick a new anchor" prompt.
 
 **Requirements covered:** SYS-042, SYS-043.
 
 ---
 
-## WF-027 — Pause / resume a habit or person
+## WF-027 — Pause / resume a do or person
 
 **Preconditions:**
-- The habit or person exists in the local DB.
+- The do or person exists in the local DB.
 
 **Main flow (pause):**
-1. User long-presses a habit/person → "Pause".
+1. User long-presses a do/person → "Pause".
 2. User picks a duration: 1 day, 1 week, 2 weeks, 1 month,
    or "Until I resume".
-3. App marks the habit/person as `pausedUntil = now + duration`
+3. App marks the do/person as `pausedUntil = now + duration`
    (or `pausedUntil = null` for "Until I resume").
 
 **Main flow (resume):**
-1. User long-presses a paused habit/person → "Resume".
+1. User long-presses a paused do/person → "Resume".
 2. App clears `pausedUntil`.
 3. The next occurrence is scheduled.
 
 **Postconditions:**
 - While paused, no reminders fire; the schedule is preserved.
-- The completion log is preserved; the streak is preserved
-  (a paused period does not break the streak).
+- The completion log is preserved; the consecutive run is preserved
+  (a paused period does not break the consecutive run).
 
 **Failure modes:**
 - "Until I resume" pause runs for > 90 days → app shows a
@@ -738,10 +738,10 @@ The workflows below are part of v0.2. The proposal is at
 ## WF-028 — Fire a test reminder in 30 seconds
 
 **Preconditions:**
-- The habit exists in the local DB.
+- The do exists in the local DB.
 
 **Main flow:**
-1. User opens the habit detail screen.
+1. User opens the do detail screen.
 2. User taps "Test in 30s".
 3. A countdown shows: "Firing in 30… 29… 28…".
 4. At T-0, the scheduler fires the same notification /
@@ -753,7 +753,7 @@ The workflows below are part of v0.2. The proposal is at
 - The test reminder fires exactly as the real one would
   (same channel, same importance, same mission UI).
 - The test does NOT log a completion (it is a verification
-  artifact, not a habit completion).
+  artifact, not a do completion).
 - The test does NOT reschedule the next occurrence.
 
 **Failure modes:**
@@ -765,16 +765,16 @@ The workflows below are part of v0.2. The proposal is at
 
 ---
 
-## WF-029 — Bulk-complete N occurrences of an interval habit
+## WF-029 — Bulk-complete N occurrences of an interval do
 
 **Preconditions:**
-- The habit is an interval habit (e.g., drink water every
+- The do is an interval do (e.g., drink water every
   30 min, 8 windows/day).
 - The current day's completions are < the daily target.
 
 **Main flow:**
 1. User opens the home screen.
-2. For an interval habit with missed windows, the home tile
+2. For an interval do with missed windows, the home tile
    shows a "Mark N done" button.
 3. User taps the button. N defaults to the number of missed
    windows, capped at 4 (to prevent accidental bulk-log).
@@ -785,7 +785,7 @@ The workflows below are part of v0.2. The proposal is at
 - N completions are logged with timestamps spread across
   the missed window range (e.g., 4 completions at 09:00,
   10:00, 11:00, 12:00 — not all at the moment of bulk-log).
-- The streak and the next-window computation handle the
+- The consecutive run and the next-window computation handle the
   bulk log normally.
 
 **Failure modes:**
@@ -797,13 +797,13 @@ The workflows below are part of v0.2. The proposal is at
 
 ---
 
-## WF-031 — Set category, color, and icon on a habit
+## WF-031 — Set category, color, and icon on a do
 
 **Preconditions:**
-- The habit exists (or is being created).
+- The do exists (or is being created).
 
 **Main flow:**
-1. User opens add/edit habit.
+1. User opens add/edit do.
 2. After the proof-mode step, user picks a category:
    Health, Mind, Relationships, Productivity, Home, Other.
 3. App auto-assigns a color based on the category
@@ -814,10 +814,10 @@ The workflows below are part of v0.2. The proposal is at
 6. User saves.
 
 **Postconditions:**
-- The habit has `category`, `colorSeed`, `iconName` fields set.
+- The do has `category`, `colorSeed`, `iconName` fields set.
 - The home screen renders the icon + color swatch beside the
-  habit name.
-- The stats screen groups habits by category.
+  do name.
+- The stats screen groups dos by category.
 
 **Failure modes:**
 - No category picked → default to "Other" / grey / a generic

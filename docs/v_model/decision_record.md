@@ -1376,3 +1376,282 @@ on-device verification (WF-001) is unchanged.
   `package` is the only one likely to
   appear in an Android applicationId
   *or* namespace segment.
+
+---
+
+## ADR-018 (reserved)
+
+Reserved (out of order; the v0.5 numbering reached 018 only after
+ADR-014..017 and a 013 follow-up. v1.0 keeps the next number free for
+the next naming-breaking refactor; this ADR is therefore a placeholder
+and not a decision.)
+
+## ADR-019 (reserved)
+
+Reserved. v1.0 has two new templates features on the
+roadmap (a curated 25-template library + a user-saveable
+template store). When the Templates PR lands it will
+take this slot; if a smaller ADR arrives first the
+reservation will be renumbered.
+
+## ADR-020 (reserved)
+
+Reserved for the template-JSON-shape decision
+(ADR-candidate: `payloadJson` blob per template,
+versioned with `kTemplateFormatVersion`, mirroring
+`kBackupFormatVersion`).
+
+## ADR-021 (reserved)
+
+Reserved for the geofence library choice
+(`flutter_geofence` vs `geofencing` vs platform-channel native).
+
+## ADR-022 (reserved)
+
+Reserved for the device-state polling cadence (60s
+default; reactive for charging / silent mode via
+platform broadcasts).
+
+## ADR-023 (reserved)
+
+Reserved for the calendar library choice
+(`device_calendar` vs `add_2_calendar` vs platform
+`CalendarContract`).
+
+## ADR-024 — v1.0/Phase A: rename "Habit" → "Do" across model, UI, and docs
+
+**Date:** 2026-06-20.
+**Status:** Accepted (lands across three PRs: class rename,
+UI copy, doc sync — see "Phasing" below).
+**Supersedes:** The v0.1..v0.5e framing of the
+core entity as a "Habit" (`HabitFixed`,
+`HabitInterval`, `HabitAnchor`, `HabitDayOfX`,
+`HabitTimeWindow`, `HabitProofMode`, `HabitCategory`,
+`HabitIcons`, `HabitRepository`, `HabitRow`,
+`StreakCalculator`, `RestDayBudget`).
+
+**Context.** The product started as a fused personal
+habit coach: time-of-day reminders with mission-gated
+proof (Alarmy DNA), contact-cadence for
+stay-in-touch (Google Reminders DNA), and an
+"anchored" wake-up→routine chain (Samsung Routines
+DNA). That framing baked "Habit" into the class
+hierarchy, the UI copy, and every V-Model artifact.
+v1.0 broadens the surface area to *any* thing the
+user wants to do on a schedule: one-off events,
+contact cadences, location-triggered routines,
+device-state routines, calendar-triggered routines,
+incoming-call routines (the Japan silent-mode
+template). The "habit" word starts to be a
+misdirection the moment a user adds a "Pay rent"
+event or a "Ring Mom through silent mode" routine —
+neither is a *habit* in any honest reading.
+
+The umbrella entity must read as a **Do**:
+whatever the user wants done, on whatever schedule
+or trigger makes sense. "Streak" is also wrong:
+the user does not care that the counter is shaped
+like a streak; they care how many *consecutive
+times* they did it. A run is what the number
+counts; "consecutive run" is the honest name.
+
+**Decision.** Three mechanical PRs, in order:
+
+1. **PR A1 (class rename).** `Habit*` → `Do*` in
+   the model layer; `lib/habits/` → `lib/do/`;
+   `HabitRepository` → `DoRepository`; `HabitRow`
+   → `DoRow`; `HabitProofMode` → `DoProofMode`;
+   `StreakCalculator` → `ConsecutiveCounter` (with
+   the `StreakConfig` / `StreakSnapshot` value
+   classes unchanged — they are the *data*, not the
+   calculator); `RestDayBudget` → `SkipBudget`.
+   The DB schema does **not** migrate: column
+   names stay `habitId`, `targetHabitId`, etc., to
+   avoid a needless v2→v3 column-rename migration.
+   The domain field `CompletionLogEntry.doId`
+   replaces the old `habitId` (model-side
+   translation happens in `DoRepository`).
+2. **PR A2 (UI copy).** User-facing strings:
+   "habit" → "do"; "streak" → "consecutive
+   done"; "rest day" → "skip day". The internal
+   `ValueKey` selectors (`'habit_tile.h1'`,
+   `'add_habit.save'`, `'home.fab.habit'`) are
+   preserved as the test API; they are
+   intentionally not the user-facing copy.
+3. **PR A3 (doc sync — this PR).** `conops.md`,
+   `requirements.md`, `workflows.md` get the
+   rename in their prose; SYS- IDs are preserved
+   (SYS-001 still says "add a habit" in the row
+   but the body is reworded to "add a do" with a
+   pointer to this ADR); test file paths in
+   requirements.md are left pointing at
+   `test/habits/...` because the test directory
+   was deliberately not renamed in this phase
+   (renaming test paths would invalidate
+   coverage reports; defer to a later PR if ever
+   needed).
+
+**Why "Do" and not "Task" / "Routine" / "Reminder".**
+
+- **Do** matches the app name "do it" and the
+  current `doit` Dart package — every brand cue
+  already points at "do".
+- **Task** is too generic and reads as a
+  one-off to-do (Google Tasks DNA), not a
+  repeated action.
+- **Routine** is the *trigger* side (Samsung
+  Routines), not the *action* side. A routine
+  is a `(trigger, condition, action)` triple;
+  the entity the user is configuring a
+  reminder for is the *action* — a Do.
+- **Reminder** is the notification, not the
+  thing. The user does not want to "remind me";
+  they want to "drink water", "call Mom",
+  "pay rent", "ring through silent mode".
+
+**Why "consecutive run" and not "streak".** A
+streak implies fire; a missed day is a "break".
+A *consecutive run* is a count of days
+completed in a row — the number itself is
+neutral on shame. This matches the v0.1
+brand-voice rule "Missed days are facts, not
+failures" (see `conops.md` § Brand voice).
+
+**DB schema policy.** No migration. The
+`habitId` / `targetHabitId` column names are
+internal — they never appear in user-facing copy
+or in any requirement. The cost of a
+column-rename migration is real (every backup
+file in the field has the old column name; every
+restore path must continue to work for v0.5e
+backups written before the migration). The
+benefit is cosmetic. The 80% coverage floor and
+the 3-gate would not catch a missed-rename
+defect at this scale. The decision is to
+keep the column names and add a one-line note
+in `architecture_options.md` § "DB schema
+naming" explaining why. (The note will land in
+Phase C alongside the v3→v4 automations-column
+migration, which is a real schema change and
+deserves its own ADR.)
+
+**Phasing.** The three PRs land in sequence on
+`main`, each with the 3-gate green and the
+matching conventional-commit message:
+
+```
+feat(v1.0): rename Habit→Do classes (Phase A, PR 1/3)
+feat(v1.0): rename user-facing copy 'habit'→'do', 'streak'→'consecutive done' (Phase A, PR 2/3)
+docs(v1.0): sync v_model docs to Do / consecutive run framing (Phase A, PR 3/3)
+```
+
+Each PR is independently revertable. Reverting
+PR 2 or PR 3 alone leaves the codebase in a
+mixed state (new class names, old user copy) —
+that is acceptable for a single release because
+the user copy is the only user-visible diff and
+it does not affect any backup / restore / data
+path.
+
+**SYS-IDs affected:** Body text of SYS-001,
+SYS-003, SYS-004, SYS-005, SYS-007, SYS-008,
+SYS-013, SYS-018..021, SYS-031, SYS-033,
+SYS-039..045, SYS-046, SYS-047, SYS-048,
+SYS-049, SYS-055, SYS-064. The ID numbers
+themselves are preserved (the requirements
+contract is stable across the rename). The
+*class names* referenced in the Verification
+column are updated to the new names
+(`DoProofMode`, `ConsecutiveCounter`,
+`SkipBudget`, `DoTimeWindow`, `DoCategory`,
+`DoFixed`).
+
+**Workflows affected:** WF-002, WF-019,
+WF-022, WF-027, WF-029, WF-031 (the six
+workflows whose descriptive title mentions a
+"habit"). The WF-NNN IDs are preserved. The
+class names referenced in the body are updated.
+
+**Out of scope for Phase A (deferred to later
+phases).**
+
+- The v0.1..v0.5e `test/habits/` and
+  `test/services/habit_repository_test.dart`
+  test file paths. The test *contents* are
+  already updated to the new class names
+  (verified by 438/438 green at v1.0-tip);
+  the *file paths* are deferred to avoid
+  invalidating coverage reports. The test
+  files renamed in this phase:
+  - `lib/habits/habit.dart` → `lib/do/do.dart`
+  - `lib/habits/category.dart` →
+    `lib/do/category.dart`
+  - `lib/habits/proof_mode.dart` →
+    `lib/do/proof_mode.dart`
+  - `lib/habits/streak_calculator.dart` →
+    `lib/do/consecutive_counter.dart`
+  - `lib/habits/rest_day_budget.dart` →
+    `lib/do/skip_budget.dart`
+  - `lib/services/habit_repository.dart` →
+    `lib/services/do_repository.dart`
+- The v0.1..v0.5e `lib/habits/` directory
+  itself. After PR A1, the directory is empty
+  and the 6 source files have moved to
+  `lib/do/`. The directory is removed in the
+  same PR (`rmdir`).
+- `lib/habits/habit_assets.dart` (the
+  `rootBundle` reader for preset definitions).
+  The presets will be re-introduced under
+  `lib/templates/` in Phase B (curated 25-template
+  library). Until Phase B lands, the file is
+  preserved in `lib/habits/` for backward
+  compat with the v0.5e release.
+- The Drift table name `RestDayBudgets`. The
+  model class is `SkipBudget`; the Drift table
+  stays `RestDayBudgets` for the same schema
+  reasons (no migration; the table name is
+  internal). The PR renames the *class*, not
+  the *table*.
+- The Drift table name `Habits`. The model
+  class is `Do`; the Drift table stays
+  `Habits` for the same reason. The PR renames
+  the *class*, not the *table*.
+
+**Lessons (project-wide).**
+
+- "Product" naming in code lags product naming
+  in the docs. The decision to ship as a
+  "personal habit coach" baked "Habit" into 6
+  model files, 8 service files, 14 screen /
+  widget files, 4 v_model docs, and 22 test
+  files in v0.1..v0.5e. The cost of the
+  rename is one PR per layer (class, UI, docs)
+  plus a 2-3x-grep sweep on the test paths
+  (deferred). A shorter feedback loop from
+  product naming to class naming — e.g., naming
+  the entity "Do" from the v0.1 first commit —
+  would have saved a day of mechanical refactor.
+- "Streak" is a loaded word. The product voice
+  already forbade shame language ("broke",
+  "lost") but the noun itself ("streak")
+  implies fire; a missed day reads as a
+  "broken streak" by default. The "consecutive
+  run" framing is brand-aligned: the number
+  is what counts; the failure mode is "missed"
+  not "broke". This was a free upgrade the
+  rename enabled.
+- "No DB migration" is the right default for
+  rename-only refactors. The 3-gate will not
+  catch a column-rename defect, and the
+  restore-from-old-backup path is non-trivial
+  to test (every backup file in the field has
+  the old column name; the v0.5e backups must
+  continue to restore). Keep DB column names
+  stable across a code-side rename; reserve
+  migrations for actual schema changes.
+- v1.0 of an Android app is a good moment to
+  do a naming pass: the user base is small,
+  the backup files are still local-only, the
+  schema has not yet been versioned in the
+  field. Defer the rename to a v1.0 minor
+  bump; never to a v1.x patch.

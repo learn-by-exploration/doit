@@ -4,20 +4,31 @@ Status: draft baseline, created 2026-06-13.
 
 ## Mission
 
-do it helps a single user build daily habits and maintain important
-relationships by turning the phone into a slightly stubborn coach. The
-app reminds you to do the things you said you would — drink water, call
-Mom, run the morning routine — and tracks the truth of what you actually
-did. The product is opinionated: it would rather refuse a fudged "done"
-than inflate a streak.
+do it is a general personal-life "do" app for a single user, combining
+the best of Alarmy (mission-gated reminders), Google Reminders (task
+templates + recurrence), and Samsung Routines (location / device-state
+triggers with conditional logic). The app reminds the user to do the
+things they said they would — drink water, call Mom, run the morning
+routine, pay rent, ring a contact through silent mode — and tracks
+the truth of what they actually did. The product is opinionated: it
+would rather refuse a fudged "done" than inflate a consecutive-run
+counter.
+
+The umbrella entity is the **Do** (formerly "Habit"; renamed in
+v1.0/Phase A — see ADR-024). A Do is anything the user wants to
+do on a schedule: a daily habit, a one-off event, a contact cadence,
+a location-triggered routine, etc. Schedules can be time-of-day,
+location-based, device-state-based, calendar-based, or
+incoming-call-based; each Do can be a Soft one-tap, a Strong
+mission-gated proof, or an Auto interval window.
 
 ### Brand voice
 
-The product is named *do it*, but the surface area spans habits,
-todos, call/message cadences, and anchored routines. Notification copy
-should lead with the **thing you do** ("Call Mom", "Drink water",
-"Submit report") and end with the streak number only when it adds
-motivation. The name does the work; the copy does not lean on it.
+The product is named *do it*, and the surface area spans dos, todos,
+call/message cadences, events, and anchored routines. Notification
+copy should lead with the **thing you do** ("Call Mom", "Drink water",
+"Submit report") and end with the consecutive-run count only when it
+adds motivation. The name does the work; the copy does not lean on it.
 
 - **Lead with the action.** "Drink water" beats "do it: hydrate".
 - **do it number is the period, not the point.** Append it as a
@@ -67,16 +78,17 @@ The app must work in ordinary day-to-day environments:
 
 | Mode | Description |
 | --- | --- |
-| **Catalog mode** | Browse, add, edit, archive, search, and group habits and people. No scheduling fires. |
+| **Catalog mode** | Browse, add, edit, archive, search, and group dos and people. No scheduling fires. |
 | **Reminder firing mode** | A scheduled reminder has come due. The system surfaces a notification; the user taps it. |
 | **Mission mode** | A strong-mode reminder is open. The user must complete a chain of one or more missions (Shake, Type, Hold, Math, Memory) in declared order. The app is in the foreground. |
 | **Calling mode** | The user has tapped a call reminder. The app opens the system dialer with the contact's number pre-filled. The app is no longer in the foreground. |
-| **Anchor mode** | A wake-up / wake-event has been recorded. Anchored habits are re-scheduled relative to the anchor's timestamp. |
-| **Stats / review mode** | The user opens the stats screen to see per-habit streak, overall streak, completion rate, best run, and time-of-day distribution. |
+| **Anchor mode** | A wake-up / wake-event has been recorded. Anchored dos are re-scheduled relative to the anchor's timestamp. |
+| **Stats / review mode** | The user opens the stats screen to see per-do consecutive-run, overall consecutive-run, completion rate, best run, and time-of-day distribution. |
+| **Routine firing mode** | A non-time trigger has fired (location enter/exit, device state, calendar event, incoming call). The matched `Action` runs. |
 | **Backup mode** | The user has chosen a backup folder; the app writes a daily snapshot to it. Restore reads a chosen file. |
 | **Settings mode** | Permissions, exact-alarm, Doze whitelist, OEM auto-start prompt, backup folder, mission defaults, theme, sound/vibration, rest-day cap, etc. |
 
-## Default Habit Presets (v0.1)
+## Default Do Presets (v0.1)
 
 | Preset | Schedule | Proof mode | Notes |
 | --- | --- | --- | --- |
@@ -85,7 +97,7 @@ The app must work in ordinary day-to-day environments:
 | **Morning routine** | Fixed: 06:30 weekdays, 09:00 weekends; chained steps | Strong (barcode / shake / hold) | Anchored to wake-up event |
 | **Daily todo** | One-off, user-defined | Soft (one-tap) or Strong (user-pickable) | Free-form; not auto-recurring |
 
-The preset system must be extensible. A user can create a custom habit
+The preset system must be extensible. A user can create a custom do
 that is not on this list (e.g., "Read 20 min", "Stretch", "Practice
 guitar") with any of the four schedule types and any of the three proof
 modes.
@@ -96,7 +108,7 @@ modes.
 2. Onboarding explains what the app does and asks for permissions in
    order (notifications first, contacts second, exact-alarm third,
    battery optimization last, with rationale for each).
-3. User creates the first habit (or accepts a default preset).
+3. User creates the first do (or accepts a default preset).
 4. User adds a person (Mom), picks cadence ("every 3 days"), and picks
    mission ("shake 10").
 5. User sets a wake-up anchor preference (manual only, first-unlock
@@ -106,7 +118,7 @@ modes.
    with a full-screen intent if the screen is off or locked.
 8. The user taps the notification. The mission UI opens.
 9. The user completes the mission chain. The completion is logged with a
-   timestamp. The streak is updated.
+   timestamp. The consecutive-run count is updated.
 10. The user continues through the day: drink water pings every 30 min
     and they confirm in the window; a "call Mom" reminder surfaces in
     the evening; the user taps it, the dialer opens, the call is made,
@@ -114,8 +126,14 @@ modes.
 11. Each night, do it writes a snapshot to the user's chosen backup
     folder.
 12. After 30 days, the stats screen shows: 28/30 days hit on drink
-    water, 10 calls to Mom (cadence kept), morning routine streak of
-    22, overall streak of 18 (two rest days used).
+    water, 10 calls to Mom (cadence kept), morning routine
+    consecutive-run of 22, overall consecutive-run of 18 (two rest
+    days used).
+13. (v1.0+, optional) The user enables the Japan silent-mode
+    template: when a contact calls and the phone is on silent, the
+    ringer restores and the contact's ringtone plays. A location-based
+    "leaving work" reminder fires at 17:30 as the user exits the
+    office geofence.
 
 ## Constraints
 
@@ -125,7 +143,7 @@ modes.
   stores anything it could not lose without harm.
 - **Android only for v0.1.** iOS is a v0.2+ candidate.
 - **Single user, single device.** No sync, no multi-device, no shared
-  habits.
+  dos.
 - **Data is local.** The app does not perform network calls with user
   data. Any `http(s)://` usage is a defect.
 - **Permission-first.** The app explains what it will do with each
@@ -140,14 +158,14 @@ modes.
 The app succeeds if, after 30 consecutive days of use, the user can
 truthfully answer "yes" to all of the following:
 
-1. do it fired a reminder for each scheduled habit within ±60 seconds
+1. do it fired a reminder for each scheduled do within ±60 seconds
    of its target time, for at least 95% of scheduled occurrences.
 2. do it survived at least one device reboot without dropping
    reminders.
 3. The user called or messaged each named contact at least once per
    cadence window, for at least 80% of windows.
 4. The completion log matches the user's honest memory of what they
-   did (the app is not lying about streaks).
+   did (the app is not lying about consecutive runs).
 5. The backup file can be moved off-device, the app can be uninstalled
    and reinstalled, and the backup can be restored with no data loss.
 6. The user has not had to fight the app to get it to remind them
