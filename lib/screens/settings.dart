@@ -394,6 +394,12 @@ class _PermissionTile extends StatelessWidget {
         // (Phase C PR 2 / ADR-021). The re-prompt flow
         // matches the other runtime kinds.
         await service.requestLocation();
+      case PermissionKind.calendar:
+        // SYS-078: READ_CALENDAR runtime permission
+        // (Phase E PR 1 / ADR-023). Used by
+        // `CalendarService` to watch event transitions for
+        // `TriggerCalendarEvent` matching.
+        await service.requestCalendar();
       case PermissionKind.backupFolder:
         // The backup folder is not a runtime permission;
         // it's a SAF picker. The re-pick is handled in

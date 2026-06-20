@@ -25,14 +25,20 @@ import 'package:flutter/material.dart';
 
 import 'package:doit/do/do.dart';
 import 'package:doit/do/proof_mode.dart';
+import 'package:doit/routines/routine.dart';
+import 'package:doit/routines/routine_executor.dart';
 import 'package:doit/services/do_repository.dart';
+import 'package:doit/services/geofence_service.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/template_repository.dart';
 import 'package:doit/templates/template.dart';
 import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/triggers/action.dart';
+import 'package:doit/triggers/trigger.dart';
 import 'package:doit/widgets/category_chip.dart';
 import 'package:doit/widgets/icon_picker.dart';
+import 'package:doit/widgets/location_picker.dart';
 
 class AddHabitScreen extends StatefulWidget {
   const AddHabitScreen({super.key, this.habitId, this.initialPayload});
@@ -82,6 +88,12 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   // pause / unpause without leaving the form.
   DateTime? _pausedUntil;
 
+  // v1.0 (Phase C, SYS-072). Non-default automation rules.
+  // Empty list = the default ActionNotify (synthesized at
+  // dispatch time). Stored on the row as
+  // `Habits.automations_json`.
+  List<Automation> _automations = const <Automation>[];
+
   // Cached list of all other habits, for the anchor picker.
   List<Do> _otherHabits = const <Do>[];
 
@@ -123,6 +135,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
       _colorSeed = h.colorSeed;
       _iconName = h.iconName;
       _pausedUntil = h.pausedUntil;
+      _automations = h.automations;
     });
     // Type-specific fields.
     final self = h;
@@ -280,6 +293,22 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
                   onTap: _pickIcon,
                 ),
               ],
+            ),
+            const SizedBox(height: Spacing.lg),
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+              child: Text(
+                'Routines',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            _RoutinesSection(
+              automations: _automations,
+              onAddLocation: _addLocationRoutine,
+              onRemove: (idx) => setState(
+                () => _automations = List.of(_automations)..removeAt(idx),
+              ),
             ),
             const SizedBox(height: Spacing.lg),
             const Divider(),
@@ -746,6 +775,50 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   /// same row that was persisted. Cleared in [dispose].
   Do? _lastSaved;
 
+  /// Open the [LocationPicker] modal and append the result
+  /// to [_automations]. The picker handles its own
+  /// permission gate (SYS-076); we just consume the
+  /// returned [Automation]. `null` returns are user cancels
+  /// or denied permissions — silent no-op.
+  Future<void> _addLocationRoutine() async {
+    final auto = await LocationPicker.show(context);
+    if (auto == null || !mounted) return;
+    // Register the trigger's geofence with the platform
+    // service so the matcher starts watching for it. We
+    // only register geofence triggers here; non-location
+    // triggers register at the executor (their seam is in
+    // Phase D / E / F).
+    final trigger = auto.trigger;
+    if (trigger is TriggerLocation) {
+      await GeofenceService.instance.register(trigger);
+    }
+    setState(() {
+      _automations = List<Automation>.unmodifiable(<Automation>[
+        ..._automations,
+        auto,
+      ]);
+    });
+  }
+
+  /// Re-register every location-triggered automation with
+  /// the [GeofenceService]. Called after a successful save
+  /// so the platform side knows which circles to watch.
+  Future<void> _registerRoutines(String entityId) async {
+    // Drop any prior registration for this entity so an
+    // edit does not leave stale circles on the platform
+    // side.
+    RoutineExecutor.instance.unregister(entityId);
+    for (final a in _automations) {
+      final t = a.trigger;
+      if (t is TriggerLocation) {
+        await GeofenceService.instance.register(t);
+      }
+    }
+    if (_automations.isNotEmpty) {
+      RoutineExecutor.instance.register(entityId, _automations);
+    }
+  }
+
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
@@ -778,6 +851,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             colorSeed: _colorSeed,
             iconName: _iconName,
             pausedUntil: _pausedUntil,
+            automations: _automations,
           );
         case 'interval':
           habit = DoInterval(
@@ -792,6 +866,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             colorSeed: _colorSeed,
             iconName: _iconName,
             pausedUntil: _pausedUntil,
+            automations: _automations,
           );
         case 'anchor':
           if (_anchorTargetId == null) {
@@ -810,6 +885,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             colorSeed: _colorSeed,
             iconName: _iconName,
             pausedUntil: _pausedUntil,
+            automations: _automations,
           );
         case 'dayOfX':
           habit = DoDayOfX(
@@ -826,6 +902,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             colorSeed: _colorSeed,
             iconName: _iconName,
             pausedUntil: _pausedUntil,
+            automations: _automations,
           );
         case 'timeWindow':
           if (_fixedWeekdays.isEmpty) {
@@ -846,6 +923,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             colorSeed: _colorSeed,
             iconName: _iconName,
             pausedUntil: _pausedUntil,
+            automations: _automations,
           );
         default:
           _showSnack('Pick a schedule type.');
@@ -859,6 +937,11 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     try {
       await DoRepository.instance.save(habit);
       _lastSaved = habit;
+      // v1.0 Phase C PR 2 (SYS-072): register the
+      // routines' geofences with the platform service so
+      // the executor can match transitions as soon as the
+      // row is persisted.
+      await _registerRoutines(habit.id);
       if (!_isEdit) {
         // Schedule the first reminder only for new habits.
         // Edits re-schedule lazily on the next listActive cycle.
@@ -1199,6 +1282,95 @@ class _PauseRow extends StatelessWidget {
         if (paused != null)
           TextButton(onPressed: onClear, child: const Text('Resume')),
       ],
+    );
+  }
+}
+
+/// "Routines" section of the Add / Edit habit form (SYS-072).
+/// Renders one [ListTile] per registered automation with a
+/// description of the trigger + action, plus an "Add a
+/// location routine" button that opens [LocationPicker].
+///
+/// The widget is intentionally dumb — the parent state owns
+/// the [List<Automation>] and rebuilds on mutation.
+class _RoutinesSection extends StatelessWidget {
+  const _RoutinesSection({
+    required this.automations,
+    required this.onAddLocation,
+    required this.onRemove,
+  });
+
+  final List<Automation> automations;
+  final VoidCallback onAddLocation;
+  final ValueChanged<int> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (automations.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+            child: Text(
+              'No routines yet. Add one to fire this do when you '
+              'arrive at or leave a place.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          )
+        else
+          for (var i = 0; i < automations.length; i++)
+            _RoutineRow(
+              automation: automations[i],
+              onRemove: () => onRemove(i),
+            ),
+        const SizedBox(height: Spacing.sm),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const ValueKey('add_habit.add_location_routine'),
+            onPressed: onAddLocation,
+            icon: const Icon(Icons.add_location_alt_outlined),
+            label: const Text('Add a location routine'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RoutineRow extends StatelessWidget {
+  const _RoutineRow({required this.automation, required this.onRemove});
+
+  final Automation automation;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final trigger = automation.trigger;
+    final action = automation.action;
+    final summary = switch (trigger) {
+      TriggerLocationEnter(:final label, :final radiusMeters) =>
+        'On enter $label ($radiusMeters m)',
+      TriggerLocationExit(:final label, :final radiusMeters) =>
+        'On exit $label ($radiusMeters m)',
+      _ => trigger.runtimeType.toString(),
+    };
+    final actionLabel = switch (action) {
+      ActionNotify(:final title) => 'Notify "$title"',
+      _ => action.runtimeType.toString(),
+    };
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.bolt_outlined),
+      title: Text(summary),
+      subtitle: Text(actionLabel),
+      trailing: IconButton(
+        key: const ValueKey('add_habit.remove_routine'),
+        tooltip: 'Remove',
+        icon: const Icon(Icons.close),
+        onPressed: onRemove,
+      ),
     );
   }
 }

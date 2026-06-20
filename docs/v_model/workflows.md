@@ -954,3 +954,88 @@ The workflows below are part of v0.2. The proposal is at
   → `SnackBar` with the message.
 
 **Requirements covered:** SYS-068.
+
+## WF-034 — Add a location-triggered do / event / person (v1.0/Phase C PR 2)
+
+The user configures an automation that fires a notification when
+the device enters or leaves a chosen place. The place is named
+("Home", "Office", "Gym"), given a coordinate + radius, and tied
+to a do / event / person via the add screens' new "Routines"
+section.
+
+**Preconditions:**
+- The user is on `AddHabitScreen` (do) / `AddEventScreen`
+  (event) / `AddPersonScreen` (person).
+- `ACCESS_COARSE_LOCATION` has been granted (the picker
+  gates on `PermissionSheet.show(PermissionKind.location)`;
+  the first tap surfaces the rationale + system dialog).
+
+**Main flow:**
+1. The user fills in the entity (do name, event name, or
+   person contact) — the entity form is the same shape as
+   in WF-002 / WF-017 / WF-003.
+2. In the new "Routines" section, the user taps
+   "Add a location routine" (`add_<entity>.add_location_routine`
+   key — the empty-state copy is entity-specific:
+   "fire this do / event / remind you to reach out when you
+   arrive at or leave a place").
+3. The `LocationPicker` bottom sheet opens (gated by
+   `PermissionSheet.show(PermissionKind.location)` →
+   granted → modal sheet).
+4. The user enters a `label` (required), `latitude` /
+   `longitude` (validated `[-90, 90]` / `[-180, 180]`,
+   populated from `Geolocator.getCurrentPosition()` if the
+   "Use current location" button is tapped), and a `radius`
+   slider (50 m .. 500 m, default 100 m). The radio group
+   selects enter (default) vs. exit.
+5. The user taps Save. The sheet pops an `Automation`
+   with `trigger: TriggerLocationEnter | TriggerLocationExit`
+   and `action: ActionNotify(title: <label>,
+   body: 'Routine fired: <label>')`. The new routine
+   appears in the Routines section as an enabled row.
+6. The user saves the entity. `automationsJson` on the
+   row carries the envelope
+   `{"k":1,"automations":[<Automation>...]}` (or empty
+   when no routines are added).
+
+**Postconditions:**
+- `GeofenceService.instance` has the new `TriggerLocation*`
+  registered (the executor's `init()` subscribes the
+  service stream and the entity's `automationsJson` is
+  decoded into a `List<Automation>` in `loadAll`).
+- The `GeofenceBroadcastReceiver` is dynamically
+  registered for the matching geofence IDs.
+- A notification fires when the device enters (or
+  exits, per the radio) the geofence circle.
+- The routine round-trips through backup / restore
+  (the envelope is plain JSON in the existing backup
+  format; no schema bump needed).
+
+**Failure modes:**
+- Permission denied at the gate → the sheet pops
+  `null` and no routine is added.
+- Validation error (blank label, lat out of range,
+  radius outside [50, 500]) → inline error renders
+  under the offending field; the Save button stays
+  enabled and the sheet does NOT pop.
+- User cancels the sheet → returns `null`; the
+  Routines section remains in the empty state.
+- User revokes `ACCESS_COARSE_LOCATION` mid-flight →
+  the geofence stream emits `PositionServiceException`;
+  the executor logs and continues, dropping the
+  pending routine silently. The home-screen reliability
+  banner flips to `Reliability.degraded` with a one-tap
+  deep link to permission settings (only when at least
+  one `TriggerLocation*` automation is registered).
+
+**Why the picker is text-input + slider (no map):** Phase C
+PR 2 ships the minimum-viable geofence UX. Users look up
+coordinates on a third-party map and paste them in, OR use
+"Use current location" for a fresh fix. A map widget
+(`google_maps_flutter` ~5MB APK + Play Services key, or
+`flutter_map`) is a v1.1 follow-up. Documented in
+ADR-021.
+
+**Requirements covered:** SYS-069 (Trigger),
+SYS-072 (geofence trigger), SYS-076 (PermissionKind.location
++ rationale).

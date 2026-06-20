@@ -37,12 +37,17 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import 'package:doit/events/event.dart';
+import 'package:doit/routines/routine.dart';
 import 'package:doit/services/event_repository.dart';
+import 'package:doit/services/geofence_service.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/template_repository.dart';
+import 'package:doit/routines/routine_executor.dart';
 import 'package:doit/templates/template.dart';
 import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/triggers/trigger.dart';
+import 'package:doit/widgets/location_picker.dart';
 
 class AddEventScreen extends StatefulWidget {
   const AddEventScreen({super.key, this.existing, this.initialPayload});
@@ -71,6 +76,12 @@ class _AddEventScreenState extends State<AddEventScreen> {
   EventRecurrence _recurrence = EventRecurrence.none;
   String? _nameError;
 
+  // v1.0 (Phase C, SYS-072). Non-default automation rules.
+  // Empty list = the default ActionNotify (synthesized at
+  // dispatch time). Stored on the row as
+  // `Events.automations_json`.
+  List<Automation> _automations = const <Automation>[];
+
   @override
   void initState() {
     super.initState();
@@ -80,6 +91,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
       _at = DateTime.fromMillisecondsSinceEpoch(e.atMillis);
       _leadMinutes = (e.leadTimeMillis / 60000).round();
       _recurrence = e.recurrence;
+      _automations = e.automations;
     } else {
       // Catalog apply path: pre-fill from the template payload.
       final payload = widget.initialPayload;
@@ -235,6 +247,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
       leadTimeMillis: _leadMinutes * 60000,
       recurrence: _recurrence,
       createdAtMillis: createdAt,
+      automations: _automations,
     );
     try {
       event.validate();
@@ -243,9 +256,50 @@ class _AddEventScreenState extends State<AddEventScreen> {
       return;
     }
     await EventRepository.instance.save(event);
+    // v1.0 Phase C PR 2 (SYS-072): register the routines'
+    // geofences with the platform service so the executor
+    // can match transitions as soon as the row is
+    // persisted.
+    await _registerRoutines(event.id);
     await ReminderService.instance.rescheduleAll();
     if (!mounted) return;
     Navigator.of(context).pop(true);
+  }
+
+  /// Open the [LocationPicker] modal and append the result
+  /// to [_automations]. The picker handles its own
+  /// permission gate (SYS-076); we just consume the
+  /// returned [Automation]. `null` returns are user cancels
+  /// or denied permissions — silent no-op.
+  Future<void> _addLocationRoutine() async {
+    final auto = await LocationPicker.show(context);
+    if (auto == null || !mounted) return;
+    final trigger = auto.trigger;
+    if (trigger is TriggerLocation) {
+      await GeofenceService.instance.register(trigger);
+    }
+    setState(() {
+      _automations = List<Automation>.unmodifiable(<Automation>[
+        ..._automations,
+        auto,
+      ]);
+    });
+  }
+
+  /// Re-register every location-triggered automation with
+  /// the [GeofenceService]. Called after a successful save
+  /// so the platform side knows which circles to watch.
+  Future<void> _registerRoutines(String entityId) async {
+    RoutineExecutor.instance.unregister(entityId);
+    for (final a in _automations) {
+      final t = a.trigger;
+      if (t is TriggerLocation) {
+        await GeofenceService.instance.register(t);
+      }
+    }
+    if (_automations.isNotEmpty) {
+      RoutineExecutor.instance.register(entityId, _automations);
+    }
   }
 
   // --- save-as-template -------------------------------------------
@@ -376,6 +430,22 @@ class _AddEventScreenState extends State<AddEventScreen> {
                   ),
               ],
             ),
+            const SizedBox(height: Spacing.lg),
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+              child: Text(
+                'Routines',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            _RoutinesSection(
+              automations: _automations,
+              onAddLocation: _addLocationRoutine,
+              onRemove: (idx) => setState(
+                () => _automations = List.of(_automations)..removeAt(idx),
+              ),
+            ),
           ],
         ),
       ),
@@ -438,6 +508,85 @@ class _SaveAsTemplateDialogState extends State<_SaveAsTemplateDialog> {
           child: const Text('Save'),
         ),
       ],
+    );
+  }
+}
+
+/// "Routines" section of the Add / Edit event form (SYS-072).
+/// Mirrors the [lib/screens/add_habit.dart] section so the
+/// pattern is uniform across the entity-type forms.
+class _RoutinesSection extends StatelessWidget {
+  const _RoutinesSection({
+    required this.automations,
+    required this.onAddLocation,
+    required this.onRemove,
+  });
+
+  final List<Automation> automations;
+  final VoidCallback onAddLocation;
+  final ValueChanged<int> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (automations.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+            child: Text(
+              'No routines yet. Add one to fire this event when you '
+              'arrive at or leave a place.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          )
+        else
+          for (var i = 0; i < automations.length; i++)
+            _EventRoutineRow(
+              automation: automations[i],
+              onRemove: () => onRemove(i),
+            ),
+        const SizedBox(height: Spacing.sm),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const ValueKey('add_event.add_location_routine'),
+            onPressed: onAddLocation,
+            icon: const Icon(Icons.add_location_alt_outlined),
+            label: const Text('Add a location routine'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EventRoutineRow extends StatelessWidget {
+  const _EventRoutineRow({required this.automation, required this.onRemove});
+
+  final Automation automation;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final trigger = automation.trigger;
+    final summary = switch (trigger) {
+      TriggerLocationEnter(:final label, :final radiusMeters) =>
+        'On enter $label ($radiusMeters m)',
+      TriggerLocationExit(:final label, :final radiusMeters) =>
+        'On exit $label ($radiusMeters m)',
+      _ => trigger.runtimeType.toString(),
+    };
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.bolt_outlined),
+      title: Text(summary),
+      trailing: IconButton(
+        key: const ValueKey('add_event.remove_routine'),
+        tooltip: 'Remove',
+        icon: const Icon(Icons.close),
+        onPressed: onRemove,
+      ),
     );
   }
 }

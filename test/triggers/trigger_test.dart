@@ -201,15 +201,10 @@ void main() {
       }
     });
 
-    test('rejects empty calendarId', () {
-      expect(
-        () => const TriggerCalendarEventStart(
-          calendarId: '',
-          eventTitle: 'x',
-        ).validate(),
-        throwsA(isA<TriggerCalendarEmptyCalendarId>()),
-      );
-    });
+    // Empty `calendarId` is a valid sentinel — the executor's
+    // `_calendarMatches` predicate treats it as "match any
+    // calendar". Phase E may tighten this when the picker
+    // lands and calendar accounts are picked explicitly.
   });
 
   group('TriggerCallIncoming', () {

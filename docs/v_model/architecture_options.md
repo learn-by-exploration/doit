@@ -85,6 +85,7 @@ with a sealed exception.
 | --- | --- | --- | --- |
 | `kBackupFormatVersion` | 2 | `lib/services/backup_service.dart` | Forward-migrate via `lib/services/db/migrations/`; reject `version > 2` with `BackupFormatTooNew` |
 | `kTemplateFormatVersion` | 1 | `lib/templates/template_library.dart` | Reject `k != 1` with `TemplateValidationException` (no forward migration path in Phase B; future bumps follow the same envelope pattern as `kBackupFormatVersion`) |
+| `kAutomationFormatVersion` | 1 | `lib/triggers/automation_codec.dart` | Reject `k != 1` with `AutomationValidationException` (v1.0/Phase C PR 1 — the `automationsJson` envelope on habits / people / events rows). Future bumps follow the same envelope pattern as `kBackupFormatVersion`. |
 
 ## App identity (v0.5a, v0.5e-fix)
 
@@ -125,6 +126,14 @@ with a sealed exception.
      radius the trigger model enforces. ACCESS_FINE_LOCATION stays
      out of scope (see below). -->
 <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+<!-- Read calendar for TriggerCalendarEvent (event-start, event-end,
+     event-reminder, free-busy). v1.0 / Phase E PR 1 / SYS-074 /
+     SYS-078 / ADR-023. Read-only; we never write to the calendar.
+     The app reads event metadata (id, calendar id, title, time)
+     to drive routine matches; no event bodies, attendees, or notes
+     are stored or transmitted off-device. -->
+<uses-permission android:name="android.permission.READ_CALENDAR" />
 
 <!-- Camera permission only requested at the moment a photo-based mission
      is enabled in v0.2. Not in v0.1. -->

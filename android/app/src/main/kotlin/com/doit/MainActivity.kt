@@ -15,9 +15,18 @@ class MainActivity : FlutterActivity() {
         // stopStream methods, not here.
         DeviceStateChannel.setAppContext(applicationContext)
         DeviceStateChannel.attach(flutterEngine)
+        // v1.0 / Phase E PR 1 / ADR-023: calendar probe
+        // channel. Watches CalendarContract.Instances via
+        // a ContentObserver; pushes busy-change events
+        // to the Dart side. The Dart matching engine
+        // (RoutineExecutor) decides whether each event
+        // matches a registered TriggerCalendarEvent.
+        CalendarChannel.setAppContext(applicationContext)
+        CalendarChannel.attach(flutterEngine)
     }
 
     override fun onDestroy() {
+        CalendarChannel.detach()
         DeviceStateChannel.detach()
         ReminderChannelProxy.detach()
         super.onDestroy()

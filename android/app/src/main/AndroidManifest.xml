@@ -22,6 +22,16 @@
          Dart on the local position stream. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <!-- v1.0 / Phase E PR 1 / ADR-023: read calendar for
+         TriggerCalendarEvent (event-start / event-end /
+         reminder / busy). Used by CalendarService to watch
+         the user's calendar via CalendarContract. We never
+         WRITE to the calendar; we only read event metadata
+         (id, title, calendar id, time) to drive routine
+         matches. No event bodies or attendees are stored or
+         transmitted off-device. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"

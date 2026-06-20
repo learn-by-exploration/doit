@@ -111,6 +111,39 @@ void main() {
     expect(find.byKey(const ValueKey('add_event.menu')), findsNothing);
   });
 
+  // Phase C PR 2 / SYS-072: the event form has a "Routines"
+  // section. Verify the empty-state copy + Add a location
+  // routine button render. Full automation UX is covered by
+  // test/widgets/location_picker_test.dart and
+  // test/routines/location_dispatch_test.dart.
+  testWidgets('Routines section renders the empty-state and the '
+      'Add a location routine button (SYS-072 / Phase C PR 2)', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        const AddEventScreen(
+          initialPayload: <String, dynamic>{
+            'name': 'My event',
+            'recurrence': 'none',
+            'leadTimeMillis': 60000,
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Routines'), findsOneWidget);
+    expect(
+      find.text(
+        'No routines yet. Add one to fire this event when you '
+        'arrive at or leave a place.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('add_event.add_location_routine')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'Edit mode (existing != null) shows the "Save as template" menu',
     (tester) async {

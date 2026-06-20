@@ -34,15 +34,21 @@ import 'dart:async';
 import 'dart:collection';
 
 import 'package:doit/routines/routine.dart';
+import 'package:doit/services/calendar_service.dart';
 import 'package:doit/services/device_state_probe.dart';
 import 'package:doit/services/geofence_service.dart';
 import 'package:doit/triggers/trigger.dart'
     show
         TriggerBatteryFull,
         TriggerBatteryLow,
+        TriggerCalendarEvent,
+        TriggerCalendarEventEnd,
+        TriggerCalendarEventStart,
+        TriggerCalendarReminder,
         TriggerChargingStarted,
         TriggerChargingStopped,
         TriggerDeviceState,
+        TriggerFreeBusy,
         TriggerHeadphoneConnected,
         TriggerHeadphoneDisconnected,
         TriggerLocation,
@@ -76,6 +82,7 @@ class RoutineExecutor {
 
   StreamSubscription<GeofenceEvent>? _geofenceSub;
   StreamSubscription<DeviceStateSnapshot>? _deviceStateSub;
+  StreamSubscription<CalendarEvent>? _calendarSub;
 
   /// Most recent device-state snapshot. Edge-trigger leaves
   /// (`TriggerChargingStarted`, `TriggerScreenOff`, ...)
@@ -85,15 +92,23 @@ class RoutineExecutor {
   @visibleForTesting
   DeviceStateSnapshot? lastDeviceState;
 
+  /// Most recent busy state for `TriggerFreeBusy` matching.
+  /// `null` = unknown / first launch; edge detection compares
+  /// the current `CalendarBusyChange` to this cached value.
+  @visibleForTesting
+  bool? lastIsBusy;
+
   /// Initialize the executor. Idempotent; multiple calls
   /// resolve the same `ready` future. On the first init,
-  /// subscribes to `GeofenceService.instance.events` and
-  /// `DeviceStateService.instance.events` so the matching
+  /// subscribes to `GeofenceService.instance.events`,
+  /// `DeviceStateService.instance.events`, and
+  /// `CalendarService.instance.events` so the matching
   /// automations are dispatched.
   Future<void> init() async {
     if (_ready.isCompleted) return;
     _geofenceSub = GeofenceService.instance.events.listen(_onGeofence);
     _deviceStateSub = DeviceStateService.instance.events.listen(_onDeviceState);
+    _calendarSub = CalendarService.instance.events.listen(_onCalendar);
     _ready.complete();
   }
 
@@ -114,7 +129,10 @@ class RoutineExecutor {
     _geofenceSub = null;
     _deviceStateSub?.cancel();
     _deviceStateSub = null;
+    _calendarSub?.cancel();
+    _calendarSub = null;
     lastDeviceState = null;
+    lastIsBusy = null;
     _registry.clear();
   }
 
@@ -297,6 +315,96 @@ class RoutineExecutor {
       case TriggerScreenOff():
         return (previous?.screenOn ?? false) == true &&
             current.screenOn == false;
+    }
+  }
+
+  /// Calendar-event stream handler. Iterates the registry
+  /// and fires every automation whose `TriggerCalendarEvent`
+  /// matches the event leaf (start / end / reminder /
+  /// free-busy transition) and the configured
+  /// `calendarId` / `eventTitle` filter.
+  ///
+  /// `TriggerFreeBusy` is edge-detected: it fires on the
+  /// `false → true` and `true → false` transitions of the
+  /// `CalendarBusyChange` events; a single busy event with
+  /// no prior state is treated as a `false → true` edge.
+  ///
+  /// Each automation's [shouldFire] call is wrapped in a
+  /// try/catch so a single invalid automation does not break
+  /// the chain and silently cancel the broadcast listener.
+  void _onCalendar(CalendarEvent event) {
+    final previousIsBusy = lastIsBusy;
+    if (event is CalendarBusyChange) {
+      lastIsBusy = event.isBusy;
+    }
+    final now = DateTime.now();
+    _registry.forEach((entityId, automations) {
+      for (final a in automations) {
+        if (!a.enabled) continue;
+        final trigger = a.trigger;
+        if (trigger is! TriggerCalendarEvent) continue;
+        try {
+          if (!shouldFire(a, now)) continue;
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint(
+              'RoutineExecutor._onCalendar: skipped invalid automation '
+              'on $entityId: $e',
+            );
+          }
+          continue;
+        }
+        if (!_calendarMatches(trigger, event, previousIsBusy)) continue;
+        _controller.add(AutomationFired(automation: a, at: now));
+      }
+    });
+  }
+
+  /// Pure predicate: does [trigger] match the [event] given
+  /// the prior busy state? Exposed `@visibleForTesting` so
+  /// unit tests can drive the matching logic without going
+  /// through the stream.
+  @visibleForTesting
+  bool calendarMatches(
+    TriggerCalendarEvent trigger,
+    CalendarEvent event, [
+    bool? previousIsBusy,
+  ]) => _calendarMatches(trigger, event, previousIsBusy);
+
+  bool _calendarMatches(
+    TriggerCalendarEvent trigger,
+    CalendarEvent event,
+    bool? previousIsBusy,
+  ) {
+    // Calendar-id filter: empty trigger.eventTitle = match any
+    // title; non-empty trigger.calendarId must equal the
+    // event's calendar id (or empty = match any calendar).
+    if (trigger.calendarId.isNotEmpty &&
+        event.calendarId.isNotEmpty &&
+        trigger.calendarId != event.calendarId) {
+      return false;
+    }
+    if (trigger.eventTitle.isNotEmpty &&
+        event.title.isNotEmpty &&
+        trigger.eventTitle != event.title) {
+      return false;
+    }
+    switch (trigger) {
+      case TriggerCalendarEventStart():
+        return event is CalendarEventStarted;
+      case TriggerCalendarEventEnd():
+        return event is CalendarEventEnded;
+      case TriggerCalendarReminder():
+        return event is CalendarEventReminder;
+      case TriggerFreeBusy():
+        if (event is! CalendarBusyChange) return false;
+        // Edge detection: fire on transition. A null prior
+        // state with a true busy event still counts as an
+        // edge (the user just went busy).
+        if (event.isBusy) {
+          return previousIsBusy != true;
+        }
+        return previousIsBusy == true;
     }
   }
 }

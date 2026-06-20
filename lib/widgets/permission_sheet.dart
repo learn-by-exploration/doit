@@ -185,6 +185,14 @@ class _PermissionSheetBodyState extends State<_PermissionSheetBody> {
       case PermissionKind.location:
         result = await PermissionService.instance.requestLocation();
         break;
+      case PermissionKind.calendar:
+        // v1.0 Phase E (SYS-E? / `CalendarContract`): the
+        // calendar read permission. Wired into the
+        // `PermissionKind` enum + service but the calendar
+        // routine templates have not landed yet, so the
+        // sheet's `Allow` CTA is a no-op for now.
+        result = await PermissionService.instance.requestCalendar();
+        break;
       case PermissionKind.backupFolder:
         // The SAF picker is handled by `requestBackupFolder`;
         // the sheet is never shown for this kind because
@@ -244,6 +252,9 @@ class _PermissionSheetBodyState extends State<_PermissionSheetBody> {
         break;
       case PermissionKind.location:
         result = await svc.requestLocation();
+        break;
+      case PermissionKind.calendar:
+        result = await svc.requestCalendar();
         break;
       case PermissionKind.backupFolder:
         result = const PermissionResultGranted();

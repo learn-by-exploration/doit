@@ -17,6 +17,7 @@ import 'package:doit/screens/onboarding.dart';
 import 'package:doit/services/backup_scheduler.dart';
 import 'package:doit/services/backup_service.dart';
 import 'package:doit/services/db.dart';
+import 'package:doit/services/geofence_service.dart';
 import 'package:doit/services/permission_service.dart';
 import 'package:doit/services/platform_alarm_scheduler.dart';
 import 'package:doit/services/platform_full_screen_intent.dart';
@@ -25,6 +26,7 @@ import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/settings_service.dart';
 import 'package:doit/services/template_repository.dart';
 import 'package:doit/templates/template_library.dart';
+import 'package:doit/routines/routine_executor.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
@@ -64,14 +66,33 @@ Future<void> main() async {
 
   // 4. Init the permission service. This probes the three
   //    runtime permissions (POST_NOTIFICATIONS, READ_CONTACTS,
-  //    SCHEDULE_EXACT_ALARM) and populates the
-  //    [PermissionService.statuses] ValueNotifier that the
-  //    v0.5d Settings → Permissions tile binds to. Without
-  //    this call, the singleton's `_ready` Completer would
-  //    never complete and every `requestX()` call (including
-  //    the onboarding "Allow" buttons) would block on
-  //    `await ready` indefinitely.
+  //    SCHEDULE_EXACT_ALARM, ACCESS_COARSE_LOCATION) and
+  //    populates the [PermissionService.statuses] ValueNotifier
+  //    that the v0.5d Settings → Permissions tile binds to.
+  //    Without this call, the singleton's `_ready` Completer
+  //    would never complete and every `requestX()` call
+  //    (including the onboarding "Allow" buttons) would block
+  //    on `await ready` indefinitely.
   await PermissionService.instance.init();
+
+  // 4a. v1.0 Phase C PR 2 (SYS-072 / ADR-021): init the
+  //     geofence service. The service starts the platform
+  //     position stream; the executor wires the matching
+  //     stream subscription below. Order matters: we init
+  //     the geofence service BEFORE the executor so the
+  //     executor's `register(...)` calls land on a ready
+  //     stream. The permission itself is NOT requested here
+  //     — the on-demand `LocationPicker` shows
+  //     [PermissionSheet.show] first.
+  await GeofenceService.instance.init();
+
+  // 4b. v1.0 Phase C PR 1/2 (SYS-069..072): init the
+  //     routine executor. The executor subscribes to
+  //     [GeofenceService.events]; the actual automations
+  //     are registered by the add-* screens via
+  //     [RoutineExecutor.register] when a Do/Event/Person
+  //     is saved. Idempotent.
+  await RoutineExecutor.instance.init();
 
   // 5. Init the backup service so the restore screen can
   //    export / import JSON snapshots of the local DB.

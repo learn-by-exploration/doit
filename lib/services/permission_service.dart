@@ -91,6 +91,16 @@ enum PermissionKind {
   /// stays out of scope per the v0.1 carve-out (see
   /// `docs/v_model/architecture_options.md`).
   location,
+
+  /// `READ_CALENDAR` (v1.0 / Phase E PR 1 / ADR-023 / SYS-078).
+  /// Used by `CalendarService` to read the user's calendar
+  /// accounts (for the on-demand account picker) and watch
+  /// event transitions for `TriggerCalendarEvent` matching.
+  /// Read-only; we never write to the calendar. Event
+  /// metadata (id, title, calendar id, time) is the only
+  /// data the app reads; no event bodies, attendees, or
+  /// notes are stored or transmitted.
+  calendar,
 }
 
 /// Singleton holder for the permission / SAF seam. The
@@ -141,9 +151,9 @@ class PermissionService {
         ),
       });
 
-  /// Idempotent. Probes the four runtime permissions and
-  /// stores the mapped [PermissionResult] in [statuses].
-  /// A platform-channel error (missing plugin, restricted
+  /// Idempotent. Probes the runtime permissions and stores
+  /// the mapped [PermissionResult] in [statuses]. A
+  /// platform-channel error (missing plugin, restricted
   /// device, etc.) is swallowed — the v0.4b-release-fix
   /// lesson is that `main()` must not crash if a plugin is
   /// absent. The service is left in a state where the
@@ -167,6 +177,9 @@ class PermissionService {
       PermissionKind.location: const PermissionResultDenied(
         canOpenSettings: true,
       ),
+      PermissionKind.calendar: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
     };
     try {
       next[PermissionKind.notifications] = _mapStatus(
@@ -183,6 +196,9 @@ class PermissionService {
       );
       next[PermissionKind.location] = _mapStatus(
         await Permission.location.status,
+      );
+      next[PermissionKind.calendar] = _mapStatus(
+        await Permission.calendarFullAccess.status,
       );
     } catch (_) {
       // v0.4b-release-fix / ADR-013 follow-up: a thrown
@@ -265,6 +281,22 @@ class PermissionService {
     await ready;
     final raw = await Permission.location.request();
     return _recordAndReturn(PermissionKind.location, raw);
+  }
+
+  /// Request `READ_CALENDAR` (v1.0 / Phase E PR 1 / ADR-023
+  /// / SYS-078). Used by `CalendarService` to read the
+  /// user's installed calendar accounts (for the on-demand
+  /// account picker) and watch event transitions for
+  /// `TriggerCalendarEvent` matching. Read-only; we never
+  /// write to the calendar. The widget layer surfaces the
+  /// rationale ("used to trigger routines when meetings
+  /// start / end / hit their reminder time, or when your
+  /// free/busy status changes") in the Settings → Permissions
+  /// tile and the on-demand permission sheet.
+  Future<PermissionResult> requestCalendar() async {
+    await ready;
+    final raw = await Permission.calendarFullAccess.request();
+    return _recordAndReturn(PermissionKind.calendar, raw);
   }
 
   /// On-demand check used by [PermissionSheet.show]. Returns
@@ -389,6 +421,9 @@ class PermissionService {
         canOpenSettings: true,
       ),
       PermissionKind.location: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
+      PermissionKind.calendar: const PermissionResultDenied(
         canOpenSettings: true,
       ),
     };

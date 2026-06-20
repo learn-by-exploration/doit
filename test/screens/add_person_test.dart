@@ -216,4 +216,29 @@ void main() {
     );
     expect(find.text('Pick a contact'), findsOneWidget);
   });
+
+  // Phase C PR 2 / SYS-072: the person form has a "Routines"
+  // section for non-default automation rules. Verify the
+  // empty-state copy + Add a location routine button render.
+  // Full automation UX is covered by
+  // test/widgets/location_picker_test.dart and
+  // test/routines/location_dispatch_test.dart.
+  testWidgets('Routines section renders the empty-state and the '
+      'Add a location routine button (SYS-072 / Phase C PR 2)', (tester) async {
+    await _resetDb(tester);
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    expect(find.text('Routines'), findsOneWidget);
+    expect(
+      find.text(
+        'No routines yet. Add one to remind you to reach '
+        'out when you arrive at or leave a place.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('add_person.add_location_routine')),
+      findsOneWidget,
+    );
+  });
 }

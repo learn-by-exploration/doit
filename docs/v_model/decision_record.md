@@ -1776,11 +1776,97 @@ shipping it would burn battery for no v1.0 benefit.
   minimum interval. Strictly worse than the broadcast
   path for the four state dimensions we care about.
 
-## ADR-023 (reserved)
+## ADR-023 — v1.0/Phase E PR 1: calendar read source — native CalendarContract over device_calendar / add_2_calendar
 
-Reserved for the calendar library choice
-(`device_calendar` vs `add_2_calendar` vs platform
-`CalendarContract`).
+**Date:** 2026-06-20.
+**Status:** Accepted (v1.0 / Phase E PR 1 / SYS-074 / SYS-078).
+
+**Context.** v1.0 Phase E wires `TriggerCalendarEvent`
+(event-start / event-end / event-reminder / free-busy)
+into the routine executor. The trigger needs three
+capabilities from the calendar layer:
+
+1. **Reactive transition stream.** When an event transitions
+   from upcoming to in-progress (start), in-progress to
+   ended (end), or hits its reminder offset, the trigger
+   must fire within seconds. The OS already exposes this via
+   `ContentObserver` on `CalendarContract.Instances`.
+2. **One-shot account list.** An on-demand permission
+   sheet shows the user which calendars exist on their
+   device (Google account work calendar, iCloud personal,
+   etc.) so they can pick which one to scope a routine to.
+   This is a single `query()` against
+   `CalendarContract.Calendars`.
+3. **No write access.** The app reads the calendar; it
+   never creates, updates, or deletes events.
+
+The candidates were:
+
+| Library | Notes |
+|---|---|
+| `device_calendar` (pub.dev) | Most popular Flutter wrapper. Read + write access via a generic `Calendar` / `Event` model. Last published 2022-Q4; the underlying platform-channel calls are stale relative to Android 14+. |
+| `add_2_calendar` (pub.dev) | Write-only (event creation). Useless for our read-only trigger model. |
+| Native `CalendarContract` over a MethodChannel | Direct read access via `ContentResolver.query` + a `ContentObserver` on `Instances.CONTENT_URI`. ~190 lines of Kotlin; no package dependency churn; full access to reminder metadata (`MIN_REMINDER` / `MAX_REMINDER`). |
+
+**Decision.** Native `CalendarContract` over a thin
+`doit/calendar` method channel. Same pattern as the
+Phase D `DeviceStateChannel`: Kotlin owns the platform
+channel, Dart owns the matching engine. The Kotlin
+side is in
+`android/app/src/main/kotlin/com/doit/CalendarChannel.kt`;
+the Dart side is `lib/services/calendar_service.dart`.
+
+**Rationale.**
+
+- **Reactive stream is a first-class requirement.** A
+  polling loop is wasteful (and out of scope per the
+  Phase D ADR-022 polling-cadence decision — we keep
+  triggers reactive-first). `ContentObserver` fires on
+  every insert/update/delete and is the platform's
+  built-in reactivity primitive. `device_calendar`
+  exposes only synchronous query helpers; turning it
+  into a reactive stream would mean running our own
+  timer (which violates the reactive-first policy).
+- **Read-only.** `device_calendar`'s write-side helpers
+  are irrelevant; we never call them. Avoiding the
+  package also avoids requesting `WRITE_CALENDAR` —
+  the manifest lists `READ_CALENDAR` only. See
+  `docs/v_model/architecture_options.md` permission
+  baseline.
+- **No dependency churn.** `device_calendar` has not
+  shipped a release in 18+ months and its
+  platform-channel call patterns are stale relative to
+  Android 14. We get to evolve the Kotlin side
+  alongside the rest of the reminder-reliability work
+  without a package-mediated breaking change.
+- **Reminder metadata.** `CalendarContract.Reminders`
+  is a first-class table; reading the per-event
+  `MINUTES` / `METHOD` is straightforward via the
+  `ContentResolver.query` path. `device_calendar`
+  surfaces reminders as opaque integers.
+
+**Permission.** `READ_CALENDAR` (added to the manifest
+in Phase E PR 1). The user-facing rationale is "used to
+trigger routines when meetings start / end / hit their
+reminder time, or when your free/busy status changes"
+(see `PermissionKind.calendar` in
+`lib/services/permission_service.dart`).
+
+**Reliability.** Calendar transitions are best-effort
+when the app process is backgrounded: the OS suspends
+the process and the `ContentObserver` does not fire.
+When the user returns to the app, the
+`CalendarChannel.startStream` re-issues a busy-state
+probe so `TriggerFreeBusy` catches up. See
+`docs/v_model/notification_reliability.md` § Trigger
+reliability.
+
+**Consequences.** The Kotlin side is a
+`MethodChannel` + `ContentObserver` (~190 lines); the
+Dart side is the `CalendarSource` seam + the matching
+engine in `RoutineExecutor`. Test coverage uses
+`ScriptedCalendarSource` so tests are deterministic
+without a real `CalendarContract`.
 
 ## ADR-024 — v1.0/Phase A: rename "Habit" → "Do" across model, UI, and docs
 

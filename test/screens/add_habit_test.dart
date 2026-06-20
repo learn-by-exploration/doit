@@ -60,4 +60,30 @@ void main() {
     expect(habits?.length, 1);
     expect(habits?.first.name, 'Stretch');
   });
+
+  // Phase C PR 2 / SYS-072: the form has a "Routines" section
+  // for non-default automation rules. Verify the section
+  // renders the empty-state copy + "Add a location routine"
+  // button. Full automation UX is covered by
+  // test/widgets/location_picker_test.dart and
+  // test/routines/location_dispatch_test.dart; this test
+  // only pins the wiring (the section is present and the
+  // button is keyed so the picker can find it).
+  testWidgets('Routines section renders the empty-state and the '
+      'Add a location routine button (SYS-072 / Phase C PR 2)', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: AddHabitScreen()));
+    await tester.pump();
+    expect(find.text('Routines'), findsOneWidget);
+    expect(
+      find.text(
+        'No routines yet. Add one to fire this do when you '
+        'arrive at or leave a place.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('add_habit.add_location_routine')),
+      findsOneWidget,
+    );
+  });
 }

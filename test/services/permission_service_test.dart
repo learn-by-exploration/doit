@@ -287,6 +287,41 @@ void main() {
     },
   );
 
+  test(
+    'requestLocation maps granted → granted (SYS-076 / Phase C PR 2 / ADR-021)',
+    () async {
+      await PermissionService.instance.init();
+      requestScriptedStatuses[Permission.location.value] =
+          PermissionStatus.granted;
+      final result = await PermissionService.instance.requestLocation();
+      expect(result, isA<PermissionResultGranted>());
+      // The service records the mapped result into
+      // `statuses` so the v0.5d Settings → Permissions tile
+      // re-renders as "Granted" the next time the user
+      // re-opens the screen, and so `GeofenceService` (the
+      // service that owns the position stream) reads the
+      // same value the next time it is asked.
+      expect(
+        PermissionService.instance.statuses.value[PermissionKind.location],
+        isA<PermissionResultGranted>(),
+      );
+    },
+  );
+
+  test(
+    'requestLocation maps denied → PermissionResultDenied (SYS-076)',
+    () async {
+      await PermissionService.instance.init();
+      requestScriptedStatuses[Permission.location.value] =
+          PermissionStatus.denied;
+      final result = await PermissionService.instance.requestLocation();
+      expect(result, isA<PermissionResultDenied>());
+      // One-shot denial must keep canOpenSettings: true so
+      // the user can be re-asked.
+      expect((result as PermissionResultDenied).canOpenSettings, isTrue);
+    },
+  );
+
   test('init() probes the five runtime permissions including '
       'battery-optimization (SYS-068) and location (SYS-076)', () async {
     await PermissionService.instance.init();
@@ -308,10 +343,17 @@ void main() {
       reason: 'init() must probe coarse-location for geofence triggers.',
     );
     expect(
-      probes.length,
-      5,
+      probes,
+      contains(Permission.calendarFullAccess.value),
       reason:
-          'init() must probe exactly five runtime permissions exactly '
+          'init() must probe calendar for TriggerCalendarEvent '
+          '(SYS-078 / Phase E PR 1 / ADR-023).',
+    );
+    expect(
+      probes.length,
+      6,
+      reason:
+          'init() must probe exactly six runtime permissions exactly '
           'once total.',
     );
   });
@@ -360,11 +402,12 @@ void main() {
         .toList();
     expect(
       probes.length,
-      5,
+      6,
       reason:
-          'init() must probe exactly the five runtime permissions '
+          'init() must probe exactly the six runtime permissions '
           '(`notification`, `contacts`, `scheduleExactAlarm`, '
-          '`ignoreBatteryOptimizations`, `location`) exactly once total. '
+          '`ignoreBatteryOptimizations`, `location`, '
+          '`calendarFullAccess`) exactly once total. '
           'A second call must short-circuit on the completed gate.',
     );
   });

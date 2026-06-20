@@ -159,7 +159,12 @@ UX in the rest of the app. Templates that ship:
   (yearly, 1-week lead), "Tax deadline" (yearly, 1-day lead).
 - **6 Routine templates** — visible with a "Coming in v1.1"
   badge in Phase B; the apply UX lands in Phase F
-  (`add_routine.dart`).
+  (`add_routine.dart`). 5 of the 6 routine templates
+  (e.g., "Leaving work → wind down", "Arriving home →
+  log dinner") are location-triggered and depend on the
+  Phase C PR 2 location picker for the `TriggerLocation`
+  parameter at apply time. The 6th is a Japan
+  call-screening routine (Phase F).
 
 The user can also save any configured Do / Event / Person as a
 user template via the AppBar overflow → "Save as template". The
@@ -171,6 +176,63 @@ because they are a regular Drift table — no backup-format bump
 is required. Phase B ships the data layer, the UI layer, and the
 V-Model doc sync; the master plan's quota of 25 curated
 templates is met across Phase B + Phase F (19 + 6).
+
+## Routines (v1.0/Phase C–F)
+
+A routine is an `Automation`: a non-time `Trigger` (location,
+device-state, calendar event, or incoming call) plus an optional
+`Condition` (boolean AND/OR tree over time-window, day-of-week,
+calendar-busy, battery-range, silent-mode leaves) plus a
+`List<Action>` (notify, fullscreen, call-intercept,
+override-silent, open-app). The entity (do / event / person)
+carries an optional `List<Automation> automationsJson` envelope;
+an entity with an empty list still gets the default
+`ActionNotify` synthesized at dispatch time so the existing
+alarm-scheduler path keeps working without change.
+
+- **Phase C PR 1** ships the sealed-type spine (`Trigger`,
+  `Condition`, `Action`, `Automation`) + the Drift v3 → v4
+  migration that adds the `automations_json` column to
+  habits / people / events + a no-op `RoutineExecutor`
+  skeleton.
+- **Phase C PR 2** ships the first concrete non-time trigger
+  kind: geofence enter / exit (`TriggerLocationEnter` /
+  `TriggerLocationExit`). The user configures a routine from
+  the add-do / add-event / add-person screens' "Routines"
+  section via the `LocationPicker` bottom sheet
+  (ADR-021, SYS-072). `GeofenceService` is the platform seam
+  — a `geolocator` ^13.0.1 position stream + a pure-Dart
+  Haversine matcher (`computeTransitions`) — and emits
+  `GeofenceEntered` / `GeofenceExited` on a broadcast
+  `Stream<GeofenceEvent>` that the executor subscribes to.
+- **Phase D** adds device-state triggers (charging, battery
+  range, bluetooth device, Wi-Fi SSID, headphones, silent
+  mode, foreground app).
+- **Phase E** adds calendar-event triggers (starts, ends,
+  busy, free).
+- **Phase F** adds the Japan silent-mode call-screening
+  routine (call-intercept + override-silent actions) and
+  ships the routine-template apply UX for the 6 routine
+  templates seeded in Phase B.
+
+A routine is a first-class field on each entity, parallel
+to the existing schedule (time-of-day) path. The two paths
+coexist: a do named "Evening walk" can have BOTH a
+fixed-time schedule (`DoFixed`) AND a routine that fires
+when the user leaves the office geofence. The schedule
+and routine are independent — either can fire, both can
+fire, neither can fire if `disabled: true`.
+
+Reliability is bounded: a geofence transition fires on
+the next position fix after the device crosses the
+boundary (typically < 30s of travel; see
+[`notification_reliability.md`](notification_reliability.md)
+§ "Trigger reliability → Geofence"). A revoked
+`ACCESS_COARSE_LOCATION` is a soft failure — the
+home-screen reliability banner flips to
+`Reliability.degraded` only if the user has at least one
+location routine registered; otherwise the denial is
+invisible. We do not queue dropped routines.
 
 ## Constraints
 

@@ -277,7 +277,9 @@ sealed class TriggerCalendarEvent extends Trigger {
   });
 
   /// Stable id of the calendar (e.g., the Android
-  /// `CalendarContract.Calendars._ID`).
+  /// `CalendarContract.Calendars._ID`). Empty string = match
+  /// any calendar (the trigger fires on event transitions
+  /// from any installed calendar account).
   final String calendarId;
 
   /// Human-readable title pattern. Empty string = any event.
@@ -285,9 +287,15 @@ sealed class TriggerCalendarEvent extends Trigger {
 
   @override
   TriggerCalendarEvent validate() {
-    if (calendarId.isEmpty) {
-      throw const TriggerCalendarEmptyCalendarId();
-    }
+    // Both `calendarId` and `eventTitle` are sentinels —
+    // empty means "match any". The executor's
+    // `_calendarMatches` predicate (lib/routines/routine_executor.dart)
+    // treats an empty `trigger.calendarId` as "match any
+    // calendar" and an empty `trigger.eventTitle` as "match
+    // any event title". The validate method only throws on
+    // a malformed instance we cannot reason about (e.g.,
+    // negative numbers in a future iteration); today every
+    // well-formed instance is acceptable.
     return this;
   }
 
@@ -447,9 +455,4 @@ final class TriggerBatteryInvalidPercent extends TriggerValidationException {
   const TriggerBatteryInvalidPercent(this.value)
     : super('percent must be in 0..100.');
   final int value;
-}
-
-final class TriggerCalendarEmptyCalendarId extends TriggerValidationException {
-  const TriggerCalendarEmptyCalendarId()
-    : super('calendarId must be non-empty.');
 }

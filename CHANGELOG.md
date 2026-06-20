@@ -9,6 +9,154 @@ V-Model artifacts are the engineering contract.
 
 ## [Unreleased]
 
+### v1.0/Phase C — Location triggers (sealed `Trigger` / `Condition` / `Action` spine + Geofence)
+
+Routines are a first-class field on each entity (do / event /
+person) — a non-time `Trigger` (location enter/exit, device-state,
+calendar event, or incoming call) plus an optional `Condition`
+plus a `List<Action>`. Phase C ships the foundation (PR 1) and the
+first concrete non-time trigger kind (PR 2: geofence enter / exit).
+
+#### v1.0/Phase C PR 1 — sealed-type spine + Drift v3 → v4 migration
+
+The sealed-type foundation every routine kind (Phase C–F) attaches
+to, plus the schema column that carries routines on each entity.
+
+**What's new**
+
+- **Sealed `Trigger`** in `lib/triggers/trigger.dart` — five
+  top-level subclasses: `TriggerLocationEnter` /
+  `TriggerLocationExit` (sealed pair; both extend a private
+  `TriggerLocation` mixin carrying `geofenceId`, `label`, `latitude`,
+  `longitude`, `radiusMeters`, `validate()` rejecting radii outside
+  50 m .. 5000 m), plus marker leaves `TriggerDeviceState` (Phase D),
+  `TriggerCalendarEvent` (Phase E), `TriggerCallIncoming` (Phase F).
+- **Sealed `Condition`** in `lib/triggers/condition.dart` — leaves
+  `ConditionAnd`, `ConditionOr`, `ConditionTimeWindow`,
+  `ConditionDayOfWeek`, `ConditionCalendarBusy`,
+  `ConditionBatteryRange`, `ConditionSilentMode`. A `null` condition
+  on an `Automation` is a no-op (the trigger fires unconditionally
+  subject to the action's own validation).
+- **Sealed `Action`** in `lib/actions/action.dart` — leaves
+  `ActionNotify` (the only PR 1 leaf with a body, wraps the existing
+  `NotificationService`), `ActionFullScreen` (wraps
+  `FullScreenIntent`), `ActionCallIntercept`, `ActionOverrideSilent`,
+  `ActionOpenApp`.
+- **`Automation`** aggregate in `lib/triggers/automation.dart` —
+  immutable `{trigger, condition?, actions, disabled}` with
+  `validate()`, `toJsonEnvelope()` / `fromJsonEnvelope()`, sealed
+  `AutomationValidationException` with one PR 1 leaf
+  (`AutomationEmptyActions`).
+- **`RoutineExecutor`** skeleton in `lib/routines/routine_executor.dart`
+  — singleton with `_ready` Completer gate (mirrors the rest of
+  `lib/services/`); exposes `init()`, `evaluate(snapshot)` (no-op
+  in PR 1), `dispatch(automation, now)` (the `ActionNotify` arm
+  runs; every other arm throws `UnimplementedError`), and a
+  broadcast `Stream<AutomationFired>`.
+- **`automationsJson` envelope** in
+  `lib/triggers/automation_codec.dart` —
+  `{"k":1,"automations":[<Automation>...]}` with
+  `kAutomationFormatVersion = 1`. Mirrors the existing
+  `missionChainJson` and `kTemplateFormatVersion = 1` patterns.
+- **Drift schema v3 → v4 migration** in
+  `lib/services/db/migrations/v3_to_v4.dart` — three `ALTER TABLE`
+  column adds (`habits`, `people`, `events`) carrying the
+  `automations_json` envelope. Nullable, no DEFAULT. NULL
+  post-migration means "no non-default automations" — the correct
+  state for every existing row.
+- **`automations` field** on `Do` (5 subclasses — `copyWith` updated
+  on all), `Event`, `Person` (`ContactPerson.copyWith` updated).
+- **Decoder** in each repository's `_fromRow` reads `automationsJson`
+  via `Automation.fromJsonEnvelope`; `null` / empty array means
+  "use the default `ActionNotify` synthesized at dispatch time".
+
+**V-Model doc sync (this release):** SYS-069 (sealed `Trigger`),
+SYS-070 (sealed `Condition`), SYS-071 (sealed `Action`),
+SYS-072 (geofence trigger), SYS-076 (`PermissionKind.location`
++ rationale), the Triggers / Conditions / Actions module row in
+`architecture_options.md`, the `kAutomationFormatVersion = 1`
+row in the format-version pins table, and a `## Routines
+(v1.0/Phase C–F)` section in `conops.md`.
+
+**Not in this release:** geofence wire-up (PR 2), device-state
+(Phase D), calendar (Phase E), call-intercept (Phase F).
+
+#### v1.0/Phase C PR 2 — `GeofenceService` + LocationEnter / Exit triggers + permission tile
+
+The first concrete non-time trigger end-to-end: geofence enter /
+exit. The user configures a routine from the add-do / add-event /
+add-person screens' new "Routines" section; the routine fires a
+notification when the device enters (or exits) the chosen circle.
+
+**What's new**
+
+- **`GeofenceService`** in `lib/services/geofence_service.dart` —
+  singleton wrapping `geolocator` ^13.0.1 (ADR-021). Subscribes to
+  `Geolocator.getPositionStream(...)` (filtered at 25 m), runs a
+  pure-Dart Haversine matcher (`computeTransitions(...)`, exposed
+  `@visibleForTesting`) against the registered `TriggerLocation`
+  circles, and emits `GeofenceEntered` / `GeofenceExited` on a
+  broadcast `Stream<GeofenceEvent>`.
+- **`LocationPicker`** in `lib/widgets/location_picker.dart` —
+  modal bottom sheet gated by `PermissionSheet.show(PermissionKind.location)`
+  (the v0.5 / ADR-014 on-demand permission pattern). Fields:
+  `label` (required), `latitude` / `longitude` (validated
+  `[-90, 90]` / `[-180, 180]`), `radius` slider (50 m .. 500 m,
+  default 100 m), `LocationEvent` radio (enter default / exit).
+  "Use current location" button calls
+  `Geolocator.getCurrentPosition()` when the permission is
+  granted. No map widget in PR 2 — coordinate paste or current-
+  position capture is the v1.0 path; `google_maps_flutter` /
+  `flutter_map` is a v1.1 follow-up.
+- **`PermissionKind.location`** entry on `PermissionService` enum
+  (v0.5a+ service singleton, `_ready` Completer gate) — probes
+  `Permission.location` (which maps to `ACCESS_COARSE_LOCATION`)
+  in `init()`, exposes `requestLocation()`, surfaces the
+  city-block-accurate rationale in `PermissionSheet`. A denied
+  coarse-location is a soft failure: geofence triggers silently
+  no-op; the home-screen reliability banner flips to
+  `Reliability.degraded` only when at least one
+  `TriggerLocation*` automation is registered.
+- **Settings → Permissions → Location** tile (the `_PermissionTile`
+  pattern from v0.5d / ADR-016) with a `case
+  PermissionKind.location:` arm in `_PermissionTile._reProbe`
+  calling `service.requestLocation()`. Onboarding step is
+  deferred to a Phase D/E/F consolidation so the user is not
+  asked for 5+ permissions during first run.
+- **"Routines" section** on `AddHabitScreen` / `AddEventScreen` /
+  `AddPersonScreen` — empty-state copy is entity-specific
+  ("fire this do / event / remind you to reach out when you arrive
+  at or leave a place"), the "Add a location routine" button
+  (`add_<entity>.add_location_routine` key) opens the picker.
+- **`RoutineExecutor` wire-up** — subscribes to
+  `GeofenceService.instance.events` in `init()`; the
+  `TriggerLocation*` arm in `dispatch(...)` calls the existing
+  `NotificationService.show(...)` path.
+- **`GeofenceBroadcastReceiver.kt`** — dynamically registered from
+  the Dart `GeofenceService.init()` path via
+  `ContextCompat.registerReceiver`. No `<receiver>` block in
+  `AndroidManifest.xml` (confirmed against the chosen library's
+  docs).
+- **`<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />`**
+  added to `android/app/src/main/AndroidManifest.xml`.
+  `ACCESS_FINE_LOCATION` stays explicitly out of scope (the
+  50 m .. 5000 m radius bound on `TriggerLocation.validate()`
+  is well above the coarse-location noise floor).
+
+**V-Model doc sync (this release):** ADR-021 (geofence library
+choice — `geolocator` over `flutter_geofence` /
+`geofence_service`), WF-034 (Add a location-triggered do /
+event / person), a Trigger-reliability → Geofence section in
+`notification_reliability.md`, the ACCESS_COARSE_LOCATION
+permission baseline row + the explicit `ACCESS_FINE_LOCATION`
+"out of scope" note in `architecture_options.md`.
+
+**Not in this release:** map widget in the picker (v1.1),
+device-state triggers (Phase D), calendar triggers (Phase E),
+call-intercept routine (Phase F), onboarding step for
+`ACCESS_COARSE_LOCATION` (consolidated with Phase D/E/F in a
+follow-up PR).
+
 ### v1.0/Phase B — Templates (curated library + save-as-template)
 
 Templates are a curated, opt-in way to bootstrap a new do / event /
