@@ -3,13 +3,22 @@
 // Per the rule doc (.claude/rules/lib-screens.md), this is a
 // StatefulWidget that subscribes to the repository. The list is
 // grouped into "Upcoming" and "Past" by the atMillis.
+//
+// Phase B PR 2: AddEventScreen was extracted to
+// `lib/screens/add_event.dart` so it can carry the `initialPayload`
+// pre-fill path and the AppBar "Save as template" action without
+// bloating this file. The class is re-exported here for callers
+// that already import this file.
 
 import 'package:flutter/material.dart';
 
 import 'package:doit/events/event.dart';
+import 'package:doit/screens/add_event.dart';
 import 'package:doit/services/event_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
+
+export 'package:doit/screens/add_event.dart' show AddEventScreen;
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -210,230 +219,5 @@ class _EventTile extends StatelessWidget {
     final hh = at.hour.toString().padLeft(2, '0');
     final mm = at.minute.toString().padLeft(2, '0');
     return '$y-$m-$d $hh:$mm';
-  }
-}
-
-class AddEventScreen extends StatefulWidget {
-  const AddEventScreen({super.key, this.existing});
-
-  final Event? existing;
-
-  @override
-  State<AddEventScreen> createState() => _AddEventScreenState();
-}
-
-class _AddEventScreenState extends State<AddEventScreen> {
-  final _nameCtrl = TextEditingController();
-  DateTime _at = DateTime.now().add(const Duration(days: 1));
-  int _leadMinutes = 15;
-  EventRecurrence _recurrence = EventRecurrence.none;
-  String? _nameError;
-
-  @override
-  void initState() {
-    super.initState();
-    final e = widget.existing;
-    if (e != null) {
-      _nameCtrl.text = e.name;
-      _at = DateTime.fromMillisecondsSinceEpoch(e.atMillis);
-      _leadMinutes = (e.leadTimeMillis / 60000).round();
-      _recurrence = e.recurrence;
-    }
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
-      initialDate: _at,
-    );
-    if (picked != null) {
-      setState(() {
-        _at = DateTime(
-          picked.year,
-          picked.month,
-          picked.day,
-          _at.hour,
-          _at.minute,
-        );
-      });
-    }
-  }
-
-  Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: _at.hour, minute: _at.minute),
-    );
-    if (picked != null) {
-      setState(() {
-        _at = DateTime(
-          _at.year,
-          _at.month,
-          _at.day,
-          picked.hour,
-          picked.minute,
-        );
-      });
-    }
-  }
-
-  Future<void> _pickLead() async {
-    final picked = await showDialog<int>(
-      context: context,
-      builder: (ctx) {
-        var n = _leadMinutes;
-        return AlertDialog(
-          title: const Text('Notify me before'),
-          content: StatefulBuilder(
-            builder: (ctx, setLocal) => Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final m in const [0, 5, 15, 30, 60, 120, 1440])
-                  RadioListTile<int>(
-                    title: Text(_leadLabel(m)),
-                    value: m,
-                    groupValue: n,
-                    onChanged: (v) {
-                      if (v != null) setLocal(() => n = v);
-                    },
-                  ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(n),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-    if (picked != null) setState(() => _leadMinutes = picked);
-  }
-
-  String _leadLabel(int m) {
-    if (m == 0) return 'At the time';
-    if (m < 60) return '$m min before';
-    if (m < 1440) return '${m ~/ 60} h before';
-    return '${m ~/ 1440} d before';
-  }
-
-  Future<void> _save() async {
-    final name = _nameCtrl.text.trim();
-    if (name.isEmpty) {
-      setState(() => _nameError = 'Name is required');
-      return;
-    }
-    final id =
-        widget.existing?.id ?? 'e_${DateTime.now().millisecondsSinceEpoch}';
-    final createdAt =
-        widget.existing?.createdAtMillis ??
-        DateTime.now().millisecondsSinceEpoch;
-    final event = Event(
-      id: id,
-      name: name,
-      atMillis: _at.millisecondsSinceEpoch,
-      leadTimeMillis: _leadMinutes * 60000,
-      recurrence: _recurrence,
-      createdAtMillis: createdAt,
-    );
-    try {
-      event.validate();
-    } on EventValidationException catch (e) {
-      setState(() => _nameError = e.toString());
-      return;
-    }
-    await EventRepository.instance.save(event);
-    await ReminderService.instance.rescheduleAll();
-    if (!mounted) return;
-    Navigator.of(context).pop(true);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.existing == null ? 'New event' : 'Edit event'),
-        actions: [
-          TextButton(
-            key: const ValueKey('add_event.save'),
-            onPressed: _save,
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(Spacing.md),
-          children: [
-            TextField(
-              controller: _nameCtrl,
-              decoration: InputDecoration(
-                labelText: 'Name',
-                errorText: _nameError,
-              ),
-            ),
-            const SizedBox(height: Spacing.md),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Date'),
-              trailing: Text(_dateLabel(_at)),
-              onTap: _pickDate,
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Time'),
-              trailing: Text(
-                TimeOfDay(hour: _at.hour, minute: _at.minute).format(context),
-              ),
-              onTap: _pickTime,
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Notify me'),
-              trailing: Text(_leadLabel(_leadMinutes)),
-              onTap: _pickLead,
-            ),
-            const SizedBox(height: Spacing.md),
-            Text('Repeats', style: Theme.of(context).textTheme.titleMedium),
-            Wrap(
-              spacing: Spacing.sm,
-              children: [
-                for (final r in EventRecurrence.values)
-                  ChoiceChip(
-                    label: Text(_recurrenceLabel(r)),
-                    selected: _recurrence == r,
-                    onSelected: (_) => setState(() => _recurrence = r),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _dateLabel(DateTime d) {
-    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-  }
-
-  String _recurrenceLabel(EventRecurrence r) {
-    return switch (r) {
-      EventRecurrence.none => 'Once',
-      EventRecurrence.annually => 'Yearly',
-    };
   }
 }

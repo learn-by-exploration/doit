@@ -23,6 +23,8 @@ import 'package:doit/services/platform_full_screen_intent.dart';
 import 'package:doit/services/platform_notification_service.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/settings_service.dart';
+import 'package:doit/services/template_repository.dart';
+import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
@@ -31,6 +33,14 @@ Future<void> main() async {
 
   // 1. Open the database.
   await AppDatabaseService.instance.init();
+
+  // 1a. Seed the curated template library (v1.0 Phase B).
+  //    Idempotent: the first call inserts all 25 built-ins; a
+  //    subsequent call (e.g., after a restore that re-populated
+  //    the templates table) is a no-op. Wired here — not in
+  //    `AppDatabaseService.init()` — so the test init() path
+  //    does not pollute the in-memory DB.
+  await TemplateLibrary.seedBuiltIns(TemplateRepository.instance);
 
   // 2. Wire the reminder service. The production wiring is
   //    a no-op stub — the Kotlin side does the real

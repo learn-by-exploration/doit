@@ -18,23 +18,38 @@
 //   - The same screen is used for edit; passing a `habitId`
 //     flips it into "edit" mode.
 
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:doit/do/do.dart';
 import 'package:doit/do/proof_mode.dart';
 import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/reminder_service.dart';
+import 'package:doit/services/template_repository.dart';
+import 'package:doit/templates/template.dart';
+import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/widgets/category_chip.dart';
 import 'package:doit/widgets/icon_picker.dart';
 
 class AddHabitScreen extends StatefulWidget {
-  const AddHabitScreen({super.key, this.habitId});
+  const AddHabitScreen({super.key, this.habitId, this.initialPayload});
 
   /// If non-null, the screen loads the habit with this id and
   /// runs in edit mode. Save will overwrite; createdAt is
   /// preserved.
   final String? habitId;
+
+  /// Optional pre-fill payload, mirroring the inner envelope
+  /// key of a template (`{"scheduleType":...,"weekdays":...,
+  /// "hour":..., ...}`). Used by the catalog screen when the
+  /// user picks a template. Default `null` (blank form).
+  ///
+  /// The payload field set is the Phase B PR 1 contract; see
+  /// `lib/templates/template_library.dart` for the schema.
+  final Map<String, dynamic>? initialPayload;
 
   @override
   State<AddHabitScreen> createState() => _AddHabitScreenState();
@@ -82,6 +97,12 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     _isEdit = widget.habitId != null;
     if (_isEdit) {
       _loadExisting();
+    } else {
+      // Pre-fill from the optional initial payload (catalog
+      // apply path). Edit mode wins — `initialPayload` is
+      // ignored when editing an existing habit.
+      final payload = widget.initialPayload;
+      if (payload != null) _applyPayload(payload);
     }
     // Add mode does NOT eagerly load the anchor-target list.
     // The list is loaded lazily when the user opens the
@@ -143,6 +164,55 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     });
   }
 
+  /// Apply a pre-fill payload to the form. Mirrors the inner
+  /// envelope key of a do-template `payloadJson` (see
+  /// `lib/templates/template_library.dart` for the schema).
+  /// Unknown fields are ignored; missing fields keep their
+  /// default. This is intentionally tolerant: a future
+  /// schema bump adds new fields to the payload, and older
+  /// clients simply ignore them.
+  void _applyPayload(Map<String, dynamic> p) {
+    _nameCtrl.text = (p['name'] as String?) ?? _nameCtrl.text;
+    final cat = p['category'] as String?;
+    if (cat != null) {
+      try {
+        _category = DoCategory.fromTag(cat);
+      } on ArgumentError catch (e) {
+        if (kDebugMode) {
+          debugPrint('AddHabit.applyPayload: unknown category: $e');
+        }
+      }
+    }
+    if (p['iconName'] is String) {
+      _iconName = p['iconName'] as String;
+    }
+    final scheduleType = p['scheduleType'] as String?;
+    if (scheduleType != null) {
+      _scheduleType = scheduleType;
+    }
+    final weekdays = p['weekdays'];
+    if (weekdays is List) {
+      _fixedWeekdays
+        ..clear()
+        ..addAll(weekdays.whereType<int>());
+    }
+    final hour = (p['hour'] as num?)?.toInt();
+    final minute = (p['minute'] as num?)?.toInt();
+    if (hour != null && minute != null) {
+      _fixedTime = TimeOfDay(hour: hour, minute: minute);
+      _twStart = _fixedTime;
+    }
+    final endHour = (p['endHour'] as num?)?.toInt();
+    final endMinute = (p['endMinute'] as num?)?.toInt();
+    if (endHour != null && endMinute != null) {
+      _twEnd = TimeOfDay(hour: endHour, minute: endMinute);
+    }
+    final nDays = (p['nDays'] as num?)?.toInt();
+    if (nDays != null && nDays > 0) {
+      _intervalNDays = nDays;
+    }
+  }
+
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -155,6 +225,23 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
       appBar: AppBar(
         title: Text(_isEdit ? 'Edit do' : 'New do'),
         actions: [
+          if (_isEdit)
+            PopupMenuButton<_HabitMenuAction>(
+              key: const ValueKey('add_habit.menu'),
+              tooltip: 'More',
+              onSelected: (a) {
+                if (a == _HabitMenuAction.saveAsTemplate) {
+                  _saveAsTemplate();
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem<_HabitMenuAction>(
+                  key: ValueKey('add_habit.save_as_template'),
+                  value: _HabitMenuAction.saveAsTemplate,
+                  child: Text('Save as template'),
+                ),
+              ],
+            ),
           TextButton(
             key: const ValueKey('add_habit.save'),
             onPressed: _save,
@@ -654,6 +741,11 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
 
   // --- save -------------------------------------------------------
 
+  /// Cached most-recent successful Do from the last [_save].
+  /// Used by [_saveAsTemplate] so the template reflects the
+  /// same row that was persisted. Cleared in [dispose].
+  Do? _lastSaved;
+
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
@@ -766,6 +858,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
 
     try {
       await DoRepository.instance.save(habit);
+      _lastSaved = habit;
       if (!_isEdit) {
         // Schedule the first reminder only for new habits.
         // Edits re-schedule lazily on the next listActive cycle.
@@ -793,6 +886,108 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  // --- save-as-template ------------------------------------------
+
+  Future<void> _saveAsTemplate() async {
+    final source = _lastSaved ?? _original;
+    if (source == null) return;
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      _showSnack('Save the do first, then save as template.');
+      return;
+    }
+    final templateName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _SaveAsTemplateDialog(defaultName: '$name template'),
+    );
+    if (templateName == null || templateName.trim().isEmpty) return;
+    final inner = _doToMap(source);
+    inner['name'] = templateName.trim();
+    final payloadJson = jsonEncode({
+      'k': TemplateLibrary.kTemplateFormatVersion,
+      'do': inner,
+    });
+    try {
+      await TemplateRepository.instance.save(
+        Template(
+          id: '',
+          name: templateName.trim(),
+          description: 'Saved from $name',
+          iconName: source.iconName ?? 'check',
+          entityType: TemplateEntityType.doEntity,
+          payloadJson: payloadJson,
+          isBuiltIn: false,
+          createdAt: DateTime.now(),
+        ),
+      );
+      if (!mounted) return;
+      _showSnack('Template saved');
+    } on TemplateValidationException catch (e) {
+      _showSnack('Template validation failed: ${e.message}');
+    }
+  }
+
+  /// Convert a [Do] into the inner envelope map for a
+  /// `payloadJson` (`{"k":1,"do":{...}}`). Mirrors the field
+  /// set used by the curated library in
+  /// `lib/templates/template_library.dart` (entries 1..15).
+  /// Subclass-specific fields are flattened.
+  Map<String, dynamic> _doToMap(Do d) {
+    final weekdays = <int>[];
+    int hour = 0;
+    int minute = 0;
+    int endHour = 0;
+    int endMinute = 0;
+    int nDays = 0;
+    const int intervalMinutes = 0;
+    final String scheduleType;
+    switch (d) {
+      case DoFixed():
+        scheduleType = 'fixed';
+        weekdays.addAll(d.weekdays);
+        hour = d.time.hour;
+        minute = d.time.minute;
+      case DoInterval():
+        scheduleType = 'interval';
+        weekdays.addAll(List<int>.generate(7, (i) => i + 1));
+        nDays = d.nDays;
+        hour = 9;
+        minute = 0;
+      case DoAnchor():
+        scheduleType = 'anchor';
+        weekdays.addAll(List<int>.generate(7, (i) => i + 1));
+        hour = 7;
+        minute = 0;
+      case DoDayOfX():
+        scheduleType = 'dayOfX';
+        weekdays.addAll(List<int>.generate(7, (i) => i + 1));
+        hour = 9;
+        minute = 0;
+      case DoTimeWindow():
+        scheduleType = 'timeWindow';
+        weekdays.addAll(d.weekdays);
+        hour = d.start.hour;
+        minute = d.start.minute;
+        endHour = d.end.hour;
+        endMinute = d.end.minute;
+    }
+    return <String, dynamic>{
+      'scheduleType': scheduleType,
+      'weekdays': weekdays,
+      'hour': hour,
+      'minute': minute,
+      'endHour': endHour,
+      'endMinute': endMinute,
+      'nDays': nDays,
+      'intervalMinutes': intervalMinutes,
+      'proofMode': 'soft',
+      'restDaysPerMonth': d.restDaysPerMonth,
+      'category': d.category.tag,
+      'iconName': d.iconName ?? 'check',
+      'name': d.name,
+    };
+  }
+
   // --- labels -----------------------------------------------------
 
   String _weekdayLabel(int d) {
@@ -811,6 +1006,54 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
       default:
         return '${n}th';
     }
+  }
+}
+
+enum _HabitMenuAction { saveAsTemplate }
+
+class _SaveAsTemplateDialog extends StatefulWidget {
+  const _SaveAsTemplateDialog({required this.defaultName});
+
+  final String defaultName;
+
+  @override
+  State<_SaveAsTemplateDialog> createState() => _SaveAsTemplateDialogState();
+}
+
+class _SaveAsTemplateDialogState extends State<_SaveAsTemplateDialog> {
+  late final TextEditingController _ctrl = TextEditingController(
+    text: widget.defaultName,
+  );
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Save as template'),
+      content: TextField(
+        key: const ValueKey('add_habit.save_as_template.name'),
+        controller: _ctrl,
+        autofocus: true,
+        decoration: const InputDecoration(labelText: 'Template name'),
+        textInputAction: TextInputAction.done,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const ValueKey('add_habit.save_as_template.save'),
+          onPressed: () => Navigator.of(context).pop(_ctrl.text.trim()),
+          child: const Text('Save'),
+        ),
+      ],
+    );
   }
 }
 

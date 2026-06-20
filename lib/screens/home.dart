@@ -36,6 +36,7 @@ import 'package:doit/screens/add_habit.dart';
 import 'package:doit/screens/add_person.dart';
 import 'package:doit/screens/settings.dart';
 import 'package:doit/screens/stats.dart';
+import 'package:doit/screens/templates.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -627,6 +628,10 @@ class _AddFab extends StatelessWidget {
               MaterialPageRoute<void>(builder: (_) => const AddPersonScreen()),
             );
             onAdded();
+          case _AddChoice.template:
+            await Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const TemplatesScreen()),
+            );
         }
       },
       child: const Icon(Icons.add),
@@ -634,7 +639,7 @@ class _AddFab extends StatelessWidget {
   }
 }
 
-enum _AddChoice { habit, person }
+enum _AddChoice { habit, person, template }
 
 class _AddSheet extends StatelessWidget {
   const _AddSheet();
@@ -656,6 +661,12 @@ class _AddSheet extends StatelessWidget {
             leading: const Icon(Icons.person_add_alt_1),
             title: const Text('New person'),
             onTap: () => Navigator.of(context).pop(_AddChoice.person),
+          ),
+          ListTile(
+            key: const ValueKey('home.fab.template'),
+            leading: const Icon(Icons.dashboard_customize),
+            title: const Text('From template'),
+            onTap: () => Navigator.of(context).pop(_AddChoice.template),
           ),
           const SizedBox(height: Spacing.md),
         ],
