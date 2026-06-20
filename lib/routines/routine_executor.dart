@@ -34,9 +34,22 @@ import 'dart:async';
 import 'dart:collection';
 
 import 'package:doit/routines/routine.dart';
+import 'package:doit/services/device_state_probe.dart';
 import 'package:doit/services/geofence_service.dart';
 import 'package:doit/triggers/trigger.dart'
-    show TriggerLocation, TriggerLocationEnter, TriggerLocationExit;
+    show
+        TriggerBatteryFull,
+        TriggerBatteryLow,
+        TriggerChargingStarted,
+        TriggerChargingStopped,
+        TriggerDeviceState,
+        TriggerHeadphoneConnected,
+        TriggerHeadphoneDisconnected,
+        TriggerLocation,
+        TriggerLocationEnter,
+        TriggerLocationExit,
+        TriggerScreenOff,
+        TriggerScreenOn;
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:meta/meta.dart';
 
@@ -62,15 +75,25 @@ class RoutineExecutor {
   final Map<String, List<Automation>> _registry = HashMap();
 
   StreamSubscription<GeofenceEvent>? _geofenceSub;
+  StreamSubscription<DeviceStateSnapshot>? _deviceStateSub;
+
+  /// Most recent device-state snapshot. Edge-trigger leaves
+  /// (`TriggerChargingStarted`, `TriggerScreenOff`, ...)
+  /// need the previous snapshot to detect a transition;
+  /// state-comparison leaves (`TriggerBatteryLow`,
+  /// `TriggerBatteryFull`) do not.
+  @visibleForTesting
+  DeviceStateSnapshot? lastDeviceState;
 
   /// Initialize the executor. Idempotent; multiple calls
   /// resolve the same `ready` future. On the first init,
-  /// subscribes to `GeofenceService.instance.events` so
-  /// enter/exit events are dispatched to the matching
-  /// automations.
+  /// subscribes to `GeofenceService.instance.events` and
+  /// `DeviceStateService.instance.events` so the matching
+  /// automations are dispatched.
   Future<void> init() async {
     if (_ready.isCompleted) return;
     _geofenceSub = GeofenceService.instance.events.listen(_onGeofence);
+    _deviceStateSub = DeviceStateService.instance.events.listen(_onDeviceState);
     _ready.complete();
   }
 
@@ -89,6 +112,9 @@ class RoutineExecutor {
     _controller = StreamController<AutomationFired>.broadcast();
     _geofenceSub?.cancel();
     _geofenceSub = null;
+    _deviceStateSub?.cancel();
+    _deviceStateSub = null;
+    lastDeviceState = null;
     _registry.clear();
   }
 
@@ -191,5 +217,86 @@ class RoutineExecutor {
         _controller.add(AutomationFired(automation: a, at: now));
       }
     });
+  }
+
+  /// Device-state stream handler. Iterates the registry and
+  /// fires every automation whose `TriggerDeviceState`
+  /// matches the snapshot.
+  ///
+  /// Edge triggers (charging started/stopped, headphone
+  /// connected/disconnected, screen on/off) compare the
+  /// current snapshot to [lastDeviceState]. State-comparison
+  /// triggers (`TriggerBatteryLow`, `TriggerBatteryFull`)
+  /// look at the current snapshot only.
+  ///
+  /// Each automation's [shouldFire] call is wrapped in a
+  /// try/catch so a single invalid automation does not break
+  /// the chain and silently cancel the broadcast listener.
+  void _onDeviceState(DeviceStateSnapshot current) {
+    final previous = lastDeviceState;
+    lastDeviceState = current;
+    final now = DateTime.now();
+    _registry.forEach((entityId, automations) {
+      for (final a in automations) {
+        if (!a.enabled) continue;
+        final trigger = a.trigger;
+        if (trigger is! TriggerDeviceState) continue;
+        try {
+          if (!shouldFire(a, now)) continue;
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint(
+              'RoutineExecutor._onDeviceState: skipped invalid automation '
+              'on $entityId: $e',
+            );
+          }
+          continue;
+        }
+        if (!_deviceStateMatches(trigger, current, previous)) continue;
+        _controller.add(AutomationFired(automation: a, at: now));
+      }
+    });
+  }
+
+  /// Pure predicate: does [trigger] match the
+  /// ([previous], [current]) snapshot pair? Exposed
+  /// `@visibleForTesting` so unit tests can drive the
+  /// matching logic without going through the stream.
+  @visibleForTesting
+  bool deviceStateMatches(
+    TriggerDeviceState trigger,
+    DeviceStateSnapshot current, [
+    DeviceStateSnapshot? previous,
+  ]) => _deviceStateMatches(trigger, current, previous);
+
+  bool _deviceStateMatches(
+    TriggerDeviceState trigger,
+    DeviceStateSnapshot current,
+    DeviceStateSnapshot? previous,
+  ) {
+    switch (trigger) {
+      case TriggerBatteryLow():
+        return current.batteryPercent <= trigger.percent;
+      case TriggerBatteryFull():
+        return current.batteryPercent >= 100;
+      case TriggerChargingStarted():
+        return (previous?.isCharging ?? false) == false &&
+            current.isCharging == true;
+      case TriggerChargingStopped():
+        return (previous?.isCharging ?? false) == true &&
+            current.isCharging == false;
+      case TriggerHeadphoneConnected():
+        return (previous?.headphonesConnected ?? false) == false &&
+            current.headphonesConnected == true;
+      case TriggerHeadphoneDisconnected():
+        return (previous?.headphonesConnected ?? false) == true &&
+            current.headphonesConnected == false;
+      case TriggerScreenOn():
+        return (previous?.screenOn ?? false) == false &&
+            current.screenOn == true;
+      case TriggerScreenOff():
+        return (previous?.screenOn ?? false) == true &&
+            current.screenOn == false;
+    }
   }
 }

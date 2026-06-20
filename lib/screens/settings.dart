@@ -34,6 +34,7 @@ import 'package:doit/services/permission_service.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/settings_service.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/widgets/device_state_row.dart';
 import 'package:doit/widgets/reliability_banner.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -109,6 +110,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               },
             ),
+            const SizedBox(height: Spacing.md),
+            const _SectionHeader('Device state'),
+            const DeviceStateRow(),
             const SizedBox(height: Spacing.md),
             const _SectionHeader('Backup'),
             ListTile(
@@ -253,6 +257,14 @@ class _ReliabilityRow extends StatelessWidget {
 /// the Android system app-settings page so the user can
 /// grant the policy permission that the system dialog no
 /// longer surfaces.
+//
+// v1.0 (Phase C, SYS-076, ADR-021): adds the coarse-
+// location tile between exact-alarm and battery-
+// optimization. The tile is rendered the same way as the
+// other runtime kinds; tapping it calls
+// [PermissionService.requestLocation] which surfaces the
+// system dialog (and re-probes the platform stream so
+// [GeofenceService] picks up the grant).
 class _PermissionsRow extends StatelessWidget {
   const _PermissionsRow();
 
@@ -283,6 +295,13 @@ class _PermissionsRow extends StatelessWidget {
               icon: Icons.alarm_outlined,
               title: 'Exact alarms',
               result: statuses[PermissionKind.exactAlarm],
+            ),
+            _PermissionTile(
+              key: const ValueKey('settings.permission.location'),
+              kind: PermissionKind.location,
+              icon: Icons.location_on_outlined,
+              title: 'Location',
+              result: statuses[PermissionKind.location],
             ),
             const _BackupFolderTile(),
           ],

@@ -211,12 +211,18 @@ void main() {
       findsOneWidget,
     );
     expect(
+      find.byKey(const ValueKey('settings.permission.location')),
+      findsOneWidget,
+    );
+    expect(
       find.byKey(const ValueKey('settings.permission.backupFolder')),
       findsOneWidget,
     );
     // The status text on the row is "Not granted — tap
-    // to ask again" for the runtime permissions.
-    expect(find.text('Not granted — tap to ask again'), findsNWidgets(3));
+    // to ask again" for the runtime permissions. v1.0
+    // Phase C PR 2 (SYS-076) added the coarse-location
+    // tile, so the count is 4 not 3.
+    expect(find.text('Not granted — tap to ask again'), findsNWidgets(4));
     // The backup folder shows "Not picked — tap to pick"
     // because the service's `init()` does not set a
     // `BackupFolderResult`; the `SettingsService` is the

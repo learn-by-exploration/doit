@@ -1664,11 +1664,117 @@ service's `register` path.
   case in Phase D when `DeviceStateProbe` ships its
   settings → triggers debug screen.
 
-## ADR-022 (reserved)
+## ADR-022 — v1.0/Phase D: device-state polling cadence (reactive-first; reserve a 60s poll slot for future state)
 
-Reserved for the device-state polling cadence (60s
-default; reactive for charging / silent mode via
-platform broadcasts).
+Status: accepted (v1.0 / Phase D PR 1 + PR 2).
+Date: 2026-06-20.
+Owners: backend (kotlin), frontend (dart), QA.
+
+### Context
+
+`TriggerDeviceState` (SYS-073) needs to know when the
+device's battery, charging, headphone, and screen state
+change. The Android side can produce these events in two
+fundamentally different ways:
+
+1. **Reactive broadcasts.** `BatteryManager` posts
+   `ACTION_POWER_CONNECTED` / `ACTION_POWER_DISCONNECTED`
+   on the charging state; `AudioManager` posts
+   `ACTION_AUDIO_BECOMING_NOISY` when headphones plug in;
+   `PowerManager` posts `ACTION_SCREEN_ON` / `ACTION_SCREEN_OFF`
+   on the screen state. Each of these is a system-wide
+   sticky broadcast the app can listen to with a
+   `BroadcastReceiver`. Battery *level* is a one-shot read
+   via `BatteryManager.BATTERY_PROPERTY_CAPACITY` and is
+   best updated reactively off the same receiver (every
+   charging / disconnect fires a level re-read).
+2. **Polling.** The app would re-read the relevant API on
+   a fixed cadence (e.g. every 60 s) and emit a snapshot
+   per tick. Polling is reliable but burns CPU + battery
+   proportional to the cadence and is always *worse* than
+   reactive for the four state dimensions above.
+
+The question is which mechanism to use as the default,
+and how much polling to leave in place as a safety net.
+
+### Decision
+
+**Reactive-first. No periodic polling in v1.0.** The
+Kotlin `DeviceStateChannel` registers a single
+`BroadcastReceiver` for the four reactive events
+(`ACTION_POWER_CONNECTED` / `DISCONNECTED`,
+`ACTION_AUDIO_BECOMING_NOISY`, `ACTION_SCREEN_ON` /
+`OFF`); battery percent is re-read inside the receiver's
+onReceive and pushed over the `doit/device_state` method
+channel as a fresh `DeviceStateSnapshot`.
+
+The Dart side is a pure publisher. `DeviceStateService`
+is the source of truth for "which snapshots are
+interesting"; the matching engine in `RoutineExecutor`
+(Phase D PR 2) decides whether each snapshot is a
+trigger edge for any registered automation.
+
+**Reservation for a 60 s poll slot.** If a future
+device-state dimension (e.g. Wi-Fi SSID, foreground
+app) does not have a clean reactive broadcast, the
+existing infrastructure has a `currentSnapshot()` method
+on the source that the receiver can call on a periodic
+ticker. The ticker itself is **not wired in PR 1 / PR 2**;
+shipping it would burn battery for no v1.0 benefit.
+
+### Consequences
+
+- **Battery friendliness.** No periodic wakeup for
+  device-state. The app only wakes when the OS itself
+  fires a state-change broadcast.
+- **Edge detection at the receiver.** A charging
+  transition (true→false) and a screen-off transition
+  (true→false) are both delivered as a single
+  snapshot, not a sequence. The matching engine's
+  edge logic (Phase D PR 2) reads `previous?.isCharging`
+  / `previous?.screenOn` to decide the edge direction;
+  this requires the executor to remember the last
+  snapshot. `lastDeviceState` is held on the executor
+  for that reason.
+- **First-snapshot default.** With no previous snapshot,
+  `(previous?.isCharging ?? false)` defaults to `false`,
+  so the first snapshot that goes `false→true` will
+  fire `TriggerChargingStarted`. This is the right
+  default — the user just plugged in.
+- **No data loss during Doze.** The broadcasts above are
+  delivered even when the app is in Doze (they are
+  system broadcasts, not user-initiated). Reliability
+  for charging / headphones / screen is ~99% on stock
+  Android; aggressive OEM battery savers (Xiaomi, Honor,
+  Vivo) may delay broadcasts but never drop them. OEM
+  detection (`lib/services/oem_detector.dart`) plus the
+  existing `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`
+  flow (SYS-068) covers the worst cases.
+- **Future poll cadence.** If a new trigger needs
+  Wi-Fi SSID, foreground app, or any other state that
+  lacks a reactive broadcast, the wiring is a 3-line
+  change in the Kotlin side (add a `Handler.postDelayed`
+  in `MainActivity.configureFlutterEngine`) plus a
+  `Stream.periodic` adapter in `DeviceStateSource`. The
+  ADR will be revised (or a new ADR-025 added) at that
+  point.
+
+### Alternatives considered
+
+- **60 s periodic poll, no reactive.** Reliable but
+  always at least 60 s late on a charging transition. The
+  reactive broadcasts are free; using only polling is
+  needless work.
+- **Reactive + 60 s safety poll.** Two paths to maintain
+  (the broadcast handler and the ticker) for no real
+  benefit in v1.0. The ticker would only catch a missed
+  broadcast, which is rare enough on stock Android that
+  the added complexity is not justified. Reserved for
+  any future state that lacks a broadcast.
+- **`WorkManager` periodic worker.** Same trade-off as
+  polling, with the added constraint of the 15-minute
+  minimum interval. Strictly worse than the broadcast
+  path for the four state dimensions we care about.
 
 ## ADR-023 (reserved)
 
