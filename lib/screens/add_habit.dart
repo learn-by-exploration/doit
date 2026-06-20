@@ -153,7 +153,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEdit ? 'Edit habit' : 'New habit'),
+        title: Text(_isEdit ? 'Edit do' : 'New do'),
         actions: [
           TextButton(
             key: const ValueKey('add_habit.save'),
@@ -304,7 +304,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
           children: [
             ListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('After habit'),
+              title: const Text('After do'),
               subtitle: Text(
                 _anchorTargetId == null
                     ? '(none)'
@@ -515,7 +515,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     if (!mounted) return;
     if (_otherHabits.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No other habits to anchor on.')),
+        const SnackBar(content: Text('No other dos to anchor on.')),
       );
       return;
     }
@@ -703,7 +703,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
           );
         case 'anchor':
           if (_anchorTargetId == null) {
-            _showSnack('Pick a habit to anchor on.');
+            _showSnack('Pick a do to anchor on.');
             return;
           }
           habit = DoAnchor(
@@ -782,7 +782,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
       if (!mounted) return;
       Navigator.of(context).pop();
     } on DuplicateDoName catch (_) {
-      setState(() => _nameError = 'A habit with this name already exists.');
+      setState(() => _nameError = 'A do with this name already exists.');
     } catch (e, st) {
       // ignore: avoid_print
       debugPrint('AddHabit save failed: $e\n$st');

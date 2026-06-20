@@ -105,7 +105,7 @@ void main() {
     await tester.pumpWidget(_wrapHome());
     await tester.pumpAndSettle();
     expect(
-      find.text('No habits yet.'),
+      find.text('No dos yet.'),
       findsOneWidget,
       reason: 'A wiped-device install should land on the empty state',
     );

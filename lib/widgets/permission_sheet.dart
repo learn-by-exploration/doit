@@ -56,14 +56,14 @@ const Map<PermissionKind, _KindMeta> _meta = <PermissionKind, _KindMeta>{
     title: 'Notifications',
     icon: Icons.notifications_outlined,
     rationale:
-        'do it sends a daily reminder for each habit. Android asks for '
+        'do it sends a daily reminder for each do. Android asks for '
         'the notification permission once.',
   ),
   PermissionKind.contacts: _KindMeta(
     title: 'Contacts',
     icon: Icons.contacts_outlined,
     rationale:
-        'If you add a "cadence" habit — call Mom every Sunday — do it '
+        'If you add a "cadence" do — call Mom every Sunday — do it '
         'reads the contact you pick. It never imports the whole address '
         'book.',
   ),

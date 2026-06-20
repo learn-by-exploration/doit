@@ -66,14 +66,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _OnboardingStep(
       title: 'Notifications',
       body:
-          'do it sends a daily reminder for each habit. Android '
+          'do it sends a daily reminder for each do. Android '
           'asks for the notification permission once.',
       cta: 'Allow',
     ),
     _OnboardingStep(
       title: 'Contacts',
       body:
-          'If you add a "cadence" habit — call Mom every Sunday — '
+          'If you add a "cadence" do — call Mom every Sunday — '
           'do it reads the contact you pick. It never imports the '
           'whole address book.',
       cta: 'Allow',

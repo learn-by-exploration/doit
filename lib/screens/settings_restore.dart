@@ -73,7 +73,7 @@ class _SettingsRestoreScreenState extends State<SettingsRestoreScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Replace all local data?'),
         content: const Text(
-          'Restoring from a backup will overwrite every habit, '
+          'Restoring from a backup will overwrite every do, '
           'completion, person, and setting currently on this '
           'device. This cannot be undone.',
         ),
@@ -137,7 +137,7 @@ class _SettingsRestoreScreenState extends State<SettingsRestoreScreen> {
                       Text(
                         'Pick a do it backup (.json). The file must have '
                         'been produced by this app — restoring overwrites '
-                        'every habit and completion currently on the '
+                        'every do and completion currently on the '
                         'device.',
                       ),
                     ],

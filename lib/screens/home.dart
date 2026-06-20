@@ -112,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _exitSelectMode();
     _refresh();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Marked ${_selected.length} habit(s) done.')),
+      SnackBar(content: Text('Marked ${_selected.length} do(s) done.')),
     );
   }
 
@@ -565,13 +565,10 @@ class _EmptyState extends StatelessWidget {
               color: Theme.of(context).colorScheme.outline,
             ),
             const SizedBox(height: Spacing.md),
-            Text(
-              'No habits yet.',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text('No dos yet.', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: Spacing.sm),
             Text(
-              'Tap the + to add a habit or a person.',
+              'Tap the + to add a do or a person.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
@@ -651,7 +648,7 @@ class _AddSheet extends StatelessWidget {
           ListTile(
             key: const ValueKey('home.fab.habit'),
             leading: const Icon(Icons.checklist),
-            title: const Text('New habit'),
+            title: const Text('New do'),
             onTap: () => Navigator.of(context).pop(_AddChoice.habit),
           ),
           ListTile(

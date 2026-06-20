@@ -162,7 +162,7 @@ class _CategorySection extends StatelessWidget {
                 const Spacer(),
                 Text(
                   '${bucket.stats.length} '
-                  '${bucket.stats.length == 1 ? 'habit' : 'habits'}',
+                  '${bucket.stats.length == 1 ? 'do' : 'dos'}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],
@@ -184,7 +184,7 @@ class _StatsCard extends StatelessWidget {
     final theme = Theme.of(context);
     return Semantics(
       label:
-          '${stats.habit.name}: current streak ${stats.snapshot.currentStreak}, '
+          '${stats.habit.name}: consecutive done ${stats.snapshot.currentStreak}, '
           'longest ${stats.snapshot.longestStreak}',
       child: Card(
         margin: const EdgeInsets.only(bottom: Spacing.sm),
@@ -238,7 +238,7 @@ class _EmptyView extends StatelessWidget {
             ),
             const SizedBox(height: Spacing.sm),
             Text(
-              'Add a habit to start tracking streaks.',
+              'Add a do to start tracking consecutive runs.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],

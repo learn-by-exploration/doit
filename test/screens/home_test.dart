@@ -59,7 +59,7 @@ void main() {
     await _resetDb(tester);
     await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
-    expect(find.text('No habits yet.'), findsOneWidget);
+    expect(find.text('No dos yet.'), findsOneWidget);
   });
 
   testWidgets('a saved habit renders as a tile', (tester) async {
