@@ -272,6 +272,17 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _automationsJsonMeta = const VerificationMeta(
+    'automationsJson',
+  );
+  @override
+  late final GeneratedColumn<String> automationsJson = GeneratedColumn<String>(
+    'automations_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -299,6 +310,7 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
     colorSeed,
     iconName,
     pausedUntilMillis,
+    automationsJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -502,6 +514,15 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
         ),
       );
     }
+    if (data.containsKey('automations_json')) {
+      context.handle(
+        _automationsJsonMeta,
+        automationsJson.isAcceptableOrUnknown(
+          data['automations_json']!,
+          _automationsJsonMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -611,6 +632,10 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
         DriftSqlType.int,
         data['${effectivePrefix}paused_until_millis'],
       ),
+      automationsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}automations_json'],
+      ),
     );
   }
 
@@ -646,6 +671,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
   final int colorSeed;
   final String? iconName;
   final int? pausedUntilMillis;
+  final String? automationsJson;
   const HabitRow({
     required this.id,
     required this.name,
@@ -672,6 +698,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     required this.colorSeed,
     this.iconName,
     this.pausedUntilMillis,
+    this.automationsJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -735,6 +762,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     if (!nullToAbsent || pausedUntilMillis != null) {
       map['paused_until_millis'] = Variable<int>(pausedUntilMillis);
     }
+    if (!nullToAbsent || automationsJson != null) {
+      map['automations_json'] = Variable<String>(automationsJson);
+    }
     return map;
   }
 
@@ -795,6 +825,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       pausedUntilMillis: pausedUntilMillis == null && nullToAbsent
           ? const Value.absent()
           : Value(pausedUntilMillis),
+      automationsJson: automationsJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(automationsJson),
     );
   }
 
@@ -833,6 +866,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       colorSeed: serializer.fromJson<int>(json['colorSeed']),
       iconName: serializer.fromJson<String?>(json['iconName']),
       pausedUntilMillis: serializer.fromJson<int?>(json['pausedUntilMillis']),
+      automationsJson: serializer.fromJson<String?>(json['automationsJson']),
     );
   }
   @override
@@ -864,6 +898,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       'colorSeed': serializer.toJson<int>(colorSeed),
       'iconName': serializer.toJson<String?>(iconName),
       'pausedUntilMillis': serializer.toJson<int?>(pausedUntilMillis),
+      'automationsJson': serializer.toJson<String?>(automationsJson),
     };
   }
 
@@ -893,6 +928,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     int? colorSeed,
     Value<String?> iconName = const Value.absent(),
     Value<int?> pausedUntilMillis = const Value.absent(),
+    Value<String?> automationsJson = const Value.absent(),
   }) => HabitRow(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -931,6 +967,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     pausedUntilMillis: pausedUntilMillis.present
         ? pausedUntilMillis.value
         : this.pausedUntilMillis,
+    automationsJson: automationsJson.present
+        ? automationsJson.value
+        : this.automationsJson,
   );
   HabitRow copyWithCompanion(HabitsCompanion data) {
     return HabitRow(
@@ -981,6 +1020,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       pausedUntilMillis: data.pausedUntilMillis.present
           ? data.pausedUntilMillis.value
           : this.pausedUntilMillis,
+      automationsJson: data.automationsJson.present
+          ? data.automationsJson.value
+          : this.automationsJson,
     );
   }
 
@@ -1011,7 +1053,8 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
           ..write('category: $category, ')
           ..write('colorSeed: $colorSeed, ')
           ..write('iconName: $iconName, ')
-          ..write('pausedUntilMillis: $pausedUntilMillis')
+          ..write('pausedUntilMillis: $pausedUntilMillis, ')
+          ..write('automationsJson: $automationsJson')
           ..write(')'))
         .toString();
   }
@@ -1043,6 +1086,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     colorSeed,
     iconName,
     pausedUntilMillis,
+    automationsJson,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -1072,7 +1116,8 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
           other.category == this.category &&
           other.colorSeed == this.colorSeed &&
           other.iconName == this.iconName &&
-          other.pausedUntilMillis == this.pausedUntilMillis);
+          other.pausedUntilMillis == this.pausedUntilMillis &&
+          other.automationsJson == this.automationsJson);
 }
 
 class HabitsCompanion extends UpdateCompanion<HabitRow> {
@@ -1101,6 +1146,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
   final Value<int> colorSeed;
   final Value<String?> iconName;
   final Value<int?> pausedUntilMillis;
+  final Value<String?> automationsJson;
   final Value<int> rowid;
   const HabitsCompanion({
     this.id = const Value.absent(),
@@ -1128,6 +1174,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     this.colorSeed = const Value.absent(),
     this.iconName = const Value.absent(),
     this.pausedUntilMillis = const Value.absent(),
+    this.automationsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   HabitsCompanion.insert({
@@ -1156,6 +1203,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     this.colorSeed = const Value.absent(),
     this.iconName = const Value.absent(),
     this.pausedUntilMillis = const Value.absent(),
+    this.automationsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -1188,6 +1236,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     Expression<int>? colorSeed,
     Expression<String>? iconName,
     Expression<int>? pausedUntilMillis,
+    Expression<String>? automationsJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1218,6 +1267,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
       if (colorSeed != null) 'color_seed': colorSeed,
       if (iconName != null) 'icon_name': iconName,
       if (pausedUntilMillis != null) 'paused_until_millis': pausedUntilMillis,
+      if (automationsJson != null) 'automations_json': automationsJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1248,6 +1298,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     Value<int>? colorSeed,
     Value<String?>? iconName,
     Value<int?>? pausedUntilMillis,
+    Value<String?>? automationsJson,
     Value<int>? rowid,
   }) {
     return HabitsCompanion(
@@ -1276,6 +1327,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
       colorSeed: colorSeed ?? this.colorSeed,
       iconName: iconName ?? this.iconName,
       pausedUntilMillis: pausedUntilMillis ?? this.pausedUntilMillis,
+      automationsJson: automationsJson ?? this.automationsJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1358,6 +1410,9 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     if (pausedUntilMillis.present) {
       map['paused_until_millis'] = Variable<int>(pausedUntilMillis.value);
     }
+    if (automationsJson.present) {
+      map['automations_json'] = Variable<String>(automationsJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1392,6 +1447,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
           ..write('colorSeed: $colorSeed, ')
           ..write('iconName: $iconName, ')
           ..write('pausedUntilMillis: $pausedUntilMillis, ')
+          ..write('automationsJson: $automationsJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1555,6 +1611,17 @@ class $PeopleTable extends People with TableInfo<$PeopleTable, PersonRow> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _automationsJsonMeta = const VerificationMeta(
+    'automationsJson',
+  );
+  @override
+  late final GeneratedColumn<String> automationsJson = GeneratedColumn<String>(
+    'automations_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1571,6 +1638,7 @@ class $PeopleTable extends People with TableInfo<$PeopleTable, PersonRow> {
     anchoredToWakeup,
     missionChainJson,
     pausedUntilMillis,
+    automationsJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1703,6 +1771,15 @@ class $PeopleTable extends People with TableInfo<$PeopleTable, PersonRow> {
         ),
       );
     }
+    if (data.containsKey('automations_json')) {
+      context.handle(
+        _automationsJsonMeta,
+        automationsJson.isAcceptableOrUnknown(
+          data['automations_json']!,
+          _automationsJsonMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1768,6 +1845,10 @@ class $PeopleTable extends People with TableInfo<$PeopleTable, PersonRow> {
         DriftSqlType.int,
         data['${effectivePrefix}paused_until_millis'],
       ),
+      automationsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}automations_json'],
+      ),
     );
   }
 
@@ -1792,6 +1873,7 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
   final bool anchoredToWakeup;
   final String? missionChainJson;
   final int? pausedUntilMillis;
+  final String? automationsJson;
   const PersonRow({
     required this.id,
     required this.lookupKey,
@@ -1807,6 +1889,7 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     required this.anchoredToWakeup,
     this.missionChainJson,
     this.pausedUntilMillis,
+    this.automationsJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1836,6 +1919,9 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     }
     if (!nullToAbsent || pausedUntilMillis != null) {
       map['paused_until_millis'] = Variable<int>(pausedUntilMillis);
+    }
+    if (!nullToAbsent || automationsJson != null) {
+      map['automations_json'] = Variable<String>(automationsJson);
     }
     return map;
   }
@@ -1868,6 +1954,9 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
       pausedUntilMillis: pausedUntilMillis == null && nullToAbsent
           ? const Value.absent()
           : Value(pausedUntilMillis),
+      automationsJson: automationsJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(automationsJson),
     );
   }
 
@@ -1891,6 +1980,7 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
       anchoredToWakeup: serializer.fromJson<bool>(json['anchoredToWakeup']),
       missionChainJson: serializer.fromJson<String?>(json['missionChainJson']),
       pausedUntilMillis: serializer.fromJson<int?>(json['pausedUntilMillis']),
+      automationsJson: serializer.fromJson<String?>(json['automationsJson']),
     );
   }
   @override
@@ -1911,6 +2001,7 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
       'anchoredToWakeup': serializer.toJson<bool>(anchoredToWakeup),
       'missionChainJson': serializer.toJson<String?>(missionChainJson),
       'pausedUntilMillis': serializer.toJson<int?>(pausedUntilMillis),
+      'automationsJson': serializer.toJson<String?>(automationsJson),
     };
   }
 
@@ -1929,6 +2020,7 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     bool? anchoredToWakeup,
     Value<String?> missionChainJson = const Value.absent(),
     Value<int?> pausedUntilMillis = const Value.absent(),
+    Value<String?> automationsJson = const Value.absent(),
   }) => PersonRow(
     id: id ?? this.id,
     lookupKey: lookupKey ?? this.lookupKey,
@@ -1948,6 +2040,9 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     pausedUntilMillis: pausedUntilMillis.present
         ? pausedUntilMillis.value
         : this.pausedUntilMillis,
+    automationsJson: automationsJson.present
+        ? automationsJson.value
+        : this.automationsJson,
   );
   PersonRow copyWithCompanion(PeopleCompanion data) {
     return PersonRow(
@@ -1981,6 +2076,9 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
       pausedUntilMillis: data.pausedUntilMillis.present
           ? data.pausedUntilMillis.value
           : this.pausedUntilMillis,
+      automationsJson: data.automationsJson.present
+          ? data.automationsJson.value
+          : this.automationsJson,
     );
   }
 
@@ -2000,7 +2098,8 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
           ..write('monthOfYear: $monthOfYear, ')
           ..write('anchoredToWakeup: $anchoredToWakeup, ')
           ..write('missionChainJson: $missionChainJson, ')
-          ..write('pausedUntilMillis: $pausedUntilMillis')
+          ..write('pausedUntilMillis: $pausedUntilMillis, ')
+          ..write('automationsJson: $automationsJson')
           ..write(')'))
         .toString();
   }
@@ -2021,6 +2120,7 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     anchoredToWakeup,
     missionChainJson,
     pausedUntilMillis,
+    automationsJson,
   );
   @override
   bool operator ==(Object other) =>
@@ -2039,7 +2139,8 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
           other.monthOfYear == this.monthOfYear &&
           other.anchoredToWakeup == this.anchoredToWakeup &&
           other.missionChainJson == this.missionChainJson &&
-          other.pausedUntilMillis == this.pausedUntilMillis);
+          other.pausedUntilMillis == this.pausedUntilMillis &&
+          other.automationsJson == this.automationsJson);
 }
 
 class PeopleCompanion extends UpdateCompanion<PersonRow> {
@@ -2057,6 +2158,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
   final Value<bool> anchoredToWakeup;
   final Value<String?> missionChainJson;
   final Value<int?> pausedUntilMillis;
+  final Value<String?> automationsJson;
   final Value<int> rowid;
   const PeopleCompanion({
     this.id = const Value.absent(),
@@ -2073,6 +2175,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     this.anchoredToWakeup = const Value.absent(),
     this.missionChainJson = const Value.absent(),
     this.pausedUntilMillis = const Value.absent(),
+    this.automationsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PeopleCompanion.insert({
@@ -2090,6 +2193,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     this.anchoredToWakeup = const Value.absent(),
     this.missionChainJson = const Value.absent(),
     this.pausedUntilMillis = const Value.absent(),
+    this.automationsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        lookupKey = Value(lookupKey),
@@ -2113,6 +2217,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     Expression<bool>? anchoredToWakeup,
     Expression<String>? missionChainJson,
     Expression<int>? pausedUntilMillis,
+    Expression<String>? automationsJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2130,6 +2235,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
       if (anchoredToWakeup != null) 'anchored_to_wakeup': anchoredToWakeup,
       if (missionChainJson != null) 'mission_chain_json': missionChainJson,
       if (pausedUntilMillis != null) 'paused_until_millis': pausedUntilMillis,
+      if (automationsJson != null) 'automations_json': automationsJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2149,6 +2255,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     Value<bool>? anchoredToWakeup,
     Value<String?>? missionChainJson,
     Value<int?>? pausedUntilMillis,
+    Value<String?>? automationsJson,
     Value<int>? rowid,
   }) {
     return PeopleCompanion(
@@ -2166,6 +2273,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
       anchoredToWakeup: anchoredToWakeup ?? this.anchoredToWakeup,
       missionChainJson: missionChainJson ?? this.missionChainJson,
       pausedUntilMillis: pausedUntilMillis ?? this.pausedUntilMillis,
+      automationsJson: automationsJson ?? this.automationsJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2215,6 +2323,9 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     if (pausedUntilMillis.present) {
       map['paused_until_millis'] = Variable<int>(pausedUntilMillis.value);
     }
+    if (automationsJson.present) {
+      map['automations_json'] = Variable<String>(automationsJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2238,6 +2349,7 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
           ..write('anchoredToWakeup: $anchoredToWakeup, ')
           ..write('missionChainJson: $missionChainJson, ')
           ..write('pausedUntilMillis: $pausedUntilMillis, ')
+          ..write('automationsJson: $automationsJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3745,6 +3857,17 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventRow> {
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _automationsJsonMeta = const VerificationMeta(
+    'automationsJson',
+  );
+  @override
+  late final GeneratedColumn<String> automationsJson = GeneratedColumn<String>(
+    'automations_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -3755,6 +3878,7 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventRow> {
     recurrence,
     archivedAtMillis,
     createdAtMillis,
+    automationsJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3835,6 +3959,15 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventRow> {
     } else if (isInserting) {
       context.missing(_createdAtMillisMeta);
     }
+    if (data.containsKey('automations_json')) {
+      context.handle(
+        _automationsJsonMeta,
+        automationsJson.isAcceptableOrUnknown(
+          data['automations_json']!,
+          _automationsJsonMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -3876,6 +4009,10 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventRow> {
         DriftSqlType.int,
         data['${effectivePrefix}created_at_millis'],
       )!,
+      automationsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}automations_json'],
+      ),
     );
   }
 
@@ -3894,6 +4031,7 @@ class EventRow extends DataClass implements Insertable<EventRow> {
   final String recurrence;
   final int? archivedAtMillis;
   final int createdAtMillis;
+  final String? automationsJson;
   const EventRow({
     required this.id,
     required this.name,
@@ -3903,6 +4041,7 @@ class EventRow extends DataClass implements Insertable<EventRow> {
     required this.recurrence,
     this.archivedAtMillis,
     required this.createdAtMillis,
+    this.automationsJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3919,6 +4058,9 @@ class EventRow extends DataClass implements Insertable<EventRow> {
       map['archived_at_millis'] = Variable<int>(archivedAtMillis);
     }
     map['created_at_millis'] = Variable<int>(createdAtMillis);
+    if (!nullToAbsent || automationsJson != null) {
+      map['automations_json'] = Variable<String>(automationsJson);
+    }
     return map;
   }
 
@@ -3936,6 +4078,9 @@ class EventRow extends DataClass implements Insertable<EventRow> {
           ? const Value.absent()
           : Value(archivedAtMillis),
       createdAtMillis: Value(createdAtMillis),
+      automationsJson: automationsJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(automationsJson),
     );
   }
 
@@ -3953,6 +4098,7 @@ class EventRow extends DataClass implements Insertable<EventRow> {
       recurrence: serializer.fromJson<String>(json['recurrence']),
       archivedAtMillis: serializer.fromJson<int?>(json['archivedAtMillis']),
       createdAtMillis: serializer.fromJson<int>(json['createdAtMillis']),
+      automationsJson: serializer.fromJson<String?>(json['automationsJson']),
     );
   }
   @override
@@ -3967,6 +4113,7 @@ class EventRow extends DataClass implements Insertable<EventRow> {
       'recurrence': serializer.toJson<String>(recurrence),
       'archivedAtMillis': serializer.toJson<int?>(archivedAtMillis),
       'createdAtMillis': serializer.toJson<int>(createdAtMillis),
+      'automationsJson': serializer.toJson<String?>(automationsJson),
     };
   }
 
@@ -3979,6 +4126,7 @@ class EventRow extends DataClass implements Insertable<EventRow> {
     String? recurrence,
     Value<int?> archivedAtMillis = const Value.absent(),
     int? createdAtMillis,
+    Value<String?> automationsJson = const Value.absent(),
   }) => EventRow(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -3992,6 +4140,9 @@ class EventRow extends DataClass implements Insertable<EventRow> {
         ? archivedAtMillis.value
         : this.archivedAtMillis,
     createdAtMillis: createdAtMillis ?? this.createdAtMillis,
+    automationsJson: automationsJson.present
+        ? automationsJson.value
+        : this.automationsJson,
   );
   EventRow copyWithCompanion(EventsCompanion data) {
     return EventRow(
@@ -4013,6 +4164,9 @@ class EventRow extends DataClass implements Insertable<EventRow> {
       createdAtMillis: data.createdAtMillis.present
           ? data.createdAtMillis.value
           : this.createdAtMillis,
+      automationsJson: data.automationsJson.present
+          ? data.automationsJson.value
+          : this.automationsJson,
     );
   }
 
@@ -4026,7 +4180,8 @@ class EventRow extends DataClass implements Insertable<EventRow> {
           ..write('missionChainJson: $missionChainJson, ')
           ..write('recurrence: $recurrence, ')
           ..write('archivedAtMillis: $archivedAtMillis, ')
-          ..write('createdAtMillis: $createdAtMillis')
+          ..write('createdAtMillis: $createdAtMillis, ')
+          ..write('automationsJson: $automationsJson')
           ..write(')'))
         .toString();
   }
@@ -4041,6 +4196,7 @@ class EventRow extends DataClass implements Insertable<EventRow> {
     recurrence,
     archivedAtMillis,
     createdAtMillis,
+    automationsJson,
   );
   @override
   bool operator ==(Object other) =>
@@ -4053,7 +4209,8 @@ class EventRow extends DataClass implements Insertable<EventRow> {
           other.missionChainJson == this.missionChainJson &&
           other.recurrence == this.recurrence &&
           other.archivedAtMillis == this.archivedAtMillis &&
-          other.createdAtMillis == this.createdAtMillis);
+          other.createdAtMillis == this.createdAtMillis &&
+          other.automationsJson == this.automationsJson);
 }
 
 class EventsCompanion extends UpdateCompanion<EventRow> {
@@ -4065,6 +4222,7 @@ class EventsCompanion extends UpdateCompanion<EventRow> {
   final Value<String> recurrence;
   final Value<int?> archivedAtMillis;
   final Value<int> createdAtMillis;
+  final Value<String?> automationsJson;
   final Value<int> rowid;
   const EventsCompanion({
     this.id = const Value.absent(),
@@ -4075,6 +4233,7 @@ class EventsCompanion extends UpdateCompanion<EventRow> {
     this.recurrence = const Value.absent(),
     this.archivedAtMillis = const Value.absent(),
     this.createdAtMillis = const Value.absent(),
+    this.automationsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   EventsCompanion.insert({
@@ -4086,6 +4245,7 @@ class EventsCompanion extends UpdateCompanion<EventRow> {
     this.recurrence = const Value.absent(),
     this.archivedAtMillis = const Value.absent(),
     required int createdAtMillis,
+    this.automationsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -4101,6 +4261,7 @@ class EventsCompanion extends UpdateCompanion<EventRow> {
     Expression<String>? recurrence,
     Expression<int>? archivedAtMillis,
     Expression<int>? createdAtMillis,
+    Expression<String>? automationsJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4112,6 +4273,7 @@ class EventsCompanion extends UpdateCompanion<EventRow> {
       if (recurrence != null) 'recurrence': recurrence,
       if (archivedAtMillis != null) 'archived_at_millis': archivedAtMillis,
       if (createdAtMillis != null) 'created_at_millis': createdAtMillis,
+      if (automationsJson != null) 'automations_json': automationsJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4125,6 +4287,7 @@ class EventsCompanion extends UpdateCompanion<EventRow> {
     Value<String>? recurrence,
     Value<int?>? archivedAtMillis,
     Value<int>? createdAtMillis,
+    Value<String?>? automationsJson,
     Value<int>? rowid,
   }) {
     return EventsCompanion(
@@ -4136,6 +4299,7 @@ class EventsCompanion extends UpdateCompanion<EventRow> {
       recurrence: recurrence ?? this.recurrence,
       archivedAtMillis: archivedAtMillis ?? this.archivedAtMillis,
       createdAtMillis: createdAtMillis ?? this.createdAtMillis,
+      automationsJson: automationsJson ?? this.automationsJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4167,6 +4331,9 @@ class EventsCompanion extends UpdateCompanion<EventRow> {
     if (createdAtMillis.present) {
       map['created_at_millis'] = Variable<int>(createdAtMillis.value);
     }
+    if (automationsJson.present) {
+      map['automations_json'] = Variable<String>(automationsJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4184,6 +4351,7 @@ class EventsCompanion extends UpdateCompanion<EventRow> {
           ..write('recurrence: $recurrence, ')
           ..write('archivedAtMillis: $archivedAtMillis, ')
           ..write('createdAtMillis: $createdAtMillis, ')
+          ..write('automationsJson: $automationsJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5753,6 +5921,7 @@ typedef $$HabitsTableCreateCompanionBuilder =
       Value<int> colorSeed,
       Value<String?> iconName,
       Value<int?> pausedUntilMillis,
+      Value<String?> automationsJson,
       Value<int> rowid,
     });
 typedef $$HabitsTableUpdateCompanionBuilder =
@@ -5782,6 +5951,7 @@ typedef $$HabitsTableUpdateCompanionBuilder =
       Value<int> colorSeed,
       Value<String?> iconName,
       Value<int?> pausedUntilMillis,
+      Value<String?> automationsJson,
       Value<int> rowid,
     });
 
@@ -5916,6 +6086,11 @@ class $$HabitsTableFilterComposer
 
   ColumnFilters<int> get pausedUntilMillis => $composableBuilder(
     column: $table.pausedUntilMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get automationsJson => $composableBuilder(
+    column: $table.automationsJson,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6053,6 +6228,11 @@ class $$HabitsTableOrderingComposer
     column: $table.pausedUntilMillis,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get automationsJson => $composableBuilder(
+    column: $table.automationsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$HabitsTableAnnotationComposer
@@ -6160,6 +6340,11 @@ class $$HabitsTableAnnotationComposer
     column: $table.pausedUntilMillis,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get automationsJson => $composableBuilder(
+    column: $table.automationsJson,
+    builder: (column) => column,
+  );
 }
 
 class $$HabitsTableTableManager
@@ -6215,6 +6400,7 @@ class $$HabitsTableTableManager
                 Value<int> colorSeed = const Value.absent(),
                 Value<String?> iconName = const Value.absent(),
                 Value<int?> pausedUntilMillis = const Value.absent(),
+                Value<String?> automationsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HabitsCompanion(
                 id: id,
@@ -6242,6 +6428,7 @@ class $$HabitsTableTableManager
                 colorSeed: colorSeed,
                 iconName: iconName,
                 pausedUntilMillis: pausedUntilMillis,
+                automationsJson: automationsJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6271,6 +6458,7 @@ class $$HabitsTableTableManager
                 Value<int> colorSeed = const Value.absent(),
                 Value<String?> iconName = const Value.absent(),
                 Value<int?> pausedUntilMillis = const Value.absent(),
+                Value<String?> automationsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HabitsCompanion.insert(
                 id: id,
@@ -6298,6 +6486,7 @@ class $$HabitsTableTableManager
                 colorSeed: colorSeed,
                 iconName: iconName,
                 pausedUntilMillis: pausedUntilMillis,
+                automationsJson: automationsJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -6338,6 +6527,7 @@ typedef $$PeopleTableCreateCompanionBuilder =
       Value<bool> anchoredToWakeup,
       Value<String?> missionChainJson,
       Value<int?> pausedUntilMillis,
+      Value<String?> automationsJson,
       Value<int> rowid,
     });
 typedef $$PeopleTableUpdateCompanionBuilder =
@@ -6356,6 +6546,7 @@ typedef $$PeopleTableUpdateCompanionBuilder =
       Value<bool> anchoredToWakeup,
       Value<String?> missionChainJson,
       Value<int?> pausedUntilMillis,
+      Value<String?> automationsJson,
       Value<int> rowid,
     });
 
@@ -6435,6 +6626,11 @@ class $$PeopleTableFilterComposer
 
   ColumnFilters<int> get pausedUntilMillis => $composableBuilder(
     column: $table.pausedUntilMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get automationsJson => $composableBuilder(
+    column: $table.automationsJson,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6517,6 +6713,11 @@ class $$PeopleTableOrderingComposer
     column: $table.pausedUntilMillis,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get automationsJson => $composableBuilder(
+    column: $table.automationsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PeopleTableAnnotationComposer
@@ -6585,6 +6786,11 @@ class $$PeopleTableAnnotationComposer
     column: $table.pausedUntilMillis,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get automationsJson => $composableBuilder(
+    column: $table.automationsJson,
+    builder: (column) => column,
+  );
 }
 
 class $$PeopleTableTableManager
@@ -6629,6 +6835,7 @@ class $$PeopleTableTableManager
                 Value<bool> anchoredToWakeup = const Value.absent(),
                 Value<String?> missionChainJson = const Value.absent(),
                 Value<int?> pausedUntilMillis = const Value.absent(),
+                Value<String?> automationsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PeopleCompanion(
                 id: id,
@@ -6645,6 +6852,7 @@ class $$PeopleTableTableManager
                 anchoredToWakeup: anchoredToWakeup,
                 missionChainJson: missionChainJson,
                 pausedUntilMillis: pausedUntilMillis,
+                automationsJson: automationsJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6663,6 +6871,7 @@ class $$PeopleTableTableManager
                 Value<bool> anchoredToWakeup = const Value.absent(),
                 Value<String?> missionChainJson = const Value.absent(),
                 Value<int?> pausedUntilMillis = const Value.absent(),
+                Value<String?> automationsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PeopleCompanion.insert(
                 id: id,
@@ -6679,6 +6888,7 @@ class $$PeopleTableTableManager
                 anchoredToWakeup: anchoredToWakeup,
                 missionChainJson: missionChainJson,
                 pausedUntilMillis: pausedUntilMillis,
+                automationsJson: automationsJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -7503,6 +7713,7 @@ typedef $$EventsTableCreateCompanionBuilder =
       Value<String> recurrence,
       Value<int?> archivedAtMillis,
       required int createdAtMillis,
+      Value<String?> automationsJson,
       Value<int> rowid,
     });
 typedef $$EventsTableUpdateCompanionBuilder =
@@ -7515,6 +7726,7 @@ typedef $$EventsTableUpdateCompanionBuilder =
       Value<String> recurrence,
       Value<int?> archivedAtMillis,
       Value<int> createdAtMillis,
+      Value<String?> automationsJson,
       Value<int> rowid,
     });
 
@@ -7564,6 +7776,11 @@ class $$EventsTableFilterComposer
 
   ColumnFilters<int> get createdAtMillis => $composableBuilder(
     column: $table.createdAtMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get automationsJson => $composableBuilder(
+    column: $table.automationsJson,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -7616,6 +7833,11 @@ class $$EventsTableOrderingComposer
     column: $table.createdAtMillis,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get automationsJson => $composableBuilder(
+    column: $table.automationsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$EventsTableAnnotationComposer
@@ -7660,6 +7882,11 @@ class $$EventsTableAnnotationComposer
     column: $table.createdAtMillis,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get automationsJson => $composableBuilder(
+    column: $table.automationsJson,
+    builder: (column) => column,
+  );
 }
 
 class $$EventsTableTableManager
@@ -7698,6 +7925,7 @@ class $$EventsTableTableManager
                 Value<String> recurrence = const Value.absent(),
                 Value<int?> archivedAtMillis = const Value.absent(),
                 Value<int> createdAtMillis = const Value.absent(),
+                Value<String?> automationsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EventsCompanion(
                 id: id,
@@ -7708,6 +7936,7 @@ class $$EventsTableTableManager
                 recurrence: recurrence,
                 archivedAtMillis: archivedAtMillis,
                 createdAtMillis: createdAtMillis,
+                automationsJson: automationsJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -7720,6 +7949,7 @@ class $$EventsTableTableManager
                 Value<String> recurrence = const Value.absent(),
                 Value<int?> archivedAtMillis = const Value.absent(),
                 required int createdAtMillis,
+                Value<String?> automationsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EventsCompanion.insert(
                 id: id,
@@ -7730,6 +7960,7 @@ class $$EventsTableTableManager
                 recurrence: recurrence,
                 archivedAtMillis: archivedAtMillis,
                 createdAtMillis: createdAtMillis,
+                automationsJson: automationsJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

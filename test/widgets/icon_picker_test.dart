@@ -55,7 +55,7 @@ void main() {
   testWidgets('Use default button is hidden when no initial icon is set', (
     tester,
   ) async {
-    await _pump(tester, initialIconName: null);
+    await _pump(tester);
     expect(find.text('Use default'), findsNothing);
   });
 

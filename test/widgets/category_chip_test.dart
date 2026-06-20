@@ -136,7 +136,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(
         _wrap(
-          CategoryPickerSheet(
+          const CategoryPickerSheet(
             initialCategory: DoCategory.health,
             initialColorSeed: 0,
           ),

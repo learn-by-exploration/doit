@@ -25,6 +25,7 @@
 import 'package:doit/do/category.dart';
 import 'package:doit/do/proof_mode.dart';
 import 'package:doit/missions/chain.dart';
+import 'package:doit/routines/routine.dart';
 import 'package:meta/meta.dart';
 
 export 'package:doit/do/category.dart'
@@ -166,6 +167,7 @@ sealed class Do {
     this.colorSeed = 0,
     this.iconName,
     this.pausedUntil,
+    this.automations = const <Automation>[],
   });
 
   final DoId id;
@@ -193,6 +195,12 @@ sealed class Do {
   /// shall not fire reminders for this do. A paused period does
   /// not break the consecutive-run.
   final DateTime? pausedUntil;
+
+  /// v1.0 (Phase C, SYS-072). Non-default automation rules.
+  /// Empty list = the default `ActionNotify` (synthesized at
+  /// dispatch time, not stored). Stored on the row as
+  /// `Habits.automations_json`.
+  final List<Automation> automations;
 
   /// Mission chain — non-empty for Strong, empty for Soft /
   /// Auto. Always reflectable: derived from [proofMode].
@@ -224,6 +232,7 @@ sealed class Do {
     String? iconName,
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
+    List<Automation>? automations,
   });
 
   /// Pure: same input → same output. Returns the next
@@ -338,6 +347,7 @@ final class DoFixed extends Do {
     super.colorSeed,
     super.iconName,
     super.pausedUntil,
+    super.automations,
   });
 
   /// Set of 1..7 (1 = Monday .. 7 = Sunday). Must be non-empty.
@@ -356,6 +366,7 @@ final class DoFixed extends Do {
     String? iconName,
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
+    List<Automation>? automations,
   }) {
     return DoFixed(
       id: id,
@@ -369,6 +380,7 @@ final class DoFixed extends Do {
       colorSeed: colorSeed ?? this.colorSeed,
       iconName: iconName ?? this.iconName,
       pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
+      automations: automations ?? this.automations,
     );
   }
 
@@ -419,6 +431,7 @@ final class DoInterval extends Do {
     super.colorSeed,
     super.iconName,
     super.pausedUntil,
+    super.automations,
   });
 
   final int nDays;
@@ -436,6 +449,7 @@ final class DoInterval extends Do {
     String? iconName,
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
+    List<Automation>? automations,
   }) {
     return DoInterval(
       id: id,
@@ -449,6 +463,7 @@ final class DoInterval extends Do {
       colorSeed: colorSeed ?? this.colorSeed,
       iconName: iconName ?? this.iconName,
       pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
+      automations: automations ?? this.automations,
     );
   }
 
@@ -498,6 +513,7 @@ final class DoAnchor extends Do {
     super.colorSeed,
     super.iconName,
     super.pausedUntil,
+    super.automations,
   });
 
   final DoId targetDoId;
@@ -516,6 +532,7 @@ final class DoAnchor extends Do {
     String? iconName,
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
+    List<Automation>? automations,
   }) {
     return DoAnchor(
       id: id,
@@ -529,6 +546,7 @@ final class DoAnchor extends Do {
       colorSeed: colorSeed ?? this.colorSeed,
       iconName: iconName ?? this.iconName,
       pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
+      automations: automations ?? this.automations,
     );
   }
 
@@ -580,6 +598,7 @@ final class DoDayOfX extends Do {
     super.colorSeed,
     super.iconName,
     super.pausedUntil,
+    super.automations,
   }) : assert(
          dayOfMonth != null || nth != null,
          'Specify either dayOfMonth or (nth, weekday).',
@@ -604,6 +623,7 @@ final class DoDayOfX extends Do {
     String? iconName,
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
+    List<Automation>? automations,
   }) {
     return DoDayOfX(
       id: id,
@@ -619,6 +639,7 @@ final class DoDayOfX extends Do {
       colorSeed: colorSeed ?? this.colorSeed,
       iconName: iconName ?? this.iconName,
       pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
+      automations: automations ?? this.automations,
     );
   }
 
@@ -711,6 +732,7 @@ final class DoTimeWindow extends Do {
     super.colorSeed,
     super.iconName,
     super.pausedUntil,
+    super.automations,
   });
 
   /// Set of 1..7 (1 = Monday .. 7 = Sunday). Must be non-empty.
@@ -737,6 +759,7 @@ final class DoTimeWindow extends Do {
     String? iconName,
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
+    List<Automation>? automations,
   }) {
     return DoTimeWindow(
       id: id,
@@ -752,6 +775,7 @@ final class DoTimeWindow extends Do {
       colorSeed: colorSeed ?? this.colorSeed,
       iconName: iconName ?? this.iconName,
       pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
+      automations: automations ?? this.automations,
     );
   }
 

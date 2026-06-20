@@ -34,7 +34,7 @@ Future<void> _seed({String groupId = 'g1', String personId = 'p1'}) async {
       lookupKey: 'lk_$personId',
       channel: const ChannelWhatsApp('+10000000000'),
       cadence: const EveryNDays(7),
-      createdAt: DateTime(2026, 6, 1),
+      createdAt: DateTime(2026, 6),
     ),
   );
   await PersonGroupRepository.instance.save(
@@ -45,7 +45,7 @@ Future<void> _seed({String groupId = 'g1', String personId = 'p1'}) async {
       semantic: GroupSemantic.rotation,
       channel: 'whatsapp',
       handle: 'chat_uri',
-      createdAt: DateTime(2026, 6, 1),
+      createdAt: DateTime(2026, 6),
     ),
   );
   await PersonGroupRepository.instance.addMember(groupId, personId);

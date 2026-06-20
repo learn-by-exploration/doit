@@ -121,7 +121,7 @@ Do _h({required String id}) => DoFixed(
   id: id,
   name: 'X',
   proofMode: const SoftProof(),
-  createdAt: DateTime(2026, 6, 1),
+  createdAt: DateTime(2026, 6),
   restDaysPerMonth: 0,
   weekdays: const {1, 2, 3, 4, 5, 6, 7},
   time: const DoTime(9, 0),

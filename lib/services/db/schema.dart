@@ -24,11 +24,23 @@
 //       The migration is in `migrations/v2_to_v3.dart`.
 //       Built-in templates are seeded separately from
 //       `main.dart` via `TemplateLibrary.seedBuiltIns(...)`.
+//   4 — v1.0 reframe (Phase C PR 1, 2026-06-20):
+//       + habits.automations_json (TEXT nullable)
+//       + people.automations_json (TEXT nullable)
+//       + events.automations_json (TEXT nullable)
+//       The migration is in `migrations/v3_to_v4.dart`. The
+//       envelope is `{"k":1,"automations":[...]}` per
+//       `kAutomationFormatVersion` in
+//       `lib/triggers/automation_codec.dart`. NULL post-
+//       migration means "no non-default automations" (the
+//       default `ActionNotify` is synthesized at dispatch
+//       time, not stored).
 
 import 'package:drift/drift.dart';
 
 import 'package:doit/services/db/migrations/v1_to_v2.dart';
 import 'package:doit/services/db/migrations/v2_to_v3.dart';
+import 'package:doit/services/db/migrations/v3_to_v4.dart';
 import 'package:doit/services/db/tables.dart';
 
 part 'schema.g.dart';
@@ -37,7 +49,7 @@ part 'schema.g.dart';
 /// change. The matching migration file MUST land in
 /// `lib/services/db/migrations/vN_to_vM.dart` and be referenced from
 /// [migrations] below.
-const int kCurrentSchemaVersion = 3;
+const int kCurrentSchemaVersion = 4;
 
 @DriftDatabase(
   tables: [
@@ -76,6 +88,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 3) {
         await migrateV2ToV3(m, this);
+      }
+      if (from < 4) {
+        await migrateV3ToV4(m, this);
       }
     },
     beforeOpen: (details) async {

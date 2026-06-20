@@ -9,6 +9,7 @@ import 'package:doit/missions/chain.dart';
 import 'package:doit/missions/mission.dart';
 import 'package:doit/people/cadence.dart' as domain;
 import 'package:doit/people/person.dart' as domain;
+import 'package:doit/routines/routine.dart';
 import 'package:drift/drift.dart';
 
 import 'package:doit/services/db.dart';
@@ -65,8 +66,10 @@ class PersonRepository {
       dayOfMonth: _monthlyDay(p.cadence) ?? _yearlyDay(p.cadence),
       monthOfYear: _yearlyMonth(p.cadence),
       anchoredToWakeup: false,
-      missionChainJson: null, // v0.1: not used; v0.2 wires a chain here.
       pausedUntilMillis: p.pausedUntil?.millisecondsSinceEpoch,
+      automationsJson: p.automations.isEmpty
+          ? null
+          : encodeAutomationList(p.automations),
     );
   }
 
@@ -80,6 +83,7 @@ class PersonRepository {
       pausedUntil: r.pausedUntilMillis == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(r.pausedUntilMillis!),
+      automations: decodeAutomationList(r.automationsJson),
     );
   }
 

@@ -28,6 +28,13 @@
 //   - templates (curated bootstrap shapes for dos / events /
 //     people / routines; user-saved custom templates on the
 //     same row shape).
+//
+// v1.0 reframe columns (added in migration v3→v4, Phase C PR 1):
+//   - habits.automations_json (TEXT nullable)
+//   - people.automations_json (TEXT nullable)
+//   - events.automations_json (TEXT nullable)
+//   The envelope is `{"k":1,"automations":[...]}` and is
+//   decoded by `lib/triggers/automation_codec.dart`.
 
 import 'package:drift/drift.dart';
 
@@ -84,6 +91,10 @@ class Habits extends Table {
   // does not fire reminders for this habit. A paused period does
   // not break the streak.
   IntColumn get pausedUntilMillis => integer().nullable()();
+  // v1.0 (Phase C): non-default automation rules. NULL =
+  // "no non-default automations" (the default `ActionNotify`
+  // is synthesized at dispatch time, not stored).
+  TextColumn get automationsJson => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -114,6 +125,10 @@ class People extends Table {
   TextColumn get missionChainJson => text().nullable()();
   // v0.2: pause state (see Habits.pausedUntilMillis).
   IntColumn get pausedUntilMillis => integer().nullable()();
+  // v1.0 (Phase C): non-default automation rules. NULL =
+  // "no non-default automations" (the default `ActionNotify`
+  // is synthesized at dispatch time, not stored).
+  TextColumn get automationsJson => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -137,6 +152,10 @@ class Events extends Table {
   // When archived. Null = active. Auto-set 24h after fire.
   IntColumn get archivedAtMillis => integer().nullable()();
   IntColumn get createdAtMillis => integer()();
+  // v1.0 (Phase C): non-default automation rules. NULL =
+  // "no non-default automations" (the default `ActionNotify`
+  // is synthesized at dispatch time, not stored).
+  TextColumn get automationsJson => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

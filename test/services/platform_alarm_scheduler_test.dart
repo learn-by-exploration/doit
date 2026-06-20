@@ -112,7 +112,7 @@ void main() {
       // scheduler). The fallback must NOT throw — it
       // cancels the platform-side alarm and re-arms
       // with a target of `now + delay`.
-      final id = const AlarmId(9999);
+      const id = AlarmId(9999);
       final newId = await scheduler.snooze(id, const Duration(minutes: 5));
       expect(bridge.cancelAlarmCalls, [9999]);
       expect(bridge.setExactAlarmCalls, hasLength(1));

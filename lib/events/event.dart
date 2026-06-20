@@ -14,7 +14,12 @@
 // Layer rules (per .claude/rules/):
 //   - No Flutter imports.
 //   - Immutable; mutations go through [Event.copyWith].
+//
+// v1.0 (Phase C, SYS-072): adds `automations` for non-default
+// routine rules. Default is an empty list (the
+// `ActionNotify` synthesized at dispatch time).
 
+import 'package:doit/routines/routine.dart';
 import 'package:meta/meta.dart';
 
 /// Stable, opaque event identifier. Same shape as [HabitId] /
@@ -41,6 +46,7 @@ class Event {
     this.missionChainJson,
     this.recurrence = EventRecurrence.none,
     this.archivedAtMillis,
+    this.automations = const <Automation>[],
   });
 
   final EventId id;
@@ -51,6 +57,12 @@ class Event {
   final EventRecurrence recurrence;
   final int? archivedAtMillis;
   final int createdAtMillis;
+
+  /// v1.0 (Phase C). Non-default automation rules. Empty
+  /// list = the default `ActionNotify` (synthesized at
+  /// dispatch time, not stored). Stored on the row as
+  /// `Events.automations_json`.
+  final List<Automation> automations;
 
   /// The millis at which the notification should fire.
   /// `atMillis - leadTimeMillis`.
@@ -94,6 +106,7 @@ class Event {
     EventRecurrence? recurrence,
     int? archivedAtMillis,
     bool clearArchived = false,
+    List<Automation>? automations,
   }) {
     return Event(
       id: id,
@@ -106,6 +119,7 @@ class Event {
           ? null
           : (archivedAtMillis ?? this.archivedAtMillis),
       createdAtMillis: createdAtMillis,
+      automations: automations ?? this.automations,
     );
   }
 

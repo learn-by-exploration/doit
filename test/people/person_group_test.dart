@@ -15,7 +15,7 @@ PersonGroup _group({
     semantic: semantic,
     channel: 'whatsapp',
     handle: 'chat_uri',
-    createdAt: DateTime(2026, 6, 1),
+    createdAt: DateTime(2026, 6),
   );
 }
 
@@ -58,7 +58,7 @@ void main() {
     });
 
     test('clearPausedUntil sets pausedUntil to null', () {
-      final g = _group().copyWith(pausedUntil: DateTime(2030, 1, 1));
+      final g = _group().copyWith(pausedUntil: DateTime(2030));
       expect(g.pausedUntil, isNotNull);
       final g2 = g.copyWith(clearPausedUntil: true);
       expect(g2.pausedUntil, isNull);
@@ -71,12 +71,12 @@ void main() {
     });
 
     test('returns true when pausedUntil is in the future', () {
-      final g = _group().copyWith(pausedUntil: DateTime(2027, 1, 1));
+      final g = _group().copyWith(pausedUntil: DateTime(2027));
       expect(g.isPausedAt(DateTime(2026, 6, 14)), isTrue);
     });
 
     test('returns false when pausedUntil is in the past', () {
-      final g = _group().copyWith(pausedUntil: DateTime(2026, 1, 1));
+      final g = _group().copyWith(pausedUntil: DateTime(2026));
       expect(g.isPausedAt(DateTime(2026, 6, 14)), isFalse);
     });
   });
@@ -89,7 +89,7 @@ void main() {
     test('returns the only member when there is one', () {
       final m = GroupMember(
         personId: 'p1',
-        addedAtMillis: DateTime(2026, 1, 1).millisecondsSinceEpoch,
+        addedAtMillis: DateTime(2026).millisecondsSinceEpoch,
       );
       expect(pickNextMember([m]), 'p1');
     });
@@ -97,12 +97,12 @@ void main() {
     test('prefers a never-contacted member over a contacted one', () {
       final never = GroupMember(
         personId: 'p1',
-        addedAtMillis: DateTime(2026, 1, 1).millisecondsSinceEpoch,
+        addedAtMillis: DateTime(2026).millisecondsSinceEpoch,
       );
       final contacted = GroupMember(
         personId: 'p2',
         addedAtMillis: DateTime(2026, 1, 2).millisecondsSinceEpoch,
-        lastContactedMillis: DateTime(2026, 5, 1).millisecondsSinceEpoch,
+        lastContactedMillis: DateTime(2026, 5).millisecondsSinceEpoch,
       );
       expect(pickNextMember([contacted, never]), 'p1');
     });
@@ -111,17 +111,17 @@ void main() {
       final p1 = GroupMember(
         personId: 'p1',
         addedAtMillis: 1,
-        lastContactedMillis: DateTime(2026, 5, 1).millisecondsSinceEpoch,
+        lastContactedMillis: DateTime(2026, 5).millisecondsSinceEpoch,
       );
       final p2 = GroupMember(
         personId: 'p2',
         addedAtMillis: 2,
-        lastContactedMillis: DateTime(2026, 3, 1).millisecondsSinceEpoch,
+        lastContactedMillis: DateTime(2026, 3).millisecondsSinceEpoch,
       );
       final p3 = GroupMember(
         personId: 'p3',
         addedAtMillis: 3,
-        lastContactedMillis: DateTime(2026, 6, 1).millisecondsSinceEpoch,
+        lastContactedMillis: DateTime(2026, 6).millisecondsSinceEpoch,
       );
       expect(pickNextMember([p1, p2, p3]), 'p2');
     });
@@ -129,15 +129,15 @@ void main() {
     test('breaks ties by addedAtMillis (oldest wins)', () {
       final p1 = GroupMember(
         personId: 'p1',
-        addedAtMillis: DateTime(2026, 1, 1).millisecondsSinceEpoch,
+        addedAtMillis: DateTime(2026).millisecondsSinceEpoch,
       );
       final p2 = GroupMember(
         personId: 'p2',
-        addedAtMillis: DateTime(2026, 2, 1).millisecondsSinceEpoch,
+        addedAtMillis: DateTime(2026, 2).millisecondsSinceEpoch,
       );
       final p3 = GroupMember(
         personId: 'p3',
-        addedAtMillis: DateTime(2026, 3, 1).millisecondsSinceEpoch,
+        addedAtMillis: DateTime(2026, 3).millisecondsSinceEpoch,
       );
       expect(pickNextMember([p3, p2, p1]), 'p1');
     });
@@ -145,11 +145,11 @@ void main() {
 
   group('markContacted', () {
     test('updates lastContactedMillis for the matching member', () {
-      final m1 = GroupMember(personId: 'p1', addedAtMillis: 1);
+      const m1 = GroupMember(personId: 'p1', addedAtMillis: 1);
       final m2 = GroupMember(
         personId: 'p2',
         addedAtMillis: 2,
-        lastContactedMillis: DateTime(2026, 5, 1).millisecondsSinceEpoch,
+        lastContactedMillis: DateTime(2026, 5).millisecondsSinceEpoch,
       );
       final updated = markContacted([m1, m2], 'p1', DateTime(2026, 6, 14));
       expect(
@@ -160,9 +160,9 @@ void main() {
     });
 
     test('preserves the length and order of the list', () {
-      final m1 = GroupMember(personId: 'p1', addedAtMillis: 1);
-      final m2 = GroupMember(personId: 'p2', addedAtMillis: 2);
-      final m3 = GroupMember(personId: 'p3', addedAtMillis: 3);
+      const m1 = GroupMember(personId: 'p1', addedAtMillis: 1);
+      const m2 = GroupMember(personId: 'p2', addedAtMillis: 2);
+      const m3 = GroupMember(personId: 'p3', addedAtMillis: 3);
       final updated = markContacted([m1, m2, m3], 'p2', DateTime(2026, 6, 14));
       expect(updated.length, 3);
       expect(updated.map((m) => m.personId).toList(), ['p1', 'p2', 'p3']);

@@ -186,15 +186,14 @@ void main() {
   });
 
   test('v2→v3 migration upgrades schema and preserves rows', () async {
-    // Open with the v3 AppDatabase. Drift sees user_version = 2
-    // (set in setUp) and kCurrentSchemaVersion = 3, so
-    // onUpgrade(from: 2, to: 3) runs — which invokes
-    // migrateV2ToV3 and creates the templates table.
+    // Open with the v4 AppDatabase. Drift sees user_version = 2
+    // (set in setUp) and kCurrentSchemaVersion = 4, so
+    // onUpgrade runs migrateV2ToV3 + migrateV3ToV4.
     final db = AppDatabase(NativeDatabase(dbFile));
     addTearDown(db.close);
 
-    // (1) Schema version is now 3.
-    expect(db.schemaVersion, 3);
+    // (1) Schema version is now 4 (current).
+    expect(db.schemaVersion, 4);
 
     // (2) The v2 rows survive.
     final habits = await db.select(db.habits).get();
@@ -215,12 +214,15 @@ void main() {
     final templates = await db.select(db.templates).get();
     expect(templates, isEmpty);
 
-    // (4) PRAGMA user_version is now 3 (the bump is what
+    // (4) PRAGMA user_version is now 4 (the bump is what
     //     prevents the migration from re-running on next open).
+    //     Phase C PR 1 stacked migrateV3ToV4 on top of v2→v3,
+    //     so the live schema is v4 even for an entity whose
+    //     first non-trivial migration was v2→v3.
     final afterVersion = await db
         .customSelect('PRAGMA user_version')
         .getSingle();
-    expect(afterVersion.data.values.first, 3);
+    expect(afterVersion.data.values.first, 4);
   });
 
   test('re-opening after migration does not re-run onUpgrade', () async {
@@ -231,7 +233,7 @@ void main() {
     // Second open on the same file: must be a no-op.
     final db2 = AppDatabase(NativeDatabase(dbFile));
     addTearDown(db2.close);
-    expect(db2.schemaVersion, 3);
+    expect(db2.schemaVersion, 4);
     final templates = await db2.select(db2.templates).get();
     expect(templates, isEmpty);
   });

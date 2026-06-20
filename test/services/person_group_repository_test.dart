@@ -22,7 +22,7 @@ void main() {
     await AppDatabaseService.instance.closeForTesting();
   });
 
-  ContactGroup _group({
+  ContactGroup group({
     String id = 'g1',
     String name = 'Friends',
     PersonCadence? cadence,
@@ -35,12 +35,12 @@ void main() {
       semantic: semantic,
       channel: 'whatsapp',
       handle: 'chat_uri',
-      createdAt: DateTime(2026, 6, 1),
+      createdAt: DateTime(2026, 6),
     );
   }
 
   test('save + getById round-trips', () async {
-    await PersonGroupRepository.instance.save(_group());
+    await PersonGroupRepository.instance.save(group());
     final got = await PersonGroupRepository.instance.getById('g1');
     expect(got, isNotNull);
     expect(got!.name, 'Friends');
@@ -56,7 +56,7 @@ void main() {
         semantic: GroupSemantic.rotation,
         channel: 'whatsapp',
         handle: 'chat_uri',
-        createdAt: DateTime(2026, 6, 1),
+        createdAt: DateTime(2026, 6),
       ),
     );
     await PersonGroupRepository.instance.save(
@@ -75,7 +75,7 @@ void main() {
   });
 
   test('deleteById removes the header and its members', () async {
-    await PersonGroupRepository.instance.save(_group());
+    await PersonGroupRepository.instance.save(group());
     await PersonGroupRepository.instance.addMember('g1', 'p1');
     await PersonGroupRepository.instance.addMember('g1', 'p2');
     await PersonGroupRepository.instance.deleteById('g1');
@@ -86,7 +86,7 @@ void main() {
   });
 
   test('addMember is idempotent', () async {
-    await PersonGroupRepository.instance.save(_group());
+    await PersonGroupRepository.instance.save(group());
     await PersonGroupRepository.instance.addMember('g1', 'p1');
     await PersonGroupRepository.instance.addMember('g1', 'p1');
     final members = await PersonGroupRepository.instance.listMembers('g1');
@@ -94,7 +94,7 @@ void main() {
   });
 
   test('removeMember drops the row', () async {
-    await PersonGroupRepository.instance.save(_group());
+    await PersonGroupRepository.instance.save(group());
     await PersonGroupRepository.instance.addMember('g1', 'p1');
     await PersonGroupRepository.instance.addMember('g1', 'p2');
     await PersonGroupRepository.instance.removeMember('g1', 'p1');
@@ -104,7 +104,7 @@ void main() {
   });
 
   test('markContacted updates lastContactedMillis', () async {
-    await PersonGroupRepository.instance.save(_group());
+    await PersonGroupRepository.instance.save(group());
     await PersonGroupRepository.instance.addMember('g1', 'p1');
     final at = DateTime(2026, 6, 14);
     await PersonGroupRepository.instance.markContacted('g1', 'p1', at);
@@ -113,7 +113,7 @@ void main() {
   });
 
   test('listMembers returns members in addedAtMillis order', () async {
-    await PersonGroupRepository.instance.save(_group());
+    await PersonGroupRepository.instance.save(group());
     await db
         .into(db.personGroupMembers)
         .insert(
@@ -147,7 +147,7 @@ void main() {
 
   test('save validates the group', () async {
     expect(
-      () => PersonGroupRepository.instance.save(_group().copyWith(name: '   ')),
+      () => PersonGroupRepository.instance.save(group().copyWith(name: '   ')),
       throwsA(isA<PersonGroupNameEmpty>()),
     );
   });

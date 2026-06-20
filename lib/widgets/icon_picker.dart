@@ -114,7 +114,6 @@ class _PickerStateState extends State<_PickerState> {
                           crossAxisCount: 4,
                           mainAxisSpacing: 8,
                           crossAxisSpacing: 8,
-                          childAspectRatio: 1,
                         ),
                     itemCount: DoIcons.keys.length,
                     itemBuilder: (context, i) {

@@ -10,6 +10,7 @@
 // uses the sealed `EventRecurrence` enum.
 
 import 'package:doit/events/event.dart';
+import 'package:doit/routines/routine.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/db/schema.dart';
 import 'package:drift/drift.dart';
@@ -93,6 +94,9 @@ class EventRepository {
       recurrence: _recurrenceToString(e.recurrence),
       archivedAtMillis: e.archivedAtMillis,
       createdAtMillis: e.createdAtMillis,
+      automationsJson: e.automations.isEmpty
+          ? null
+          : encodeAutomationList(e.automations),
     );
   }
 
@@ -106,6 +110,7 @@ class EventRepository {
       recurrence: _recurrenceFromString(r.recurrence),
       archivedAtMillis: r.archivedAtMillis,
       createdAtMillis: r.createdAtMillis,
+      automations: decodeAutomationList(r.automationsJson),
     );
   }
 

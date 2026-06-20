@@ -59,7 +59,7 @@ void main() {
         leadTimeMillis: 0,
         createdAtMillis: 0,
       );
-      final next = e.nextOccurrence(DateTime(2026, 6, 1));
+      final next = e.nextOccurrence(DateTime(2026, 6));
       expect(next, DateTime(2026, 6, 15));
     });
 
@@ -67,7 +67,7 @@ void main() {
       final e = Event(
         id: 'e1',
         name: 'X',
-        atMillis: DateTime(2026, 6, 1).millisecondsSinceEpoch,
+        atMillis: DateTime(2026, 6).millisecondsSinceEpoch,
         leadTimeMillis: 0,
         createdAtMillis: 0,
       );
@@ -87,7 +87,7 @@ void main() {
           recurrence: EventRecurrence.annually,
         );
         // From after the birthday in 2025: next is 2026-03-15.
-        final next = e.nextOccurrence(DateTime(2025, 4, 1));
+        final next = e.nextOccurrence(DateTime(2025, 4));
         expect(next, DateTime(2026, 3, 15));
       },
     );
@@ -101,7 +101,7 @@ void main() {
         createdAtMillis: 0,
         recurrence: EventRecurrence.annually,
       );
-      final next = e.nextOccurrence(DateTime(2026, 1, 1));
+      final next = e.nextOccurrence(DateTime(2026));
       expect(next, DateTime(2026, 3, 15));
     });
   });

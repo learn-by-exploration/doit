@@ -1,5 +1,12 @@
 // Add / Edit event screen — one-off date-specific reminders.
 //
+// Note: `RadioListTile.groupValue` / `onChanged` are deprecated
+// after Flutter 3.32.0 in favor of the `RadioGroup` ancestor.
+// The local ignore comments below mark the legacy usage until
+// this screen is migrated (out of scope for Phase C PR 1).
+
+// ignore_for_file: deprecated_member_use
+//
 // Per WF-017 (event create) and WF-019 (event edit). One screen
 // with two modes:
 //   - Add: no `existing` arg. Saves a new event and re-schedules

@@ -10,8 +10,13 @@
 //   - No Flutter imports.
 //   - The model is immutable; mutations go through
 //     [Person.copyWith].
+//
+// v1.0 (Phase C, SYS-072): adds `automations` for non-default
+// routine rules. Default is an empty list (the `ActionNotify`
+// synthesized at dispatch time).
 
 import 'package:doit/people/cadence.dart';
+import 'package:doit/routines/routine.dart';
 import 'package:meta/meta.dart';
 
 /// Stable, opaque person identifier. Same shape as [HabitId]:
@@ -132,6 +137,7 @@ sealed class Person {
     required this.cadence,
     required this.createdAt,
     this.pausedUntil,
+    this.automations = const <Automation>[],
   });
 
   /// Stable identifier within do it. Different from the
@@ -158,6 +164,12 @@ sealed class Person {
   /// consume a missed-period streak break.
   final DateTime? pausedUntil;
 
+  /// v1.0 (Phase C). Non-default automation rules. Empty
+  /// list = the default `ActionNotify` (synthesized at
+  /// dispatch time, not stored). Stored on the row as
+  /// `People.automations_json`.
+  final List<Automation> automations;
+
   /// `true` when the person is currently paused (i.e.,
   /// [pausedUntil] is set and in the future at [now]).
   bool isPausedAt(DateTime now) =>
@@ -171,6 +183,7 @@ sealed class Person {
     PersonCadence? cadence,
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
+    List<Automation>? automations,
   });
 }
 
@@ -186,6 +199,7 @@ final class ContactPerson extends Person {
     required super.cadence,
     required super.createdAt,
     super.pausedUntil,
+    super.automations,
   });
 
   @override
@@ -194,6 +208,7 @@ final class ContactPerson extends Person {
     PersonCadence? cadence,
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
+    List<Automation>? automations,
   }) {
     return ContactPerson(
       id: id,
@@ -202,6 +217,7 @@ final class ContactPerson extends Person {
       cadence: cadence ?? this.cadence,
       createdAt: createdAt,
       pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
+      automations: automations ?? this.automations,
     );
   }
 
