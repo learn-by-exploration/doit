@@ -159,12 +159,35 @@ void main() {
       expect(after, isEmpty);
     });
 
-    test('schemaVersion is 2 for v0.2', () {
+    test('schemaVersion is 3 for v1.0 reframe (Phase B PR 1)', () {
       // The version pin is a contract — Phase 3+ bump it.
       // Drift exposes it via the database instance.
       final db = AppDatabaseService.instance.db;
       expect(db.schemaVersion, kCurrentSchemaVersion);
-      expect(kCurrentSchemaVersion, 2);
+      expect(kCurrentSchemaVersion, 3);
+    });
+
+    test('fresh install creates the v3 templates table', () async {
+      final db = AppDatabaseService.instance.db;
+      // A row insert in a missing table would throw. This is
+      // the cheapest "the table exists" assertion without a
+      // schema-introspection helper.
+      await db
+          .into(db.templates)
+          .insert(
+            TemplateRow(
+              id: 't_test_v3',
+              name: 'Drink water',
+              description: 'Test template',
+              iconName: 'check',
+              entityType: 'do',
+              payloadJson: '{"k":1,"do":{}}',
+              isBuiltIn: false,
+              createdAtMillis: DateTime(2026).millisecondsSinceEpoch,
+            ),
+          );
+      final back = await db.select(db.templates).getSingle();
+      expect(back.name, 'Drink water');
     });
   });
 }

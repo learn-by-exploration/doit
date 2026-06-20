@@ -17,10 +17,18 @@
 //       + person_groups table
 //       + person_group_members table
 //       The migration is in `migrations/v1_to_v2.dart`.
+//   3 — v1.0 reframe (Phase B PR 1, 2026-06-20):
+//       + templates table (curated bootstrap shapes for
+//         dos / events / people / routines; user-saved
+//         custom templates on the same row shape).
+//       The migration is in `migrations/v2_to_v3.dart`.
+//       Built-in templates are seeded separately from
+//       `main.dart` via `TemplateLibrary.seedBuiltIns(...)`.
 
 import 'package:drift/drift.dart';
 
 import 'package:doit/services/db/migrations/v1_to_v2.dart';
+import 'package:doit/services/db/migrations/v2_to_v3.dart';
 import 'package:doit/services/db/tables.dart';
 
 part 'schema.g.dart';
@@ -29,7 +37,7 @@ part 'schema.g.dart';
 /// change. The matching migration file MUST land in
 /// `lib/services/db/migrations/vN_to_vM.dart` and be referenced from
 /// [migrations] below.
-const int kCurrentSchemaVersion = 2;
+const int kCurrentSchemaVersion = 3;
 
 @DriftDatabase(
   tables: [
@@ -43,6 +51,8 @@ const int kCurrentSchemaVersion = 2;
     Events,
     PersonGroups,
     PersonGroupMembers,
+    // v1.0 reframe (Phase B PR 1)
+    Templates,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -63,6 +73,9 @@ class AppDatabase extends _$AppDatabase {
     onUpgrade: (m, from, to) async {
       if (from < 2) {
         await migrateV1ToV2(m, this);
+      }
+      if (from < 3) {
+        await migrateV2ToV3(m, this);
       }
     },
     beforeOpen: (details) async {

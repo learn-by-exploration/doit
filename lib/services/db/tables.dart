@@ -23,6 +23,11 @@
 //   - events
 //   - person_groups
 //   - person_group_members
+//
+// v1.0 reframe tables (added in migration v2→v3, Phase B PR 1):
+//   - templates (curated bootstrap shapes for dos / events /
+//     people / routines; user-saved custom templates on the
+//     same row shape).
 
 import 'package:drift/drift.dart';
 
@@ -230,4 +235,33 @@ class EventLogs extends Table {
   TextColumn get kind =>
       text()(); // 'boot' | 'tz_change' | 'dst' | 'app_update' | 'migration'
   TextColumn get detailJson => text().nullable()();
+}
+
+/// A template — a saved shape the user can pick to bootstrap a
+/// new do / event / person / routine. Templates are versioned by
+/// `payloadJson` format (see `kTemplateFormatVersion` in
+/// `lib/templates/template_library.dart`); the repository
+/// validates the envelope `k` on save.
+///
+/// Built-in templates are seeded by `TemplateLibrary.seedBuiltIns`
+/// from `main.dart`. The migration only creates the table; it
+/// does NOT auto-seed (seeding is idempotent and belongs in the
+/// app-init path, not the migration).
+///
+/// v1.0 reframe (Phase B PR 1). Created in migration v2→v3.
+@DataClassName('TemplateRow')
+class Templates extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get description => text()();
+  TextColumn get iconName => text()();
+  // 'do' | 'event' | 'person' | 'routine' — see TemplateEntityType.
+  TextColumn get entityType => text()();
+  TextColumn get payloadJson => text()();
+  BoolColumn get isBuiltIn => boolean().withDefault(const Constant(false))();
+  IntColumn get createdAtMillis => integer()();
+  IntColumn get lastUsedAtMillis => integer().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }

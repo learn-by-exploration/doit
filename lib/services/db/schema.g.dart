@@ -5110,6 +5110,590 @@ class PersonGroupMembersCompanion
   }
 }
 
+class $TemplatesTable extends Templates
+    with TableInfo<$TemplatesTable, TemplateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TemplatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _iconNameMeta = const VerificationMeta(
+    'iconName',
+  );
+  @override
+  late final GeneratedColumn<String> iconName = GeneratedColumn<String>(
+    'icon_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _entityTypeMeta = const VerificationMeta(
+    'entityType',
+  );
+  @override
+  late final GeneratedColumn<String> entityType = GeneratedColumn<String>(
+    'entity_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadJsonMeta = const VerificationMeta(
+    'payloadJson',
+  );
+  @override
+  late final GeneratedColumn<String> payloadJson = GeneratedColumn<String>(
+    'payload_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isBuiltInMeta = const VerificationMeta(
+    'isBuiltIn',
+  );
+  @override
+  late final GeneratedColumn<bool> isBuiltIn = GeneratedColumn<bool>(
+    'is_built_in',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_built_in" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMillisMeta = const VerificationMeta(
+    'createdAtMillis',
+  );
+  @override
+  late final GeneratedColumn<int> createdAtMillis = GeneratedColumn<int>(
+    'created_at_millis',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastUsedAtMillisMeta = const VerificationMeta(
+    'lastUsedAtMillis',
+  );
+  @override
+  late final GeneratedColumn<int> lastUsedAtMillis = GeneratedColumn<int>(
+    'last_used_at_millis',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    description,
+    iconName,
+    entityType,
+    payloadJson,
+    isBuiltIn,
+    createdAtMillis,
+    lastUsedAtMillis,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'templates';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TemplateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_descriptionMeta);
+    }
+    if (data.containsKey('icon_name')) {
+      context.handle(
+        _iconNameMeta,
+        iconName.isAcceptableOrUnknown(data['icon_name']!, _iconNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_iconNameMeta);
+    }
+    if (data.containsKey('entity_type')) {
+      context.handle(
+        _entityTypeMeta,
+        entityType.isAcceptableOrUnknown(data['entity_type']!, _entityTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_entityTypeMeta);
+    }
+    if (data.containsKey('payload_json')) {
+      context.handle(
+        _payloadJsonMeta,
+        payloadJson.isAcceptableOrUnknown(
+          data['payload_json']!,
+          _payloadJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadJsonMeta);
+    }
+    if (data.containsKey('is_built_in')) {
+      context.handle(
+        _isBuiltInMeta,
+        isBuiltIn.isAcceptableOrUnknown(data['is_built_in']!, _isBuiltInMeta),
+      );
+    }
+    if (data.containsKey('created_at_millis')) {
+      context.handle(
+        _createdAtMillisMeta,
+        createdAtMillis.isAcceptableOrUnknown(
+          data['created_at_millis']!,
+          _createdAtMillisMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMillisMeta);
+    }
+    if (data.containsKey('last_used_at_millis')) {
+      context.handle(
+        _lastUsedAtMillisMeta,
+        lastUsedAtMillis.isAcceptableOrUnknown(
+          data['last_used_at_millis']!,
+          _lastUsedAtMillisMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TemplateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TemplateRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      )!,
+      iconName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon_name'],
+      )!,
+      entityType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entity_type'],
+      )!,
+      payloadJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload_json'],
+      )!,
+      isBuiltIn: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_built_in'],
+      )!,
+      createdAtMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at_millis'],
+      )!,
+      lastUsedAtMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_used_at_millis'],
+      ),
+    );
+  }
+
+  @override
+  $TemplatesTable createAlias(String alias) {
+    return $TemplatesTable(attachedDatabase, alias);
+  }
+}
+
+class TemplateRow extends DataClass implements Insertable<TemplateRow> {
+  final String id;
+  final String name;
+  final String description;
+  final String iconName;
+  final String entityType;
+  final String payloadJson;
+  final bool isBuiltIn;
+  final int createdAtMillis;
+  final int? lastUsedAtMillis;
+  const TemplateRow({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.iconName,
+    required this.entityType,
+    required this.payloadJson,
+    required this.isBuiltIn,
+    required this.createdAtMillis,
+    this.lastUsedAtMillis,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['description'] = Variable<String>(description);
+    map['icon_name'] = Variable<String>(iconName);
+    map['entity_type'] = Variable<String>(entityType);
+    map['payload_json'] = Variable<String>(payloadJson);
+    map['is_built_in'] = Variable<bool>(isBuiltIn);
+    map['created_at_millis'] = Variable<int>(createdAtMillis);
+    if (!nullToAbsent || lastUsedAtMillis != null) {
+      map['last_used_at_millis'] = Variable<int>(lastUsedAtMillis);
+    }
+    return map;
+  }
+
+  TemplatesCompanion toCompanion(bool nullToAbsent) {
+    return TemplatesCompanion(
+      id: Value(id),
+      name: Value(name),
+      description: Value(description),
+      iconName: Value(iconName),
+      entityType: Value(entityType),
+      payloadJson: Value(payloadJson),
+      isBuiltIn: Value(isBuiltIn),
+      createdAtMillis: Value(createdAtMillis),
+      lastUsedAtMillis: lastUsedAtMillis == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastUsedAtMillis),
+    );
+  }
+
+  factory TemplateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TemplateRow(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      description: serializer.fromJson<String>(json['description']),
+      iconName: serializer.fromJson<String>(json['iconName']),
+      entityType: serializer.fromJson<String>(json['entityType']),
+      payloadJson: serializer.fromJson<String>(json['payloadJson']),
+      isBuiltIn: serializer.fromJson<bool>(json['isBuiltIn']),
+      createdAtMillis: serializer.fromJson<int>(json['createdAtMillis']),
+      lastUsedAtMillis: serializer.fromJson<int?>(json['lastUsedAtMillis']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'description': serializer.toJson<String>(description),
+      'iconName': serializer.toJson<String>(iconName),
+      'entityType': serializer.toJson<String>(entityType),
+      'payloadJson': serializer.toJson<String>(payloadJson),
+      'isBuiltIn': serializer.toJson<bool>(isBuiltIn),
+      'createdAtMillis': serializer.toJson<int>(createdAtMillis),
+      'lastUsedAtMillis': serializer.toJson<int?>(lastUsedAtMillis),
+    };
+  }
+
+  TemplateRow copyWith({
+    String? id,
+    String? name,
+    String? description,
+    String? iconName,
+    String? entityType,
+    String? payloadJson,
+    bool? isBuiltIn,
+    int? createdAtMillis,
+    Value<int?> lastUsedAtMillis = const Value.absent(),
+  }) => TemplateRow(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    description: description ?? this.description,
+    iconName: iconName ?? this.iconName,
+    entityType: entityType ?? this.entityType,
+    payloadJson: payloadJson ?? this.payloadJson,
+    isBuiltIn: isBuiltIn ?? this.isBuiltIn,
+    createdAtMillis: createdAtMillis ?? this.createdAtMillis,
+    lastUsedAtMillis: lastUsedAtMillis.present
+        ? lastUsedAtMillis.value
+        : this.lastUsedAtMillis,
+  );
+  TemplateRow copyWithCompanion(TemplatesCompanion data) {
+    return TemplateRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      iconName: data.iconName.present ? data.iconName.value : this.iconName,
+      entityType: data.entityType.present
+          ? data.entityType.value
+          : this.entityType,
+      payloadJson: data.payloadJson.present
+          ? data.payloadJson.value
+          : this.payloadJson,
+      isBuiltIn: data.isBuiltIn.present ? data.isBuiltIn.value : this.isBuiltIn,
+      createdAtMillis: data.createdAtMillis.present
+          ? data.createdAtMillis.value
+          : this.createdAtMillis,
+      lastUsedAtMillis: data.lastUsedAtMillis.present
+          ? data.lastUsedAtMillis.value
+          : this.lastUsedAtMillis,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TemplateRow(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('iconName: $iconName, ')
+          ..write('entityType: $entityType, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('isBuiltIn: $isBuiltIn, ')
+          ..write('createdAtMillis: $createdAtMillis, ')
+          ..write('lastUsedAtMillis: $lastUsedAtMillis')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    description,
+    iconName,
+    entityType,
+    payloadJson,
+    isBuiltIn,
+    createdAtMillis,
+    lastUsedAtMillis,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TemplateRow &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.description == this.description &&
+          other.iconName == this.iconName &&
+          other.entityType == this.entityType &&
+          other.payloadJson == this.payloadJson &&
+          other.isBuiltIn == this.isBuiltIn &&
+          other.createdAtMillis == this.createdAtMillis &&
+          other.lastUsedAtMillis == this.lastUsedAtMillis);
+}
+
+class TemplatesCompanion extends UpdateCompanion<TemplateRow> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String> description;
+  final Value<String> iconName;
+  final Value<String> entityType;
+  final Value<String> payloadJson;
+  final Value<bool> isBuiltIn;
+  final Value<int> createdAtMillis;
+  final Value<int?> lastUsedAtMillis;
+  final Value<int> rowid;
+  const TemplatesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.description = const Value.absent(),
+    this.iconName = const Value.absent(),
+    this.entityType = const Value.absent(),
+    this.payloadJson = const Value.absent(),
+    this.isBuiltIn = const Value.absent(),
+    this.createdAtMillis = const Value.absent(),
+    this.lastUsedAtMillis = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TemplatesCompanion.insert({
+    required String id,
+    required String name,
+    required String description,
+    required String iconName,
+    required String entityType,
+    required String payloadJson,
+    this.isBuiltIn = const Value.absent(),
+    required int createdAtMillis,
+    this.lastUsedAtMillis = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       description = Value(description),
+       iconName = Value(iconName),
+       entityType = Value(entityType),
+       payloadJson = Value(payloadJson),
+       createdAtMillis = Value(createdAtMillis);
+  static Insertable<TemplateRow> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? description,
+    Expression<String>? iconName,
+    Expression<String>? entityType,
+    Expression<String>? payloadJson,
+    Expression<bool>? isBuiltIn,
+    Expression<int>? createdAtMillis,
+    Expression<int>? lastUsedAtMillis,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (description != null) 'description': description,
+      if (iconName != null) 'icon_name': iconName,
+      if (entityType != null) 'entity_type': entityType,
+      if (payloadJson != null) 'payload_json': payloadJson,
+      if (isBuiltIn != null) 'is_built_in': isBuiltIn,
+      if (createdAtMillis != null) 'created_at_millis': createdAtMillis,
+      if (lastUsedAtMillis != null) 'last_used_at_millis': lastUsedAtMillis,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TemplatesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String>? description,
+    Value<String>? iconName,
+    Value<String>? entityType,
+    Value<String>? payloadJson,
+    Value<bool>? isBuiltIn,
+    Value<int>? createdAtMillis,
+    Value<int?>? lastUsedAtMillis,
+    Value<int>? rowid,
+  }) {
+    return TemplatesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      iconName: iconName ?? this.iconName,
+      entityType: entityType ?? this.entityType,
+      payloadJson: payloadJson ?? this.payloadJson,
+      isBuiltIn: isBuiltIn ?? this.isBuiltIn,
+      createdAtMillis: createdAtMillis ?? this.createdAtMillis,
+      lastUsedAtMillis: lastUsedAtMillis ?? this.lastUsedAtMillis,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (iconName.present) {
+      map['icon_name'] = Variable<String>(iconName.value);
+    }
+    if (entityType.present) {
+      map['entity_type'] = Variable<String>(entityType.value);
+    }
+    if (payloadJson.present) {
+      map['payload_json'] = Variable<String>(payloadJson.value);
+    }
+    if (isBuiltIn.present) {
+      map['is_built_in'] = Variable<bool>(isBuiltIn.value);
+    }
+    if (createdAtMillis.present) {
+      map['created_at_millis'] = Variable<int>(createdAtMillis.value);
+    }
+    if (lastUsedAtMillis.present) {
+      map['last_used_at_millis'] = Variable<int>(lastUsedAtMillis.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TemplatesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('iconName: $iconName, ')
+          ..write('entityType: $entityType, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('isBuiltIn: $isBuiltIn, ')
+          ..write('createdAtMillis: $createdAtMillis, ')
+          ..write('lastUsedAtMillis: $lastUsedAtMillis, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5123,6 +5707,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PersonGroupsTable personGroups = $PersonGroupsTable(this);
   late final $PersonGroupMembersTable personGroupMembers =
       $PersonGroupMembersTable(this);
+  late final $TemplatesTable templates = $TemplatesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5137,6 +5722,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     events,
     personGroups,
     personGroupMembers,
+    templates,
   ];
 }
 
@@ -7650,6 +8236,292 @@ typedef $$PersonGroupMembersTableProcessedTableManager =
       PersonGroupMemberRow,
       PrefetchHooks Function()
     >;
+typedef $$TemplatesTableCreateCompanionBuilder =
+    TemplatesCompanion Function({
+      required String id,
+      required String name,
+      required String description,
+      required String iconName,
+      required String entityType,
+      required String payloadJson,
+      Value<bool> isBuiltIn,
+      required int createdAtMillis,
+      Value<int?> lastUsedAtMillis,
+      Value<int> rowid,
+    });
+typedef $$TemplatesTableUpdateCompanionBuilder =
+    TemplatesCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String> description,
+      Value<String> iconName,
+      Value<String> entityType,
+      Value<String> payloadJson,
+      Value<bool> isBuiltIn,
+      Value<int> createdAtMillis,
+      Value<int?> lastUsedAtMillis,
+      Value<int> rowid,
+    });
+
+class $$TemplatesTableFilterComposer
+    extends Composer<_$AppDatabase, $TemplatesTable> {
+  $$TemplatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get iconName => $composableBuilder(
+    column: $table.iconName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entityType => $composableBuilder(
+    column: $table.entityType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isBuiltIn => $composableBuilder(
+    column: $table.isBuiltIn,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAtMillis => $composableBuilder(
+    column: $table.createdAtMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastUsedAtMillis => $composableBuilder(
+    column: $table.lastUsedAtMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TemplatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $TemplatesTable> {
+  $$TemplatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get iconName => $composableBuilder(
+    column: $table.iconName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entityType => $composableBuilder(
+    column: $table.entityType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isBuiltIn => $composableBuilder(
+    column: $table.isBuiltIn,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAtMillis => $composableBuilder(
+    column: $table.createdAtMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastUsedAtMillis => $composableBuilder(
+    column: $table.lastUsedAtMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TemplatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TemplatesTable> {
+  $$TemplatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get iconName =>
+      $composableBuilder(column: $table.iconName, builder: (column) => column);
+
+  GeneratedColumn<String> get entityType => $composableBuilder(
+    column: $table.entityType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isBuiltIn =>
+      $composableBuilder(column: $table.isBuiltIn, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAtMillis => $composableBuilder(
+    column: $table.createdAtMillis,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get lastUsedAtMillis => $composableBuilder(
+    column: $table.lastUsedAtMillis,
+    builder: (column) => column,
+  );
+}
+
+class $$TemplatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TemplatesTable,
+          TemplateRow,
+          $$TemplatesTableFilterComposer,
+          $$TemplatesTableOrderingComposer,
+          $$TemplatesTableAnnotationComposer,
+          $$TemplatesTableCreateCompanionBuilder,
+          $$TemplatesTableUpdateCompanionBuilder,
+          (
+            TemplateRow,
+            BaseReferences<_$AppDatabase, $TemplatesTable, TemplateRow>,
+          ),
+          TemplateRow,
+          PrefetchHooks Function()
+        > {
+  $$TemplatesTableTableManager(_$AppDatabase db, $TemplatesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TemplatesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TemplatesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TemplatesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> description = const Value.absent(),
+                Value<String> iconName = const Value.absent(),
+                Value<String> entityType = const Value.absent(),
+                Value<String> payloadJson = const Value.absent(),
+                Value<bool> isBuiltIn = const Value.absent(),
+                Value<int> createdAtMillis = const Value.absent(),
+                Value<int?> lastUsedAtMillis = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TemplatesCompanion(
+                id: id,
+                name: name,
+                description: description,
+                iconName: iconName,
+                entityType: entityType,
+                payloadJson: payloadJson,
+                isBuiltIn: isBuiltIn,
+                createdAtMillis: createdAtMillis,
+                lastUsedAtMillis: lastUsedAtMillis,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required String description,
+                required String iconName,
+                required String entityType,
+                required String payloadJson,
+                Value<bool> isBuiltIn = const Value.absent(),
+                required int createdAtMillis,
+                Value<int?> lastUsedAtMillis = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TemplatesCompanion.insert(
+                id: id,
+                name: name,
+                description: description,
+                iconName: iconName,
+                entityType: entityType,
+                payloadJson: payloadJson,
+                isBuiltIn: isBuiltIn,
+                createdAtMillis: createdAtMillis,
+                lastUsedAtMillis: lastUsedAtMillis,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TemplatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TemplatesTable,
+      TemplateRow,
+      $$TemplatesTableFilterComposer,
+      $$TemplatesTableOrderingComposer,
+      $$TemplatesTableAnnotationComposer,
+      $$TemplatesTableCreateCompanionBuilder,
+      $$TemplatesTableUpdateCompanionBuilder,
+      (
+        TemplateRow,
+        BaseReferences<_$AppDatabase, $TemplatesTable, TemplateRow>,
+      ),
+      TemplateRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7672,4 +8544,6 @@ class $AppDatabaseManager {
       $$PersonGroupsTableTableManager(_db, _db.personGroups);
   $$PersonGroupMembersTableTableManager get personGroupMembers =>
       $$PersonGroupMembersTableTableManager(_db, _db.personGroupMembers);
+  $$TemplatesTableTableManager get templates =>
+      $$TemplatesTableTableManager(_db, _db.templates);
 }
