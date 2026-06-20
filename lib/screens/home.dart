@@ -25,9 +25,9 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:doit/habits/habit.dart';
+import 'package:doit/do/do.dart';
 import 'package:doit/services/completion_log_service.dart';
-import 'package:doit/services/habit_repository.dart';
+import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/widgets/category_chip.dart';
@@ -45,7 +45,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  Future<List<Habit>>? _habitsFuture;
+  Future<List<Do>>? _habitsFuture;
   final Set<String> _selected = <String>{};
   bool _selectMode = false;
 
@@ -69,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _refresh() {
     setState(() {
-      _habitsFuture = HabitRepository.instance.listAll();
+      _habitsFuture = DoRepository.instance.listAll();
     });
   }
 
@@ -161,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ReliabilityBanner.fromService(),
             const _AddAnchorButton(),
             Expanded(
-              child: FutureBuilder<List<Habit>>(
+              child: FutureBuilder<List<Do>>(
                 future: _habitsFuture,
                 builder: (context, snap) {
                   if (snap.connectionState != ConnectionState.done) {
@@ -173,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       onRetry: _refresh,
                     );
                   }
-                  final habits = snap.data ?? <Habit>[];
+                  final habits = snap.data ?? <Do>[];
                   if (habits.isEmpty) {
                     return const _EmptyState();
                   }
@@ -244,7 +244,7 @@ class _HabitTile extends StatelessWidget {
     this.onLongPress,
     this.onTap,
   });
-  final Habit habit;
+  final Do habit;
   final bool selected;
   final bool selectMode;
   final VoidCallback? onLongPress;
@@ -261,7 +261,7 @@ class _HabitTile extends StatelessWidget {
         habit.pausedUntil != null && habit.pausedUntil!.isAfter(DateTime.now());
     return Semantics(
       label:
-          'Habit ${habit.name}'
+          'Do ${habit.name}'
           '${isPaused ? ', paused' : ''}'
           '${selected ? ', selected' : ''}',
       button: true,
@@ -332,8 +332,8 @@ class _HabitTile extends StatelessWidget {
                         _describe(habit),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
-                      if (habit is HabitTimeWindow)
-                        _FastingTimer(habit: habit as HabitTimeWindow),
+                      if (habit is DoTimeWindow)
+                        _FastingTimer(habit: habit as DoTimeWindow),
                     ],
                   ),
                 ),
@@ -356,23 +356,23 @@ class _HabitTile extends StatelessWidget {
     );
   }
 
-  String _describe(Habit h) {
+  String _describe(Do h) {
     return switch (h) {
-      HabitFixed() => 'Fixed — ${h.time}',
-      HabitInterval() => 'Every ${h.nDays} days',
-      HabitAnchor() => 'Anchor',
-      HabitDayOfX() => 'Day-of-X',
-      HabitTimeWindow() => 'Window — ${h.start}–${h.end}',
+      DoFixed() => 'Fixed — ${h.time}',
+      DoInterval() => 'Every ${h.nDays} days',
+      DoAnchor() => 'Anchor',
+      DoDayOfX() => 'Day-of-X',
+      DoTimeWindow() => 'Window — ${h.start}–${h.end}',
     };
   }
 }
 
-/// Live-updating fasting timer shown on HabitTimeWindow tiles.
+/// Live-updating fasting timer shown on DoTimeWindow tiles.
 /// Ticks every second; shows the time until the window closes
 /// (or "starts in HH:MM" if the window hasn't opened yet).
 class _FastingTimer extends StatefulWidget {
   const _FastingTimer({required this.habit});
-  final HabitTimeWindow habit;
+  final DoTimeWindow habit;
 
   @override
   State<_FastingTimer> createState() => _FastingTimerState();
@@ -414,7 +414,7 @@ class _FastingTimerState extends State<_FastingTimer> {
 
   /// "Closes in 02:30" / "Opens in 12:00" / null if today is
   /// not a fasting weekday.
-  String? _windowLabel(HabitTimeWindow h, DateTime now) {
+  String? _windowLabel(DoTimeWindow h, DateTime now) {
     if (!h.weekdays.contains(now.weekday)) return null;
     final open = DateTime(
       now.year,
@@ -461,7 +461,7 @@ class _TileIcon extends StatelessWidget {
     required this.color,
   });
 
-  final HabitCategory category;
+  final DoCategory category;
   final String? iconName;
   final Color color;
 
@@ -478,8 +478,8 @@ class _TileIcon extends StatelessWidget {
     );
   }
 
-  IconData _iconFor(HabitCategory c, String? name) {
-    final key = HabitIcons.resolveFor(category: c, iconName: name);
+  IconData _iconFor(DoCategory c, String? name) {
+    final key = DoIcons.resolveFor(category: c, iconName: name);
     return _iconMap[key] ?? Icons.check;
   }
 

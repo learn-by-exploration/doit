@@ -1,18 +1,21 @@
-// Habit proof mode — sealed Soft / Strong / Auto.
+// Do proof mode — sealed Soft / Strong / Auto.
 //
-// Each habit declares its proof mode at creation. The mode is
-// the answer to "how does the user prove they did this habit
-// today?" See docs/v_model/requirements.md § SYS-004 and
+// Each do declares its proof mode at creation. The mode is
+// the answer to "how does the user prove they did this do
+// today?" See docs/v_model/requirements.md § SYS-007 and
 // docs/v_model/mission_catalog.md.
+//
+// v1.0 reframe (Phase A): renamed from `DoProofMode` to
+// `DoProofMode`. The DB tag stays `proofMode` (no migration).
 
 import 'package:doit/missions/chain.dart';
 import 'package:doit/missions/mission.dart';
 import 'package:meta/meta.dart';
 
-/// How the user proves they completed a habit on a given day.
+/// How the user proves they completed a do on a given day.
 ///
 /// Soft: a tap on the home screen. No sensor input. Default
-/// for routine, low-friction habits ("drink water").
+/// for routine, low-friction dos ("drink water").
 ///
 /// Strong: a Mission chain. The user must complete N missions
 /// in order; a failure in mission N forces a retry of N. See
@@ -20,20 +23,20 @@ import 'package:meta/meta.dart';
 ///
 /// Auto: the app proves it. Reserved for v0.2 (anchor detection
 /// from calendar / contact events). Phase 1 ships the type so
-/// habits can be persisted with `Auto`; the engine is a stub
+/// dos can be persisted with `Auto`; the engine is a stub
 /// that defers to v0.2.
 @immutable
-sealed class HabitProofMode {
-  const HabitProofMode();
+sealed class DoProofMode {
+  const DoProofMode();
 }
 
 /// Soft proof: a single tap. No chain.
-final class SoftProof extends HabitProofMode {
+final class SoftProof extends DoProofMode {
   const SoftProof();
 }
 
 /// Strong proof: complete the given mission chain.
-final class StrongProof extends HabitProofMode {
+final class StrongProof extends DoProofMode {
   const StrongProof(this.chain);
 
   /// The mission chain. Must be non-empty and respect
@@ -43,7 +46,7 @@ final class StrongProof extends HabitProofMode {
 
 /// Auto proof: the app determines completion. Phase 1 stub;
 /// the v0.2 anchor detector fills this in.
-final class AutoProof extends HabitProofMode {
+final class AutoProof extends DoProofMode {
   const AutoProof();
 
   @override
@@ -54,23 +57,23 @@ final class AutoProof extends HabitProofMode {
 }
 
 @immutable
-sealed class HabitProofModeException implements Exception {
-  const HabitProofModeException(this.message);
+sealed class DoProofModeException implements Exception {
+  const DoProofModeException(this.message);
   final String message;
 
   @override
-  String toString() => 'HabitProofModeException: $message';
+  String toString() => 'DoProofModeException: $message';
 }
 
 /// Thrown by `validate` when a Strong chain is empty or its
 /// total timeout exceeds SYS-031 (5 min).
-final class StrongChainInvalid extends HabitProofModeException {
+final class StrongChainInvalid extends DoProofModeException {
   const StrongChainInvalid(super.message);
 }
 
 /// Thrown by `validate` when an Auto proof is created. Phase 1
 /// rejects Auto explicitly; v0.2 enables it.
-final class AutoProofNotSupported extends HabitProofModeException {
+final class AutoProofNotSupported extends DoProofModeException {
   const AutoProofNotSupported()
     : super('Auto proof is not supported in v0.1; it lands in v0.2.');
 }
@@ -78,7 +81,7 @@ final class AutoProofNotSupported extends HabitProofModeException {
 /// Validates a proof mode. Strong mode requires a non-empty
 /// chain with `totalTimeout ≤ 5 min` (SYS-031). Auto is
 /// rejected in v0.1.
-void validateProofMode(HabitProofMode mode) {
+void validateProofMode(DoProofMode mode) {
   switch (mode) {
     case SoftProof():
       return;

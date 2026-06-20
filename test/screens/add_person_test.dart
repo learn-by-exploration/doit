@@ -54,9 +54,7 @@ void main() {
     'flutter.baseflow.com/permissions/methods',
   );
   // The flutter_contacts seam.
-  const contactsChannel = MethodChannel(
-    'github.com/QuisApp/flutter_contacts',
-  );
+  const contactsChannel = MethodChannel('github.com/QuisApp/flutter_contacts');
 
   final requestScriptedStatuses = <int, PermissionStatus>{};
   // What `getContact` / `select` returns when asked for the
@@ -120,106 +118,102 @@ void main() {
     expect(find.text('Pick a contact first.'), findsOneWidget);
   });
 
-  testWidgets(
-    'Pick contact then save pops the route and persists the picked '
-    'contact (SYS-067)',
-    (tester) async {
-      // Permission is denied initially, grant on request.
-      requestScriptedStatuses[Permission.contacts.value] =
-          PermissionStatus.granted;
-      // The contact the system picker will return.
-      scriptedContact = <String, dynamic>{
-        'id': '42',
-        'displayName': 'Jane Doe',
-        'phones': [
-          <String, dynamic>{
-            'number': '+15550100',
-            'normalizedNumber': '+15550100',
-            'label': 'mobile',
-            'isPrimary': true,
-          },
-        ],
-      };
-      await _resetDb(tester);
-      await tester.pumpWidget(_wrap());
+  testWidgets('Pick contact then save pops the route and persists the picked '
+      'contact (SYS-067)', (tester) async {
+    // Permission is denied initially, grant on request.
+    requestScriptedStatuses[Permission.contacts.value] =
+        PermissionStatus.granted;
+    // The contact the system picker will return.
+    scriptedContact = <String, dynamic>{
+      'id': '42',
+      'displayName': 'Jane Doe',
+      'phones': [
+        <String, dynamic>{
+          'number': '+15550100',
+          'normalizedNumber': '+15550100',
+          'label': 'mobile',
+          'isPrimary': true,
+        },
+      ],
+    };
+    await _resetDb(tester);
+    await tester.pumpWidget(_wrap());
 
-      // Tap the pick-contact row. The screen will surface
-      // the `READ_CONTACTS` sheet (the probe in `init`
-      // returned `denied`); we then grant and the sheet
-      // pops. The mocked `flutter_contacts` channel
-      // returns the contact above.
-      await tester.tap(find.byKey(const ValueKey('add_person.pick_contact')));
-      // Drive the permission-sheet async setup under
-      // `runAsync` (FakeAsync does not process microtasks
-      // scheduled from the outer test zone — same pattern
-      // as `permission_sheet_test.dart`).
-      await tester.runAsync(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      });
-      await tester.pump(const Duration(milliseconds: 500));
-      // The Allow button may be off-screen; scroll it
-      // into view before tapping.
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('permission_sheet.allow')),
-      );
-      await tester.pump(const Duration(milliseconds: 250));
-      await tester.tap(find.byKey(const ValueKey('permission_sheet.allow')));
-      await tester.pump();
-      await tester.runAsync(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      });
-      await tester.pump(const Duration(milliseconds: 500));
+    // Tap the pick-contact row. The screen will surface
+    // the `READ_CONTACTS` sheet (the probe in `init`
+    // returned `denied`); we then grant and the sheet
+    // pops. The mocked `flutter_contacts` channel
+    // returns the contact above.
+    await tester.tap(find.byKey(const ValueKey('add_person.pick_contact')));
+    // Drive the permission-sheet async setup under
+    // `runAsync` (FakeAsync does not process microtasks
+    // scheduled from the outer test zone — same pattern
+    // as `permission_sheet_test.dart`).
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    // The Allow button may be off-screen; scroll it
+    // into view before tapping.
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('permission_sheet.allow')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.byKey(const ValueKey('permission_sheet.allow')));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
 
-      // The picked contact's display name appears in the
-      // row. The system picker's "Done" / "Cancel" step
-      // is a no-op in the test (the mock returns the
-      // contact synchronously).
-      expect(find.text('Jane Doe'), findsOneWidget);
-      expect(find.text('+15550100'), findsOneWidget);
+    // The picked contact's display name appears in the
+    // row. The system picker's "Done" / "Cancel" step
+    // is a no-op in the test (the mock returns the
+    // contact synchronously).
+    expect(find.text('Jane Doe'), findsOneWidget);
+    expect(find.text('+15550100'), findsOneWidget);
 
-      // Save and verify the route pops.
-      await tester.tap(find.byKey(const ValueKey('add_person.save')));
-      await tester.pumpAndSettle();
-      expect(find.byType(AddPersonScreen), findsNothing);
-    },
-  );
+    // Save and verify the route pops.
+    await tester.tap(find.byKey(const ValueKey('add_person.save')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AddPersonScreen), findsNothing);
+  });
 
-  testWidgets(
-    'Pick contact with no phone shows an inline error (SYS-067)',
-    (tester) async {
-      requestScriptedStatuses[Permission.contacts.value] =
-          PermissionStatus.granted;
-      scriptedContact = <String, dynamic>{
-        'id': '99',
-        'displayName': 'No Phone',
-        'phones': <Map<String, dynamic>>[],
-      };
-      await _resetDb(tester);
-      await tester.pumpWidget(_wrap());
+  testWidgets('Pick contact with no phone shows an inline error (SYS-067)', (
+    tester,
+  ) async {
+    requestScriptedStatuses[Permission.contacts.value] =
+        PermissionStatus.granted;
+    scriptedContact = <String, dynamic>{
+      'id': '99',
+      'displayName': 'No Phone',
+      'phones': <Map<String, dynamic>>[],
+    };
+    await _resetDb(tester);
+    await tester.pumpWidget(_wrap());
 
-      await tester.tap(find.byKey(const ValueKey('add_person.pick_contact')));
-      await tester.runAsync(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      });
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('permission_sheet.allow')),
-      );
-      await tester.pump(const Duration(milliseconds: 250));
-      await tester.tap(find.byKey(const ValueKey('permission_sheet.allow')));
-      await tester.pump();
-      await tester.runAsync(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      });
-      await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.byKey(const ValueKey('add_person.pick_contact')));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('permission_sheet.allow')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.byKey(const ValueKey('permission_sheet.allow')));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
 
-      // The inline error appears, the row falls back to
-      // the empty-state title.
-      expect(
-        find.text('That contact has no phone number. Pick another.'),
-        findsOneWidget,
-      );
-      expect(find.text('Pick a contact'), findsOneWidget);
-    },
-  );
+    // The inline error appears, the row falls back to
+    // the empty-state title.
+    expect(
+      find.text('That contact has no phone number. Pick another.'),
+      findsOneWidget,
+    );
+    expect(find.text('Pick a contact'), findsOneWidget);
+  });
 }

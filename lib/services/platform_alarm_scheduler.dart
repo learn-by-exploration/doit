@@ -42,7 +42,7 @@
 import 'dart:async';
 
 import 'package:doit/events/event.dart';
-import 'package:doit/habits/habit.dart';
+import 'package:doit/do/do.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
 
@@ -77,7 +77,7 @@ class PlatformAlarmScheduler implements AlarmScheduler {
   DateTime? _cachedReliabilityAt;
 
   @override
-  Future<AlarmId> schedule(Habit habit, DateTime at) async {
+  Future<AlarmId> schedule(Do habit, DateTime at) async {
     // The id is stable across re-schedules of the same
     // occurrence so a re-call replaces (not duplicates) the
     // prior alarm. The bridge returns the same id we sent

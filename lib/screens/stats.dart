@@ -2,10 +2,10 @@
 // by category.
 //
 // Per WF-011 (v0.1) + WF-031 (v0.2). Reads the habit list
-// from `HabitRepository` and the per-habit completion log
+// from `DoRepository` and the per-habit completion log
 // from `CompletionLogService`, then runs
-// `StreakCalculator.compute` once per habit. The result is
-// grouped by `HabitCategory` and rendered with the
+// `ConsecutiveCounter.compute` once per habit. The result is
+// grouped by `DoCategory` and rendered with the
 // category's swatch color in the group header.
 //
 // Layer rules (per .claude/rules/lib-screens.md):
@@ -15,11 +15,11 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:doit/habits/habit.dart';
-import 'package:doit/habits/rest_day_budget.dart';
-import 'package:doit/habits/streak_calculator.dart';
+import 'package:doit/do/do.dart';
+import 'package:doit/do/skip_budget.dart';
+import 'package:doit/do/consecutive_counter.dart';
 import 'package:doit/services/completion_log_service.dart';
-import 'package:doit/services/habit_repository.dart';
+import 'package:doit/services/do_repository.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/widgets/category_chip.dart';
 
@@ -27,15 +27,15 @@ import 'package:doit/widgets/category_chip.dart';
 /// `_load()` so the build method is pure.
 class _HabitStats {
   const _HabitStats({required this.habit, required this.snapshot});
-  final Habit habit;
+  final Do habit;
   final StreakSnapshot snapshot;
 }
 
 /// A category-bucketed view of `_HabitStats`. The order of
-/// the buckets matches `HabitCategory.values`.
+/// the buckets matches `DoCategory.values`.
 class _CategoryBucket {
   const _CategoryBucket({required this.category, required this.stats});
-  final HabitCategory category;
+  final DoCategory category;
   final List<_HabitStats> stats;
 }
 
@@ -56,7 +56,7 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   Future<List<_CategoryBucket>> _load() async {
-    final habits = await HabitRepository.instance.listAll();
+    final habits = await DoRepository.instance.listAll();
     final perHabit = <_HabitStats>[];
     for (final h in habits) {
       final completions = await CompletionLogService.instance.listForHabit(
@@ -65,31 +65,28 @@ class _StatsScreenState extends State<StatsScreen> {
       final log = completions
           .map(
             (r) => CompletionLogEntry(
-              habitId: r.habitId,
+              doId: r.habitId,
               date: DateTime.fromMillisecondsSinceEpoch(r.dayMillis),
             ),
           )
           .toList(growable: false);
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: log,
         config: StreakConfig(
           graceWindow: const Duration(hours: 3),
-          restDayBudget: RestDayBudget(
-            habitId: h.id,
-            monthlyLimit: h.restDaysPerMonth,
-          ),
+          skipBudget: SkipBudget(doId: h.id, monthlyLimit: h.restDaysPerMonth),
         ),
         asOf: DateTime.now(),
       );
       perHabit.add(_HabitStats(habit: h, snapshot: snap));
     }
-    // Group by category. Order: HabitCategory.values order.
-    final groups = <HabitCategory, List<_HabitStats>>{};
+    // Group by category. Order: DoCategory.values order.
+    final groups = <DoCategory, List<_HabitStats>>{};
     for (final s in perHabit) {
       groups.putIfAbsent(s.habit.category, () => <_HabitStats>[]).add(s);
     }
     return [
-      for (final c in HabitCategory.values)
+      for (final c in DoCategory.values)
         if (groups.containsKey(c))
           _CategoryBucket(category: c, stats: groups[c]!),
     ];

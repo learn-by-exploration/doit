@@ -49,25 +49,29 @@ void main() {
       expect(await b.probeReliability(), Reliability.unknown);
     });
 
-    test('setExactAlarm records the call and returns the id by default',
-        () async {
-      final b = FakeReminderBridge();
-      final epochMs = DateTime(2026, 6, 18, 7, 30).millisecondsSinceEpoch;
-      final id = await b.setExactAlarm(alarmId: 7, epochMs: epochMs);
-      expect(id, 7);
-      expect(b.setExactAlarmCalls, [(alarmId: 7, epochMs: epochMs)]);
-    });
+    test(
+      'setExactAlarm records the call and returns the id by default',
+      () async {
+        final b = FakeReminderBridge();
+        final epochMs = DateTime(2026, 6, 18, 7, 30).millisecondsSinceEpoch;
+        final id = await b.setExactAlarm(alarmId: 7, epochMs: epochMs);
+        expect(id, 7);
+        expect(b.setExactAlarmCalls, [(alarmId: 7, epochMs: epochMs)]);
+      },
+    );
 
-    test('setExactAlarm respects a custom result (degraded fallback)',
-        () async {
-      final b = FakeReminderBridge();
-      b.setExactAlarmResult = (id) => id * 100;
-      final id = await b.setExactAlarm(
-        alarmId: 3,
-        epochMs: DateTime(2026, 6, 18, 8).millisecondsSinceEpoch,
-      );
-      expect(id, 300);
-    });
+    test(
+      'setExactAlarm respects a custom result (degraded fallback)',
+      () async {
+        final b = FakeReminderBridge();
+        b.setExactAlarmResult = (id) => id * 100;
+        final id = await b.setExactAlarm(
+          alarmId: 3,
+          epochMs: DateTime(2026, 6, 18, 8).millisecondsSinceEpoch,
+        );
+        expect(id, 300);
+      },
+    );
 
     test('cancelAlarm records the id', () async {
       final b = FakeReminderBridge();
@@ -221,34 +225,38 @@ void main() {
       expect(caught, isNull);
     });
 
-    test('setExactAlarm passes alarmId and epochMs and returns the id',
-        () async {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async {
-        log.add(call);
-        if (call.method == 'setExactAlarm') return 17;
-        return null;
-      });
-      final b = PlatformReminderBridge();
-      final epochMs = DateTime(2026, 6, 18, 7, 30).millisecondsSinceEpoch;
-      final id = await b.setExactAlarm(alarmId: 5, epochMs: epochMs);
-      expect(id, 17);
-      expect(log.length, 1);
-      expect(log.first.method, 'setExactAlarm');
-      final args = log.first.arguments as Map;
-      expect(args['alarmId'], 5);
-      expect(args['epochMs'], epochMs);
-    });
+    test(
+      'setExactAlarm passes alarmId and epochMs and returns the id',
+      () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              log.add(call);
+              if (call.method == 'setExactAlarm') return 17;
+              return null;
+            });
+        final b = PlatformReminderBridge();
+        final epochMs = DateTime(2026, 6, 18, 7, 30).millisecondsSinceEpoch;
+        final id = await b.setExactAlarm(alarmId: 5, epochMs: epochMs);
+        expect(id, 17);
+        expect(log.length, 1);
+        expect(log.first.method, 'setExactAlarm');
+        final args = log.first.arguments as Map;
+        expect(args['alarmId'], 5);
+        expect(args['epochMs'], epochMs);
+      },
+    );
 
-    test('setExactAlarm falls back to alarmId when the platform returns null',
-        () async {
-      final b = PlatformReminderBridge();
-      final id = await b.setExactAlarm(
-        alarmId: 9,
-        epochMs: DateTime(2026, 6, 18).millisecondsSinceEpoch,
-      );
-      expect(id, 9);
-    });
+    test(
+      'setExactAlarm falls back to alarmId when the platform returns null',
+      () async {
+        final b = PlatformReminderBridge();
+        final id = await b.setExactAlarm(
+          alarmId: 9,
+          epochMs: DateTime(2026, 6, 18).millisecondsSinceEpoch,
+        );
+        expect(id, 9);
+      },
+    );
 
     test('cancelAlarm passes the id', () async {
       final b = PlatformReminderBridge();

@@ -24,7 +24,7 @@ class MissionChain extends UnmodifiableListView<Mission> {
       MissionChain(List.unmodifiable(source));
 
   /// Empty chain. A chain of length 0 is not a valid Strong-mode
-  /// proof; [Habit.validate] rejects it.
+  /// proof; [Do.validate] rejects it.
   static final empty = MissionChain(<Mission>[]);
 
   /// Sum of per-mission timeouts. The chain executor (Phase 3)

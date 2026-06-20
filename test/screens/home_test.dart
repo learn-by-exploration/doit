@@ -2,8 +2,8 @@
 // saved habit. The reliability banner and the FAB are also
 // asserted.
 
-import 'package:doit/habits/habit.dart';
-import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/do/do.dart';
+import 'package:doit/do/proof_mode.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/reminders/full_screen_intent.dart';
@@ -13,7 +13,7 @@ import 'package:doit/screens/home.dart';
 import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/db/schema.dart';
-import 'package:doit/services/habit_repository.dart';
+import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/settings_service.dart';
 import 'package:doit/theme/app_theme.dart';
@@ -41,7 +41,7 @@ Widget _wrap() {
 
 void main() {
   setUp(() async {
-    HabitRepository.instance;
+    DoRepository.instance;
     ReminderService.resetForTesting();
     await ReminderService.init(
       ReminderService(
@@ -64,15 +64,15 @@ void main() {
 
   testWidgets('a saved habit renders as a tile', (tester) async {
     await _resetDb(tester);
-    await HabitRepository.instance.save(
-      HabitFixed(
+    await DoRepository.instance.save(
+      DoFixed(
         id: 'h1',
         name: 'Stretch',
         proofMode: const SoftProof(),
         createdAt: DateTime(2026, 6),
         restDaysPerMonth: 2,
         weekdays: const {1, 3, 5},
-        time: const HabitTime(9, 0),
+        time: const DoTime(9, 0),
       ),
     );
     await tester.pumpWidget(_wrap());
@@ -94,26 +94,26 @@ void main() {
     'long-press enters select mode and complete-selected marks done',
     (tester) async {
       await _resetDb(tester);
-      await HabitRepository.instance.save(
-        HabitFixed(
+      await DoRepository.instance.save(
+        DoFixed(
           id: 'h1',
           name: 'Stretch',
           proofMode: const SoftProof(),
           createdAt: DateTime(2026, 6),
           restDaysPerMonth: 0,
           weekdays: const {1, 2, 3, 4, 5, 6, 7},
-          time: const HabitTime(9, 0),
+          time: const DoTime(9, 0),
         ),
       );
-      await HabitRepository.instance.save(
-        HabitFixed(
+      await DoRepository.instance.save(
+        DoFixed(
           id: 'h2',
           name: 'Meditate',
           proofMode: const SoftProof(),
           createdAt: DateTime(2026, 6),
           restDaysPerMonth: 0,
           weekdays: const {1, 2, 3, 4, 5, 6, 7},
-          time: const HabitTime(9, 0),
+          time: const DoTime(9, 0),
         ),
       );
       await tester.pumpWidget(_wrap());
@@ -141,22 +141,22 @@ void main() {
     },
   );
 
-  testWidgets('a HabitTimeWindow tile shows the fasting timer', (tester) async {
+  testWidgets('a DoTimeWindow tile shows the fasting timer', (tester) async {
     await _resetDb(tester);
     final now = DateTime.now();
     // Pick a weekday matching today's weekday so the timer is
     // visible.
     final wd = now.weekday;
-    await HabitRepository.instance.save(
-      HabitTimeWindow(
+    await DoRepository.instance.save(
+      DoTimeWindow(
         id: 'h1',
         name: 'Fasting',
         proofMode: const SoftProof(),
         createdAt: DateTime(2026, 6),
         restDaysPerMonth: 0,
         weekdays: {wd},
-        start: const HabitTime(8, 0),
-        end: const HabitTime(20, 0),
+        start: const DoTime(8, 0),
+        end: const DoTime(20, 0),
         targetHours: 12,
       ),
     );

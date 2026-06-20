@@ -1,9 +1,9 @@
 // IconPicker — the 8×8 grid of Material Symbols keys from
-// `HabitIcons.keys`.
+// `DoIcons.keys`.
 //
 // Per WF-031. The picker is the single source of truth for
 // "which icon does the user want for this habit?" — every
-// other surface reads `HabitIcons.resolveFor`.
+// other surface reads `DoIcons.resolveFor`.
 //
 // The 64 keys are split across 8 thematic rows:
 //   1. Physical (water, run, fitness, sleep, sun, food, fire)
@@ -25,7 +25,7 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:doit/habits/category.dart';
+import 'package:doit/do/category.dart';
 
 /// Show the icon picker as a modal bottom sheet. Returns the
 /// picked icon key, or null if the user dismissed.
@@ -37,12 +37,12 @@ class IconPickerSheet extends StatelessWidget {
   });
 
   final String? initialIconName;
-  final HabitCategory category;
+  final DoCategory category;
 
   static Future<String?> show(
     BuildContext context, {
     required String? initialIconName,
-    required HabitCategory category,
+    required DoCategory category,
   }) {
     return showModalBottomSheet<String?>(
       context: context,
@@ -62,7 +62,7 @@ class _PickerState extends StatefulWidget {
   const _PickerState({required this.initialIconName, required this.category});
 
   final String? initialIconName;
-  final HabitCategory category;
+  final DoCategory category;
 
   @override
   State<_PickerState> createState() => _PickerStateState();
@@ -116,9 +116,9 @@ class _PickerStateState extends State<_PickerState> {
                           crossAxisSpacing: 8,
                           childAspectRatio: 1,
                         ),
-                    itemCount: HabitIcons.keys.length,
+                    itemCount: DoIcons.keys.length,
                     itemBuilder: (context, i) {
-                      final key = HabitIcons.keys[i];
+                      final key = DoIcons.keys[i];
                       final isSelected = _picked == key;
                       return Semantics(
                         button: true,
@@ -159,11 +159,11 @@ class _PickerStateState extends State<_PickerState> {
   }
 }
 
-/// Static registry from `HabitIcons.keys` → `IconData` constant.
+/// Static registry from `DoIcons.keys` → `IconData` constant.
 ///
 /// This is a hand-maintained map (there is no Material Symbols
 /// code-point generator for Flutter yet). The keys match
-/// `lib/habits/category.dart#HabitIcons.keys` 1:1; if the keys
+/// `lib/habits/category.dart#DoIcons.keys` 1:1; if the keys
 /// set changes, update this map in the same PR.
 const Map<String, IconData> _iconRegistry = <String, IconData>{
   // Row 1 — physical

@@ -11,13 +11,13 @@
 
 import 'dart:async';
 
-import 'package:doit/habits/habit.dart';
+import 'package:doit/do/do.dart';
 import 'package:doit/missions/chain.dart';
 import 'package:doit/reminders/full_screen_intent.dart';
 
 class PlatformFullScreenIntent implements FullScreenIntent {
   @override
-  Future<void> show(Habit habit, MissionChain chain) async {
+  Future<void> show(Do habit, MissionChain chain) async {
     // The Kotlin side does the actual launch. The Dart side
     // just records the intent. The chain is persisted in the
     // local DB so the activity can re-derive it on resume.

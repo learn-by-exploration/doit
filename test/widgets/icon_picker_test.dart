@@ -5,7 +5,7 @@
 // button when a selection is present, and pop the picked key
 // on tap. Coverage target: ≥ 80% on the file.
 
-import 'package:doit/habits/category.dart';
+import 'package:doit/do/category.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/widgets/icon_picker.dart';
 import 'package:flutter/material.dart';
@@ -21,7 +21,7 @@ Widget _wrap(Widget child) {
 Future<void> _pump(
   WidgetTester tester, {
   String? initialIconName,
-  HabitCategory category = HabitCategory.health,
+  DoCategory category = DoCategory.health,
 }) async {
   tester.view.physicalSize = const Size(1080, 2400);
   tester.view.devicePixelRatio = 1.0;
@@ -36,14 +36,14 @@ Future<void> _pump(
 }
 
 void main() {
-  testWidgets('renders one tile per HabitIcons.keys entry', (tester) async {
+  testWidgets('renders one tile per DoIcons.keys entry', (tester) async {
     await _pump(tester);
     // Probe a few well-known keys (visible without scrolling).
     expect(find.byKey(const ValueKey('icon.local_drink')), findsOneWidget);
     expect(find.byKey(const ValueKey('icon.fitness_center')), findsOneWidget);
     // The last key (hiking) is in row 8 and may be off-screen;
     // scroll the grid to find it. This proves every key in
-    // HabitIcons.keys has a corresponding tile.
+    // DoIcons.keys has a corresponding tile.
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('icon.hiking')),
       200,
@@ -88,7 +88,7 @@ void main() {
                   popped = await IconPickerSheet.show(
                     context,
                     initialIconName: null,
-                    category: HabitCategory.health,
+                    category: DoCategory.health,
                   );
                 },
                 child: const Text('open'),
@@ -106,9 +106,7 @@ void main() {
     expect(popped, 'fitness_center');
   });
 
-  testWidgets('Sheet renders 64 tiles (one per HabitIcons.keys)', (
-    tester,
-  ) async {
+  testWidgets('Sheet renders 64 tiles (one per DoIcons.keys)', (tester) async {
     await _pump(tester);
     // Every Material InkWell in the grid is a tile. The
     // GridView.builder lazy-builds, so we scroll to the bottom
@@ -116,7 +114,7 @@ void main() {
     // full list was provided via `itemCount` and the builder
     // produced every key.
     final scrollable = find.byType(Scrollable).first;
-    final lastKey = 'icon.${HabitIcons.keys.last}';
+    final lastKey = 'icon.${DoIcons.keys.last}';
     await tester.scrollUntilVisible(
       find.byKey(ValueKey(lastKey)),
       200,

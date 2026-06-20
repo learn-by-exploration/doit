@@ -75,8 +75,7 @@ class _RecordingBridge implements ReminderBridge {
   Future<int> setExactAlarm({
     required int alarmId,
     required int epochMs,
-  }) async =>
-      alarmId;
+  }) async => alarmId;
 
   @override
   Future<void> cancelAlarm(int alarmId) async {}

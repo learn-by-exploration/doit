@@ -1,5 +1,5 @@
 // CategoryChip — the *only* file in the v0.2 codebase that
-// bridges `HabitCategory` (a pure-Dart enum in
+// bridges `DoCategory` (a pure-Dart enum in
 // `lib/habits/category.dart`) into a Flutter `Color`.
 //
 // Per `.claude/rules/lib-habits.md`, the model layer must not
@@ -16,7 +16,7 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:doit/habits/category.dart';
+import 'package:doit/do/category.dart';
 
 /// The resolved visual identity for a habit: the swatch ARGB
 /// int to paint with, and the human-readable label of the
@@ -39,13 +39,13 @@ class CategoryVisual {
 ///
 /// A null [iconName] returns the category default; an unknown
 /// [iconName] also returns the default (the model layer's
-/// `HabitIcons.resolveFor` does the same — this is the
+/// `DoIcons.resolveFor` does the same — this is the
 /// UI-side mirror so the chip can render the icon).
 class CategoryChipResolver {
   const CategoryChipResolver._();
 
   static CategoryVisual resolveFor({
-    required HabitCategory category,
+    required DoCategory category,
     required int colorSeed,
   }) {
     final seed = CategoryPalette.seedFor(category, colorSeed);
@@ -56,25 +56,25 @@ class CategoryChipResolver {
   }
 
   static String resolveIconFor({
-    required HabitCategory category,
+    required DoCategory category,
     required String? iconName,
   }) {
-    return HabitIcons.resolveFor(category: category, iconName: iconName);
+    return DoIcons.resolveFor(category: category, iconName: iconName);
   }
 
-  static String _labelFor(HabitCategory c) {
+  static String _labelFor(DoCategory c) {
     switch (c) {
-      case HabitCategory.health:
+      case DoCategory.health:
         return 'Health';
-      case HabitCategory.mind:
+      case DoCategory.mind:
         return 'Mind';
-      case HabitCategory.relationships:
+      case DoCategory.relationships:
         return 'Relationships';
-      case HabitCategory.productivity:
+      case DoCategory.productivity:
         return 'Productivity';
-      case HabitCategory.home:
+      case DoCategory.home:
         return 'Home';
-      case HabitCategory.other:
+      case DoCategory.other:
         return 'Other';
     }
   }
@@ -90,7 +90,7 @@ class CategoryChip extends StatelessWidget {
     required this.onTap,
   });
 
-  final HabitCategory category;
+  final DoCategory category;
   final int colorSeed;
   final VoidCallback onTap;
 
@@ -146,15 +146,15 @@ class CategoryPickerSheet extends StatelessWidget {
     required this.initialColorSeed,
   });
 
-  final HabitCategory initialCategory;
+  final DoCategory initialCategory;
   final int initialColorSeed;
 
-  static Future<({HabitCategory category, int colorSeed})?> show(
+  static Future<({DoCategory category, int colorSeed})?> show(
     BuildContext context, {
-    required HabitCategory initialCategory,
+    required DoCategory initialCategory,
     required int initialColorSeed,
   }) {
-    return showModalBottomSheet<({HabitCategory category, int colorSeed})>(
+    return showModalBottomSheet<({DoCategory category, int colorSeed})>(
       context: context,
       isScrollControlled: true,
       builder: (_) => CategoryPickerSheet(
@@ -179,7 +179,7 @@ class _PickerState extends StatefulWidget {
     required this.initialColorSeed,
   });
 
-  final HabitCategory initialCategory;
+  final DoCategory initialCategory;
   final int initialColorSeed;
 
   @override
@@ -187,7 +187,7 @@ class _PickerState extends StatefulWidget {
 }
 
 class _PickerStateState extends State<_PickerState> {
-  late HabitCategory _category;
+  late DoCategory _category;
   late int _colorSeed;
 
   @override
@@ -212,7 +212,7 @@ class _PickerStateState extends State<_PickerState> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final c in HabitCategory.values)
+                for (final c in DoCategory.values)
                   ChoiceChip(
                     key: ValueKey('category.${c.name}'),
                     label: Text(_label(c)),
@@ -258,19 +258,19 @@ class _PickerStateState extends State<_PickerState> {
     );
   }
 
-  String _label(HabitCategory c) {
+  String _label(DoCategory c) {
     switch (c) {
-      case HabitCategory.health:
+      case DoCategory.health:
         return 'Health';
-      case HabitCategory.mind:
+      case DoCategory.mind:
         return 'Mind';
-      case HabitCategory.relationships:
+      case DoCategory.relationships:
         return 'Relationships';
-      case HabitCategory.productivity:
+      case DoCategory.productivity:
         return 'Productivity';
-      case HabitCategory.home:
+      case DoCategory.home:
         return 'Home';
-      case HabitCategory.other:
+      case DoCategory.other:
         return 'Other';
     }
   }

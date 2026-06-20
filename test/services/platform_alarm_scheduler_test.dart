@@ -13,26 +13,26 @@
 //     cached for 30 s.
 
 import 'package:doit/events/event.dart';
-import 'package:doit/habits/habit.dart';
-import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/do/do.dart';
+import 'package:doit/do/proof_mode.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
 import 'package:doit/services/platform_alarm_scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// A minimal [Habit] shell for the scheduler tests. The
+/// A minimal [Do] shell for the scheduler tests. The
 /// scheduler itself does not read the habit's schedule or
 /// proof mode (it hands `(id, epochMs)` to the bridge); the
 /// only field consulted is `id`, which is derived from the
-/// `HabitFixed` instance.
-HabitFixed _makeHabit(String id) => HabitFixed(
+/// `DoFixed` instance.
+DoFixed _makeHabit(String id) => DoFixed(
   id: id,
   name: 'Test habit',
   iconName: 'check',
   colorSeed: 0, // ignore: avoid_redundant_argument_values
-  category: HabitCategory.health,
+  category: DoCategory.health,
   weekdays: const {1, 2, 3, 4, 5, 6, 7},
-  time: const HabitTime(7, 30),
+  time: const DoTime(7, 30),
   proofMode: const SoftProof(),
   createdAt: DateTime(2026, 6, 18),
   restDaysPerMonth: 2,

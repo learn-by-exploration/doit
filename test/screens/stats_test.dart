@@ -1,12 +1,12 @@
 // Tests for the StatsScreen — empty state, error retry, and
 // a happy path that asserts a single habit renders.
 
-import 'package:doit/habits/habit.dart';
-import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/do/do.dart';
+import 'package:doit/do/proof_mode.dart';
 import 'package:doit/screens/stats.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/db/schema.dart';
-import 'package:doit/services/habit_repository.dart';
+import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/completion_log_service.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -25,7 +25,7 @@ Widget _wrap() => const MaterialApp(home: StatsScreen());
 
 void main() {
   setUp(() {
-    HabitRepository.instance;
+    DoRepository.instance;
     CompletionLogService.instance;
   });
 
@@ -38,15 +38,15 @@ void main() {
 
   testWidgets('a single habit renders as a card', (tester) async {
     await _resetDb(tester);
-    await HabitRepository.instance.save(
-      HabitFixed(
+    await DoRepository.instance.save(
+      DoFixed(
         id: 'h1',
         name: 'Stretch',
         proofMode: const SoftProof(),
         createdAt: DateTime(2026, 6),
         restDaysPerMonth: 2,
         weekdays: const {1, 3, 5},
-        time: const HabitTime(9, 0),
+        time: const DoTime(9, 0),
       ),
     );
     await tester.pumpWidget(_wrap());

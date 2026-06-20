@@ -2,14 +2,14 @@
 //
 // The calculator is pure. `asOf` is the reference clock.
 
-import 'package:doit/habits/rest_day_budget.dart';
-import 'package:doit/habits/streak_calculator.dart';
+import 'package:doit/do/skip_budget.dart';
+import 'package:doit/do/consecutive_counter.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 StreakConfig _config({Duration grace = const Duration(hours: 3)}) {
   return StreakConfig(
     graceWindow: grace,
-    restDayBudget: RestDayBudget(habitId: 'h1', monthlyLimit: 2),
+    skipBudget: SkipBudget(doId: 'h1', monthlyLimit: 2),
   );
 }
 
@@ -17,12 +17,12 @@ DateTime _day(int y, int m, int d, [int h = 0, int mm = 0]) =>
     DateTime(y, m, d, h, mm);
 
 CompletionLogEntry _entry(int y, int m, int d) =>
-    CompletionLogEntry(habitId: 'h1', date: _day(y, m, d));
+    CompletionLogEntry(doId: 'h1', date: _day(y, m, d));
 
 void main() {
-  group('StreakCalculator.compute', () {
+  group('ConsecutiveCounter.compute', () {
     test('empty log → streak 0', () {
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: const <CompletionLogEntry>[],
         config: _config(),
         asOf: _day(2026, 6, 13),
@@ -34,7 +34,7 @@ void main() {
     });
 
     test('single completion today → streak 1, longest 1', () {
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: [_entry(2026, 6, 13)],
         config: _config(),
         asOf: _day(2026, 6, 13),
@@ -45,7 +45,7 @@ void main() {
 
     test('consecutive days → streak equals the run length', () {
       final log = [for (var d = 1; d <= 7; d++) _entry(2026, 6, d)];
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: log,
         config: _config(),
         asOf: _day(2026, 6, 7),
@@ -60,7 +60,7 @@ void main() {
         for (var d = 1; d <= 5; d++) _entry(2026, 6, d),
         for (var d = 7; d <= 10; d++) _entry(2026, 6, d),
       ];
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: log,
         config: _config(),
         asOf: _day(2026, 6, 10),
@@ -76,7 +76,7 @@ void main() {
         for (var d = 1; d <= 5; d++) _entry(2026, 6, d),
         for (var d = 8; d <= 10; d++) _entry(2026, 6, d),
       ];
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: log,
         config: _config(),
         asOf: _day(2026, 6, 10),
@@ -87,7 +87,7 @@ void main() {
     });
 
     test('single completion 4 days ago is broken (asOf is later)', () {
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: [_entry(2026, 6, 9)],
         config: _config(),
         asOf: _day(2026, 6, 13),
@@ -108,7 +108,7 @@ void main() {
         _entry(2026, 6, 4),
         _entry(2026, 6, 5),
       ];
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: log,
         config: _config(),
         asOf: _day(2026, 6, 5),
@@ -121,12 +121,12 @@ void main() {
 
     test('multiple completions on the same day collapse to one', () {
       final log = [
-        CompletionLogEntry(habitId: 'h1', date: _day(2026, 6, 1, 8)),
-        CompletionLogEntry(habitId: 'h1', date: _day(2026, 6, 1, 14)),
-        CompletionLogEntry(habitId: 'h1', date: _day(2026, 6, 1, 22)),
+        CompletionLogEntry(doId: 'h1', date: _day(2026, 6, 1, 8)),
+        CompletionLogEntry(doId: 'h1', date: _day(2026, 6, 1, 14)),
+        CompletionLogEntry(doId: 'h1', date: _day(2026, 6, 1, 22)),
         _entry(2026, 6, 2),
       ];
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: log,
         config: _config(),
         asOf: _day(2026, 6, 2),
@@ -135,15 +135,15 @@ void main() {
     });
 
     test('rest day budget is reported (usedOnOrBefore)', () {
-      final budget = RestDayBudget(
-        habitId: 'h1',
+      final budget = SkipBudget(
+        doId: 'h1',
         monthlyLimit: 2,
       ).consume(_day(2026, 6, 5)).consume(_day(2026, 6, 10));
       final config = StreakConfig(
         graceWindow: const Duration(hours: 3),
-        restDayBudget: budget,
+        skipBudget: budget,
       );
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: const <CompletionLogEntry>[],
         config: config,
         asOf: _day(2026, 6, 13),
@@ -158,7 +158,7 @@ void main() {
         for (var d = 14; d <= 18; d++) _entry(2026, 5, d),
         for (var d = 21; d <= 23; d++) _entry(2026, 5, d),
       ];
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: log,
         config: _config(),
         asOf: _day(2026, 5, 23),
@@ -173,7 +173,7 @@ void main() {
       // 03:00 EDT. The completion log is in local clock; the
       // engine strips time-of-day.
       final log = [_entry(2026, 3, 7), _entry(2026, 3, 8), _entry(2026, 3, 9)];
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: log,
         config: _config(),
         asOf: _day(2026, 3, 9),
@@ -183,7 +183,7 @@ void main() {
 
     test('zero grace window: asOf 04:00 of next day breaks the streak', () {
       final log = [_entry(2026, 6, 12)];
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: log,
         config: _config(grace: Duration.zero),
         asOf: _day(2026, 6, 13, 4),
@@ -196,7 +196,7 @@ void main() {
 
     test('12h grace window: asOf 13:00 of next day breaks the streak', () {
       final log = [_entry(2026, 6, 12)];
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: log,
         config: _config(grace: const Duration(hours: 12)),
         asOf: _day(2026, 6, 13, 13),
@@ -208,7 +208,7 @@ void main() {
 
     test('12h grace window: asOf 11:00 of next day keeps the streak alive', () {
       final log = [_entry(2026, 6, 12)];
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: log,
         config: _config(grace: const Duration(hours: 12)),
         asOf: _day(2026, 6, 13, 11),
@@ -218,7 +218,7 @@ void main() {
     });
 
     test('streak is never negative even with no completions', () {
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: const <CompletionLogEntry>[],
         config: _config(),
         asOf: _day(2026, 6, 13),
@@ -232,7 +232,7 @@ void main() {
         _entry(2026, 6, 5),
         _entry(2026, 6, 3), // out of order
       ];
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: log,
         config: _config(),
         asOf: _day(2026, 6, 5),
@@ -241,7 +241,7 @@ void main() {
     });
 
     test('a single completion on the same day as asOf gives streak 1', () {
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: [_entry(2026, 6, 13)],
         config: _config(),
         asOf: _day(2026, 6, 13, 23, 59),
@@ -250,7 +250,7 @@ void main() {
     });
 
     test('a single completion yesterday, asOf today 01:00 → still 1', () {
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: [_entry(2026, 6, 12)],
         config: _config(),
         asOf: _day(2026, 6, 13, 1),
@@ -259,7 +259,7 @@ void main() {
     });
 
     test('a single completion yesterday, asOf 04:00 next day → broken', () {
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: [_entry(2026, 6, 12)],
         config: _config(),
         asOf: _day(2026, 6, 13, 4),
@@ -268,7 +268,7 @@ void main() {
     });
 
     test('a streak that ends exactly at the asOf is still alive', () {
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: [_entry(2026, 6, 13)],
         config: _config(),
         asOf: _day(2026, 6, 13),
@@ -285,7 +285,7 @@ void main() {
         // streak is alive (1). This is a degenerate case; the
         // service layer is expected to backfill entries only
         // up to "today".
-        final snap = StreakCalculator.compute(
+        final snap = ConsecutiveCounter.compute(
           log: [_entry(2026, 6, 15)],
           config: _config(),
           asOf: _day(2026, 6, 13),
@@ -307,7 +307,7 @@ void main() {
           log.add(_entry(2026, 5, d - 30));
         }
       }
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: log,
         config: _config(),
         asOf: _day(2026, 5, 20),
@@ -318,14 +318,14 @@ void main() {
 
     test('dedup keeps the note when present', () {
       final log = [
-        CompletionLogEntry(habitId: 'h1', date: _day(2026, 6, 1, 8)),
+        CompletionLogEntry(doId: 'h1', date: _day(2026, 6, 1, 8)),
         CompletionLogEntry(
-          habitId: 'h1',
+          doId: 'h1',
           date: _day(2026, 6, 1, 22),
           note: 'real completion',
         ),
       ];
-      final snap = StreakCalculator.compute(
+      final snap = ConsecutiveCounter.compute(
         log: log,
         config: _config(),
         asOf: _day(2026, 6, 1, 23),

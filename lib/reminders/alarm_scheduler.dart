@@ -3,7 +3,7 @@
 //
 // Per .claude/rules/lib-reminders.md, this file is the public
 // surface for scheduling. The rest of the app calls
-// `AlarmScheduler.schedule(Habit h, DateTime at)` and the
+// `AlarmScheduler.schedule(Do h, DateTime at)` and the
 // scheduler routes the call to the right platform primitive.
 //
 // Layer rules:
@@ -19,7 +19,7 @@
 import 'dart:async';
 
 import 'package:doit/events/event.dart';
-import 'package:doit/habits/habit.dart';
+import 'package:doit/do/do.dart';
 import 'package:meta/meta.dart';
 
 /// A stable identifier for a scheduled alarm. The alarm id is
@@ -69,7 +69,7 @@ enum Reliability {
 abstract class AlarmScheduler {
   /// Schedule `habit` for `at`. The alarm id is derived from
   /// (habitId, at). Re-scheduling replaces the prior alarm.
-  Future<AlarmId> schedule(Habit habit, DateTime at);
+  Future<AlarmId> schedule(Do habit, DateTime at);
 
   /// Cancel the alarm with the given id.
   Future<void> cancel(AlarmId id);
@@ -129,7 +129,7 @@ class FakeAlarmScheduler implements AlarmScheduler {
   Set<AlarmId> get cancelledIds => Set.unmodifiable(_cancelled);
 
   @override
-  Future<AlarmId> schedule(Habit habit, DateTime at) async {
+  Future<AlarmId> schedule(Do habit, DateTime at) async {
     final id = AlarmId(_nextId++);
     _scheduled.add(ScheduledAlarm(id: id, habitId: habit.id, at: at));
     return id;

@@ -1,8 +1,8 @@
 // Tests for [AlarmScheduler] (and [FakeAlarmScheduler] which
 // is the in-memory test implementation).
 
-import 'package:doit/habits/habit.dart';
-import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/do/do.dart';
+import 'package:doit/do/proof_mode.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -38,14 +38,14 @@ void main() {
   });
 
   group('FakeAlarmScheduler', () {
-    final habit = HabitFixed(
+    final habit = DoFixed(
       id: 'h1',
       name: 'Stretch',
       createdAt: DateTime(2026, 6),
       restDaysPerMonth: 2,
       proofMode: const SoftProof(),
       weekdays: const {1, 3, 5},
-      time: const HabitTime(9, 0),
+      time: const DoTime(9, 0),
     );
 
     test('schedule records the alarm', () async {
@@ -117,12 +117,12 @@ void main() {
   });
 }
 
-Habit _h({required String id}) => HabitFixed(
+Do _h({required String id}) => DoFixed(
   id: id,
   name: 'X',
   proofMode: const SoftProof(),
   createdAt: DateTime(2026, 6, 1),
   restDaysPerMonth: 0,
   weekdays: const {1, 2, 3, 4, 5, 6, 7},
-  time: const HabitTime(9, 0),
+  time: const DoTime(9, 0),
 );

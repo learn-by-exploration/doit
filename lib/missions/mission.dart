@@ -4,9 +4,9 @@
 // execution engine (verify(), pure functions, sensor adapters)
 // lands in Phase 3 per docs/v_model/implementation_status.md.
 //
-// Why a stub now: a Habit in Strong mode carries a `missionChain`.
+// Why a stub now: a Do in Strong mode carries a `missionChain`.
 // To stay type-safe without a circular import, the chain type
-// lives next to Habit in lib/missions/. Phase 3 adds the
+// lives next to Do in lib/missions/. Phase 3 adds the
 // `verify()` method and the sensor adapters without changing
 // the data shape.
 

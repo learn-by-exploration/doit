@@ -1,4 +1,4 @@
-// HabitCategory — the visual-identity taxonomy for a habit.
+// DoCategory — the visual-identity taxonomy for a do.
 //
 // v0.2 (WF-031). Six buckets: health, mind, relationships,
 // productivity, home, other. The category drives the default
@@ -6,15 +6,18 @@
 // color (8 swatches via colorSeed 0..7) and the icon (one of 64
 // Material Symbols keys).
 //
-// Per .claude/rules/lib-habits.md: pure Dart, no Flutter imports.
+// v1.0 reframe (Phase A): renamed from `DoCategory` to
+// `DoCategory`. The DB tag stays `category` (no migration).
+//
+// Per .claude/rules/lib-do.md: pure Dart, no Flutter imports.
 
 import 'package:meta/meta.dart';
 
-/// The visual / semantic category of a habit. Used for:
+/// The visual / semantic category of a do. Used for:
 ///   - the default color on the home screen tile,
 ///   - the default icon (overridable),
 ///   - the stats screen grouping.
-enum HabitCategory {
+enum DoCategory {
   health,
   mind,
   relationships,
@@ -26,20 +29,20 @@ enum HabitCategory {
   String get tag => name;
 
   /// Parse from the DB tag. Falls back to [other] for unknown
-  /// values (forward-compat: a v0.3+ category would not crash
-  /// a v0.2 build).
-  static HabitCategory fromTag(String tag) {
-    for (final c in HabitCategory.values) {
+  /// values (forward-compat: a future category would not crash
+  /// the current build).
+  static DoCategory fromTag(String tag) {
+    for (final c in DoCategory.values) {
       if (c.tag == tag) return c;
     }
-    return HabitCategory.other;
+    return DoCategory.other;
   }
 }
 
 /// The 8-swatch color palette. The user can override the
 /// category-assigned color by picking a `colorSeed` 0..7.
 ///
-/// Per `.claude/rules/lib-habits.md`, this file must NOT import
+/// Per `.claude/rules/lib-do.md`, this file must NOT import
 /// Flutter. The mapping from `colorSeed` to a Flutter `Color`
 /// lives in `lib/widgets/category_chip.dart` (which is the only
 /// file allowed to bridge into the UI layer).
@@ -62,26 +65,26 @@ class CategoryPalette {
   ];
 
   /// The default swatch index for a category.
-  static int defaultSeedFor(HabitCategory c) {
+  static int defaultSeedFor(DoCategory c) {
     switch (c) {
-      case HabitCategory.health:
+      case DoCategory.health:
         return 0;
-      case HabitCategory.mind:
+      case DoCategory.mind:
         return 1;
-      case HabitCategory.relationships:
+      case DoCategory.relationships:
         return 2;
-      case HabitCategory.productivity:
+      case DoCategory.productivity:
         return 3;
-      case HabitCategory.home:
+      case DoCategory.home:
         return 4;
-      case HabitCategory.other:
+      case DoCategory.other:
         return 5;
     }
   }
 
   /// Resolve a (category, colorSeed) pair to a swatch index.
   /// Out-of-range seeds clamp to the nearest valid index.
-  static int seedFor(HabitCategory c, int colorSeed) {
+  static int seedFor(DoCategory c, int colorSeed) {
     if (colorSeed <= 0) return defaultSeedFor(c);
     if (colorSeed >= swatches.length) return swatches.length - 1;
     return colorSeed;
@@ -93,8 +96,8 @@ class CategoryPalette {
 /// `directions_run`). The icon picker in
 /// `lib/widgets/icon_picker.dart` is the single source of UI.
 @immutable
-class HabitIcons {
-  const HabitIcons._();
+class DoIcons {
+  const DoIcons._();
 
   /// The 64 icon keys. The order is the picker grid order
   /// (8 columns × 8 rows).
@@ -127,19 +130,19 @@ class HabitIcons {
 
   /// The canonical icon for a category when the user has not
   /// picked an explicit icon. Matches the user-facing label.
-  static String defaultForCategory(HabitCategory c) {
+  static String defaultForCategory(DoCategory c) {
     switch (c) {
-      case HabitCategory.health:
+      case DoCategory.health:
         return 'local_drink';
-      case HabitCategory.mind:
+      case DoCategory.mind:
         return 'self_improvement';
-      case HabitCategory.relationships:
+      case DoCategory.relationships:
         return 'group';
-      case HabitCategory.productivity:
+      case DoCategory.productivity:
         return 'task_alt';
-      case HabitCategory.home:
+      case DoCategory.home:
         return 'home';
-      case HabitCategory.other:
+      case DoCategory.other:
         return 'check_circle';
     }
   }
@@ -149,7 +152,7 @@ class HabitIcons {
   /// default. The picker is the only UI that produces a
   /// non-null, non-default value.
   static String resolveFor({
-    required HabitCategory category,
+    required DoCategory category,
     required String? iconName,
   }) {
     if (iconName == null || iconName.isEmpty) {

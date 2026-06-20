@@ -1,7 +1,7 @@
 // Fresh-install integration test (SYS-055). Simulates a wiped-device
 // install: empty Drift DB -> OnboardingScreen renders -> the "Skip"
 // CTA is tapped -> HomeScreen renders with the empty-state placeholder
-// -> a HabitFixed is saved -> ReminderService.scheduleTestReminder is
+// -> a DoFixed is saved -> ReminderService.scheduleTestReminder is
 // fired and the FakeAlarmScheduler records exactly one alarm.
 //
 // The test is the contract that the v0.3 sideloaders will hit on a
@@ -9,8 +9,8 @@
 // hands-on "Wiped-device smoke" step documented in
 // docs/v_model/v0_3_release_checklist.md.
 
-import 'package:doit/habits/habit.dart';
-import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/do/do.dart';
+import 'package:doit/do/proof_mode.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/reminders/full_screen_intent.dart';
@@ -20,7 +20,7 @@ import 'package:doit/screens/home.dart';
 import 'package:doit/screens/onboarding.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/db/schema.dart';
-import 'package:doit/services/habit_repository.dart';
+import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/settings_service.dart';
 import 'package:doit/theme/app_theme.dart';
@@ -57,12 +57,10 @@ Widget _wrapOnboarding({required VoidCallback onDone}) {
 
 void main() {
   testWidgets('fresh install: empty DB -> Onboarding -> Home empty-state -> '
-      'save HabitFixed -> test reminder lands in the scheduler', (
-    tester,
-  ) async {
+      'save DoFixed -> test reminder lands in the scheduler', (tester) async {
     // Wipe the in-memory DB and reset services.
     await _resetDb(tester);
-    HabitRepository.instance;
+    DoRepository.instance;
     ReminderService.resetForTesting();
     final fakeScheduler = FakeAlarmScheduler();
     await ReminderService.init(
@@ -112,19 +110,19 @@ void main() {
       reason: 'A wiped-device install should land on the empty state',
     );
 
-    // 4) Save a HabitFixed. The minimum-viable payload is an id,
+    // 4) Save a DoFixed. The minimum-viable payload is an id,
     //    a name, a proof mode, weekdays, and a time. The habit id
     //    'doit.test_reminder' is reserved by ReminderService;
     //    pick something distinct.
-    await HabitRepository.instance.save(
-      HabitFixed(
+    await DoRepository.instance.save(
+      DoFixed(
         id: 'fresh-install-h1',
         name: 'Drink water',
         proofMode: const SoftProof(),
         createdAt: DateTime(2026, 6, 14, 9),
         restDaysPerMonth: 2,
         weekdays: const {1, 2, 3, 4, 5, 6, 7},
-        time: const HabitTime(9, 0),
+        time: const DoTime(9, 0),
       ),
     );
 

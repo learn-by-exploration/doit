@@ -22,9 +22,9 @@
 
 import 'dart:async';
 
-import 'package:doit/habits/habit.dart';
+import 'package:doit/do/do.dart';
 import 'package:doit/people/person.dart';
-import 'package:doit/services/habit_repository.dart';
+import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/person_repository.dart';
 
 class PauseService {
@@ -42,23 +42,23 @@ class PauseService {
   /// Pause a habit until [until] (inclusive). A null
   /// [until] is rejected; call [resume] to clear.
   ///
-  /// Re-saves the habit through [HabitRepository] (so the
+  /// Re-saves the habit through [DoRepository] (so the
   /// v0.1 `insertOnConflictUpdate` path is used). The
   /// reminder layer reads `pausedUntil` directly from the
   /// row, so the new state is effective on the next
   /// `listActive` / `scheduleHabit` call.
-  Future<void> pauseHabit(Habit habit, DateTime until) async {
+  Future<void> pauseHabit(Do habit, DateTime until) async {
     await _ready;
     final updated = habit.copyWith(pausedUntil: until);
-    await HabitRepository.instance.save(updated);
+    await DoRepository.instance.save(updated);
   }
 
   /// Clear the pause state on a habit. The next call to
   /// `nextOccurrence` will fire reminders as usual.
-  Future<void> resumeHabit(Habit habit) async {
+  Future<void> resumeHabit(Do habit) async {
     await _ready;
     final updated = habit.copyWith(clearPausedUntil: true);
-    await HabitRepository.instance.save(updated);
+    await DoRepository.instance.save(updated);
   }
 
   /// Pause a person (cadence habit) until [until]. The cadence
@@ -80,7 +80,7 @@ class PauseService {
   /// is "now". Used by the home-screen "Pause 1 day" /
   /// "Pause 1 week" quick-actions.
   Future<void> pauseHabitFor(
-    Habit habit,
+    Do habit,
     Duration duration, {
     DateTime? from,
   }) async {

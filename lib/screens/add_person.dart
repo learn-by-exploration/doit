@@ -146,9 +146,7 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
     }
     setState(() {
       _error = null;
-      _pickedName = picked.displayName.isEmpty
-          ? 'No name'
-          : picked.displayName;
+      _pickedName = picked.displayName.isEmpty ? 'No name' : picked.displayName;
       _pickedPhone = picked.phones.first.number;
       // Stash the contact's stable id so future re-resolutions
       // (per `PersonResolver`) can match the same record even

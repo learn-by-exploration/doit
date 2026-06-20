@@ -2,10 +2,10 @@
 // (WF-031 — category / color / icon on a habit).
 //
 // CategoryChipResolver is the only file in v0.2 that bridges
-// `HabitCategory` (a pure-Dart enum) into a Flutter `Color`.
+// `DoCategory` (a pure-Dart enum) into a Flutter `Color`.
 // Coverage target: ≥ 80% on the file.
 
-import 'package:doit/habits/category.dart';
+import 'package:doit/do/category.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/widgets/category_chip.dart';
 import 'package:flutter/material.dart';
@@ -21,7 +21,7 @@ Widget _wrap(Widget child) {
 void main() {
   group('CategoryChipResolver.resolveFor', () {
     test('resolves every category to a non-zero color and a label', () {
-      for (final c in HabitCategory.values) {
+      for (final c in DoCategory.values) {
         final v = CategoryChipResolver.resolveFor(category: c, colorSeed: 0);
         expect(v.color, isNot(0));
         expect(v.label, isNotEmpty);
@@ -31,11 +31,11 @@ void main() {
     test('colorSeed 0 picks the category default', () {
       // Health and Mind have different defaults.
       final health = CategoryChipResolver.resolveFor(
-        category: HabitCategory.health,
+        category: DoCategory.health,
         colorSeed: 0,
       );
       final mind = CategoryChipResolver.resolveFor(
-        category: HabitCategory.mind,
+        category: DoCategory.mind,
         colorSeed: 0,
       );
       expect(health.color, isNot(mind.color));
@@ -43,12 +43,12 @@ void main() {
 
     test('colorSeed 1..7 returns a non-default swatch', () {
       final baseline = CategoryChipResolver.resolveFor(
-        category: HabitCategory.health,
+        category: DoCategory.health,
         colorSeed: 0,
       );
       for (var seed = 1; seed <= 7; seed++) {
         final v = CategoryChipResolver.resolveFor(
-          category: HabitCategory.health,
+          category: DoCategory.health,
           colorSeed: seed,
         );
         expect(
@@ -62,7 +62,7 @@ void main() {
     test('unknown colorSeed falls back gracefully', () {
       // CategoryPalette.seedFor should clamp to a valid index.
       final v = CategoryChipResolver.resolveFor(
-        category: HabitCategory.health,
+        category: DoCategory.health,
         colorSeed: 99,
       );
       expect(v.color, isNot(0));
@@ -72,17 +72,17 @@ void main() {
   group('CategoryChipResolver.resolveIconFor', () {
     test('null iconName returns the category default', () {
       final key = CategoryChipResolver.resolveIconFor(
-        category: HabitCategory.health,
+        category: DoCategory.health,
         iconName: null,
       );
       expect(key, isNotEmpty);
-      expect(HabitIcons.keys, contains(key));
+      expect(DoIcons.keys, contains(key));
     });
 
     test('known iconName is returned verbatim', () {
       const pick = 'local_drink';
       final key = CategoryChipResolver.resolveIconFor(
-        category: HabitCategory.health,
+        category: DoCategory.health,
         iconName: pick,
       );
       expect(key, pick);
@@ -94,7 +94,7 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           CategoryChip(
-            category: HabitCategory.relationships,
+            category: DoCategory.relationships,
             colorSeed: 0,
             onTap: () {},
           ),
@@ -108,7 +108,7 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           CategoryChip(
-            category: HabitCategory.home,
+            category: DoCategory.home,
             colorSeed: 0,
             onTap: () => taps++,
           ),
@@ -119,7 +119,7 @@ void main() {
     });
 
     testWidgets('renders without exploding for every category', (tester) async {
-      for (final c in HabitCategory.values) {
+      for (final c in DoCategory.values) {
         await tester.pumpWidget(
           _wrap(CategoryChip(category: c, colorSeed: 2, onTap: () {})),
         );
@@ -137,7 +137,7 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           CategoryPickerSheet(
-            initialCategory: HabitCategory.health,
+            initialCategory: DoCategory.health,
             initialColorSeed: 0,
           ),
         ),
@@ -147,7 +147,7 @@ void main() {
 
     testWidgets('shows a ChoiceChip for every category', (tester) async {
       await openPicker(tester);
-      for (final c in HabitCategory.values) {
+      for (final c in DoCategory.values) {
         expect(
           find.byKey(ValueKey('category.${c.name}')),
           findsOneWidget,
@@ -184,7 +184,7 @@ void main() {
     testWidgets('Save returns the chosen (category, colorSeed) pair', (
       tester,
     ) async {
-      ({HabitCategory category, int colorSeed})? result;
+      ({DoCategory category, int colorSeed})? result;
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.dark,
@@ -195,7 +195,7 @@ void main() {
                   onPressed: () async {
                     result = await CategoryPickerSheet.show(
                       context,
-                      initialCategory: HabitCategory.health,
+                      initialCategory: DoCategory.health,
                       initialColorSeed: 0,
                     );
                   },
@@ -216,12 +216,12 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('category_picker.save')));
       await tester.pumpAndSettle();
       expect(result, isNotNull);
-      expect(result!.category, HabitCategory.home);
+      expect(result!.category, DoCategory.home);
       expect(result!.colorSeed, 2);
     });
 
     testWidgets('Cancel returns null', (tester) async {
-      ({HabitCategory category, int colorSeed})? result;
+      ({DoCategory category, int colorSeed})? result;
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.dark,
@@ -232,7 +232,7 @@ void main() {
                   onPressed: () async {
                     result = await CategoryPickerSheet.show(
                       context,
-                      initialCategory: HabitCategory.mind,
+                      initialCategory: DoCategory.mind,
                       initialColorSeed: 0,
                     );
                   },

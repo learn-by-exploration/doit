@@ -15,7 +15,7 @@
 
 import 'dart:async';
 
-import 'package:doit/habits/habit.dart';
+import 'package:doit/do/do.dart';
 import 'package:doit/missions/chain.dart';
 import 'package:meta/meta.dart';
 
@@ -23,14 +23,14 @@ import 'package:meta/meta.dart';
 @immutable
 class FullScreenLaunch {
   const FullScreenLaunch({required this.habit, required this.chain});
-  final Habit habit;
+  final Do habit;
   final MissionChain chain;
 }
 
 abstract class FullScreenIntent {
   /// Show the full-screen mission UI for the given habit and
   /// mission chain.
-  Future<void> show(Habit habit, MissionChain chain);
+  Future<void> show(Do habit, MissionChain chain);
 }
 
 /// In-memory implementation used by tests.
@@ -38,7 +38,7 @@ class FakeFullScreenIntent implements FullScreenIntent {
   final List<FullScreenLaunch> launches = <FullScreenLaunch>[];
 
   @override
-  Future<void> show(Habit habit, MissionChain chain) async {
+  Future<void> show(Do habit, MissionChain chain) async {
     launches.add(FullScreenLaunch(habit: habit, chain: chain));
   }
 }

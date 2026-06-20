@@ -22,7 +22,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// reset the in-memory services (settings, reminder, database),
 /// and re-init with the test fakes + an in-memory Drift
 /// database so `HomeScreen` can resolve
-/// `ReminderService.instance` and `HabitRepository.instance`.
+/// `ReminderService.instance` and `DoRepository.instance`.
 /// Mirrors the v0.3d `fresh_install_test.dart` setup.
 Future<void> _setUpApp(WidgetTester tester) async {
   SharedPreferences.setMockInitialValues({});
@@ -103,7 +103,7 @@ void main() {
       //
       // We deliberately do NOT use `pumpAndSettle` here.
       // `HomeScreen._habitsFuture` is a real `Future` from
-      // `HabitRepository.instance.listAll()`. Even with an
+      // `DoRepository.instance.listAll()`. Even with an
       // in-memory Drift DB the future resolves on the real
       // event loop (not the fake-async zone), and a pending
       // `Future` in the widget tree prevents the framework

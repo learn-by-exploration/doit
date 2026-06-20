@@ -1,66 +1,68 @@
-// Streak calculator — pure-Dart math over a completion log.
+// Consecutive-run counter — pure-Dart math over a completion log.
 //
-// The completion log is the source of truth; the streak number
-// is derived. The calculator is the only place that decides
-// what "did the streak break today?" means.
+// The completion log is the source of truth; the consecutive-run
+// number is derived. The counter is the only place that decides
+// what "did the run break today?" means.
 //
-// Layer rules (per .claude/rules/lib-habits.md):
+// v1.0 reframe (Phase A): renamed from `ConsecutiveCounter` to
+// `ConsecutiveCounter` to better reflect the user-facing
+// semantics (PR A2 will swap the UI copy "streak" →
+// "consecutive done"). The DB column stays `proofMode` and the
+// algorithm is unchanged.
+//
+// Layer rules (per .claude/rules/lib-do.md):
 //   - No Flutter imports.
 //   - No `DateTime.now()` inside the calculator. The caller
-//     passes `asOf`. This is the only way the streak is
+//     passes `asOf`. This is the only way the consecutive-run is
 //     testable across DST / timezone changes / time travel.
-//   - The streak never goes negative.
+//   - The consecutive-run never goes negative.
 //
 // Inputs:
-//   - `log` is the full history of completions for a single
-//     habit, ordered or unordered. The calculator sorts by
-//     date and de-duplicates per-day (multiple completions on
-//     the same day collapse to one).
-//   - `config` carries the grace window and the rest-day
-//     budget. Both are per-habit; the calculator does not
-//     know the habit's other fields.
+//   - `log` is the full history of completions for a single do,
+//     ordered or unordered. The calculator sorts by date and
+//     de-duplicates per-day (multiple completions on the same
+//     day collapse to one).
+//   - `config` carries the grace window and the skip-day
+//     budget. Both are per-do; the calculator does not know
+//     the do's other fields.
 //   - `asOf` is the reference "now" — the test's frozen clock
 //     or the app's wall clock.
 
-import 'package:doit/habits/rest_day_budget.dart';
+import 'package:doit/do/skip_budget.dart';
 import 'package:meta/meta.dart';
 
-/// A single completion of a habit.
+/// A single completion of a do.
 ///
-/// [date] is the local-calendar date the user marked the habit
-/// done. Times of day are ignored — two completions on the
-/// same calendar day collapse to one (the calculator de-dupes).
+/// [date] is the local-calendar date the user marked the do
+/// done. Times of day are ignored — two completions on the same
+/// calendar day collapse to one (the calculator de-dupes).
 @immutable
 class CompletionLogEntry {
-  const CompletionLogEntry({
-    required this.habitId,
-    required this.date,
-    this.note,
-  });
+  const CompletionLogEntry({required this.doId, required this.date, this.note});
 
-  final String habitId;
+  final String doId;
   final DateTime date;
   final String? note;
 }
 
-/// Configuration for streak calculation. Per-habit.
+/// Configuration for consecutive-run calculation. Per-do.
 @immutable
 class StreakConfig {
-  const StreakConfig({required this.graceWindow, required this.restDayBudget});
+  const StreakConfig({required this.graceWindow, required this.skipBudget});
 
   /// How long after a missed day can the user still complete
-  /// the habit without breaking the streak. SYS-019: default
-  /// 03:00 — the user has until 3:00 AM of the next day to
-  /// mark yesterday done.
+  /// the do without breaking the consecutive-run. SYS-019:
+  /// default 03:00 — the user has until 3:00 AM of the next
+  /// day to mark yesterday done.
   final Duration graceWindow;
 
-  /// The rest-day budget for this habit. A day the user
-  /// explicitly marks as a "rest day" (not just missed)
-  /// consumes one budget unit and does NOT break the streak.
-  final RestDayBudget restDayBudget;
+  /// The skip-day budget for this do. A day the user explicitly
+  /// marks as a "skip day" (not just missed) consumes one
+  /// budget unit and does NOT break the consecutive-run.
+  final SkipBudget skipBudget;
 }
 
-/// Snapshot of the streak state at a point in time.
+/// Snapshot of the consecutive-run state at a point in time.
 @immutable
 class StreakSnapshot {
   const StreakSnapshot({
@@ -71,22 +73,23 @@ class StreakSnapshot {
     required this.restDaysUsed,
   });
 
-  /// The streak as of [asOf]. Always ≥ 0.
+  /// The consecutive-run as of [asOf]. Always ≥ 0.
   final int currentStreak;
 
-  /// The longest streak the user has ever held on this habit.
+  /// The longest consecutive-run the user has ever held on
+  /// this do.
   final int longestStreak;
 
   /// The most recent completion date in the log.
   final DateTime? lastCompletion;
 
-  /// The date the current streak was broken, if applicable.
-  /// `null` if the streak is still alive.
+  /// The date the current consecutive-run was broken, if
+  /// applicable. `null` if the run is still alive.
   final DateTime? brokenAt;
 
-  /// How many rest days the user has used this calendar
-  /// month. Surfaced in the UI so the user knows how many
-  /// they have left.
+  /// How many skip days the user has used this calendar month.
+  /// Surfaced in the UI so the user knows how many they have
+  /// left.
   final int restDaysUsed;
 
   @override
@@ -111,27 +114,32 @@ class StreakSnapshot {
 }
 
 /// The calculator. Stateless: pass the inputs, get a snapshot.
+///
+/// v1.0 reframe: the canonical name is `ConsecutiveCounter`.
+/// The old name `ConsecutiveCounter` is kept as a typedef alias
+/// in `lib/do/streak_calculator_shim.dart` for backward-compat
+/// with PR-A1 imports. New code uses `ConsecutiveCounter`.
 @immutable
-class StreakCalculator {
-  const StreakCalculator._();
+class ConsecutiveCounter {
+  const ConsecutiveCounter._();
 
-  /// Compute the streak. Pure function.
+  /// Compute the consecutive-run. Pure function.
   ///
   /// Rules:
   ///   1. Two completions on the same calendar day count as
   ///      one.
   ///   2. A gap of more than 1 day in the log breaks the
-  ///      streak. A 1-day gap is a missed day; the streak
-  ///      resets after it.
-  ///   3. The grace window is a *boundary* check: if the
-  ///      last completion is yesterday (in calendar days)
-  ///      AND `asOf` is within the grace window past
-  ///      yesterday's end-of-day, the streak is still
-  ///      considered alive. SYS-019: default grace 03:00
-  ///      means the user has until 03:00 of the day after
-  ///      the missed day to "fix" it (i.e., complete the
-  ///      missed day retroactively — the engine treats the
-  ///      boundary as alive so the UI can prompt for it).
+  ///      consecutive-run. A 1-day gap is a missed day; the
+  ///      run resets after it.
+  ///   3. The grace window is a *boundary* check: if the last
+  ///      completion is yesterday (in calendar days) AND
+  ///      `asOf` is within the grace window past yesterday's
+  ///      end-of-day, the run is still considered alive.
+  ///      SYS-019: default grace 03:00 means the user has
+  ///      until 03:00 of the day after the missed day to
+  ///      "fix" it (i.e., complete the missed day
+  ///      retroactively — the engine treats the boundary as
+  ///      alive so the UI can prompt for it).
   static StreakSnapshot compute({
     required List<CompletionLogEntry> log,
     required StreakConfig config,
@@ -142,7 +150,7 @@ class StreakCalculator {
       longestStreak: 0,
       lastCompletion: null,
       brokenAt: null,
-      restDaysUsed: config.restDayBudget.usedOnOrBefore(asOf),
+      restDaysUsed: config.skipBudget.usedOnOrBefore(asOf),
     );
     if (log.isEmpty) return empty;
 
@@ -171,7 +179,7 @@ class StreakCalculator {
       if (gap == 1) {
         run++;
       } else {
-        // Streak broke between prev and day. Record the
+        // Run broke between prev and day. Record the
         // earliest break only.
         brokenAt ??= _addDays(prev, 1);
         run = 1;
@@ -179,7 +187,7 @@ class StreakCalculator {
       if (run > longest) longest = run;
     }
 
-    // Boundary check: is the streak still alive at asOf?
+    // Boundary check: is the consecutive-run still alive at asOf?
     final daysSinceLast = asOfDay.difference(lastDay).inDays;
     final isStreakAlive =
         daysSinceLast == 0 ||
@@ -192,7 +200,7 @@ class StreakCalculator {
         longestStreak: longest,
         lastCompletion: lastDay,
         brokenAt: brokenAt,
-        restDaysUsed: config.restDayBudget.usedOnOrBefore(asOf),
+        restDaysUsed: config.skipBudget.usedOnOrBefore(asOf),
       );
     }
 
@@ -201,7 +209,7 @@ class StreakCalculator {
       longestStreak: longest,
       lastCompletion: lastDay,
       brokenAt: brokenAt,
-      restDaysUsed: config.restDayBudget.usedOnOrBefore(asOf),
+      restDaysUsed: config.skipBudget.usedOnOrBefore(asOf),
     );
   }
 

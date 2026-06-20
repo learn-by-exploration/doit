@@ -2,7 +2,7 @@
 //
 // A cadence is the answer to "how often should I reach out
 // to this person?" It is the schedule for a Person, not a
-// Habit — the app's domain separation keeps the two
+// Do — the app's domain separation keeps the two
 // schedule engines clean.
 //
 // Layer rules (per .claude/rules/lib-people.md):

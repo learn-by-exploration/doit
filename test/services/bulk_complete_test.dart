@@ -5,12 +5,12 @@
 // a CompletionLogEntry for every selected habit at the current
 // wall-clock day, then exits select mode.
 
-import 'package:doit/habits/habit.dart';
-import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/do/do.dart';
+import 'package:doit/do/proof_mode.dart';
 import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/db/schema.dart';
-import 'package:doit/services/habit_repository.dart';
+import 'package:doit/services/do_repository.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -30,15 +30,15 @@ void main() {
 
   Future<void> seed(int n) async {
     for (var i = 0; i < n; i++) {
-      await HabitRepository.instance.save(
-        HabitFixed(
+      await DoRepository.instance.save(
+        DoFixed(
           id: 'h$i',
-          name: 'Habit $i',
+          name: 'Do $i',
           proofMode: const SoftProof(),
           createdAt: DateTime(2026, 6, 1),
           restDaysPerMonth: 0,
           weekdays: const {1, 2, 3, 4, 5, 6, 7},
-          time: const HabitTime(9, 0),
+          time: const DoTime(9, 0),
         ),
       );
     }

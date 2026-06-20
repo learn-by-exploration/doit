@@ -5,7 +5,7 @@
 //   - Add: no `habitId` arg. The save creates a new habit and
 //     schedules the next occurrence.
 //   - Edit: `habitId` arg provided. The form pre-fills from
-//     `HabitRepository.getById`. Saving overwrites the row in
+//     `DoRepository.getById`. Saving overwrites the row in
 //     place. The habit's `createdAt` and completion log are
 //     preserved (the repo's `insertOnConflictUpdate` does not
 //     touch Completions).
@@ -13,16 +13,16 @@
 // v0.2 surface (SYS-031, SYS-042..047, WF-019, WF-022, WF-031):
 //   - All 5 schedule types: fixed, interval, anchor, dayOfX,
 //     timeWindow.
-//   - Category picker (HabitCategory + 8-swatch colorSeed).
+//   - Category picker (DoCategory + 8-swatch colorSeed).
 //   - Icon picker (64-icon grid).
 //   - The same screen is used for edit; passing a `habitId`
 //     flips it into "edit" mode.
 
 import 'package:flutter/material.dart';
 
-import 'package:doit/habits/habit.dart';
-import 'package:doit/habits/proof_mode.dart';
-import 'package:doit/services/habit_repository.dart';
+import 'package:doit/do/do.dart';
+import 'package:doit/do/proof_mode.dart';
+import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/widgets/category_chip.dart';
@@ -59,7 +59,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   int? _twTargetHours; // null for meals, 12/14/16/18/20 for fasting
 
   // v0.2 visual identity (SYS-045, SYS-046).
-  HabitCategory _category = HabitCategory.other;
+  DoCategory _category = DoCategory.other;
   int _colorSeed = 0;
   String? _iconName;
 
@@ -68,11 +68,11 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   DateTime? _pausedUntil;
 
   // Cached list of all other habits, for the anchor picker.
-  List<Habit> _otherHabits = const <Habit>[];
+  List<Do> _otherHabits = const <Do>[];
 
   // The original habit (in edit mode), so we can re-save
   // preserving `createdAt` and `id`.
-  Habit? _original;
+  Do? _original;
 
   bool _isEdit = false;
 
@@ -93,7 +93,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   Future<void> _loadExisting() async {
     final id = widget.habitId;
     if (id == null) return;
-    final h = await HabitRepository.instance.getById(id);
+    final h = await DoRepository.instance.getById(id);
     if (h == null || !mounted) return;
     setState(() {
       _original = h;
@@ -105,24 +105,24 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     });
     // Type-specific fields.
     final self = h;
-    if (self is HabitFixed) {
+    if (self is DoFixed) {
       _scheduleType = 'fixed';
       _fixedTime = TimeOfDay(hour: self.time.hour, minute: self.time.minute);
       _fixedWeekdays
         ..clear()
         ..addAll(self.weekdays);
-    } else if (self is HabitInterval) {
+    } else if (self is DoInterval) {
       _scheduleType = 'interval';
       _intervalNDays = self.nDays;
-    } else if (self is HabitAnchor) {
+    } else if (self is DoAnchor) {
       _scheduleType = 'anchor';
-      _anchorTargetId = self.targetHabitId;
-    } else if (self is HabitDayOfX) {
+      _anchorTargetId = self.targetDoId;
+    } else if (self is DoDayOfX) {
       _scheduleType = 'dayOfX';
       _dayOfXDayOfMonth = self.dayOfMonth ?? 1;
       _dayOfXNth = self.nth ?? 1;
       _dayOfXWeekday = self.weekday ?? 1;
-    } else if (self is HabitTimeWindow) {
+    } else if (self is DoTimeWindow) {
       _scheduleType = 'timeWindow';
       _twStart = TimeOfDay(hour: self.start.hour, minute: self.start.minute);
       _twEnd = TimeOfDay(hour: self.end.hour, minute: self.end.minute);
@@ -134,7 +134,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   }
 
   Future<void> _loadOtherHabits() async {
-    final all = await HabitRepository.instance.listAll();
+    final all = await DoRepository.instance.listAll();
     if (!mounted) return;
     setState(() {
       _otherHabits = all
@@ -662,7 +662,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     }
     setState(() => _nameError = null);
 
-    Habit habit;
+    Do habit;
     final now = DateTime.now();
     final id = _original?.id ?? 'h_${now.millisecondsSinceEpoch}';
     final createdAt = _original?.createdAt ?? now;
@@ -674,21 +674,21 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             _showSnack('Pick at least one weekday.');
             return;
           }
-          habit = HabitFixed(
+          habit = DoFixed(
             id: id,
             name: name,
             proofMode: proofMode,
             createdAt: createdAt,
             restDaysPerMonth: 2,
             weekdays: Set<int>.from(_fixedWeekdays),
-            time: HabitTime(_fixedTime.hour, _fixedTime.minute),
+            time: DoTime(_fixedTime.hour, _fixedTime.minute),
             category: _category,
             colorSeed: _colorSeed,
             iconName: _iconName,
             pausedUntil: _pausedUntil,
           );
         case 'interval':
-          habit = HabitInterval(
+          habit = DoInterval(
             id: id,
             name: name,
             proofMode: proofMode,
@@ -706,13 +706,13 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             _showSnack('Pick a habit to anchor on.');
             return;
           }
-          habit = HabitAnchor(
+          habit = DoAnchor(
             id: id,
             name: name,
             proofMode: proofMode,
             createdAt: createdAt,
             restDaysPerMonth: 2,
-            targetHabitId: _anchorTargetId!,
+            targetDoId: _anchorTargetId!,
             lastAnchor: null,
             category: _category,
             colorSeed: _colorSeed,
@@ -720,7 +720,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             pausedUntil: _pausedUntil,
           );
         case 'dayOfX':
-          habit = HabitDayOfX(
+          habit = DoDayOfX(
             id: id,
             name: name,
             proofMode: proofMode,
@@ -740,15 +740,15 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             _showSnack('Pick at least one active day.');
             return;
           }
-          habit = HabitTimeWindow(
+          habit = DoTimeWindow(
             id: id,
             name: name,
             proofMode: proofMode,
             createdAt: createdAt,
             restDaysPerMonth: 2,
             weekdays: Set<int>.from(_fixedWeekdays),
-            start: HabitTime(_twStart.hour, _twStart.minute),
-            end: HabitTime(_twEnd.hour, _twEnd.minute),
+            start: DoTime(_twStart.hour, _twStart.minute),
+            end: DoTime(_twEnd.hour, _twEnd.minute),
             targetHours: _twTargetHours,
             category: _category,
             colorSeed: _colorSeed,
@@ -759,13 +759,13 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
           _showSnack('Pick a schedule type.');
           return;
       }
-    } on HabitValidationException catch (e) {
+    } on DoValidationException catch (e) {
       setState(() => _nameError = e.message);
       return;
     }
 
     try {
-      await HabitRepository.instance.save(habit);
+      await DoRepository.instance.save(habit);
       if (!_isEdit) {
         // Schedule the first reminder only for new habits.
         // Edits re-schedule lazily on the next listActive cycle.
@@ -781,7 +781,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
       }
       if (!mounted) return;
       Navigator.of(context).pop();
-    } on DuplicateHabitName catch (_) {
+    } on DuplicateDoName catch (_) {
       setState(() => _nameError = 'A habit with this name already exists.');
     } catch (e, st) {
       // ignore: avoid_print
@@ -821,7 +821,7 @@ class _IconThumb extends StatelessWidget {
     required this.onTap,
   });
 
-  final HabitCategory category;
+  final DoCategory category;
   final String? iconName;
   final VoidCallback onTap;
 
@@ -852,11 +852,11 @@ class _IconThumb extends StatelessWidget {
     );
   }
 
-  IconData _iconFor(HabitCategory c, String? name) {
+  IconData _iconFor(DoCategory c, String? name) {
     // The same lookup as IconPickerSheet uses; we keep a
     // small inline map so the thumb doesn't pull in the
     // full registry.
-    final key = HabitIcons.resolveFor(category: c, iconName: name);
+    final key = DoIcons.resolveFor(category: c, iconName: name);
     return _iconMap[key] ?? Icons.check;
   }
 

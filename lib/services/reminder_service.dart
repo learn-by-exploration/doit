@@ -12,8 +12,8 @@
 import 'dart:async';
 
 import 'package:doit/events/event.dart';
-import 'package:doit/habits/habit.dart';
-import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/do/do.dart';
+import 'package:doit/do/proof_mode.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/reminders/full_screen_intent.dart';
@@ -66,7 +66,7 @@ class ReminderService {
 
   /// Schedule a reminder for a habit at the given wall-clock
   /// time.
-  Future<AlarmId> scheduleHabit(Habit habit, DateTime at) async {
+  Future<AlarmId> scheduleHabit(Do habit, DateTime at) async {
     await _ready.future;
     final id = await scheduler.schedule(habit, at);
     final mode = habit.proofMode;
@@ -142,18 +142,18 @@ class ReminderService {
     await scheduler.cancelForHabit('doit.test_reminder');
   }
 
-  /// A synthetic [HabitFixed] used by the "Test reminder" button.
+  /// A synthetic [DoFixed] used by the "Test reminder" button.
   /// The id is a stable, well-known string so the test alarm
   /// can be cancelled. The schedule is "every day at 00:00" but
   /// since the test alarm is fired manually by the settings
   /// button, the schedule itself is irrelevant.
-  static final HabitFixed _testHabit = HabitFixed(
+  static final DoFixed _testHabit = DoFixed(
     id: 'doit.test_reminder',
     name: 'do it test reminder',
     proofMode: const SoftProof(),
     createdAt: DateTime.fromMillisecondsSinceEpoch(0),
     restDaysPerMonth: 0,
     weekdays: const {1, 2, 3, 4, 5, 6, 7},
-    time: const HabitTime(0, 0),
+    time: const DoTime(0, 0),
   );
 }

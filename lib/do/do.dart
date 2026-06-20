@@ -1,28 +1,34 @@
-// Habit model — sealed hierarchy of 4 schedule types.
+// Do model — sealed hierarchy of 5 schedule types.
 //
-// A habit is the source of truth for "what does the user want
-// to do, and when". The model is immutable; mutations go
-// through [Habit.copyWith] which returns a new instance.
+// A do is the source of truth for "what does the user want to
+// do, and when". The model is immutable; mutations go through
+// [Do.copyWith] which returns a new instance.
 //
-// Layer rules (per .claude/rules/lib-habits.md): no Flutter
+// v1.0 reframe (Phase A): renamed from `Do` to `Do`. The DB
+// table stays `Habits` and the column names stay the same (no
+// schema migration). Sealed subclasses were `DoFixed`,
+// `DoInterval`, `DoAnchor`, `DoDayOfX`,
+// `DoTimeWindow` — now `DoFixed`, `DoInterval`, `DoAnchor`,
+// `DoDayOfX`, `DoTimeWindow`.
+//
+// Layer rules (per .claude/rules/lib-do.md): no Flutter
 // imports. TimeOfDay is `(hour, minute)` for purity.
 //
-// v0.2 adds (SYS-042..SYS-047):
-//   - category (HabitCategory)
+// v0.2 additions (SYS-042..SYS-047) carried over verbatim:
+//   - category (DoCategory)
 //   - colorSeed (int, 0..7)
-//   - iconName (String?, one of HabitIcons.keys)
+//   - iconName (String?, one of DoIcons.keys)
 //   - pausedUntil (DateTime?)
-//   - a fifth schedule type, HabitTimeWindow (defined in
-//     habit_time_window.dart), which is the foundation for
-//     WF-019 (v0.2d).
+//   - a fifth schedule type, DoTimeWindow (defined inline),
+//     which is the foundation for WF-019 (v0.2d).
 
-import 'package:doit/habits/category.dart';
-import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/do/category.dart';
+import 'package:doit/do/proof_mode.dart';
 import 'package:doit/missions/chain.dart';
 import 'package:meta/meta.dart';
 
-export 'package:doit/habits/category.dart'
-    show HabitCategory, CategoryPalette, HabitIcons;
+export 'package:doit/do/category.dart'
+    show DoCategory, CategoryPalette, DoIcons;
 export 'package:doit/missions/mission.dart'
     show
         Mission,
@@ -33,24 +39,24 @@ export 'package:doit/missions/mission.dart'
         MathDifficulty,
         MemoryMission;
 
-/// Stable, opaque habit identifier. Wrapping the String in a
-/// typed value-class would be tempting, but v0.1 persists
-/// habits as plain rows in Drift; a typed wrapper adds churn
-/// without payoff. Keep it as a `String` alias.
-typedef HabitId = String;
+/// Stable, opaque do identifier. Wrapping the String in a typed
+/// value-class would be tempting, but v0.1 persists dos as plain
+/// rows in Drift; a typed wrapper adds churn without payoff.
+/// Keep it as a `String` alias.
+typedef DoId = String;
 
 /// Hour + minute in 24-hour clock. Pure-Dart replacement for
 /// `package:flutter/material.dart`'s `TimeOfDay` so the model
 /// can be unit-tested without a Flutter harness.
 @immutable
-class HabitTime {
-  const HabitTime(this.hour, this.minute);
+class DoTime {
+  const DoTime(this.hour, this.minute);
   final int hour;
   final int minute;
 
   @override
   bool operator ==(Object other) =>
-      other is HabitTime && other.hour == hour && other.minute == minute;
+      other is DoTime && other.hour == hour && other.minute == minute;
 
   @override
   int get hashCode => Object.hash(hour, minute);
@@ -60,87 +66,84 @@ class HabitTime {
       '${hour.toString().padLeft(2, "0")}:${minute.toString().padLeft(2, "0")}';
 }
 
-/// Thrown by [Habit.validate] when the immutable invariants
-/// are violated.
+/// Thrown by [Do.validate] when the immutable invariants are
+/// violated.
 @immutable
-sealed class HabitValidationException implements Exception {
-  const HabitValidationException(this.message);
+sealed class DoValidationException implements Exception {
+  const DoValidationException(this.message);
   final String message;
 
   @override
-  String toString() => 'HabitValidationException: $message';
+  String toString() => 'DoValidationException: $message';
 }
 
-final class HabitNameEmpty extends HabitValidationException {
-  const HabitNameEmpty() : super('Habit name must be non-empty (trimmed).');
+final class DoNameEmpty extends DoValidationException {
+  const DoNameEmpty() : super('Do name must be non-empty (trimmed).');
 }
 
-final class HabitInvalidTime extends HabitValidationException {
-  const HabitInvalidTime(this.hour, this.minute)
+final class DoInvalidTime extends DoValidationException {
+  const DoInvalidTime(this.hour, this.minute)
     : super('Time of day out of range.');
   final int hour;
   final int minute;
 }
 
-final class HabitInvalidInterval extends HabitValidationException {
-  const HabitInvalidInterval() : super('Interval must be >= 1 day.');
+final class DoInvalidInterval extends DoValidationException {
+  const DoInvalidInterval() : super('Interval must be >= 1 day.');
 }
 
-final class HabitNoWeekdaysSelected extends HabitValidationException {
-  const HabitNoWeekdaysSelected()
-    : super('Fixed habits must have at least one weekday.');
+final class DoNoWeekdaysSelected extends DoValidationException {
+  const DoNoWeekdaysSelected()
+    : super('Fixed dos must have at least one weekday.');
 }
 
-final class HabitInvalidDayOfMonth extends HabitValidationException {
-  const HabitInvalidDayOfMonth(this.day)
-    : super('Day-of-month must be in 1..31.');
+final class DoInvalidDayOfMonth extends DoValidationException {
+  const DoInvalidDayOfMonth(this.day) : super('Day-of-month must be in 1..31.');
   final int day;
 }
 
-final class HabitInvalidNthWeekday extends HabitValidationException {
-  const HabitInvalidNthWeekday(this.nth)
-    : super('Nth weekday must be in 1..5.');
+final class DoInvalidNthWeekday extends DoValidationException {
+  const DoInvalidNthWeekday(this.nth) : super('Nth weekday must be in 1..5.');
   final int nth;
 }
 
-final class HabitInvalidWeekday extends HabitValidationException {
-  const HabitInvalidWeekday(this.weekday)
+final class DoInvalidWeekday extends DoValidationException {
+  const DoInvalidWeekday(this.weekday)
     : super('Weekday must be in 1..7 (Mon..Sun).');
   final int weekday;
 }
 
-final class HabitInvalidRestDays extends HabitValidationException {
-  const HabitInvalidRestDays(this.value)
-    : super('restDaysPerMonth must be >= 0.');
+final class DoInvalidRestDays extends DoValidationException {
+  const DoInvalidRestDays(this.value) : super('restDaysPerMonth must be >= 0.');
   final int value;
 }
 
-final class HabitDayOfXMismatch extends HabitValidationException {
-  const HabitDayOfXMismatch()
+final class DoDayOfXMismatch extends DoValidationException {
+  const DoDayOfXMismatch()
     : super(
-        'DayOfX habits must specify either a day-of-month '
+        'DayOfX dos must specify either a day-of-month '
         'or a (nth, weekday) pair.',
       );
 }
 
-final class HabitAnchorSelfReference extends HabitValidationException {
-  const HabitAnchorSelfReference()
-    : super('Anchor habits cannot reference themselves.');
+final class DoAnchorSelfReference extends DoValidationException {
+  const DoAnchorSelfReference()
+    : super('Anchor dos cannot reference themselves.');
 }
 
-final class HabitInvalidColorSeed extends HabitValidationException {
-  const HabitInvalidColorSeed(this.value) : super('colorSeed must be in 0..7.');
+final class DoInvalidColorSeed extends DoValidationException {
+  const DoInvalidColorSeed(this.value) : super('colorSeed must be in 0..7.');
   final int value;
 }
 
-final class HabitInvalidIconName extends HabitValidationException {
-  const HabitInvalidIconName(this.value)
+final class DoInvalidIconName extends DoValidationException {
+  const DoInvalidIconName(this.value)
     : super('iconName is not in the 64-icon set.');
   final String value;
 }
 
-final class HabitInvalidTargetHours extends HabitValidationException {
-  const HabitInvalidTargetHours(this.value)
+final class DoInvalidTargetHours extends DoValidationException {
+  const DoInvalidTargetHours(this.value)
     : super('targetHours must be in 1..23.');
   final int value;
 }
@@ -149,46 +152,46 @@ final class HabitInvalidTargetHours extends HabitValidationException {
 /// 1 = Monday .. 7 = Sunday. Typed for readability.
 typedef Weekday = int;
 
-/// A sealed habit. The 4 v0.1 schedule types are exhaustive;
-/// adding a v0.2 schedule means adding a new subclass.
+/// A sealed do. The 5 schedule types are exhaustive; adding a
+/// new schedule means adding a new subclass.
 @immutable
-sealed class Habit {
-  const Habit({
+sealed class Do {
+  const Do({
     required this.id,
     required this.name,
     required this.proofMode,
     required this.createdAt,
     required this.restDaysPerMonth,
-    this.category = HabitCategory.other,
+    this.category = DoCategory.other,
     this.colorSeed = 0,
     this.iconName,
     this.pausedUntil,
   });
 
-  final HabitId id;
+  final DoId id;
   final String name;
-  final HabitProofMode proofMode;
+  final DoProofMode proofMode;
   final DateTime createdAt;
 
-  /// Default 2 per calendar month. Stored on the habit so the
-  /// budget survives habit moves across devices.
+  /// Default 2 per calendar month. Stored on the do so the
+  /// budget survives do moves across devices.
   final int restDaysPerMonth;
 
   /// v0.2 (SYS-045). Visual category. Drives the default color
   /// and icon; the user can override both.
-  final HabitCategory category;
+  final DoCategory category;
 
   /// v0.2 (SYS-045). 0..7 — the index into `CategoryPalette.swatches`.
   /// 0 means "use the category default".
   final int colorSeed;
 
-  /// v0.2 (SYS-046). One of `HabitIcons.keys`, or null (= use
-  /// the category default).
+  /// v0.2 (SYS-046). One of `DoIcons.keys`, or null (= use the
+  /// category default).
   final String? iconName;
 
   /// v0.2 (SYS-047). When set and in the future, the scheduler
-  /// shall not fire reminders for this habit. A paused period
-  /// does not break the streak.
+  /// shall not fire reminders for this do. A paused period does
+  /// not break the consecutive-run.
   final DateTime? pausedUntil;
 
   /// Mission chain — non-empty for Strong, empty for Soft /
@@ -199,7 +202,7 @@ sealed class Habit {
     return MissionChain.empty;
   }
 
-  /// True iff the habit is currently paused (i.e., [pausedUntil]
+  /// True iff the do is currently paused (i.e., [pausedUntil]
   /// is in the future relative to [now]). Caller passes the
   /// reference time so the model stays pure.
   bool isPausedAt(DateTime now) {
@@ -211,13 +214,12 @@ sealed class Habit {
   /// override to add their schedule-specific fields, but the
   /// base v0.2 fields ([pausedUntil], [category], [colorSeed],
   /// [iconName]) live on every subclass, so the base signature
-  /// includes them and subclasses accept the call via
-  /// super.
-  Habit copyWith({
+  /// includes them and subclasses accept the call via super.
+  Do copyWith({
     String? name,
-    HabitProofMode? proofMode,
+    DoProofMode? proofMode,
     int? restDaysPerMonth,
-    HabitCategory? category,
+    DoCategory? category,
     int? colorSeed,
     String? iconName,
     DateTime? pausedUntil,
@@ -230,59 +232,59 @@ sealed class Habit {
   /// `nextOccurrence(from.add(Duration(days: 1)))` instead.
   DateTime? nextOccurrence(DateTime from);
 
-  /// Validates the habit's invariants. Throws
-  /// [HabitValidationException] on the first defect.
+  /// Validates the do's invariants. Throws
+  /// [DoValidationException] on the first defect.
   void validate() {
     if (name.trim().isEmpty) {
-      throw const HabitNameEmpty();
+      throw const DoNameEmpty();
     }
     if (restDaysPerMonth < 0) {
-      throw HabitInvalidRestDays(restDaysPerMonth);
+      throw DoInvalidRestDays(restDaysPerMonth);
     }
     if (colorSeed < 0 || colorSeed > 7) {
-      throw HabitInvalidColorSeed(colorSeed);
+      throw DoInvalidColorSeed(colorSeed);
     }
     final icon = iconName;
-    if (icon != null && !HabitIcons.keys.contains(icon)) {
-      throw HabitInvalidIconName(icon);
+    if (icon != null && !DoIcons.keys.contains(icon)) {
+      throw DoInvalidIconName(icon);
     }
     final self = this;
     switch (self) {
-      case HabitFixed(:final time, :final weekdays):
+      case DoFixed(:final time, :final weekdays):
         _validateTime(time);
         if (weekdays.isEmpty) {
-          throw const HabitNoWeekdaysSelected();
+          throw const DoNoWeekdaysSelected();
         }
         for (final wd in weekdays) {
-          if (wd < 1 || wd > 7) throw HabitInvalidWeekday(wd);
+          if (wd < 1 || wd > 7) throw DoInvalidWeekday(wd);
         }
-      case HabitInterval(:final nDays):
-        if (nDays < 1) throw const HabitInvalidInterval();
-      case HabitAnchor(:final targetHabitId):
-        if (targetHabitId == id) throw const HabitAnchorSelfReference();
-      case HabitDayOfX(
+      case DoInterval(:final nDays):
+        if (nDays < 1) throw const DoInvalidInterval();
+      case DoAnchor(:final targetDoId):
+        if (targetDoId == id) throw const DoAnchorSelfReference();
+      case DoDayOfX(
         :final nth,
         :final weekday,
         :final dayOfMonth,
         :final referenceDayOfMonth,
       ):
         if (dayOfMonth == null && nth == null) {
-          throw const HabitDayOfXMismatch();
+          throw const DoDayOfXMismatch();
         }
         if (dayOfMonth != null && (dayOfMonth < 1 || dayOfMonth > 31)) {
-          throw HabitInvalidDayOfMonth(dayOfMonth);
+          throw DoInvalidDayOfMonth(dayOfMonth);
         }
         if (nth != null && (nth < 1 || nth > 5)) {
-          throw HabitInvalidNthWeekday(nth);
+          throw DoInvalidNthWeekday(nth);
         }
         if (weekday != null && (weekday < 1 || weekday > 7)) {
-          throw HabitInvalidWeekday(weekday);
+          throw DoInvalidWeekday(weekday);
         }
         if (referenceDayOfMonth != null &&
             (referenceDayOfMonth < 1 || referenceDayOfMonth > 31)) {
-          throw HabitInvalidDayOfMonth(referenceDayOfMonth);
+          throw DoInvalidDayOfMonth(referenceDayOfMonth);
         }
-      case HabitTimeWindow(
+      case DoTimeWindow(
         :final start,
         :final end,
         :final weekdays,
@@ -291,28 +293,28 @@ sealed class Habit {
         _validateTime(start);
         _validateTime(end);
         if (weekdays.isEmpty) {
-          throw const HabitNoWeekdaysSelected();
+          throw const DoNoWeekdaysSelected();
         }
         for (final wd in weekdays) {
-          if (wd < 1 || wd > 7) throw HabitInvalidWeekday(wd);
+          if (wd < 1 || wd > 7) throw DoInvalidWeekday(wd);
         }
         if (targetHours != null && (targetHours < 1 || targetHours > 23)) {
-          throw HabitInvalidTargetHours(targetHours);
+          throw DoInvalidTargetHours(targetHours);
         }
     }
     validateProofMode(proofMode);
   }
 
-  static void _validateTime(HabitTime t) {
+  static void _validateTime(DoTime t) {
     if (t.hour < 0 || t.hour > 23 || t.minute < 0 || t.minute > 59) {
-      throw HabitInvalidTime(t.hour, t.minute);
+      throw DoInvalidTime(t.hour, t.minute);
     }
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    if (other is! Habit) return false;
+    if (other is! Do) return false;
     return id == other.id;
   }
 
@@ -320,11 +322,11 @@ sealed class Habit {
   int get hashCode => id.hashCode;
 }
 
-/// Fixed schedule: do the habit on the given weekdays at
-/// [time]. At least one weekday must be selected.
+/// Fixed schedule: do the do on the given weekdays at [time].
+/// At least one weekday must be selected.
 @immutable
-final class HabitFixed extends Habit {
-  const HabitFixed({
+final class DoFixed extends Do {
+  const DoFixed({
     required super.id,
     required super.name,
     required super.proofMode,
@@ -340,22 +342,22 @@ final class HabitFixed extends Habit {
 
   /// Set of 1..7 (1 = Monday .. 7 = Sunday). Must be non-empty.
   final Set<Weekday> weekdays;
-  final HabitTime time;
+  final DoTime time;
 
   @override
-  HabitFixed copyWith({
+  DoFixed copyWith({
     String? name,
-    HabitProofMode? proofMode,
+    DoProofMode? proofMode,
     int? restDaysPerMonth,
     Set<Weekday>? weekdays,
-    HabitTime? time,
-    HabitCategory? category,
+    DoTime? time,
+    DoCategory? category,
     int? colorSeed,
     String? iconName,
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
   }) {
-    return HabitFixed(
+    return DoFixed(
       id: id,
       name: name ?? this.name,
       proofMode: proofMode ?? this.proofMode,
@@ -404,8 +406,8 @@ final class HabitFixed extends Habit {
 /// calendar days — "every 3 days" means refDay, refDay+3,
 /// refDay+6, ...
 @immutable
-final class HabitInterval extends Habit {
-  const HabitInterval({
+final class DoInterval extends Do {
+  const DoInterval({
     required super.id,
     required super.name,
     required super.proofMode,
@@ -423,19 +425,19 @@ final class HabitInterval extends Habit {
   final DateTime referenceDate;
 
   @override
-  HabitInterval copyWith({
+  DoInterval copyWith({
     String? name,
-    HabitProofMode? proofMode,
+    DoProofMode? proofMode,
     int? restDaysPerMonth,
     int? nDays,
     DateTime? referenceDate,
-    HabitCategory? category,
+    DoCategory? category,
     int? colorSeed,
     String? iconName,
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
   }) {
-    return HabitInterval(
+    return DoInterval(
       id: id,
       name: name ?? this.name,
       proofMode: proofMode ?? this.proofMode,
@@ -455,10 +457,10 @@ final class HabitInterval extends Habit {
     final fromLocal = from.toLocal();
     final ref = referenceDate.toLocal();
     final refDay = DateTime(ref.year, ref.month, ref.day);
-    // If `from` is strictly before refDay, the next
-    // occurrence is refDay itself. If `from` is on refDay
-    // (any time of day), the next strictly-after occurrence
-    // is refDay + nDays.
+    // If `from` is strictly before refDay, the next occurrence
+    // is refDay itself. If `from` is on refDay (any time of
+    // day), the next strictly-after occurrence is refDay +
+    // nDays.
     if (fromLocal.isBefore(refDay)) return refDay;
     if (_isSameDay(fromLocal, refDay)) {
       return refDay.add(Duration(days: nDays));
@@ -481,16 +483,16 @@ final class HabitInterval extends Habit {
 }
 
 /// Anchor schedule: the day after the user completes the
-/// target habit.
+/// target do.
 @immutable
-final class HabitAnchor extends Habit {
-  const HabitAnchor({
+final class DoAnchor extends Do {
+  const DoAnchor({
     required super.id,
     required super.name,
     required super.proofMode,
     required super.createdAt,
     required super.restDaysPerMonth,
-    required this.targetHabitId,
+    required this.targetDoId,
     required this.lastAnchor,
     super.category,
     super.colorSeed,
@@ -498,30 +500,30 @@ final class HabitAnchor extends Habit {
     super.pausedUntil,
   });
 
-  final HabitId targetHabitId;
+  final DoId targetDoId;
   final DateTime? lastAnchor;
 
   @override
-  HabitAnchor copyWith({
+  DoAnchor copyWith({
     String? name,
-    HabitProofMode? proofMode,
+    DoProofMode? proofMode,
     int? restDaysPerMonth,
-    HabitId? targetHabitId,
+    DoId? targetDoId,
     DateTime? lastAnchor,
     bool clearLastAnchor = false,
-    HabitCategory? category,
+    DoCategory? category,
     int? colorSeed,
     String? iconName,
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
   }) {
-    return HabitAnchor(
+    return DoAnchor(
       id: id,
       name: name ?? this.name,
       proofMode: proofMode ?? this.proofMode,
       createdAt: createdAt,
       restDaysPerMonth: restDaysPerMonth ?? this.restDaysPerMonth,
-      targetHabitId: targetHabitId ?? this.targetHabitId,
+      targetDoId: targetDoId ?? this.targetDoId,
       lastAnchor: clearLastAnchor ? null : (lastAnchor ?? this.lastAnchor),
       category: category ?? this.category,
       colorSeed: colorSeed ?? this.colorSeed,
@@ -563,8 +565,8 @@ final class HabitAnchor extends Habit {
 ///  - "the [referenceDayOfMonth] of every month" (alias of
 ///    dayOfMonth; reserved for future variants).
 @immutable
-final class HabitDayOfX extends Habit {
-  const HabitDayOfX({
+final class DoDayOfX extends Do {
+  const DoDayOfX({
     required super.id,
     required super.name,
     required super.proofMode,
@@ -589,21 +591,21 @@ final class HabitDayOfX extends Habit {
   final int? referenceDayOfMonth;
 
   @override
-  HabitDayOfX copyWith({
+  DoDayOfX copyWith({
     String? name,
-    HabitProofMode? proofMode,
+    DoProofMode? proofMode,
     int? restDaysPerMonth,
     int? dayOfMonth,
     int? nth,
     Weekday? weekday,
     int? referenceDayOfMonth,
-    HabitCategory? category,
+    DoCategory? category,
     int? colorSeed,
     String? iconName,
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
   }) {
-    return HabitDayOfX(
+    return DoDayOfX(
       id: id,
       name: name ?? this.name,
       proofMode: proofMode ?? this.proofMode,
@@ -686,16 +688,16 @@ final class HabitDayOfX extends Habit {
   }
 }
 
-/// Schedule: the habit is "active" between [start] and [end] on
+/// Schedule: the do is "active" between [start] and [end] on
 /// the listed [weekdays]. For fasting, [targetHours] gives the
 /// goal duration (e.g., 16); for meals, null.
 ///
 /// v0.2d (WF-019). Declared now (with the rest of the sealed
-/// `Habit` family) so the hierarchy stays exhaustive; the home
+/// `Do` family) so the hierarchy stays exhaustive; the home
 /// screen and DB migration get the actual UI in v0.2d.
 @immutable
-final class HabitTimeWindow extends Habit {
-  const HabitTimeWindow({
+final class DoTimeWindow extends Do {
+  const DoTimeWindow({
     required super.id,
     required super.name,
     required super.proofMode,
@@ -713,30 +715,30 @@ final class HabitTimeWindow extends Habit {
 
   /// Set of 1..7 (1 = Monday .. 7 = Sunday). Must be non-empty.
   final Set<int> weekdays;
-  final HabitTime start;
-  final HabitTime end;
+  final DoTime start;
+  final DoTime end;
 
   /// Optional target duration in hours (12, 14, 16, 18, 20) for
   /// fasting windows. Null for plain meal windows.
   final int? targetHours;
 
   @override
-  HabitTimeWindow copyWith({
+  DoTimeWindow copyWith({
     String? name,
-    HabitProofMode? proofMode,
+    DoProofMode? proofMode,
     int? restDaysPerMonth,
     Set<int>? weekdays,
-    HabitTime? start,
-    HabitTime? end,
+    DoTime? start,
+    DoTime? end,
     int? targetHours,
     bool clearTargetHours = false,
-    HabitCategory? category,
+    DoCategory? category,
     int? colorSeed,
     String? iconName,
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
   }) {
-    return HabitTimeWindow(
+    return DoTimeWindow(
       id: id,
       name: name ?? this.name,
       proofMode: proofMode ?? this.proofMode,

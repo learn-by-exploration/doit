@@ -1,19 +1,19 @@
-// Tests for [Habit.nextOccurrence] across the 4 schedule types.
+// Tests for [Do.nextOccurrence] across the 4 schedule types.
 //
 // Schedule engine contract: same input → same output. No
 // `DateTime.now()`. Reference times are explicit in every
 // test. The tests use UTC offsets to keep dates stable across
 // CI machines; `.toLocal()` happens inside the engine.
 
-import 'package:doit/habits/habit.dart';
-import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/do/do.dart';
+import 'package:doit/do/proof_mode.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-HabitFixed _fixed({
+DoFixed _fixed({
   Set<Weekday> weekdays = const {1, 3, 5}, // Mon, Wed, Fri
-  HabitTime time = const HabitTime(9, 0),
+  DoTime time = const DoTime(9, 0),
 }) {
-  return HabitFixed(
+  return DoFixed(
     id: 'h1',
     name: 'Drink water',
     proofMode: const SoftProof(),
@@ -24,8 +24,8 @@ HabitFixed _fixed({
   );
 }
 
-HabitInterval _interval({int nDays = 3, DateTime? ref}) {
-  return HabitInterval(
+DoInterval _interval({int nDays = 3, DateTime? ref}) {
+  return DoInterval(
     id: 'h1',
     name: 'Read',
     proofMode: const SoftProof(),
@@ -36,20 +36,20 @@ HabitInterval _interval({int nDays = 3, DateTime? ref}) {
   );
 }
 
-HabitAnchor _anchor({DateTime? lastAnchor}) {
-  return HabitAnchor(
+DoAnchor _anchor({DateTime? lastAnchor}) {
+  return DoAnchor(
     id: 'h1',
     name: 'Follow up',
     proofMode: const SoftProof(),
     createdAt: DateTime(2026),
     restDaysPerMonth: 2,
-    targetHabitId: 'h0',
+    targetDoId: 'h0',
     lastAnchor: lastAnchor,
   );
 }
 
-HabitDayOfX _dayOfMonth({required int day}) {
-  return HabitDayOfX(
+DoDayOfX _dayOfMonth({required int day}) {
+  return DoDayOfX(
     id: 'h1',
     name: 'Pay rent',
     proofMode: const SoftProof(),
@@ -59,8 +59,8 @@ HabitDayOfX _dayOfMonth({required int day}) {
   );
 }
 
-HabitDayOfX _nthWeekday({required int nth, required Weekday weekday}) {
-  return HabitDayOfX(
+DoDayOfX _nthWeekday({required int nth, required Weekday weekday}) {
+  return DoDayOfX(
     id: 'h1',
     name: 'Family dinner',
     proofMode: const SoftProof(),
@@ -72,7 +72,7 @@ HabitDayOfX _nthWeekday({required int nth, required Weekday weekday}) {
 }
 
 void main() {
-  group('HabitFixed.nextOccurrence', () {
+  group('DoFixed.nextOccurrence', () {
     test('returns the same day at the configured time if weekday matches '
         'and time is later in the day', () {
       // 2026-06-15 is a Monday (weekday 1).
@@ -109,7 +109,7 @@ void main() {
     });
   });
 
-  group('HabitInterval.nextOccurrence', () {
+  group('DoInterval.nextOccurrence', () {
     test('returns the reference day if from is before it', () {
       final h = _interval(ref: DateTime(2026, 6, 10));
       final from = DateTime(2026, 6, 5);
@@ -138,7 +138,7 @@ void main() {
     });
   });
 
-  group('HabitAnchor.nextOccurrence', () {
+  group('DoAnchor.nextOccurrence', () {
     test('returns the day after the last anchor', () {
       final h = _anchor(lastAnchor: DateTime(2026, 6, 10));
       final from = DateTime(2026, 6, 11, 8);
@@ -160,7 +160,7 @@ void main() {
     });
   });
 
-  group('HabitDayOfX.nextOccurrence (dayOfMonth)', () {
+  group('DoDayOfX.nextOccurrence (dayOfMonth)', () {
     test('returns this month on dayOfMonth when the day has not passed', () {
       final h = _dayOfMonth(day: 15);
       final from = DateTime(2026, 6, 10);
@@ -203,7 +203,7 @@ void main() {
     });
   });
 
-  group('HabitDayOfX.nextOccurrence (nth weekday)', () {
+  group('DoDayOfX.nextOccurrence (nth weekday)', () {
     test('returns the 2nd Tuesday of the month', () {
       // 2026-06-02 is a Tuesday. The 2nd Tuesday is 2026-06-09.
       final h = _nthWeekday(nth: 2, weekday: 2);

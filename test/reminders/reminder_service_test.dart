@@ -2,8 +2,8 @@
 // scheduler, notifications, full-screen intent, anchor
 // detector, and bridge.
 
-import 'package:doit/habits/habit.dart';
-import 'package:doit/habits/proof_mode.dart';
+import 'package:doit/do/do.dart';
+import 'package:doit/do/proof_mode.dart';
 import 'package:doit/missions/chain.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/anchor_detector.dart';
@@ -13,20 +13,20 @@ import 'package:doit/reminders/reminder_bridge.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-HabitFixed _habit() {
-  return HabitFixed(
+DoFixed _habit() {
+  return DoFixed(
     id: 'h1',
     name: 'Stretch',
     createdAt: DateTime(2026, 6),
     restDaysPerMonth: 2,
     proofMode: const SoftProof(),
     weekdays: const {1, 3, 5},
-    time: const HabitTime(9, 0),
+    time: const DoTime(9, 0),
   );
 }
 
-HabitFixed _strong() {
-  return HabitFixed(
+DoFixed _strong() {
+  return DoFixed(
     id: 'h2',
     name: 'Run',
     createdAt: DateTime(2026, 6),
@@ -42,7 +42,7 @@ HabitFixed _strong() {
       ]),
     ),
     weekdays: const {1},
-    time: const HabitTime(7, 0),
+    time: const DoTime(7, 0),
   );
 }
 
