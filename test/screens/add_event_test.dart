@@ -161,7 +161,7 @@ void main() {
       );
       final all =
           await tester.runAsync<List<Template>>(
-            () => TemplateRepository.instance.listAll(),
+            TemplateRepository.instance.listAll,
           ) ??
           <Template>[];
       final user = all.where((t) => !t.isBuiltIn).toList(growable: false);
