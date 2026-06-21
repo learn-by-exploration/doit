@@ -235,64 +235,160 @@ intentionally incomplete for that slice.
 - **Sign-off.** Pending the user's hands-on `v1.0h`
   pass. The checklist `§ Sign-off` line is the gate.
 
-## Milestone 8 — v1.1: Polish + expansion (stub)
+## Milestone 8 — v1.1: Polish + expansion (shipped)
 
-- **Date:** _planned v1.1a commit_.
-- **Status:** stub. v1.1 is the polish / expansion
-  milestone that follows v1.0 sign-off. The candidate
-  list below is the working set; v1.1a is whichever
-  item the user picks first.
-- **Candidate scope (v1.1 working set):**
-  - **Map widget in `LocationPicker`.** Add a map
-    preview (OpenStreetMap tile layer via `flutter_map`;
-    no Google Play Services key). v1.0 ships the radius
-    picker without the map; v1.1 adds the map for visual
-    confirmation of the geofence footprint.
-  - **Per-automation reliability badges.** The executor
-    surfaces a global `Reliability.degraded` banner today;
-    v1.1 surfaces per-automation badges so the user can
-    see which routine is in the degraded mode without
-    opening the debug screen.
-  - **Generic routine apply UX for templates #17–#21.**
-    v1.0f.2 routes only template #16 (Japan) to a real
-    `AddRoutineScreen`; templates #17–#21 still show the
-    "v1.1 follow-up" snackbar. v1.1 lands the
-    `RoutineTemplatePayload` decoder + a 6-template
-    picker workflow.
-  - **Foreground-app permission
-    (`PACKAGE_USAGE_STATS`).** v1.0 fires the
-    `TriggerDeviceState` for foreground-app on a
-    best-effort basis; v1.1 adds the
-    `PACKAGE_USAGE_STATS` permission flow with a
-    dedicated SYS- ID + ADR. The permission is a
-    special-access permission — the rationale + opt-in
-    UX is non-trivial.
-  - **i18n.** All v1.0 copy is hard-coded English. v1.1
-    extracts the user-facing strings to ARB files and
-    ships at least one non-English locale (the user's
-    preference).
-  - **Wear OS / Android Auto.** Out of v1.0 scope.
-    v1.1+ candidate; depends on whether the user wants
-    a phone-only or wrist-or-car experience.
-  - **New app icon + splash.** v1.0 ships with the
-    default Flutter icon. v1.1 adds a custom icon +
-    splash (no new permissions).
-  - **Multi-user / multi-device sync.** Out of project
-    scope; deferred to v2.0+.
+- **Date:** 2026-06-21.
+- **Status:** shipped. Nine sub-entries (v1.1a
+  through v1.1i) landed across the v1.1 cycle; v1.1j
+  is the doc-only sign-off that flips this milestone
+  to `shipped` and finalises the CHANGELOG `[1.1.0]`
+  block. The implementation rows are in
+  `implementation_status.md` (rows v1.1a..v1.1j) and
+  the CHANGELOG entries are in `CHANGELOG.md`
+  `[1.1.0]` (`### v1.1a` through `### v1.1i`). SHA
+  range: `<v1.1a SHA>` → `78b1267`; sign-off commit
+  is the v1.1j SHA.
+- **What shipped (v1.1a..v1.1i — 9 sub-entries, 152
+  new tests, 741 → 893):**
+  - **Routines — first-class value class + executor
+    wiring.** v1.1a (SYS-080 / ADR-025) lands
+    `RoutineConfig` (immutable value class with
+    structural `==`, deterministic `hashCode`,
+    `copyWith`, and a version-free `toJson` /
+    `fromJson` codec) + per-template persistence
+    under `doit.routine.<templateId>`. v1.1b wires
+    `RoutineExecutor` to consume `SettingsService.routines`
+    reactively via a `ValueNotifier` listener with
+    a single exhaustive `is`-switch over all five
+    `Action` leaves. v1.1c (SYS-082 / ADR-026) adds
+    the `ActionOpenApp` leaf + `RoutineOpenAppRequest`
+    value class + a passive `RoutineBanner` widget
+    that drains FIFO. v1.1d (SYS-083 / ADR-027)
+    routes templates #17..#21 through a generic
+    `RoutineApplyScreen` (the "Coming in v1.1"
+    badge on the Templates screen is removed).
+  - **Location — offline map preview.** v1.1e
+    (SYS-084 / ADR-028) adds a pure-`CustomPaint`
+    `LocationMapPreview` widget — stylised grid +
+    pin + geofence ring. No `flutter_map`, no
+    `INTERNET` permission. The pin follows typed
+    lat/lon coordinates in real time.
+  - **Reliability — per-automation badges +
+    `PACKAGE_USAGE_STATS` permission.** v1.1f
+    (SYS-085 / ADR-029) adds an `AutomationReliability`
+    enum + a pure `automationReliability(Automation, statuses)`
+    function (exhaustive over the sealed `Trigger`
+    hierarchy via `_requiredPermissionForTrigger`)
+    + a 40×40 dp `IconButton` badge that hides
+    itself for optimal automations, paints
+    warning-amber for degraded, info-outline for
+    unknown. v1.1g (SYS-086 / ADR-030) ships
+    `UsageStatsService` (a `isGranted()` probe +
+    `openSettings()` deep-link), extends
+    `PermissionService` with `PermissionKind.usageStats`,
+    adds the `<uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"/>`
+    manifest entry (cross-checked against the v0.1
+    permission baseline), and routes the
+    `PermissionSheet` "Allow" CTA to the Settings →
+    Special access → Usage access deep-link (no
+    system dialog — special-access permissions have
+    no on-demand grant).
+  - **i18n — ARB scaffolding + Spanish smoke-test
+    locale.** v1.1h (SYS-087 / ADR-031) extracts
+    ~60 user-facing strings to `lib/l10n/app_en.arb`
+    (English is the source of truth) +
+    `lib/l10n/app_es.arb` (Spanish smoke-test
+    translation; NOT a professional translation).
+    `flutter_localizations` + `intl` are added to
+    `pubspec.yaml`. `flutter gen-l10n` (driven by
+    a new top-level `l10n.yaml`) produces
+    `AppLocalizations`, which is wired through
+    `lib/main.dart` so every screen reads its copy
+    from `AppLocalizations.of(context)` at runtime.
+    10 existing screen-test files route through a
+    new `test/support/localized_app.dart` helper
+    that pre-installs the generated delegates on
+    the test `MaterialApp`.
+  - **Branding — custom launcher icon + splash +
+    notification icon.** v1.1i (SYS-088 / ADR-032)
+    ships three hand-authored vector adaptive-icon
+    layers (background = solid brand purple
+    `#FF6750A4`, foreground = white sans-serif
+    lowercase 'd' + small filled check dot,
+    monochrome = pure white for Android 13+
+    themed icons). Splash drawables are rewritten
+    as `<layer-list>` that paints the brand purple
+    first (via a new `@color/launch_background`
+    named color resource — AAPT2 rejects inline
+    color values inside `drawable-v21/`) then
+    layers the foreground vector centered on a
+    96dp × 96dp box. The pre-existing
+    `drawable/ic_streak_notification.xml`
+    resource gap (called out at
+    `architecture_options.md:191-192`) is closed
+    in the same PR. Version bumped `1.0.0+7` →
+    `1.1.0+8`. Bundled platform maintenance:
+    `android/app/build.gradle.kts` compileSdk 34 →
+    36 + minSdk 28 → 30; `CallInterceptor.kt`
+    migrates from the removed `Call.Response.Builder`
+    to `CallScreeningService.CallResponse.Builder`;
+    `MainActivity.kt` passes the Activity
+    explicitly via `setActivity(this / null)`
+    because `FlutterEngine.activity` was removed in
+    the modern embedding.
 - **Why v1.1 is its own milestone, not bundled into
   v1.0.** v1.0 closed the four-theme foundation
-  (Routines, Japan silent-mode, Do rename, Templates).
-  Each v1.1 follow-up is a meaningful feature on its
-  own; bundling them into v1.0 would have doubled the
-  commit count and required two on-device
-  verification cycles on the user's primary phone.
-  v1.1 keeps each follow-up PR-sized and gets one APK
-  install per feature.
-- **Open questions** (deferred to v1.1a):
-  - Map provider choice (`google_maps_flutter` with
-    Play Services key vs `flutter_map` with
-    OpenStreetMap).
-  - i18n scope (only the user's preferred locale, or
-    a full Latin + CJK baseline).
-  - Wear OS target (companion tile on the watch face,
-    or a standalone wear-app).
+  (Routines, Japan silent-mode, Do rename,
+  Templates). Each v1.1 follow-up is a meaningful
+  feature on its own; bundling them into v1.0 would
+  have doubled the commit count and required two
+  on-device verification cycles on the user's primary
+  phone. v1.1 kept each follow-up PR-sized and got
+  one APK install per feature.
+- **Deferred to v1.2+ (open at v1.1 sign-off):**
+  - **Per-density PNG regeneration from the master
+    vector** (v1.1i leaves the legacy PNGs as the
+    API 21..25 fallback; a v1.2 follow-up can
+    regenerate them from the master vector if a
+    pre-26 device needs on-brand visuals).
+  - **`flutter_map` + cached tiles for
+    `LocationMapPreview`** (v1.1e ships a pure
+    `CustomPaint` body; the `flutter_map` swap
+    needs the `INTERNET` permission, which is out
+    of v1.1 scope).
+  - **`TriggerForegroundApp` leaf** consuming
+    `PermissionKind.usageStats` (v1.1g ships the
+    permission flow; the actual consumer routine
+    leaf is v1.2).
+  - **`TriggerCallIncoming*` fold into
+    `automation_reliability_badge`** once
+    `RoleManager` is wired through
+    `PermissionService` (v1.1f ships the per-
+    automation badge minus the
+    `TriggerCallIncoming*` arm; v1.2 candidate).
+  - **Wearable / auto surface — Wear OS / Android
+    Auto.** v1.1 stays phone-only. Wear OS target
+    (companion tile vs standalone wear-app) is a
+    product decision deferred to v1.2.
+  - **iOS port.** v1.1 stays Android-only. iOS
+    App Store icon assets + iOS-specific call-
+    screening flow are v2.0+ candidates.
+  - **Multi-user / multi-device sync.** Out of
+    project scope; deferred to v2.0+.
+  - **Professional Spanish translation.** v1.1h's
+    `app_es.arb` is a smoke-test translation, not
+    a professional one. A native-Spanish-speaker
+    pass is a v1.2 follow-up.
+- **Open questions (resolved during v1.1):**
+  - Map provider choice → `flutter_map` with
+    OpenStreetMap is **deferred to v1.2+** (the v1.1
+    ship uses a pure-`CustomPaint` preview; see
+    ADR-028). Picking `flutter_map` vs
+    `google_maps_flutter` is now a v1.2 question.
+  - i18n scope → **English + Spanish smoke-test
+    only** (per the v1.1h author choice in
+    ADR-031). A full Latin + CJK baseline is a
+    v1.2+ question.
+  - Wear OS target → **deferred to v1.2** (Wear OS
+    / Android Auto was not picked for v1.1; the
+    phone-only experience ships first).

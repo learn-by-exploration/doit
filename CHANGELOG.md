@@ -7,6 +7,413 @@ checklist (`v<major>_<minor>_release_checklist.md`). This changelog
 is the user-facing summary of what shipped in each release; the
 V-Model artifacts are the engineering contract.
 
+## [1.1.0] — 2026-06-21 — Polish + expansion
+
+Nine v1.1 sub-entries (v1.1a through v1.1i) ship nine
+follow-ups to the v1.0 foundation. The headline themes:
+**routines** (RoutineConfig + dispatch + ActionOpenApp +
+generic apply UX for templates #17..#21), **location**
+(offline map preview for the location picker),
+**reliability** (per-automation badges + the
+PACKAGE_USAGE_STATS permission flow), **i18n** (ARB
+scaffolding + Spanish smoke-test locale), and **branding**
+(custom launcher icon + splash + notification icon).
+Version `1.0.0+7` → `1.1.0+8`. SHA range: `<v1.1a SHA>`
+→ `78b1267`. 893 / 893 tests, `dart format` clean,
+`flutter analyze --fatal-infos` clean. Right-side gate:
+`implementation_status.md` rows v1.1a..v1.1i.
+
+### v1.1a — `RoutineConfig` value class + per-template persistence
+
+(SYS-080 / ADR-025.)
+
+Routines now have a first-class value object instead of
+free-form JSON. `lib/services/routine_config.dart`
+defines a structural-`==`, deterministic-`hashCode`,
+immutable `RoutineConfig` with `copyWith` and a
+version-free `toJson` / `fromJson` codec (the codec uses
+per-shape discriminators so an envelope from a future
+client can fail-soft instead of crashing). The class
+follows the singleton-with-`_ready` gate pattern that
+every service in `lib/services/` uses (see
+`.claude/rules/lib-services.md`).
+
+**What's new**
+
+- `SettingsService.setRoutine(templateId, config)` /
+  `getRoutine(templateId)` / `deleteRoutine(templateId)`
+  / `routines` `ValueNotifier<Map<String, RoutineConfig>>`
+  are persisted under the `doit.routine.<templateId>`
+  SharedPreferences key — a stable shape that survives
+  uninstall/reinstall and is independent of the
+  `JapanRoutineConfig` legacy keys (the deliberate
+  non-migration is documented in ADR-025).
+- 19 new tests (12 codec + 5 settings-service + 2
+  routine-executor dispatch regression).
+
+ADR-025 / SYS-080. See `decision_record.md` ADR-025 for
+the rationale on the codec shape + persistence key.
+
+### v1.1b — Routine executor: dispatch + reactive settings
+
+The executor-side half of v1.1: `RoutineExecutor`
+consumes `SettingsService.routines` reactively via a
+`ValueNotifier` listener — no manual `executor.refresh()`
+is needed after a settings change. `_dispatchAction` is
+a single exhaustive `is`-switch over all five `Action`
+leaves (ADR-021 wired). Per the V-Model, no widget code
+in this PR; the widget-side follow-up is v1.1c.
+
+**What's new**
+
+- Reactive subscription to `SettingsService.routines`
+  via `ValueNotifier.addListener`.
+- `_dispatchAction` is one exhaustive `is`-switch over
+  all five `Action` leaves (`ActionOpenApp` is added in
+  v1.1c).
+- 16 new tests (4 dispatch + 12 reactive subscription
+  tests).
+
+### v1.1c — `ActionOpenApp` + `RoutineOpenAppRequest` + `RoutineBanner`
+
+(SYS-082 / ADR-026.)
+
+A routine can now ask the user to open an app (e.g., "When
+I arrive at the gym, open Spotify"). The request is queued
+in FIFO order and surfaced as a passive banner on the
+home screen; the user taps to dismiss or to open.
+
+**What's new**
+
+- New `ActionOpenApp` `Action` leaf.
+- New `RoutineOpenAppRequest` value class +
+  `pendingOpenApp` `ValueListenable`.
+- New passive `RoutineBanner` widget that drains FIFO.
+  Captures `NavigatorState` synchronously inside `build`
+  to avoid the stale-`BuildContext` crash that an
+  async-after-build pattern would risk.
+- The home screen places the banner under
+  `ReliabilityBanner.fromService()` so it sits in the
+  same slot as the existing reliability hint.
+- 4 new banner tests.
+
+ADR-026 / SYS-082.
+
+### v1.1d — Generic `RoutineApplyScreen` for templates #17..#21
+
+(SYS-083 / ADR-027.)
+
+Templates #17 through #21 (the second batch of curated
+routines) were a "Coming in v1.1" badge on the Templates
+screen in v1.0. v1.1d routes them through a generic
+`RoutineApplyScreen` that knows how to decode any
+`RoutineTemplatePayload` envelope and let the user save,
+update, or delete the routine. The badge is removed; the
+existing "Use this" button does the job.
+
+**What's new**
+
+- New `lib/routines/routine_template_payload.dart` —
+  fail-soft decoder for the
+  `{k:1, routine:{trigger, condition, action, note}}`
+  envelope (an envelope from an old format falls through
+  to a "this template needs an update" fallback rather
+  than crashing the templates screen).
+- New `lib/screens/routine_apply.dart` — generic apply
+  UX with enable toggle, Save / Update / Delete, and
+  the malformed-envelope fallback path.
+- New `SettingsService.deleteRoutine(templateId)`.
+- `TemplatesScreen._onUse` routes templates #17..#21 to
+  the new screen.
+- 27 new tests (12 codec + 13 settings-service + 6 widget
+  + 2 catalog regression updates).
+
+ADR-027 / SYS-083.
+
+### v1.1e — Offline `LocationMapPreview` for `LocationPicker`
+
+(SYS-084 / ADR-028.)
+
+The location picker used to be three text fields (lat, lon,
+radius). It now shows a map-style preview of the geofence
+footprint: a stylised grid + a pin + a ring at the chosen
+radius. The preview is a pure `CustomPaint` widget — no
+`flutter_map`, no `INTERNET` permission. The pin follows
+typed coordinates in real time as the user types.
+
+**What's new**
+
+- New `lib/widgets/location_map_preview.dart` — pure
+  `CustomPaint` widget with stylised grid + pin + geofence
+  ring. Equirectangular projection helpers exposed for
+  tests.
+- `LocationPicker` mounts the preview between the lat/lon
+  fields and the "Use current location" button.
+- `lat` / `lon` `TextFormField`s gain
+  `onChanged: (_) => setState(() {})` so the pin follows
+  typed coordinates.
+- 15 new tests (11 preview widget/helper + 4 picker + a
+  scroll-up drag for the On exit path because the
+  preview's added height made the Save button sit at the
+  bottom-sheet's scroll-detector overlap).
+
+**Not in this release:** swapping the `CustomPaint` body
+for `flutter_map` + cached tiles. That would need the
+`INTERNET` permission, which is out of v1.1 scope. v1.2
+candidate.
+
+ADR-028 / SYS-084.
+
+### v1.1f — Per-automation reliability badges
+
+(SYS-085 / ADR-029.)
+
+The home screen today shows a global `Reliability.degraded`
+banner. v1.1f adds a per-automation badge to each routine
+row in the add-do / add-person / add-event screens, so the
+user can see which routine is in the degraded mode without
+opening the debug screen. The badge hides itself for
+optimal automations, paints warning-amber for degraded
+(matches `ReliabilityBanner`), and info-outline for
+unknown.
+
+**What's new**
+
+- New `lib/routines/automation_reliability.dart` —
+  `AutomationReliability` enum + a pure
+  `automationReliability(Automation, statuses)`
+  function exhaustive over the sealed `Trigger`
+  hierarchy via `_requiredPermissionForTrigger`
+  (`TriggerLocation*` → `PermissionKind.location`,
+  `TriggerCalendarEvent*` → `PermissionKind.calendar`,
+  `TriggerDeviceState*` / `TriggerCallIncoming*` /
+  `TriggerTimeOfDay` → `null`).
+- New `lib/widgets/automation_reliability_badge.dart` —
+  40×40 dp `IconButton` wrapped in a
+  `ValueListenableBuilder` over
+  `PermissionService.instance.statuses`.
+- Three `_RoutineRow` widgets (`add_habit` / `add_person`
+  / `add_event`) restructure their trailing slot from a
+  single `IconButton` into a
+  `Row(min, [badge, remove])`.
+- 28 new tests (16 pure-function unit tests + 11 widget
+  tests + 1 catalog regression test).
+
+**Not in this release:** the `onTap` dialog wiring
+(deferred to a follow-up). v1.2 candidate: fold
+`TriggerCallIncoming*` into the badge once `RoleManager`
+is wired through `PermissionService`.
+
+ADR-029 / SYS-085.
+
+### v1.1g — `PACKAGE_USAGE_STATS` permission + rationale UX
+
+(SYS-086 / ADR-030.)
+
+`PACKAGE_USAGE_STATS` is a special-access permission —
+the system has no on-demand grant dialog, so the user has
+to flip a switch in Settings → Special access → Usage
+access. v1.1g ships the probe + deep-link + rationale
+copy for the permission. The actual `TriggerForegroundApp`
+routine leaf that will consume the permission is v1.2
+scope.
+
+**What's new**
+
+- New `lib/services/usage_stats_service.dart` —
+  `UsageStatsService` singleton with `isGranted()` probe
+  + `openSettings()` deep-link. Abstract
+  `UsageStatsSource` seam; production
+  `_MethodChannelUsageStatsSource` talks to
+  `doit/device_state`; the test `ScriptedUsageStatsSource`
+  is hand-driven.
+- `PermissionService` gains `PermissionKind.usageStats`,
+  `requestUsageStats()`, `refreshUsageStats()`. The probe
+  is fire-and-forget from `init()` via
+  `unawaited(_refreshUsageStatsAfterInit())` —
+  mandatory because `MethodChannel.invokeMethod` returns
+  a real `Future` that does NOT advance in a widget-test
+  fake-async zone (the v1.1g diagnostic caught this when
+  `calendar_picker_test.dart` hung at
+  `await PermissionService.instance.init()`).
+- `PermissionSheet` extends its sealed `PermissionKind`
+  switch with `_meta` rationale copy + routes the
+  "Allow" CTA to the deep-link (no system dialog).
+- `Settings._PermissionTile._reProbe` calls
+  `refreshUsageStats()` on `usageStats` (the only kind
+  that re-probes rather than re-requests).
+- New manifest entry
+  `<uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions"/>`
+  — cross-checked against the v0.1 permission baseline.
+- Kotlin side (`DeviceStateChannel.kt`) gains
+  `isUsageStatsGranted` (uses
+  `AppOpsManager.unsafeCheckOpNoThrow(OPSTR_GET_USAGE_STATS, Process.myUid(), packageName)`)
+  + `openUsageAccessSettings` (launches
+  `Settings.ACTION_USAGE_ACCESS_SETTINGS` with
+  `FLAG_ACTIVITY_NEW_TASK`).
+- 8 new `UsageStatsService` unit tests.
+
+**Not in this release:** the `TriggerForegroundApp` leaf
+that will consume `PermissionKind.usageStats` — v1.2
+candidate.
+
+ADR-030 / SYS-086.
+
+### v1.1h — i18n scaffolding (ARB extraction + `es` locale + `localizedApp` test helper)
+
+(SYS-087 / ADR-031.)
+
+Every user-facing string moves to ARB files. English
+(`app_en.arb`) is the source of truth; Spanish
+(`app_es.arb`) is a smoke-test locale for the codegen +
+delegate pipeline (NOT a professional translation — a
+v1.2 follow-up with a native Spanish speaker). The
+generated `AppLocalizations` class is wired through
+`lib/main.dart` so every screen reads its copy from
+`AppLocalizations.of(context)` at runtime.
+
+**What's new**
+
+- New `lib/l10n/app_en.arb` (~60 keys — source of truth
+  for AppBar titles, snackbars, empty states, settings
+  sections, theme / anchor / reliability copy, permission
+  tile labels, onboarding step labels, licenses / version
+  rows, plus ICU plural in `homeSelectionAppBarTitle`
+  and `homeSnackbarMarkedCount`).
+- New `lib/l10n/app_es.arb` (Spanish translation of every
+  key — smoke-test locale for the codegen + delegate
+  pipeline).
+- New top-level `l10n.yaml` drives `flutter gen-l10n`
+  (`arb-dir: lib/l10n`, `template-arb-file: app_en.arb`,
+  `output-class: AppLocalizations`,
+  `output-dir: lib/l10n/gen`, `nullable-getter: false`).
+- `pubspec.yaml` adds
+  `flutter_localizations: { sdk: flutter }` + `intl: any` +
+  `flutter: { generate: true }`.
+- Generated `lib/l10n/gen/app_localizations*.dart`
+  produced by `flutter gen-l10n`.
+- `lib/main.dart` wires
+  `localizationsDelegates: AppLocalizations.localizationsDelegates`
+  + `supportedLocales: AppLocalizations.supportedLocales`.
+- `lib/screens/{home,settings,onboarding}.dart` read
+  every user-facing string from
+  `AppLocalizations.of(context)`.
+- New `test/support/localized_app.dart` helper (~30
+  lines) builds a `MaterialApp` with the generated
+  delegates pre-installed so existing widget tests do
+  not crash on `AppLocalizations.of(context)!`. 10
+  screen-test files route through it.
+- New `test/l10n/app_localizations_test.dart` (11 tests —
+  5 structural assertions on ARB catalogs, 4 widget tests,
+  2 class-API tests).
+
+**Hands-on:** pick Spanish in Android Settings → System →
+Languages, launch do it, confirm the AppBar / settings
+sections / onboarding steps render in Spanish.
+
+ADR-031 / SYS-087.
+
+### v1.1i — Custom app icon + splash (adaptive icon + brand color)
+
+(SYS-088 / ADR-032.)
+
+The default Flutter launcher icon (a blue "F" on white) is
+gone. The app now ships a hand-authored vector adaptive
+icon (a white sans-serif lowercase 'd' with a small filled
+check dot on the brand purple `#FF6750A4`) and an on-brand
+splash that layers the same 'd' centered on the purple
+background. The pre-existing
+`drawable/ic_streak_notification.xml` resource gap (called
+out at `architecture_options.md:191-192`) is closed in the
+same PR.
+
+**What's new**
+
+- New `mipmap-anydpi-v26/ic_launcher.xml` is the
+  `<adaptive-icon>` entry point, referencing three vector
+  layers:
+  - `drawable/ic_launcher_background.xml` — solid brand
+    purple `#FF6750A4` on the 108dp adaptive-icon canvas.
+  - `drawable/ic_launcher_foreground.xml` — a white
+    sans-serif lowercase 'd' glyph (stem at
+    x ∈ [23, 29], bowl centered on (54, 54) with outer
+    radius 25 and inner radius 16, evenOdd fill carves
+    the counter) plus a small filled check dot at
+    (80, 80), radius 4. The 'd' represents the 'do'
+    brand entity; the dot represents completion.
+  - `drawable/ic_launcher_monochrome.xml` — same glyph as
+    the foreground, paint pure white. Android 13+ themed
+    icons recolor this layer against the user's
+    wallpaper-derived tint; we ship the foreground glyph
+    only (no brand purple), so the themed-icon system
+    paints the 'd' against the wallpaper tint and drops
+    the background layer entirely.
+- The five
+  `mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png`
+  legacy density buckets stay in place as the API 21..25
+  fallback. A v1.2 follow-up can regenerate them from the
+  master vector if a pre-26 device needs on-brand
+  visuals.
+- Both `drawable/launch_background.xml` and
+  `drawable-v21/launch_background.xml` are rewritten as a
+  `<layer-list>` that paints the brand purple first (via a
+  new named color resource `@color/launch_background`
+  defined in `values/colors.xml` — AAPT2 rejects inline
+  color values inside `drawable-v21/`
+  `<item android:drawable>`) then layers the foreground
+  vector centered on a 96dp × 96dp box (Material's
+  "logo size on splash" guideline).
+- New `drawable/ic_streak_notification.xml` — monochrome
+  white-on-transparent version of the launcher glyph with
+  the check dot dropped (the dot is unreadable at 24dp).
+  This is the resource name
+  `architecture_options.md:191-192` calls out as the
+  status-bar icon for the `streak.reminders` notification
+  channel; the Kotlin-side channel init reads it by name.
+- Version bumped `1.0.0+7` → `1.1.0+8` in `pubspec.yaml`
+  + `lib/build_info.dart`. The mirror-pin assertions in
+  `test/release_signing_test.dart` update in lockstep;
+  two new tests pin the manifest icon reference +
+  `app_name` + `kAppVersion` together.
+- New `test/app_icon_test.dart` (9 filesystem tests).
+- Bundled platform maintenance:
+  `android/app/build.gradle.kts` compileSdk 34 → 36 +
+  minSdk 28 → 30; `CallInterceptor.kt` migrates from the
+  removed `Call.Response.Builder` to
+  `CallScreeningService.CallResponse.Builder`;
+  `MainActivity.kt` passes the Activity explicitly via
+  `setActivity(this / null)`.
+
+**Not in this release:** per-density PNG regeneration
+from the master vector (v1.2 follow-up; the legacy PNGs
+stay as the API 21..25 fallback in the meantime), iOS
+App Store icon assets (v1.1+ port candidate; iOS is not
+in v1.1 scope), light-theme icon variant (v1.2 follow-up;
+dark theme is the v1.0 default).
+
+**Hands-on:** `flutter build appbundle --release` (asks
+first per CLAUDE.md) →
+`adb install -r build/app/outputs/bundle/release/app-release.aab`
+(asks first) → visual checks: app drawer shows the 'd' +
+dot icon on the brand purple background, masked into a
+circle (Pixel launcher) / squircle (Samsung) / teardrop
+(Xiaomi); Settings → Apps → do it → Icon shows the
+adaptive icon previews (background + foreground layers
+visible separately); splash on cold start: brand purple
+flash with the 'd' icon centered for ~100ms before the
+home screen draws; status-bar notification (Settings →
+Test reminder): white 'd' glyph, no dot; on Android 13+:
+Settings → Wallpaper & style → Themed icons → enable,
+the launcher icon re-tints against the wallpaper palette.
+
+ADR-032 / SYS-088. See `decision_record.md` ADR-032 for
+the hand-authored-vector choice (over
+`flutter_launcher_icons` / `flutter_native_splash`),
+`docs/v_model/requirements.md` SYS-088 for the
+behavioral contract, and
+`docs/v_model/architecture_options.md:191-192` for the
+notification-icon resource reference.
+
 ## [Unreleased]
 
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
@@ -517,105 +924,6 @@ decoder + a 6-template picker workflow), call-screening
 on iOS (the role is Android-only; iOS is a v1.1+ port
 candidate), per-call notification customization
 (v1.1+).
-
-### v1.1i — Custom app icon + splash (adaptive icon + brand color)
-
-The default Flutter launcher icon (blue "F" on white) and
-the white-on-dark splash no longer match the brand seed
-(`#FF6750A4`). v1.1i ships a hand-authored vector
-adaptive-icon (lowercase white 'd' + small check dot on
-the brand purple) and an on-brand splash that layers the
-same foreground centered on the purple background. The
-pre-existing `ic_streak_notification.xml` resource gap
-(`docs/v_model/architecture_options.md:191-192`) is
-closed in the same PR.
-
-**What's new**
-
-- **Adaptive icon (API 26+).** New
-  `mipmap-anydpi-v26/ic_launcher.xml` is the
-  `<adaptive-icon>` entry point. It references three
-  vector layers:
-  - `drawable/ic_launcher_background.xml` — solid brand
-    purple `#FF6750A4` on the 108dp adaptive-icon canvas.
-  - `drawable/ic_launcher_foreground.xml` — a white
-    sans-serif lowercase 'd' glyph (stem at x ∈ [23, 29],
-    bowl centered on (54, 54) with outer radius 25 and
-    inner radius 16, evenOdd fill carves the counter) plus
-    a small filled check dot at (80, 80), radius 4. The 'd'
-    represents the 'do' brand entity; the dot represents
-    completion.
-  - `drawable/ic_launcher_monochrome.xml` — same glyph as
-    the foreground, paint pure white. Android 13+ themed
-    icons recolor this layer against the user's
-    wallpaper-derived tint; we ship the foreground glyph
-    only (no brand purple), so the themed-icon system
-    paints the 'd' against the wallpaper tint and drops the
-    background layer entirely.
-- **Legacy density buckets.** The five
-  `mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png`
-  files (the Flutter default 48..192px PNGs) stay in
-  place as the API 21..25 fallback. `@mipmap/ic_launcher`
-  in `AndroidManifest.xml:66` continues to resolve to the
-  adaptive-icon XML on API 26+ and to the PNG on API 21..25.
-  A v1.2 follow-up can regenerate the PNGs from the master
-  vector if a pre-26 device needs on-brand visuals.
-- **Splash drawables (API 21+).** Both
-  `drawable/launch_background.xml` (the pre-API-21
-  fallback) and `drawable-v21/launch_background.xml` are
-  rewritten as a `<layer-list>` that paints the brand
-  purple first (via a new named color resource
-  `@color/launch_background` defined in
-  `values/colors.xml`, which AAPT2 requires because inline
-  color values are rejected inside `drawable-v21/`
-  `<item android:drawable>`), then layers the foreground
-  vector centered on a 96dp × 96dp box (Material's "logo
-  size on splash" guideline). The `?android:colorBackground`
-  reference in the API 21+ variant is dropped — keeping the
-  splash on-brand beats flipping it to the theme's dark
-  background.
-- **Notification icon (status bar).** New
-  `drawable/ic_streak_notification.xml` is a monochrome
-  white-on-transparent version of the launcher glyph, with
-  the check dot dropped (the dot is unreadable at 24dp).
-  This is the resource name
-  `architecture_options.md:191-192` calls out as the
-  status-bar icon for the `streak.reminders` notification
-  channel; the Kotlin-side channel init reads it by name.
-- **Version bump.** `pubspec.yaml` and
-  `lib/build_info.dart` move from `1.0.0+7` to `1.1.0+8`.
-  The mirror-pin assertions in
-  `test/release_signing_test.dart` (`pubspec.yaml` +
-  `lib/build_info.dart` agreement) update in lockstep; two
-  new tests pin the `AndroidManifest.xml` icon reference +
-  the `app_name` + `kAppVersion` trio together.
-- **Tests.** New `test/app_icon_test.dart` (9 filesystem
-  tests — adaptive-icon manifest + three-layer references,
-  foreground white-on-transparent, background brand
-  purple, monochrome pure white (no brand purple), the
-  notification icon shape and 24dp size, all five legacy
-  density buckets present, both splash drawables reference
-  the `@color/launch_background` named resource + the
-  centered foreground, `values/colors.xml` defines
-  `launch_background` as the brand purple). The
-  `test/release_signing_test.dart` mirror-pin tests
-  update (1.0.0+7 → 1.1.0+8) and two new tests pin the
-  manifest icon reference + app_name + kAppVersion trio.
-
-**Not in this release:** per-density PNG regeneration from
-the master vector (v1.2 follow-up; the legacy PNGs stay as
-the API 21..25 fallback in the meantime), iOS App Store
-icon assets (v1.1+ port candidate; iOS is not in v1.1
-scope), light-theme icon variant (v1.2 follow-up; dark
-theme is the v1.0 default).
-
-ADR-032 / SYS-088. See `docs/v_model/decision_record.md`
-ADR-032 for the hand-authored-vector choice (over
-`flutter_launcher_icons` / `flutter_native_splash`),
-`docs/v_model/requirements.md` SYS-088 for the
-behavioral contract, and `docs/v_model/architecture_options.md:191-192`
-for the notification-icon resource reference.
-
 ### v0.5a — rename to "do it"
 
 App-level rename. The app's display name, package id, directory,
