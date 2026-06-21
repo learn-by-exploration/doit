@@ -1004,6 +1004,146 @@ role-hold probe + the OS request flow. Routine dispatch test
 
 ---
 
+## WF-038 — Apply a template-based routine (v1.1 / templates #17–#21)
+
+The user opts in to one of the five v1.0 routine templates that
+previously showed a "Coming in v1.1" badge (#17 Focus block,
+#18 Working from home, #19 At the gym, #20 Leaving work,
+#21 Meeting prep) and configures the trigger / action through a
+shared apply UX.
+
+**Preconditions:**
+- The user is on `TemplatesScreen`.
+- For #18 / #19 / #20 (location-triggered): `ACCESS_COARSE_LOCATION`
+  is OPTIONAL at apply time — the picker renders, but the routine
+  is silently inert at runtime if the permission is denied. The
+  Settings → Permissions tile surfaces the recovery affordance.
+- For #17 / #21 (calendar-triggered): `READ_CALENDAR` is OPTIONAL
+  at apply time, same shape as location.
+- For all five: no call-screening role is required. Templates #17–#21
+  do not touch `CallInterceptorService`.
+
+**Steps:**
+1. The user taps template #17 / #18 / #19 / #20 / #21 in the
+   catalog. The catalog (`templates.dart:_routinesWithApplyUx`)
+   short-circuits to `RoutineApplyScreen` carrying the template.
+   The "Coming in v1.1" badge is gone; the row carries the
+   existing "Use this" button.
+2. `RoutineApplyScreen` (SYS-083 / ADR-027) opens. It reads the
+   template's `payloadJson` envelope via `RoutineTemplatePayload`
+   — a fail-soft decoder that returns `null` for malformed JSON,
+   missing `routine` keys, empty `trigger` / `action` strings,
+   etc. The screen renders:
+   - The template name + description header.
+   - Read-only chips for the decoded `trigger` / `condition` /
+     `action` discriminator (the per-template picker UIs are
+     deferred to a v1.1+ follow-up; v1.1 ships a structured
+     preview that is good enough to confirm the wiring).
+   - A `MalformedView` fallback if the envelope is bad — no Save
+     button, an explanatory icon + copy.
+   - An Enable toggle (seeds `RoutineConfig.enabled`).
+   - Save / Update / Delete buttons. The labels depend on whether
+     a `RoutineConfig` is already persisted for the template id:
+     Save for first-time, Update + Delete for re-edit.
+3. The user toggles Enable and taps Save / Update.
+   `SettingsService.setRoutine(RoutineConfig)` (SYS-080 / ADR-025)
+   persists the JSON blob under `doit.routine.<templateId>` in
+   `SharedPreferences` and updates the `routines`
+   `ValueNotifier<Map<String, RoutineConfig>>` synchronously so
+   `RoutineExecutor`'s `addListener` picks the change up before
+   the next microtask. The screen pops the route via
+   `Navigator.of(context).canPop()` guard so the root-mounted
+   test case is a clean no-op.
+4. Delete calls `SettingsService.deleteRoutine(templateId)` — an
+   idempotent removal that clears the in-memory map AND the
+   SharedPreferences key.
+5. The first time the routine's trigger fires (calendar event
+   start for #17, location enter for #18/#19, location exit for
+   #20, calendar reminder for #21), `RoutineExecutor` matches the
+   snapshot against the registered automation set and calls
+   `_dispatchAction` (SYS-082 / ADR-026). One of five leaves
+   runs:
+   - `ActionOverrideSilent` (#17, #18) → `CallInterceptorService
+     .setRingerMode(SilentMode.silent | vibrate)`.
+   - `ActionNotify` (#19, #20) → `NotificationService.show` with
+     the template's seed title + body. A broken
+     `NotificationService` (StateError on `.instance`) is
+     swallowed by the `_safe(label, fn)` helper so the dispatch
+     chain keeps running.
+   - `ActionOpenApp` (#21) → the executor appends a
+     `RoutineOpenAppRequest{route: '/event', at: now}` to its
+     `pendingOpenApp` `ValueListenable`. The home-screen
+     `RoutineBanner` widget drains the queue FIFO via
+     `Navigator.pushNamed(req.route)` and clears it.
+6. For #18 / #19 / #20, the `LocationPicker` sheet (now backed
+   by the offline `LocationMapPreview` — SYS-084 / ADR-028)
+   shows a stylised `CustomPaint` map with the pin and the
+   geofence ring; no `INTERNET` permission, no `flutter_map`,
+   no tile fetch.
+7. The Add screens (habit / person / event) surface a per-row
+   reliability badge (SYS-085 / ADR-029): a 40×40 dp
+   `IconButton` whose state derives from
+   `automationReliability(Automation, statuses)` exhaustive over
+   the sealed `Trigger` hierarchy via `_requiredPermissionForTrigger`.
+   Optimal hides the badge; degraded shows
+   `Icons.warning_amber_rounded`; unknown shows `Icons.info_outline`.
+
+**Postconditions:**
+- A `RoutineConfig` row is in `SettingsService.routines.value`
+  keyed by the template id.
+- For #18 / #19 / #20 the geofence is registered with
+  `GeofenceService` (the executor subscribes once at app start
+  and matches each snapshot — v0.1 behaviour).
+- For #17 / #21 the calendar reminder is registered with
+  `CalendarService`.
+- On the next matching trigger, the matching `Action` runs
+  end-to-end and the home-screen banner (if applicable) surfaces
+  the fire.
+- Re-tapping the template opens the screen in Update mode with
+  the persisted values pre-loaded.
+
+**Failure modes:**
+- Malformed `payloadJson` envelope → `_MalformedView` is shown
+  with no Save button; no `RoutineConfig` is created.
+- `ACCESS_COARSE_LOCATION` / `READ_CALENDAR` denied at runtime
+  (not at apply time) → the routine silently no-ops; the per-row
+  reliability badge in the Add screen shows the degraded state
+  and links to Settings → Permissions.
+- A `PACKAGE_USAGE_STATS`-style special-access permission (none
+  required for #17–#21; this is the v1.2 `TriggerForegroundApp`
+  shape) is denied → no popup; the user must opt in via
+  Settings → Special access. ADR-030 documents the pattern.
+- The user taps Delete on a stale Update screen → the in-memory
+  map AND the SharedPreferences key are cleared; the executor's
+  listener drops the automation on the next microtask.
+
+**Verification:**
+- `test/screens/templates_test.dart` asserts all six routine
+  templates (#16 + #17–#21) carry a "Use this" button and route
+  through `_routinesWithApplyUx`.
+- `test/screens/templates_japan_routing_test.dart` rewrote the
+  Japan assertion AND asserts template #17 routes to
+  `RoutineApplyScreen` (the snackbar assertion is gone).
+- `test/screens/routine_apply_screen_test.dart` (6 tests)
+  covers render / save / toggle / update-with-Delete / delete /
+  malformed-envelope.
+- `test/routines/routine_template_payload_test.dart` (12 tests)
+  covers the fail-soft decoder across every defect path.
+- `test/services/routine_config_test.dart` + `settings_service_
+  routine_test.dart` cover the persistence layer.
+- `test/routines/action_dispatch_test.dart` (11 tests) covers
+  all five `Action` leaves through the executor's dispatcher.
+- `test/widgets/routine_banner_test.dart` (4 tests) covers the
+  `pendingOpenApp` FIFO drain + the post-frame `pushNamed` path.
+- `test/widgets/location_map_preview_test.dart` (11 tests) +
+  `test/widgets/location_picker_test.dart` (3 new) cover the
+  offline map preview.
+- `test/routines/automation_reliability_test.dart` (16 tests)
+  + `test/widgets/automation_reliability_badge_test.dart`
+  (11 tests) cover the per-row badge.
+
+---
+
 ## WF-034 — Add a location-triggered do / event / person (v1.0/Phase C PR 2)
 
 The user configures an automation that fires a notification when

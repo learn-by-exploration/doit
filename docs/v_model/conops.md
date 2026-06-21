@@ -170,14 +170,22 @@ UX in the rest of the app. Templates that ship:
 - **4 Event templates** — "Pay rent" (monthly 1st, 1-day lead),
   "Doctor appointment" (one-off, 1-h lead), "Anniversary"
   (yearly, 1-week lead), "Tax deadline" (yearly, 1-day lead).
-- **6 Routine templates** — visible with a "Coming in v1.1"
-  badge in Phase B; the apply UX lands in Phase F
-  (`add_routine.dart`). 5 of the 6 routine templates
-  (e.g., "Leaving work → wind down", "Arriving home →
-  log dinner") are location-triggered and depend on the
-  Phase C PR 2 location picker for the `TriggerLocation`
-  parameter at apply time. The 6th is a Japan
-  call-screening routine (Phase F).
+- **6 Routine templates** — Apply UX shipped in v1.1 (SYS-080 /
+  SYS-082 / SYS-083, ADR-025 / ADR-026 / ADR-027). Templates
+  #16 (Japan silent-mode, Phase F) and #17–#21 (Focus block /
+  Working from home / At the gym / Leaving work / Meeting prep)
+  all route through `RoutineApplyScreen` and persist via
+  `SettingsService.setRoutine`. The "Coming in v1.1" badge is
+  gone (v1.1d, `c6a8f48`). The 3 location-triggered templates
+  (#18 Working from home, #19 At the gym, #20 Leaving work) use
+  the v0.1/Phase C PR 2 location picker for `TriggerLocation
+  Enter/Exit` (now backed by the offline `LocationMapPreview`
+  from SYS-084 / ADR-028 — `CustomPaint`, no `INTERNET`).
+  Calendar templates (#17 Focus block, #21 Meeting prep) use
+  the v0.1/Phase E calendar picker. See WF-038 for the
+  user-facing flow and `test/screens/templates_test.dart` for
+  the catalog regression that pins all six templates to the
+  apply UX.
 
 The user can also save any configured Do / Event / Person as a
 user template via the AppBar overflow → "Save as template". The
