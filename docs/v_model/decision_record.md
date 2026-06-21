@@ -3177,3 +3177,188 @@ continue to find it.
   treats them the same. This is a deliberate naming choice
   to make a future merge (if the global enum ever
   disappears) cheap.
+
+## ADR-030 — v1.1g: PACKAGE_USAGE_STATS — special-access probe, not a runtime-prompt permission
+
+### Context
+
+v1.2 will add a `TriggerForegroundApp` ("do X when I open app Y")
+routine. The signal source is the foreground-app state from
+Android's `UsageStatsManager` API, which is gated behind the
+`PACKAGE_USAGE_STATS` permission — a **special-access**
+permission that:
+
+1. Is NOT in the runtime-prompt flow. Android shows no popup;
+   the user MUST navigate to Settings → Special access →
+   Usage access and toggle do it on manually.
+2. Has no API in `permission_handler` (the Dart plugin does
+   not expose it because it cannot request it programmatically).
+3. Is queried at the OS level via `AppOpsManager.unsafeCheckOpNoThrow`
+   (`OPSTR_GET_USAGE_STATS`) rather than the runtime
+   `checkSelfPermission` path.
+4. Is toggled by the user, not by the app — the app can only
+   deep-link to the Settings page and re-probe on resume.
+
+v1.1g ships the **plumbing** for this permission now so v1.2
+only has to add the `TriggerForegroundApp` leaf (no permission
+work, no manifest change, no `PermissionSheet` extension).
+The `PermissionKind.usageStats` enum entry, the
+`UsageStatsService` singleton, the Kotlin method-channel
+handlers, the manifest declaration, the Settings tile, and
+the rationale copy all ship together.
+
+The PermissionSheet must handle this kind even though there is
+no system dialog to show. The sheet's "Allow" CTA becomes a
+deep-link to `Settings.ACTION_USAGE_ACCESS_SETTINGS`; the
+result depends on whether the user came back having toggled
+the permission.
+
+### Decision
+
+1. **New sealed-entry: `PermissionKind.usageStats`.** Added
+   to `lib/services/permission_service.dart`'s `PermissionKind`
+   enum (alongside the existing `notifications`, `contacts`,
+   `exactAlarm`, `batteryOptimization`, `location`, `calendar`,
+   `backupFolder`).
+
+2. **New singleton: `UsageStatsService`
+   (`lib/services/usage_stats_service.dart`).** Standard
+   `_ready` Completer gate; production source is
+   `_MethodChannelUsageStatsSource` (talks to `doit/device_state`);
+   test source is `ScriptedUsageStatsSource` (hand-driven
+   `setGranted()` / `setOpenSettingsResult()`). Two public
+   methods: `isGranted()` (one-shot probe) and `openSettings()`
+   (deep-link to Settings → Special access → Usage access).
+   A `@visibleForTesting` factory `debugInstance({required
+   UsageStatsSource source})` lets the test file construct
+   isolated instances.
+
+3. **`_ready` starts completed.** Unlike the other services in
+   `lib/services/`, `UsageStatsService.init()` has no async
+   init work — the platform side is a stateless probe + a
+   deep-link. The `_ready` Completer is therefore constructed
+   with `..complete()` so production callers (e.g.,
+   `PermissionService._refreshUsageStatsAfterInit`) do not
+   need to await `init()` first. `resetForTesting` is the
+   only path that re-creates the gate.
+
+4. **Probe is fire-and-forget from `PermissionService.init()`.**
+   `init()` calls `unawaited(_refreshUsageStatsAfterInit())`
+   instead of `await UsageStatsService.instance.isGranted()`.
+   This is mandatory because the platform-channel call uses
+   a real Future that does NOT advance in a widget-test's
+   fake-async zone — a test like
+   `calendar_picker_test.dart` calls `await PermissionService.instance.init()`
+   at the top of a `testWidgets` block, and an `await
+   _channel.invokeMethod(...)` inside `init()` hangs the test
+   (the fake-async clock does not process real Futures).
+   `init()` MUST complete in fake-async without touching the
+   real-async platform channel. The post-init probe runs on
+   the real-async microtask queue and merges into `statuses`
+   when it resolves. `refreshUsageStats()` (the public
+   API used by `Settings._PermissionTile._reProbe` and the
+   future `AppLifecycleState.resumed` handler) is the same
+   probe but synchronous-style awaited.
+
+5. **Manifest entry: `PACKAGE_USAGE_STATS` with
+   `tools:ignore="ProtectedPermissions"`.** The permission is
+   opt-in only — the user is never blocked from using do it
+   for declining. The `tools:ignore` suppresses the
+   manifest-merger lint that flags "signature|privileged"
+   permissions. Cross-checked against the v0.1 permission
+   baseline in `docs/v_model/architecture_options.md`
+   `Permission Baseline`.
+
+6. **Rationale copy in `PermissionSheet._meta`:** "Allows
+   do it to fire 'do X when I open app Y' routines (coming
+   in v1.2). Android does not show a popup for this — you
+   will need to toggle do it on in the next screen." Icon
+   `Icons.query_stats_outlined`, title "Usage access".
+
+7. **PermissionSheet switches extended.** The `_onAllow`
+   switch routes `usageStats` to `PermissionService.requestUsageStats()`
+   (which deep-links to Settings → Usage access via
+   `UsageStatsService.openSettings()`). The `_onOpenSettings`
+   switch routes `usageStats` to `requestUsageStats()` +
+   `refreshUsageStats()` (the deep-link + the re-probe).
+
+8. **Settings → Permissions tile re-probes differently.**
+   `Settings._PermissionTile._reProbe` for `usageStats` calls
+   `PermissionService.refreshUsageStats()` (the probe) instead
+   of `requestUsageStats()` (the deep-link), because the
+   "Allow" CTA was a deep-link and the user has already
+   returned from Settings; we want to reflect the new
+   toggle state, not re-prompt.
+
+9. **Kotlin side (`DeviceStateChannel.kt`):** two new method
+   handlers — `isUsageStatsGranted` (calls
+   `AppOpsManager.unsafeCheckOpNoThrow(OPSTR_GET_USAGE_STATS,
+   Process.myUid(), packageName)`) and
+   `openUsageAccessSettings` (launches an intent with
+   `Settings.ACTION_USAGE_ACCESS_SETTINGS` and
+   `FLAG_ACTIVITY_NEW_TASK`).
+
+### Alternatives considered
+
+- **Use `permission_handler` for usage stats.** Rejected —
+  the plugin does not expose this permission because Android
+  does not show a runtime prompt for it. The plugin would
+  always report "denied" without a way to request.
+- **Skip the deep-link and just tell the user where to
+  toggle.** Rejected — the Settings → Permissions tile would
+  show "denied" with no actionable affordance, leaving the
+  user to discover Settings → Special access → Usage access
+  on their own. The deep-link + re-probe is the standard
+  pattern for special-access permissions (mirrors the
+  battery-optimization flow in v0.6).
+- **Make `UsageStatsService` a probe-only service (drop
+  `openSettings`).** Rejected — the deep-link is part of the
+  service's contract because the rationale UX must not
+  import the platform-channel seam directly (separation of
+  concerns: the widget layer imports only `permission_sheet.dart`
+  which imports `permission_service.dart` which imports
+  `usage_stats_service.dart` which talks to the platform).
+- **Synchronously await the probe in `init()`.** Rejected —
+  the v1.1g diagnostic revealed that `MethodChannel.invokeMethod`
+  in a widget test's fake-async zone hangs because real
+  Futures do not advance without `tester.runAsync`. The
+  fire-and-forget probe resolves this without sacrificing
+  the eventual consistency of the badge tile.
+- **Move the probe to `app.dart`'s `initState` instead of
+  `PermissionService.init()`.** Rejected — the probe belongs
+  in `PermissionService` because the badge widget reads
+  from `PermissionService.statuses`. Splitting the probe
+  path would require a second `ValueNotifier` and two
+  listeners in the badge.
+- **Defer the permission work to v1.2 alongside the
+  `TriggerForegroundApp` leaf.** Rejected — the manifest
+  entry, the `PermissionKind` enum, and the `PermissionSheet`
+  extension are all API-surface changes. Shipping them in
+  v1.2 means a separate PR with a "permission baseline
+  bump" footnote in `architecture_options.md`. Shipping
+  them in v1.1g keeps the v1.2 PR focused on the trigger
+  leaf + the foreground-app probe in `DeviceStateService`.
+
+### Lessons
+
+- **Permission probes that touch the platform channel must
+  not block `PermissionService.init()`.** The fire-and-forget
+  pattern via `unawaited(_refreshUsageStatsAfterInit())` is
+  the right shape. Any future permission kind that requires
+  a platform-channel probe (e.g., the planned
+  `PermissionKind.callScreening` for `RoleManager`) must
+  follow the same pattern.
+- **`_ready` start state is a per-service decision.** Some
+  services genuinely have async init (e.g., `CalendarService`
+  registers a `ContentObserver` on init) and need an
+  uncompleted `_ready` gate. Others (like `UsageStatsService`)
+  have no init work and should start completed to avoid
+  "await init() that nobody calls" bugs in production.
+- **The first widget-test hang in a new permission's probe
+  is always the fake-async / real-async divide.** The
+  `permission_handler` calls in `PermissionService.init()`
+  work in `testWidgets` because `permission_handler` uses
+  Pigeon which has both sync and async paths; a raw
+  `MethodChannel.invokeMethod` does not. Document this in
+  the inline comment at the probe site so the next person
+  does not undo the `unawaited` workaround.

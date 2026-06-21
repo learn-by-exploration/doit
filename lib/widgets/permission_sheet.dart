@@ -90,6 +90,14 @@ const Map<PermissionKind, _KindMeta> _meta = <PermissionKind, _KindMeta>{
         'arrive at Y" routines. City-block accuracy is enough — '
         'your location is never stored or sent off the device.',
   ),
+  PermissionKind.usageStats: _KindMeta(
+    title: 'Usage access',
+    icon: Icons.query_stats_outlined,
+    rationale:
+        'Allows do it to fire "do X when I open app Y" routines '
+        '(coming in v1.2). Android does not show a popup for this — '
+        'you will need to toggle do it on in the next screen.',
+  ),
 };
 
 /// Public surface. Returns `true` when the permission is
@@ -193,6 +201,21 @@ class _PermissionSheetBodyState extends State<_PermissionSheetBody> {
         // sheet's `Allow` CTA is a no-op for now.
         result = await PermissionService.instance.requestCalendar();
         break;
+      case PermissionKind.usageStats:
+        // v1.1g / ADR-030 / SYS-086. There is no runtime
+        // prompt for `PACKAGE_USAGE_STATS`; the user MUST
+        // navigate to Settings → Special access → Usage
+        // access and toggle do it on. The "Allow" CTA on
+        // this sheet deep-links to that page; the result is
+        // decided after the user comes back via the
+        // `_onOpenSettings` flow's re-probe (the
+        // `AppLifecycleState.resumed` listener calls
+        // `PermissionService.refreshUsageStats`).
+        final opened = await PermissionService.instance.requestUsageStats();
+        result = opened
+            ? const PermissionResultDenied(canOpenSettings: true)
+            : const PermissionResultPermanentlyDenied();
+        break;
       case PermissionKind.backupFolder:
         // The SAF picker is handled by `requestBackupFolder`;
         // the sheet is never shown for this kind because
@@ -255,6 +278,20 @@ class _PermissionSheetBodyState extends State<_PermissionSheetBody> {
         break;
       case PermissionKind.calendar:
         result = await svc.requestCalendar();
+        break;
+      case PermissionKind.usageStats:
+        // `PACKAGE_USAGE_STATS` is a special-access permission;
+        // the deep-link target is the Usage Access Settings
+        // page, not the generic app Settings page. We call
+        // `requestUsageStats()` (which deep-links + returns
+        // true if the launch resolved) and then re-probe so
+        // the user sees the updated status if they came back
+        // having toggled it on.
+        await svc.requestUsageStats();
+        await svc.refreshUsageStats();
+        result =
+            svc.statuses.value[PermissionKind.usageStats] ??
+            const PermissionResultDenied(canOpenSettings: true);
         break;
       case PermissionKind.backupFolder:
         result = const PermissionResultGranted();

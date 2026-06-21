@@ -43,6 +43,23 @@
     <!-- (no <uses-permission> for call screening — see <service>
          below for the BIND_SCREENING_SERVICE attribute.) -->
 
+    <!-- v1.1g / ADR-030 / SYS-086: PACKAGE_USAGE_STATS is a
+         special-access permission for the planned
+         TriggerForegroundApp (v1.2 — "do X when I open app
+         Y"). Android does not show a runtime prompt for it;
+         the user toggles it on in Settings → Special access
+         → Usage access. The rationale UX (deep-link +
+         re-probe on resume) lives in
+         lib/widgets/permission_sheet.dart and
+         lib/services/usage_stats_service.dart. The
+         `tools:ignore="ProtectedPermissions"` marker
+         suppresses the manifest-merger lint because the
+         permission is opt-in only (the user is never
+         blocked from using do it for declining). -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"

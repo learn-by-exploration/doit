@@ -32,7 +32,7 @@
 // returns a sealed [PermissionResult] / [BackupFolderResult]
 // so the widget layer never sees `PermissionStatus` directly.
 
-import 'dart:async' show Completer;
+import 'dart:async' show Completer, unawaited;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show ValueNotifier;
@@ -50,6 +50,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
 
 import 'package:doit/services/permission_result.dart';
+import 'package:doit/services/usage_stats_service.dart';
 
 /// Identifiers for the runtime permissions / pickers the
 /// service manages. Used as keys in [PermissionService.statuses]
@@ -101,6 +102,21 @@ enum PermissionKind {
   /// data the app reads; no event bodies, attendees, or
   /// notes are stored or transmitted.
   calendar,
+
+  /// `PACKAGE_USAGE_STATS` (v1.1g / ADR-030 / SYS-086). A
+  /// special-access permission: Android never shows a runtime
+  /// prompt for it; the user MUST navigate to Settings →
+  /// Special access → Usage access and toggle do it on
+  /// manually. Used in v1.2 by the planned
+  /// `TriggerForegroundApp` (a device-state leaf that fires
+  /// when the user opens a configured app — e.g., "Open
+  /// Instagram → mute ringer for 10 minutes"). v1.1g ships
+  /// the rationale UX, the settings tile, and the probe;
+  /// v1.2 will wire the trigger itself. The
+  /// `canOpenSettings` payload on the sealed result is
+  /// always `true` because the deep-link target is well-
+  /// defined (`Settings.ACTION_USAGE_ACCESS_SETTINGS`).
+  usageStats,
 }
 
 /// Singleton holder for the permission / SAF seam. The
@@ -149,6 +165,9 @@ class PermissionService {
         PermissionKind.location: const PermissionResultDenied(
           canOpenSettings: true,
         ),
+        PermissionKind.usageStats: const PermissionResultDenied(
+          canOpenSettings: true,
+        ),
       });
 
   /// Idempotent. Probes the runtime permissions and stores
@@ -180,6 +199,9 @@ class PermissionService {
       PermissionKind.calendar: const PermissionResultDenied(
         canOpenSettings: true,
       ),
+      PermissionKind.usageStats: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
     };
     try {
       next[PermissionKind.notifications] = _mapStatus(
@@ -200,6 +222,21 @@ class PermissionService {
       next[PermissionKind.calendar] = _mapStatus(
         await Permission.calendarFullAccess.status,
       );
+      // Usage stats is a special-access permission; the
+      // `permission_handler` plugin does not expose it. The
+      // probe goes through `UsageStatsService` → Kotlin
+      // `DeviceStateChannel.isUsageStatsGranted`. We do NOT
+      // await it here: `MethodChannel.invokeMethod` returns
+      // a real Future that does NOT advance in a widget
+      // test's fake-async zone, which would hang `init()`
+      // for every test that calls `PermissionService.init()`
+      // at the top of a `testWidgets` block. Instead we
+      // fire-and-forget the probe so it completes
+      // asynchronously on the real-async microtask queue;
+      // when it resolves, [refreshUsageStats] merges the
+      // result into [statuses] (the Settings tile rebuilds
+      // from the ValueNotifier).
+      unawaited(_refreshUsageStatsAfterInit());
     } catch (_) {
       // v0.4b-release-fix / ADR-013 follow-up: a thrown
       // platform-channel error must not crash `main()`. The
@@ -349,6 +386,59 @@ class PermissionService {
     // directly to avoid an import-name shadow with this
     // method.
     return PermissionHandlerPlatform.instance.openAppSettings();
+  }
+
+  /// Deep-links the user to Settings → Special access →
+  /// Usage access so they can toggle `PACKAGE_USAGE_STATS`
+  /// on. v1.1g / ADR-030 / SYS-086. Returns `true` if the
+  /// OEM Settings activity resolved the intent.
+  ///
+  /// Unlike the other `requestX` methods, this does NOT
+  /// re-probe immediately: the user has to navigate the
+  /// system Settings page, toggle do it on, and come back.
+  /// The widget that called this method should re-probe
+  /// via [PermissionService.instance.init] when the app
+  /// resumes (e.g., `WidgetsBindingObserver.didChangeAppLifecycleState`
+  /// → `resumed`).
+  Future<bool> requestUsageStats() async {
+    await ready;
+    return UsageStatsService.instance.openSettings();
+  }
+
+  /// Re-probes the `PACKAGE_USAGE_STATS` permission. Used
+  /// by the app-resume handler so the Settings → Triggers
+  /// tile and the `AutomationReliabilityBadge` reflect the
+  /// user's most recent toggle without a full restart.
+  Future<void> refreshUsageStats() async {
+    await ready;
+    final granted = await UsageStatsService.instance.isGranted();
+    final next = <PermissionKind, PermissionResult?>{
+      ...statuses.value,
+      PermissionKind.usageStats: granted
+          ? const PermissionResultGranted()
+          : const PermissionResultDenied(canOpenSettings: true),
+    };
+    statuses.value = next;
+  }
+
+  /// Probe helper for [init]. Called after `_ready` is
+  /// completed so the result merges into [statuses] via
+  /// [refreshUsageStats]'s `ValueNotifier` write. Returns
+  /// a `Future` but is `unawaited` by the caller (init must
+  /// not block on the platform-channel round-trip — see
+  /// the inline comment at the call site).
+  Future<void> _refreshUsageStatsAfterInit() async {
+    await ready;
+    // Swallow the platform-channel error here too — the
+    // missing-plugin path (test, iOS, desktop) leaves the
+    // status at the `denied(canOpenSettings: true)`
+    // default set in [init].
+    try {
+      await refreshUsageStats();
+    } catch (_) {
+      // v0.4b-release-fix / ADR-013 follow-up: never let a
+      // platform-channel error crash the post-init probe.
+    }
   }
 
   // --- internal ----------------------------------------------------

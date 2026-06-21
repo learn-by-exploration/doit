@@ -6,9 +6,12 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.app.AppOpsManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
+import android.os.Process
+import android.provider.Settings
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
@@ -83,6 +86,31 @@ object DeviceStateChannel {
                 "stopStream" -> {
                     stopStream()
                     result.success(null)
+                }
+                "isUsageStatsGranted" -> {
+                    val ctx = appContext
+                    if (ctx == null) {
+                        result.error(
+                            "NO_CONTEXT",
+                            "DeviceStateChannel has no app context",
+                            null,
+                        )
+                    } else {
+                        result.success(isUsageStatsGranted(ctx))
+                    }
+                }
+                "openUsageAccessSettings" -> {
+                    val ctx = appContext
+                    if (ctx == null) {
+                        result.error(
+                            "NO_CONTEXT",
+                            "DeviceStateChannel has no app context",
+                            null,
+                        )
+                    } else {
+                        val launched = openUsageAccessSettings(ctx)
+                        result.success(launched)
+                    }
                 }
                 else -> result.notImplemented()
             }
@@ -202,5 +230,57 @@ object DeviceStateChannel {
 
     fun setAppContext(ctx: Context) {
         appContext = ctx.applicationContext
+    }
+
+    /**
+     * Returns true if the user has granted do it the
+     * `PACKAGE_USAGE_STATS` special-access permission
+     * (v1.1g / ADR-030 / SYS-086).
+     *
+     * Android does not show a runtime prompt for this
+     * permission; the user must navigate to Settings →
+     * Special access → Usage access manually. The probe
+     * uses `AppOpsManager.unsafeCheckOpNoThrow` with
+     * `OPSTR_GET_USAGE_STATS` (API 21+) — the
+     * `MODE_ALLOWED` / `MODE_DEFAULT` distinction matches
+     * the user's toggle in system Settings.
+     *
+     * The runtime `Process.myUid()` is correct here: we
+     * are checking the app's own permission, not another
+     * app's. `packageName` is the app's own package name.
+     */
+    private fun isUsageStatsGranted(ctx: Context): Boolean {
+        val appOps = ctx.getSystemService(Context.APP_OPS_SERVICE)
+            as? AppOpsManager ?: return false
+        val mode = runCatching {
+            @Suppress("DEPRECATION")
+            appOps.unsafeCheckOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                Process.myUid(),
+                ctx.packageName,
+            )
+        }.getOrNull() ?: return false
+        return mode == AppOpsManager.MODE_ALLOWED
+    }
+
+    /**
+     * Deep-links the user to Settings → Special access →
+     * Usage access so they can toggle do it on.
+     *
+     * Returns true if the launch resolved (i.e., the OEM
+     * Settings activity exists). Returns false if no
+     * activity handled the intent (very rare; some custom
+     * ROMs ship without the standard Settings activity).
+     */
+    private fun openUsageAccessSettings(ctx: Context): Boolean {
+        val intent = Intent(
+            Settings.ACTION_USAGE_ACCESS_SETTINGS,
+        ).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return runCatching {
+            ctx.startActivity(intent)
+            true
+        }.getOrDefault(false)
     }
 }

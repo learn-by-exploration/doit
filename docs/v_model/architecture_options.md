@@ -139,6 +139,20 @@ with a sealed exception.
      are stored or transmitted off-device. -->
 <uses-permission android:name="android.permission.READ_CALENDAR" />
 
+<!-- v1.1g / ADR-030 / SYS-086: special-access permission for
+     the planned TriggerForegroundApp (v1.2 — "do X when I open
+     app Y"). Android does not show a runtime prompt for it;
+     the user toggles it on in Settings → Special access →
+     Usage access. The rationale UX (deep-link + re-probe on
+     resume) lives in lib/widgets/permission_sheet.dart and
+     lib/services/usage_stats_service.dart. Declared with
+     tools:ignore="ProtectedPermissions" because the permission
+     is opt-in only — the user is never blocked from using do
+     it for declining. -->
+<uses-permission
+    android:name="android.permission.PACKAGE_USAGE_STATS"
+    tools:ignore="ProtectedPermissions" />
+
 <!-- Camera permission only requested at the moment a photo-based mission
      is enabled in v0.2. Not in v0.1. -->
 ```

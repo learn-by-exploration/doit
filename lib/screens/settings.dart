@@ -402,6 +402,16 @@ class _PermissionTile extends StatelessWidget {
         // `CalendarService` to watch event transitions for
         // `TriggerCalendarEvent` matching.
         await service.requestCalendar();
+      case PermissionKind.usageStats:
+        // v1.1g / ADR-030 / SYS-086: PACKAGE_USAGE_STATS
+        // is a special-access permission. There is no
+        // runtime prompt; the user MUST navigate to
+        // Settings → Special access → Usage access. The
+        // re-probe re-reads the current AppOpsManager mode
+        // and refreshes the cached status so the tile
+        // updates when the user toggles it on in the
+        // background.
+        await service.refreshUsageStats();
       case PermissionKind.backupFolder:
         // The backup folder is not a runtime permission;
         // it's a SAF picker. The re-pick is handled in
