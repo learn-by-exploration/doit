@@ -38,6 +38,7 @@ import 'package:doit/services/permission_service.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/action.dart';
 import 'package:doit/triggers/trigger.dart';
+import 'package:doit/widgets/location_map_preview.dart';
 import 'package:doit/widgets/permission_sheet.dart';
 
 /// Static facade. Mirrors the `PermissionSheet.show(...)`
@@ -245,6 +246,9 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'[-0-9.]')),
                       ],
+                      // Re-render so the v1.1e map preview pin
+                      // follows the typed coordinates.
+                      onChanged: (_) => setState(() {}),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Required';
                         final d = double.tryParse(v.trim());
@@ -267,6 +271,9 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'[-0-9.]')),
                       ],
+                      // Re-render so the v1.1e map preview pin
+                      // follows the typed coordinates.
+                      onChanged: (_) => setState(() {}),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Required';
                         final d = double.tryParse(v.trim());
@@ -277,6 +284,24 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: Spacing.sm),
+              // v1.1e (SYS-084 / ADR-028): offline map preview.
+              // Renders the picked (lat, lon) as a pin on a
+              // stylised world canvas. Tapping the canvas
+              // moves the pin and writes back to the lat / lon
+              // controllers, so the picker form and the preview
+              // stay in sync without a network tile fetch (the
+              // no-network baseline from `lib-services.md`).
+              LocationMapPreview(
+                latitude: double.tryParse(_latCtrl.text.trim()) ?? 0,
+                longitude: double.tryParse(_lonCtrl.text.trim()) ?? 0,
+                radiusMeters: _radiusMeters,
+                onLatLonChanged: (lat, lon) {
+                  _latCtrl.text = lat.toStringAsFixed(6);
+                  _lonCtrl.text = lon.toStringAsFixed(6);
+                  setState(() {});
+                },
               ),
               const SizedBox(height: Spacing.sm),
               Align(

@@ -2858,3 +2858,161 @@ now real, not stub).
   time the assertion runs. `tester.pump()
   + tester.runAsync(...) + tester.pump()`
   is the established pattern.
+
+## ADR-028 — v1.1e: Offline `CustomPaint` map preview for `LocationPicker` (SYS-084)
+
+Status: accepted 2026-06-21.
+
+### Context.
+
+The v1.0 / Phase C / SYS-076 `LocationPicker`
+modal bottom sheet has three ways for the
+user to set a geofence: paste a lat / lon,
+key in a label, or tap "Use current
+location" (which calls `Geolocator.
+getCurrentPosition` under a
+`PermissionSheet` gate). None of these give
+the user visual feedback for the chosen
+point — a 37.7749 / -122.4194 is just two
+numbers, and the user has no way to know if
+they typed "the office" or "the office
+across the street" without leaving the app
+and opening a real map.
+
+The v1.0 sign-off explicitly listed
+`LocationPicker` map widget as a v1.1
+candidate
+(`docs/v_model/v1_0_release_baseline.md`),
+naming `google_maps_flutter` and
+`flutter_map` as the two implementation
+options. `google_maps_flutter` would add a
+Google Play Services dependency + API key +
+~5 MB of native code. `flutter_map` is
+pure Dart on top of OSM tiles.
+
+Either choice triggers a v0.1 permission
+baseline cross-check per `AGENTS.md` /
+`CLAUDE.md`: OSM tile fetches require
+`INTERNET`, which is **deliberately
+omitted** from the v0.1 baseline
+(no analytics, no remote logs, no tile
+fetches — see the constraints section of
+`v1_0_release_baseline.md`). Adding
+`INTERNET` is a privacy-blast-radius
+change for the whole app: any code path
+could in principle make a network call,
+which contradicts the "no remote logs"
+user contract.
+
+### Decision.
+
+Ship an **offline `CustomPaint`-based map
+preview** — `LocationMapPreview` in
+`lib/widgets/location_map_preview.dart`.
+
+- Pure `dart:ui` painting. No
+  `flutter_map`, no `latlong2`, no
+  `package:http`, no `INTERNET`
+  permission.
+- Equirectangular projection of a fixed
+  world window (lat ∈ [-85°, 85°],
+  lon ∈ [-180°, 180°]) onto a 360×100
+  canvas (default height; configurable).
+- 5×5 stylised grid on the background;
+  a filled pin (radius 6 px) at the
+  projected (lat, lon); a translucent
+  ring (radius scaled by 1° lat ≈
+  111 320 m) for the geofence.
+- One callback: `onLatLonChanged(lat,
+  lon)` invoked on `onTapDown` and
+  `onPanUpdate`. Coordinates clamped to
+  ±90 / ±180 before being reported.
+- Three pure helpers
+  (`projectLatLonForTest`,
+  `unprojectLatLonForTest`,
+  `radiusMetresToPxForTest`) exposed for
+  unit tests; the widget itself uses
+  the same logic internally.
+
+The picker mounts the preview between
+the lat/lon `TextFormField` row and the
+"Use current location" button. The
+`TextFormField`s gain an `onChanged: (_)
+=> setState(() {})` so the pin follows
+typed coordinates in real time, and the
+slider's existing `setState` already
+re-renders the ring. Tapping the preview
+writes back to `_latCtrl` / `_lonCtrl`
+via `toStringAsFixed(6)` and triggers
+`setState` so the form's `form.validate`
+runs.
+
+The widget's public API
+(`onLatLonChanged`) is shaped so a v1.2
+candidate can swap the `CustomPaint`
+body for `flutter_map`'s `FlutterMap`
+without changing the call site.
+
+### Alternatives considered.
+
+- **`flutter_map` + OpenStreetMap
+  + `INTERNET` permission.** Matches the
+  v1.0 sign-off wording, gives a real
+  world map. Rejected because it requires
+  the `INTERNET` permission baseline
+  cross-check per `CLAUDE.md`; the
+  blast radius is the whole app, not just
+  the picker. `INTERNET` is a v0.1
+  baseline change; we don't make it
+  incidentally.
+- **`google_maps_flutter`.** Adds
+  ~5 MB of native code + a Play Services
+  key + a billing account. Also requires
+  `INTERNET`. Rejected for the same reason
+  as `flutter_map`, plus the APK bloat.
+- **Hide the "Use current location"
+  button behind a "Show on map" toggle
+  that opens the system Maps app.**
+  Rejected because it pushes the user out
+  of the app for what should be a 2-second
+  visual confirmation. The picker is
+  modal; routing the user out is jarring.
+- **Do nothing (keep v1.0's behaviour).**
+  Rejected because the v0.6 reliability
+  feedback explicitly flagged "no visual
+  feedback for the chosen location" as a
+  high-frequency complaint.
+
+### Lessons.
+
+- **The no-network baseline is a
+  *feature*, not a *constraint* to
+  work around.** Forcing an offline
+  implementation pushed the design toward
+  a pure-paint widget that is faster,
+  lighter (no network on the cold path),
+  and easier to test. A v1.2 swap to
+  `flutter_map` is still on the table —
+  but the offline preview is the right
+  default for v1.1.
+- **`HitTestBehavior.opaque` is the
+  default for `GestureDetector`-wrapped
+  `CustomPaint`.** Without it, taps fall
+  through the (otherwise empty)
+  `SizedBox.expand` child to whatever is
+  behind the preview.
+- **Pre-seed `SharedPreferences` via
+  `setMockInitialValues` + `resetForTesting`
+  + `init()`** is the established pattern
+  for widget tests that read service state
+  on mount; the picker's preview follows
+  the same shape as the routine apply
+  screen's edit-mode read.
+- **`tester.ensureVisible` lands the
+  target at the bottom edge of the
+  bottom sheet** where the scroll-gesture
+  detector overlaps it; an extra `drag(
+  find.byType(SingleChildScrollView),
+  Offset(0, -80))` after a radio-tap
+  re-render clears the overlap so the
+  Save button is fully tappable.

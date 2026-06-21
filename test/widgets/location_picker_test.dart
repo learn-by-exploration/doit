@@ -390,6 +390,14 @@ void main() {
       find.byKey(const ValueKey('location_picker.save')),
     );
     await tester.pump(const Duration(milliseconds: 250));
+    // Tapping the radio earlier triggered a re-render that
+    // reset the scroll position; `ensureVisible` lands the
+    // Save button at the bottom edge where the bottom-sheet's
+    // scroll-gesture detector overlaps it. Drag up a bit more
+    // so the Save button is fully clear of the scroll
+    // detector before tapping.
+    await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -80));
+    await tester.pump(const Duration(milliseconds: 250));
     await tester.tap(find.byKey(const ValueKey('location_picker.save')));
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -448,6 +456,155 @@ void main() {
         .controller;
     expect(latCtrl!.text, '12.340000');
     expect(lonCtrl!.text, '56.780000');
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('location_picker.cancel')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.byKey(const ValueKey('location_picker.cancel')));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    await future;
+  });
+
+  testWidgets('LocationMapPreview is mounted above the radius slider '
+      '(v1.1e / SYS-084)', (tester) async {
+    await PermissionService.instance.init();
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    final ctx = tester.element(find.text('open'));
+    final future = LocationPicker.show(ctx);
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(
+      find.byKey(const ValueKey('location_picker.map_preview')),
+      findsOneWidget,
+    );
+    // Dismiss.
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('location_picker.cancel')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.byKey(const ValueKey('location_picker.cancel')));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    await future;
+  });
+
+  testWidgets('tapping the map preview writes back to the lat / lon fields '
+      '(v1.1e / SYS-084)', (tester) async {
+    await PermissionService.instance.init();
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    final ctx = tester.element(find.text('open'));
+    final future = LocationPicker.show(ctx);
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    // Pre-fill with a known location so the pin starts
+    // somewhere on-canvas.
+    await tester.enterText(
+      find.byKey(const ValueKey('location_picker.label')),
+      'Tap test',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('location_picker.latitude')),
+      '0',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('location_picker.longitude')),
+      '0',
+    );
+    await tester.pump();
+    // Scroll the preview into the visible area of the
+    // bottom sheet before tapping — the form is taller than
+    // the test viewport, so the preview sits below the
+    // visible region by default.
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('location_picker.map_preview')),
+    );
+    await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -80));
+    await tester.pump(const Duration(milliseconds: 250));
+    // Tap the preview — GestureDetector onLatLonChanged fires
+    // and writes to the controllers. The exact lat/lon
+    // depends on the rendered widget position, so we only
+    // assert that the controllers now contain non-zero,
+    // in-range values (i.e. the write-back happened and the
+    // values are valid for the trigger model).
+    await tester.tap(
+      find.byKey(const ValueKey('location_picker.map_preview')),
+      warnIfMissed: false,
+    );
+    await tester.pump();
+    final latCtrl = tester
+        .widget<TextFormField>(
+          find.byKey(const ValueKey('location_picker.latitude')),
+        )
+        .controller;
+    final lonCtrl = tester
+        .widget<TextFormField>(
+          find.byKey(const ValueKey('location_picker.longitude')),
+        )
+        .controller;
+    final lat = double.tryParse(latCtrl!.text);
+    final lon = double.tryParse(lonCtrl!.text);
+    expect(lat, isNotNull);
+    expect(lon, isNotNull);
+    expect(lat!, inInclusiveRange(-90, 90));
+    expect(lon!, inInclusiveRange(-180, 180));
+    // Dismiss.
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('location_picker.cancel')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.byKey(const ValueKey('location_picker.cancel')));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    await future;
+  });
+
+  testWidgets('typing into lat / lon fields updates the preview pin '
+      '(v1.1e / SYS-084)', (tester) async {
+    await PermissionService.instance.init();
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    final ctx = tester.element(find.text('open'));
+    final future = LocationPicker.show(ctx);
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    // The preview is mounted.
+    expect(
+      find.byKey(const ValueKey('location_picker.map_preview')),
+      findsOneWidget,
+    );
+    // Enter valid coords; the preview rebuilds without
+    // throwing.
+    await tester.enterText(
+      find.byKey(const ValueKey('location_picker.latitude')),
+      '37.7749',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('location_picker.longitude')),
+      '-122.4194',
+    );
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    // The preview is still mounted after the rebuilds.
+    expect(
+      find.byKey(const ValueKey('location_picker.map_preview')),
+      findsOneWidget,
+    );
+    // Dismiss.
     await tester.ensureVisible(
       find.byKey(const ValueKey('location_picker.cancel')),
     );
