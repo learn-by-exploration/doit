@@ -22,6 +22,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import '../support/localized_app.dart';
+
 class _PushObserver extends NavigatorObserver {
   Route<dynamic>? pushed;
 
@@ -35,7 +37,10 @@ class _PushObserver extends NavigatorObserver {
 Widget _wrap({NavigatorObserver? observer}) {
   return ChangeNotifierProvider<SettingsService>.value(
     value: SettingsService.instance,
-    child: MaterialApp(
+    // v1.1h / ADR-031 / SYS-087: route through
+    // `localizedApp` to wire the generated
+    // `AppLocalizations` delegate.
+    child: localizedApp(
       theme: AppTheme.dark,
       navigatorObservers: observer == null ? const [] : [observer],
       home: const SettingsScreen(),

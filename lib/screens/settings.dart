@@ -26,6 +26,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:doit/build_info.dart';
+import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/screens/settings_restore.dart';
@@ -58,8 +59,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(l.settingsAppBarTitle)),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(Spacing.md),
@@ -68,7 +70,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               key: const ValueKey<String>('settings.reliability_banner'),
             ),
             const SizedBox(height: Spacing.md),
-            const _SectionHeader('Appearance'),
+            _SectionHeader(l.settingsSectionAppearance),
             ValueListenableBuilder<ThemeMode>(
               valueListenable: SettingsService.instance.themeMode,
               builder: (_, mode, _) => _ThemeModeTile(
@@ -77,7 +79,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: Spacing.md),
-            const _SectionHeader('Wake-up anchor'),
+            _SectionHeader(l.settingsSectionAnchor),
             _AnchorModeTile(
               mode: _anchorMode,
               onChanged: (m) {
@@ -88,39 +90,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             const SizedBox(height: Spacing.md),
-            const _SectionHeader('Permissions'),
+            _SectionHeader(l.settingsSectionPermissions),
             const _PermissionsRow(),
             const SizedBox(height: Spacing.md),
-            const _SectionHeader('Reliability'),
+            _SectionHeader(l.settingsSectionReliability),
             _ReliabilityRow(
               reliability: ReminderService.instance.scheduler.reliability,
             ),
             ListTile(
               key: const ValueKey('settings.test_reminder'),
               leading: const Icon(Icons.notifications_outlined),
-              title: const Text('Send a test reminder'),
-              subtitle: const Text('Fires a notification in ~5 seconds.'),
+              title: Text(l.settingsTestReminderTitle),
+              subtitle: Text(l.settingsTestReminderSubtitle),
               onTap: () async {
                 final messenger = ScaffoldMessenger.of(context);
                 await ReminderService.instance.scheduleTestReminder();
                 if (!context.mounted) return;
                 messenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Test reminder scheduled for 5s from now.'),
-                  ),
+                  SnackBar(content: Text(l.settingsTestReminderSnackbar)),
                 );
               },
             ),
             const SizedBox(height: Spacing.md),
-            const _SectionHeader('Device state'),
+            _SectionHeader(l.settingsSectionDeviceState),
             const DeviceStateRow(),
             const SizedBox(height: Spacing.md),
-            const _SectionHeader('Backup'),
+            _SectionHeader(l.settingsSectionBackup),
             ListTile(
               key: const ValueKey('settings.restore'),
               leading: const Icon(Icons.restore_outlined),
-              title: const Text('Restore from backup'),
-              subtitle: const Text('Pick a do it .json backup file.'),
+              title: Text(l.settingsRestoreTitle),
+              subtitle: Text(l.settingsRestoreSubtitle),
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -130,25 +130,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             const SizedBox(height: Spacing.lg),
-            const _SectionHeader('About'),
-            const ListTile(
-              title: Text('do it'),
-              subtitle: Text(
-                '$kAppVersion — local-only. See PRIVACY.md for the data '
-                'we store and the data we do not.',
-              ),
+            _SectionHeader(l.settingsSectionAbout),
+            ListTile(
+              title: Text(l.appTitle),
+              subtitle: Text(l.settingsAboutAppVersion(kAppVersion)),
               dense: true,
             ),
             ListTile(
               key: const ValueKey('settings.licenses'),
               leading: const Icon(Icons.description_outlined),
-              title: const Text('Open source licenses'),
-              subtitle: const Text(
-                'Flutter, Drift, flutter_local_notifications, …',
-              ),
+              title: Text(l.settingsLicensesTitle),
+              subtitle: Text(l.settingsLicensesSubtitle),
               onTap: () => showLicensePage(
                 context: context,
-                applicationName: 'do it',
+                applicationName: l.appTitle,
                 applicationVersion: kAppVersion,
                 applicationLegalese: 'Local-only. No telemetry. No accounts.',
               ),
@@ -180,6 +175,7 @@ class _ThemeModeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return RadioGroup<ThemeMode>(
       groupValue: mode,
       onChanged: (m) {
@@ -187,10 +183,10 @@ class _ThemeModeTile extends StatelessWidget {
       },
       child: Column(
         children: [
-          for (final entry in const [
-            (ThemeMode.dark, 'Dark'),
-            (ThemeMode.light, 'Light'),
-            (ThemeMode.system, 'System'),
+          for (final entry in <(ThemeMode, String)>[
+            (ThemeMode.dark, l.settingsThemeDark),
+            (ThemeMode.light, l.settingsThemeLight),
+            (ThemeMode.system, l.settingsThemeSystem),
           ])
             RadioListTile<ThemeMode>(title: Text(entry.$2), value: entry.$1),
         ],
@@ -206,6 +202,7 @@ class _AnchorModeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return RadioGroup<AnchorMode>(
       groupValue: mode,
       onChanged: (m) {
@@ -213,10 +210,10 @@ class _AnchorModeTile extends StatelessWidget {
       },
       child: Column(
         children: [
-          for (final entry in const [
-            (AnchorMode.manual, 'Manual — I tap "I\'m up"'),
-            (AnchorMode.firstUnlock, 'First unlock of the day'),
-            (AnchorMode.either, 'Either, with confirmation'),
+          for (final entry in <(AnchorMode, String)>[
+            (AnchorMode.manual, l.settingsAnchorManual),
+            (AnchorMode.firstUnlock, l.settingsAnchorFirstUnlock),
+            (AnchorMode.either, l.settingsAnchorEither),
           ])
             RadioListTile<AnchorMode>(title: Text(entry.$2), value: entry.$1),
         ],
@@ -231,14 +228,15 @@ class _ReliabilityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final label = switch (reliability) {
-      Reliability.optimal => 'Optimal — exact alarm granted.',
-      Reliability.degraded => 'Degraded — using WorkManager fallback.',
-      Reliability.unknown => 'Unknown — first launch, probe pending.',
+      Reliability.optimal => l.settingsReminderReliabilityOptimal,
+      Reliability.degraded => l.settingsReminderReliabilityDegraded,
+      Reliability.unknown => l.settingsReminderReliabilityUnknown,
     };
     return ListTile(
       leading: const Icon(Icons.notifications_active_outlined),
-      title: const Text('Reminder reliability'),
+      title: Text(l.settingsReminderReliabilityTitle),
       subtitle: Text(label),
       onTap: HapticFeedback.selectionClick,
     );
@@ -271,6 +269,7 @@ class _PermissionsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return ValueListenableBuilder<Map<PermissionKind, PermissionResult?>>(
       valueListenable: PermissionService.instance.statuses,
       builder: (context, statuses, _) {
@@ -280,28 +279,28 @@ class _PermissionsRow extends StatelessWidget {
               key: const ValueKey('settings.permission.notifications'),
               kind: PermissionKind.notifications,
               icon: Icons.notifications_outlined,
-              title: 'Notifications',
+              title: l.permissionNotificationsTitle,
               result: statuses[PermissionKind.notifications],
             ),
             _PermissionTile(
               key: const ValueKey('settings.permission.contacts'),
               kind: PermissionKind.contacts,
               icon: Icons.contacts_outlined,
-              title: 'Contacts',
+              title: l.permissionContactsTitle,
               result: statuses[PermissionKind.contacts],
             ),
             _PermissionTile(
               key: const ValueKey('settings.permission.exactAlarm'),
               kind: PermissionKind.exactAlarm,
               icon: Icons.alarm_outlined,
-              title: 'Exact alarms',
+              title: l.permissionExactAlarmTitle,
               result: statuses[PermissionKind.exactAlarm],
             ),
             _PermissionTile(
               key: const ValueKey('settings.permission.location'),
               kind: PermissionKind.location,
               icon: Icons.location_on_outlined,
-              title: 'Location',
+              title: l.permissionLocationTitle,
               result: statuses[PermissionKind.location],
             ),
             const _CallScreeningTile(),
@@ -343,7 +342,7 @@ class _PermissionTile extends StatelessWidget {
     return ListTile(
       leading: Icon(icon),
       title: Text(title),
-      subtitle: Text(_statusText(result)),
+      subtitle: Text(_statusText(context, result)),
       // The "Settings" `TextButton` is rendered only for
       // `permanentlyDenied` because that is the only
       // state where the system dialog will not re-appear;
@@ -359,7 +358,9 @@ class _PermissionTile extends StatelessWidget {
           ? TextButton(
               key: ValueKey('settings.permission.settings.${kind.name}'),
               onPressed: PermissionService.instance.openAppSettings,
-              child: const Text('Settings'),
+              child: Text(
+                AppLocalizations.of(context).permissionSettingsButton,
+              ),
             )
           : const Icon(Icons.chevron_right),
       onTap: _reProbe,
@@ -421,13 +422,13 @@ class _PermissionTile extends StatelessWidget {
     }
   }
 
-  static String _statusText(PermissionResult? r) {
+  static String _statusText(BuildContext context, PermissionResult? r) {
+    final l = AppLocalizations.of(context);
     return switch (r) {
-      PermissionResultGranted() => 'Granted',
-      PermissionResultDenied() => 'Not granted — tap to ask again',
-      PermissionResultPermanentlyDenied() =>
-        "Blocked. Tap 'Settings' to grant.",
-      null => 'Not asked yet — tap to ask',
+      PermissionResultGranted() => l.permissionStatusGranted,
+      PermissionResultDenied() => l.permissionStatusDenied,
+      PermissionResultPermanentlyDenied() => l.permissionStatusBlocked,
+      null => l.permissionStatusNotAsked,
     };
   }
 }
@@ -447,14 +448,15 @@ class _BackupFolderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return ValueListenableBuilder<String?>(
       valueListenable: SettingsService.instance.backupFolderUri,
       builder: (context, uri, _) {
         return ListTile(
           key: const ValueKey('settings.permission.backupFolder'),
           leading: const Icon(Icons.folder_outlined),
-          title: const Text('Backup folder'),
-          subtitle: Text(uri ?? 'Not picked — tap to pick'),
+          title: Text(l.permissionBackupFolderTitle),
+          subtitle: Text(uri ?? l.permissionBackupFolderNotPicked),
           trailing: uri == null
               ? const Icon(Icons.chevron_right)
               : TextButton(
@@ -462,7 +464,7 @@ class _BackupFolderTile extends StatelessWidget {
                     'settings.permission.backupFolder.repick',
                   ),
                   onPressed: () => _rePick(context),
-                  child: const Text('Re-pick'),
+                  child: Text(l.permissionBackupFolderRePick),
                 ),
           onTap: uri == null ? () => _rePick(context) : null,
         );
@@ -471,6 +473,7 @@ class _BackupFolderTile extends StatelessWidget {
   }
 
   Future<void> _rePick(BuildContext context) async {
+    final l = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final result = await PermissionService.instance.requestBackupFolder();
     if (!context.mounted) return;
@@ -478,7 +481,7 @@ class _BackupFolderTile extends StatelessWidget {
       case BackupFolderPicked(:final path):
         SettingsService.instance.setBackupFolderUri(path);
         messenger.showSnackBar(
-          SnackBar(content: Text('Backup folder set: $path')),
+          SnackBar(content: Text(l.permissionBackupFolderSet(path))),
         );
       case BackupFolderCancelled():
         // Silent: the user cancelled, the previous URI
@@ -491,7 +494,7 @@ class _BackupFolderTile extends StatelessWidget {
         break;
       case BackupFolderError(:final message):
         messenger.showSnackBar(
-          SnackBar(content: Text('Folder picker error: $message')),
+          SnackBar(content: Text(l.permissionBackupFolderError(message))),
         );
     }
   }
@@ -563,16 +566,17 @@ class _CallScreeningTileState extends State<_CallScreeningTile>
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final held = _held;
     final subtitle = switch (held) {
-      null => 'Checking…',
-      true => 'Held — Japan routine can intercept calls.',
-      false => 'Not held — tap "Change" to grant the role.',
+      null => l.permissionCallScreeningChecking,
+      true => l.permissionCallScreeningHeld,
+      false => l.permissionCallScreeningNotHeld,
     };
     return ListTile(
       key: const ValueKey('settings.permission.callScreening'),
       leading: const Icon(Icons.call_outlined),
-      title: const Text('Call-screening role'),
+      title: Text(l.permissionCallScreeningTitle),
       subtitle: Text(subtitle),
       trailing: _busy
           ? const SizedBox(
@@ -584,7 +588,11 @@ class _CallScreeningTileState extends State<_CallScreeningTile>
           : TextButton(
               key: const ValueKey('settings.permission.callScreening.change'),
               onPressed: _request,
-              child: Text(held == true ? 'Change' : 'Grant'),
+              child: Text(
+                held == true
+                    ? l.permissionCallScreeningChange
+                    : l.permissionCallScreeningGrant,
+              ),
             ),
       onTap: _busy ? null : _request,
     );

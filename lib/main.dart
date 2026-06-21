@@ -29,6 +29,7 @@ import 'package:doit/services/template_repository.dart';
 import 'package:doit/templates/template_library.dart';
 import 'package:doit/routines/routine_executor.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 Future<void> main() async {
@@ -164,6 +165,19 @@ class DoItApp extends StatelessWidget {
             theme: AppTheme.light,
             darkTheme: AppTheme.dark,
             themeMode: mode,
+            // v1.1h / ADR-031 / SYS-087: wire the
+            // generated `AppLocalizations` delegate into
+            // MaterialApp. The delegate is a
+            // `LocalizationsDelegate<AppLocalizations>`
+            // that loads the right ARB on
+            // `Locale` change; the supported list is
+            // `[en, es]` today (mirrored by
+            // `AppLocalizations.supportedLocales`). The
+            // AppBar titles, snackbars, and onboarding
+            // copy are pulled from this delegate instead
+            // of hardcoded `Text('...')`.
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: (firstLaunchOverride ?? !firstLaunchDone)
                 ? OnboardingScreen(
                     // v0.4a.3 (SYS-059): persist the flag so the

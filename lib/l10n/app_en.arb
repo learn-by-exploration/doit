@@ -1,0 +1,131 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "do it",
+  "@appTitle": {
+    "description": "The app display name shown in the launcher and About section."
+  },
+
+  "homeAppBarTitle": "do it",
+  "@homeAppBarTitle": {
+    "description": "Home screen AppBar title. Mirrors the app name for the non-selection mode."
+  },
+  "homeSelectionAppBarTitle": "{count, plural, =0{No selection} =1{1 selected} other{{count} selected}}",
+  "@homeSelectionAppBarTitle": {
+    "description": "Home screen AppBar title when the user has entered selection mode.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "compact"
+      }
+    }
+  },
+  "homeSnackbarMarkedDone": "Marked done.",
+  "homeSnackbarMarkedCount": "Marked {count} do(s) done.",
+  "@homeSnackbarMarkedCount": {
+    "description": "Snackbar copy after a bulk-mark operation.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "compact"
+      }
+    }
+  },
+  "homeEmptyTitle": "No dos yet.",
+  "homeRetryButton": "Retry",
+  "homeAddSheetNewDo": "New do",
+  "homeAddSheetNewPerson": "New person",
+  "homeAddSheetFromTemplate": "From template",
+
+  "settingsAppBarTitle": "Settings",
+  "settingsSectionAppearance": "Appearance",
+  "settingsSectionAnchor": "Wake-up anchor",
+  "settingsSectionPermissions": "Permissions",
+  "settingsSectionReliability": "Reliability",
+  "settingsSectionDeviceState": "Device state",
+  "settingsSectionBackup": "Backup",
+  "settingsSectionAbout": "About",
+  "settingsThemeDark": "Dark",
+  "settingsThemeLight": "Light",
+  "settingsThemeSystem": "System",
+  "settingsAnchorManual": "Manual — I tap \"I'm up\"",
+  "settingsAnchorFirstUnlock": "First unlock of the day",
+  "settingsAnchorEither": "Either, with confirmation",
+  "settingsReminderReliabilityTitle": "Reminder reliability",
+  "settingsReminderReliabilityOptimal": "Optimal — exact alarm granted.",
+  "settingsReminderReliabilityDegraded": "Degraded — using WorkManager fallback.",
+  "settingsReminderReliabilityUnknown": "Unknown — first launch, probe pending.",
+  "settingsTestReminderTitle": "Send a test reminder",
+  "settingsTestReminderSubtitle": "Fires a notification in ~5 seconds.",
+  "settingsTestReminderSnackbar": "Test reminder scheduled for 5s from now.",
+  "settingsRestoreTitle": "Restore from backup",
+  "settingsRestoreSubtitle": "Pick a do it .json backup file.",
+  "settingsAboutAppVersion": "{version} — local-only. See PRIVACY.md for the data we store and the data we do not.",
+  "@settingsAboutAppVersion": {
+    "description": "About-section subtitle. Carries the version string verbatim.",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsLicensesTitle": "Open source licenses",
+  "settingsLicensesSubtitle": "Flutter, Drift, flutter_local_notifications, …",
+
+  "permissionNotificationsTitle": "Notifications",
+  "permissionContactsTitle": "Contacts",
+  "permissionExactAlarmTitle": "Exact alarms",
+  "permissionLocationTitle": "Location",
+  "permissionCalendarTitle": "Calendar",
+  "permissionUsageStatsTitle": "Usage access",
+  "permissionStatusGranted": "Granted",
+  "permissionStatusDenied": "Not granted — tap to ask again",
+  "permissionStatusBlocked": "Blocked. Tap 'Settings' to grant.",
+  "permissionStatusNotAsked": "Not asked yet — tap to ask",
+  "permissionSettingsButton": "Settings",
+  "permissionBackupFolderTitle": "Backup folder",
+  "permissionBackupFolderNotPicked": "Not picked — tap to pick",
+  "permissionBackupFolderRePick": "Re-pick",
+  "permissionBackupFolderSet": "Backup folder set: {path}",
+  "@permissionBackupFolderSet": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "permissionBackupFolderError": "Folder picker error: {message}",
+  "@permissionBackupFolderError": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "permissionCallScreeningTitle": "Call-screening role",
+  "permissionCallScreeningChecking": "Checking…",
+  "permissionCallScreeningHeld": "Held — Japan routine can intercept calls.",
+  "permissionCallScreeningNotHeld": "Not held — tap \"Change\" to grant the role.",
+  "permissionCallScreeningChange": "Change",
+  "permissionCallScreeningGrant": "Grant",
+
+  "onboardingAppBarTitle": "Welcome to do it",
+  "onboardingLastStepAppBarTitle": "Last step",
+  "onboardingStepNotificationsTitle": "Notifications",
+  "onboardingStepNotificationsBody": "do it sends a daily reminder for each do. Android asks for the notification permission once.",
+  "onboardingStepNotificationsCta": "Allow",
+  "onboardingStepContactsTitle": "Contacts",
+  "onboardingStepContactsBody": "If you add a \"cadence\" do — call Mom every Sunday — do it reads the contact you pick. It never imports the whole address book.",
+  "onboardingStepContactsCta": "Allow",
+  "onboardingStepExactAlarmsTitle": "Exact alarms",
+  "onboardingStepExactAlarmsBody": "Exact alarms fire reminders on the minute, not up to 15 minutes late. If you decline, do it falls back to a best-effort schedule.",
+  "onboardingStepExactAlarmsCta": "Allow",
+  "onboardingStepBackupFolderTitle": "Backup folder",
+  "onboardingStepBackupFolderBody": "Pick a folder on your phone (or SD card) for nightly auto-backups. do it writes a single encrypted file; the folder stays yours.",
+  "onboardingStepBackupFolderCta": "Pick folder",
+  "onboardingStepCallScreeningTitle": "Call-screening role",
+  "onboardingStepCallScreeningBody": "Optional: let do it screen incoming calls so the Japan routine can ring specific contacts through silent mode. Android will ask you to confirm.",
+  "onboardingStepCallScreeningCta": "Grant",
+  "onboardingSkipCta": "Skip",
+  "onboardingOpenAndroidSettingsCta": "Open Android settings"
+}

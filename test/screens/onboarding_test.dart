@@ -17,10 +17,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import '../support/localized_app.dart';
+
 Widget _wrap({required VoidCallback onDone}) {
   return ChangeNotifierProvider<SettingsService>.value(
     value: SettingsService.instance,
-    child: MaterialApp(
+    // v1.1h / ADR-031 / SYS-087: route through
+    // `localizedApp` so the v1.1h `AppLocalizations`
+    // delegate is wired (otherwise
+    // `AppLocalizations.of(context)` returns null in
+    // the new OnboardingScreen build).
+    child: localizedApp(
       theme: AppTheme.dark,
       home: OnboardingScreen(onDone: onDone),
     ),

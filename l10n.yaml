@@ -1,0 +1,20 @@
+# l10n configuration for `flutter gen-l10n`.
+#
+# v1.1h / ADR-031 / SYS-087: the first ARB extraction.
+# `arb-dir` is the source-of-truth directory (one .arb file
+# per supported locale). `template-arb-file` is the master
+# locale that other ARB files are diffed against at codegen
+# time. `output-localization-file` is the class name written
+# to `.dart_tool/.../app_localizations.dart`.
+#
+# `nullable-getter false` is the v1.1h default — a missing
+# key in a non-template ARB is a hard analyzer error, which
+# matches the project rule that a localisation gap is a
+# defect (see ADR-031 § Lesson 2). Set to `true` only if we
+# ever ship a locale we knowingly leave partial.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+output-dir: lib/l10n/gen
+nullable-getter: false

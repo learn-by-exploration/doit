@@ -26,6 +26,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:doit/do/do.dart';
+import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/reminder_service.dart';
@@ -114,15 +115,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _exitSelectMode();
     _refresh();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Marked ${_selected.length} do(s) done.')),
+      SnackBar(
+        content: Text(
+          AppLocalizations.of(
+            context,
+          ).homeSnackbarMarkedCount(_selected.length),
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(_selectMode ? '${_selected.length} selected' : 'do it'),
+        title: Text(
+          _selectMode
+              ? l.homeSelectionAppBarTitle(_selected.length)
+              : l.homeAppBarTitle,
+        ),
         leading: _selectMode
             ? IconButton(
                 key: const ValueKey('home.cancel_select'),
@@ -347,7 +359,11 @@ class _HabitTile extends StatelessWidget {
                     iconSize: Sizing.tapHome / 2,
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Marked done.')),
+                        SnackBar(
+                          content: Text(
+                            AppLocalizations.of(context).homeSnackbarMarkedDone,
+                          ),
+                        ),
                       );
                     },
                   ),
@@ -568,7 +584,10 @@ class _EmptyState extends StatelessWidget {
               color: Theme.of(context).colorScheme.outline,
             ),
             const SizedBox(height: Spacing.md),
-            Text('No dos yet.', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              AppLocalizations.of(context).homeEmptyTitle,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: Spacing.sm),
             Text(
               'Tap the + to add a do or a person.',
@@ -596,7 +615,10 @@ class _ErrorView extends StatelessWidget {
           children: [
             Text(message),
             const SizedBox(height: Spacing.md),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
+            FilledButton(
+              onPressed: onRetry,
+              child: Text(AppLocalizations.of(context).homeRetryButton),
+            ),
           ],
         ),
       ),
@@ -648,6 +670,7 @@ class _AddSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -655,19 +678,19 @@ class _AddSheet extends StatelessWidget {
           ListTile(
             key: const ValueKey('home.fab.habit'),
             leading: const Icon(Icons.checklist),
-            title: const Text('New do'),
+            title: Text(l.homeAddSheetNewDo),
             onTap: () => Navigator.of(context).pop(_AddChoice.habit),
           ),
           ListTile(
             key: const ValueKey('home.fab.person'),
             leading: const Icon(Icons.person_add_alt_1),
-            title: const Text('New person'),
+            title: Text(l.homeAddSheetNewPerson),
             onTap: () => Navigator.of(context).pop(_AddChoice.person),
           ),
           ListTile(
             key: const ValueKey('home.fab.template'),
             leading: const Icon(Icons.dashboard_customize),
-            title: const Text('From template'),
+            title: Text(l.homeAddSheetFromTemplate),
             onTap: () => Navigator.of(context).pop(_AddChoice.template),
           ),
           const SizedBox(height: Spacing.md),

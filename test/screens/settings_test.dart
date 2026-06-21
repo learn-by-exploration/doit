@@ -22,10 +22,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
 import 'package:provider/provider.dart';
 
+import '../support/localized_app.dart';
+
 Widget _wrap() {
   return ChangeNotifierProvider<SettingsService>.value(
     value: SettingsService.instance,
-    child: MaterialApp(theme: AppTheme.dark, home: const SettingsScreen()),
+    // v1.1h / ADR-031 / SYS-087: route through
+    // `localizedApp` to wire the generated
+    // `AppLocalizations` delegate (the Settings screen's
+    // section headers, permission tile titles, theme
+    // radio labels, and reliability labels are now
+    // pulled from the ARB catalog).
+    child: localizedApp(theme: AppTheme.dark, home: const SettingsScreen()),
   );
 }
 

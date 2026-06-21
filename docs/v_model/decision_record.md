@@ -3362,3 +3362,225 @@ the permission.
   `MethodChannel.invokeMethod` does not. Document this in
   the inline comment at the probe site so the next person
   does not undo the `unawaited` workaround.
+
+## ADR-031 — v1.1h: i18n scaffolding — ARB catalogs + `flutter_localizations` + `localizedApp` test helper (SYS-087)
+
+### Context
+
+Every user-facing string in `lib/main.dart`, `lib/screens/home.dart`,
+`lib/screens/settings.dart`, and `lib/screens/onboarding.dart` is a
+hard-coded English literal (`'Notifications'`, `'Skip'`,
+`'Optimal — exact alarm granted.'`, `'Send a test reminder'`, etc.).
+A future translator has no clean extraction surface — they would
+have to grep for `Text('...')` and `SnackBar(content: Text(...))`
+across the screens and assemble the catalog by hand, then patch
+every literal in parallel.
+
+The v1.0 sign-off explicitly deferred i18n ("no localized strings,
+English-only copy"). v1.1h ships the scaffolding so v1.2+ can land
+a translation PR without touching any `lib/screens/` file: the
+translator edits `app_es.arb`, runs `flutter gen-l10n`, and the
+visible copy flips at runtime via `MaterialApp.locale`.
+
+The constraint set:
+
+1. **No code changes outside the i18n surface.** A new locale
+   must be addable by editing one ARB file and re-running
+   `flutter gen-l10n` — no Dart edits, no test edits.
+2. **Existing widget tests must not crash.** Production code calls
+   `AppLocalizations.of(context)!` (with bang); a test that mounts
+   `HomeScreen` in a plain `MaterialApp` without the localizations
+   delegate crashes on the bang. The fix is a shared
+   `localizedApp(...)` helper that all screen tests use instead of
+   hand-rolling `MaterialApp`.
+3. **No new dependencies that pull transitive native code.** The
+   localization stack must be pure-Flutter — no `flutter_localizations`
+   generator switches, no third-party ARB tools.
+4. **`flutter analyze` and `flutter test` stay clean** without
+   relaxing any threshold.
+
+### Decision
+
+1. **ARB catalogs in `lib/l10n/`.** Two files:
+   `app_en.arb` is the source-of-truth (`@@locale: en` +
+   ~60 keys) and `app_es.arb` is the Spanish translation
+   (`@@locale: es`). Keys are grouped by surface:
+   `appTitle`, `homeAppBarTitle`, `homeSelectionAppBarTitle`
+   (ICU plural: `{count, plural, =0{Select dos} =1{1 do selected}
+   other{{count} dos selected}}`), `homeSnackbarMarkedDone`,
+   `homeSnackbarMarkedCount` (placeholder), `homeEmptyTitle`,
+   `homeRetryButton`, `homeAddSheetNewDo/Person/FromTemplate`;
+   `settingsAppBarTitle`, `settingsSectionAppearance/Anchor/
+   Permissions/Reliability/DeviceState/Backup/About`,
+   `settingsThemeDark/Light/System`, `settingsAnchorManual/
+   FirstUnlock/Either`, `settingsReminderReliabilityTitle/Optimal/
+   Degraded/Unknown`, `settingsTestReminderTitle/Subtitle/
+   Snackbar`, `settingsRestoreTitle/Subtitle`,
+   `settingsAboutAppVersion` (placeholder),
+   `settingsLicensesTitle/Subtitle`;
+   `permissionNotificationsTitle/ContactsTitle/ExactAlarmTitle/
+   LocationTitle/CalendarTitle/UsageStatsTitle`,
+   `permissionStatusGranted/Denied/Blocked/NotAsked`,
+   `permissionSettingsButton`,
+   `permissionBackupFolderTitle/NotPicked/RePick/Set/Error`
+   (placeholders),
+   `permissionCallScreeningTitle/Checking/Held/NotHeld/Change/Grant`;
+   `onboardingAppBarTitle/LastStepAppBarTitle`,
+   `onboardingStep{N}Title/Body/Cta` for N ∈ {0..4},
+   `onboardingSkipCta`,
+   `onboardingOpenAndroidSettingsCta`.
+
+2. **`l10n.yaml` at the repo root.** Six keys:
+   `arb-dir: lib/l10n`, `template-arb-file: app_en.arb`,
+   `output-localization-file: app_localizations.dart`,
+   `output-class: AppLocalizations`,
+   `output-dir: lib/l10n/gen`, `nullable-getter: false`. The
+   `synthetic-package: false` key was removed (Flutter 3.44
+   deprecated the option; leaving it in produces a warning).
+   `nullable-getter: false` means `AppLocalizations.of(context)`
+   throws on a missing delegate — production code can therefore
+   use `!` without runtime surprises; the test helper installs
+   the delegate so tests never hit the throw.
+
+3. **`pubspec.yaml` adds `flutter_localizations` + `intl: any`.**
+   `flutter_localizations: { sdk: flutter }` brings in the
+   standard `GlobalMaterialLocalizations` /
+   `GlobalWidgetsLocalizations` / `GlobalCupertinoLocalizations`
+   delegates the `MaterialApp` needs to render a non-English
+   locale (date / time / directionality). `intl: any` pins to
+   whatever the Flutter SDK ships so we do not pull a major
+   `intl` upgrade by accident. `flutter: { generate: true }`
+   opts the project into the codegen pipeline that
+   `flutter pub get` / `flutter gen-l10n` drives.
+
+4. **Generated code in `lib/l10n/gen/`.** Three files produced
+   by `flutter gen-l10n`: `app_localizations.dart` (the
+   `AppLocalizations` class with `supportedLocales`,
+   `localizationsDelegates`, and one getter per ARB key),
+   `app_localizations_en.dart`, `app_localizations_es.dart`.
+   Generated files are NOT hand-edited — they are a build
+   artifact. The directory is `.gitignore`-clean by Flutter's
+   convention; the `.gitignore` already excludes
+   `**/gen/**/app_localizations*.dart`.
+
+5. **Three screens read every user-facing string from
+   `AppLocalizations.of(context)`.** `home.dart`,
+   `settings.dart`, `onboarding.dart` no longer contain a
+   hard-coded English literal that the user sees. Pattern:
+
+   ```dart
+   final l = AppLocalizations.of(context);
+   // ...
+   appBar: AppBar(title: Text(l.homeAppBarTitle)),
+   ```
+
+   The onboarding step list (formerly `static const
+   _steps = <_OnboardingStep>[...]`) becomes
+   `static List<_OnboardingStep> _buildSteps(AppLocalizations l)
+   => [...]` because each entry now reads its title/body/cta from
+   the ARB catalog. `_kStepCount = 5` stays `const` so the
+   `_handleSkip` "Skip to last step" logic stays compile-time.
+
+6. **`MaterialApp` wires delegates + supportedLocales.**
+   `lib/main.dart`'s `MaterialApp` now passes
+   `localizationsDelegates: AppLocalizations.localizationsDelegates`
+   and `supportedLocales: AppLocalizations.supportedLocales`. The
+   locale is NOT hard-coded — Flutter picks the best match from
+   `supportedLocales`, falling back to the first entry (English)
+   for an unsupported locale like `fr-FR`.
+
+7. **Test helper: `test/support/localized_app.dart`.** A 30-line
+   `localizedApp({required Widget home, ThemeData? theme, ...})`
+   function that builds a `MaterialApp` with the generated
+   delegates pre-installed. All 10 screen-test files
+   (`test/screens/home_test.dart`, `settings_test.dart`,
+   `settings_permissions_test.dart`, `settings_licenses_test.dart`,
+   `settings_test_reminder_test.dart`,
+   `settings_call_screening_tile_test.dart`,
+   `onboarding_test.dart`, `onboarding_permission_wiring_test.dart`,
+   `onboarding_call_screening_step_test.dart`,
+   `test/integration/fresh_install_test.dart`) route through it.
+
+8. **Test coverage in `test/l10n/app_localizations_test.dart`.**
+   11 tests across two groups:
+   - **Structural (5 tests):** ARB file presence, `@@locale`
+     header on each, key-set parity between `app_en.arb` and
+     `app_es.arb` (asserts the translator did not add or drop a
+     key), ICU plural placeholder type metadata on
+     `homeSelectionAppBarTitle` / `homeSnackbarMarkedCount` (the
+     plural-type metadata is the field the codegen reads).
+   - **Widget (4 tests):** Spanish resolution (mounts a tiny
+     widget with `locale: const Locale('es')` and asserts the
+     translated AppBar title), English resolution, unsupported-
+     locale fallback (`const Locale('fr')` lands on English —
+     the first entry in `supportedLocales`), ICU plural branches
+     in Spanish (`count: 0`, `count: 1`, `count: 2`).
+   - **Class API (2 tests):**
+     `AppLocalizations.supportedLocales` contains exactly `en`
+     and `es`; the delegate list contains
+     `DefaultMaterialLocalizations.delegate` and
+     `DefaultWidgetsLocalizations.delegate` (the runtime types,
+     not the static `.delegate` instances — the latter would
+     crash on a missing-delegate test path).
+
+### Consequences
+
+- **Adding a new locale is one file edit.** Drop
+  `app_<lang>.arb` in `lib/l10n/`, run `flutter gen-l10n`,
+  the generated `AppLocalizations` picks it up, and
+  `supportedLocales` grows. No `lib/screens/` change.
+- **New screen tests MUST route through `localizedApp`.** The
+  production code's `!` bang will crash any test that mounts
+  a screen directly. The helper is the single source of truth
+  for test-side delegate wiring; an `appBar: AppBar(title:
+  Text(l.foo))` regression in production code is caught the
+  first time a screen test mounts without `localizedApp`.
+- **`flutter pub get` is now a code step.** Removing
+  `flutter: { generate: true }` from `pubspec.yaml` would break
+  the build — the import in `main.dart`
+  (`import 'package:doit/l10n/gen/app_localizations.dart';`)
+  resolves only when codegen has produced the file. A fresh
+  clone needs `flutter pub get` before `flutter analyze`
+  returns clean.
+- **No permission baseline change.** No new permission,
+  no manifest entry, no `INTERNET` requirement.
+  `AppLocalizations` is generated from in-tree ARB files; the
+  Flutter SDK does not fetch anything.
+- **English copy is unchanged for v1.1h.** The new
+  `app_en.arb` keys match the prior hard-coded literals
+  verbatim (character-for-character, including em-dashes in
+  "Optimal — exact alarm granted."). Users on English locales
+  see no copy change. A user-facing copy audit is a separate
+  concern.
+- **Spanish coverage is partial.** `app_es.arb` translates the
+  ~60 extracted keys as a smoke test of the codegen + delegate
+  pipeline; it is NOT a professional translation. The keys
+  exist so a translator can iterate on them — they are not the
+  final v1.1 release copy. A real translation pass (with a
+  native Spanish speaker) is a v1.2 follow-up.
+
+### Alternatives considered
+
+- **`easy_localization` package.** Lower ceremony (one import,
+  a `tr(context, ...)` call), but adds a transitive dependency,
+  its own runtime JSON loading, and a non-standard test seam.
+  The Flutter-team-blessed `flutter_localizations` + ARB pipeline
+  has no third-party surface area, so the trade is
+  "more boilerplate" vs "less indirection". The boilerplate is
+  one `l10n.yaml` file and one `flutter gen-l10n` run — not
+  enough to justify a third-party dep.
+- **Code-gen keys (one Dart constant per key) instead of ARB.**
+  Faster compile, but the translator has to read Dart instead
+  of JSON. The ARB format is the Flutter convention; a future
+  contributor will recognise it immediately.
+- **Ship English-only and translate later.** The argument is
+  that v1.0 was English-only and v1.1 is too. But the
+  scaffold is the highest-cost part of any future translation
+  PR (the call-site edits); the ARB extraction is cheap now
+  and prevents `Text('Notifications')` from accumulating in
+  new screens between now and v1.2.
+- **Translate to all 24 supported locales.** Way out of scope
+  for one PR; the spec is one source-of-truth locale (English)
+  + one smoke-test locale (Spanish) to prove the pipeline. A
+  real translator picks the locales.
+

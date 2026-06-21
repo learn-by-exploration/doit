@@ -17,8 +17,17 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   cupertino_icons: ^1.0.8
+
+  # i18n message catalogs. The `intl` package ships the
+  # `DateFormat` / `NumberFormat` helpers consumed by
+  # `intl_message_format` (the ARB runtime), and `gen-l10n`
+  # uses it for placeholder + select parsing at code-gen
+  # time. v1.1h / ADR-031 / SYS-087.
+  intl: any
 
   # v0.1 baseline dependencies (see
   # docs/v_model/architecture_options.md § Baseline Tech Stack).
@@ -103,3 +112,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # v1.1h / ADR-031 / SYS-087: turn on `gen-l10n`. The
+  # source-of-truth ARB files live under `lib/l10n/`; the
+  # generated `AppLocalizations` class is written to
+  # `.dart_tool/flutter_gen/gen_l10n/` and re-exported
+  # through `package:flutter_gen/gen_l10n/app_localizations.dart`.
+  # `synthetic-package: false` keeps the generated files
+  # out of `package:flutter_gen` so the project does not
+  # pick up a parallel package_config on the next
+  # `flutter pub get`.
+  generate: true

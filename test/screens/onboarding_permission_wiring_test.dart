@@ -60,10 +60,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
 import 'package:provider/provider.dart';
 
+import '../support/localized_app.dart';
+
 Widget _wrap({required VoidCallback onDone}) {
   return ChangeNotifierProvider<SettingsService>.value(
     value: SettingsService.instance,
-    child: MaterialApp(
+    // v1.1h / ADR-031 / SYS-087: route through
+    // `localizedApp` so the generated `AppLocalizations`
+    // delegate is wired. The plain `MaterialApp` below
+    // would have made `AppLocalizations.of(context)`
+    // return null and the new OnboardingScreen build
+    // would crash.
+    child: localizedApp(
       theme: AppTheme.dark,
       home: OnboardingScreen(onDone: onDone),
     ),

@@ -29,6 +29,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import '../support/localized_app.dart';
+
 Future<void> _resetDb(WidgetTester tester) async {
   await AppDatabaseService.instance.closeForTesting();
   final db = AppDatabase(NativeDatabase.memory());
@@ -41,14 +43,22 @@ Future<void> _resetDb(WidgetTester tester) async {
 Widget _wrapHome() {
   return ChangeNotifierProvider<SettingsService>.value(
     value: SettingsService.instance,
-    child: MaterialApp(theme: AppTheme.dark, home: const HomeScreen()),
+    // v1.1h / ADR-031 / SYS-087: route through `localizedApp`
+    // so `AppLocalizations.of(context)` resolves. The home
+    // screen reads its AppBar title and snackbar copy from
+    // the generated ARB catalog.
+    child: localizedApp(theme: AppTheme.dark, home: const HomeScreen()),
   );
 }
 
 Widget _wrapOnboarding({required VoidCallback onDone}) {
   return ChangeNotifierProvider<SettingsService>.value(
     value: SettingsService.instance,
-    child: MaterialApp(
+    // v1.1h / ADR-031 / SYS-087: route through `localizedApp`
+    // so `AppLocalizations.of(context)` resolves. The
+    // onboarding step labels are now pulled from the
+    // generated ARB catalog.
+    child: localizedApp(
       theme: AppTheme.dark,
       home: OnboardingScreen(onDone: onDone),
     ),

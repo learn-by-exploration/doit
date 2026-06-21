@@ -13,10 +13,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import '../support/localized_app.dart';
+
 Widget _wrap() {
   return ChangeNotifierProvider<SettingsService>.value(
     value: SettingsService.instance,
-    child: MaterialApp(theme: AppTheme.dark, home: const SettingsScreen()),
+    // v1.1h / ADR-031 / SYS-087: route through
+    // `localizedApp` to wire the generated
+    // `AppLocalizations` delegate.
+    child: localizedApp(theme: AppTheme.dark, home: const SettingsScreen()),
   );
 }
 

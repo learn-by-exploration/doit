@@ -26,6 +26,7 @@
 
 import 'package:flutter/material.dart';
 
+import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/services/call_interceptor.dart';
 import 'package:doit/services/permission_result.dart';
@@ -47,6 +48,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   AnchorMode _anchorMode = AnchorMode.manual;
   ThemeMode _themeMode = ThemeMode.dark;
 
+  /// Total number of permission-step screens in the
+  /// onboarding flow. Pinned as a constant because the
+  /// step list is rebuilt from `AppLocalizations.of(context)`
+  /// inside `build` (we cannot keep a `static const` of
+  /// localized strings), and `_handleSkip` /
+  /// `_handleStepCta` consult the count outside the
+  /// `build` context. Mirrors the length of
+  /// `_buildSteps(...)` (5 steps: Notifications, Contacts,
+  /// Exact alarms, Backup folder, Call-screening role).
+  /// If a future PR adds or removes a step, this constant
+  /// MUST be updated in lockstep.
+  static const int _kStepCount = 5;
+
   // v0.5c (ADR-016) state for the permission-step UX.
   // - `_inFlight` blocks double-taps while a system dialog or
   //   SAF picker is open. The CTA's `onPressed` consults
@@ -63,61 +77,50 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String? _rationaleText;
   bool _goToSettingsVisible = false;
 
-  static const _steps = <_OnboardingStep>[
-    _OnboardingStep(
-      title: 'Notifications',
-      body:
-          'do it sends a daily reminder for each do. Android '
-          'asks for the notification permission once.',
-      cta: 'Allow',
-    ),
-    _OnboardingStep(
-      title: 'Contacts',
-      body:
-          'If you add a "cadence" do — call Mom every Sunday — '
-          'do it reads the contact you pick. It never imports the '
-          'whole address book.',
-      cta: 'Allow',
-    ),
-    _OnboardingStep(
-      title: 'Exact alarms',
-      body:
-          'Exact alarms fire reminders on the minute, not up to '
-          '15 minutes late. If you decline, do it falls back to a '
-          'best-effort schedule.',
-      cta: 'Allow',
-    ),
-    _OnboardingStep(
-      title: 'Backup folder',
-      body:
-          'Pick a folder on your phone (or SD card) for nightly '
-          'auto-backups. do it writes a single encrypted file; the '
-          'folder stays yours.',
-      cta: 'Pick folder',
-    ),
-    // Phase F PR 2 (SYS-075 / SYS-079). Opt-in to the
-    // call-screening role so the Japan routine can intercept
-    // matched contacts. The role is opt-in on Android Q+;
-    // older OS versions silently skip the grant. The step
-    // is skippable: a user who declines stays on the next
-    // step (anchor mode) and can grant the role later from
-    // Settings.
-    _OnboardingStep(
-      title: 'Call-screening role',
-      body:
-          'Optional: let do it screen incoming calls so the '
-          'Japan routine can ring specific contacts through '
-          'silent mode. Android will ask you to confirm.',
-      cta: 'Grant',
-    ),
-  ];
+  static List<_OnboardingStep> _buildSteps(AppLocalizations l) =>
+      <_OnboardingStep>[
+        _OnboardingStep(
+          title: l.onboardingStepNotificationsTitle,
+          body: l.onboardingStepNotificationsBody,
+          cta: l.onboardingStepNotificationsCta,
+        ),
+        _OnboardingStep(
+          title: l.onboardingStepContactsTitle,
+          body: l.onboardingStepContactsBody,
+          cta: l.onboardingStepContactsCta,
+        ),
+        _OnboardingStep(
+          title: l.onboardingStepExactAlarmsTitle,
+          body: l.onboardingStepExactAlarmsBody,
+          cta: l.onboardingStepExactAlarmsCta,
+        ),
+        _OnboardingStep(
+          title: l.onboardingStepBackupFolderTitle,
+          body: l.onboardingStepBackupFolderBody,
+          cta: l.onboardingStepBackupFolderCta,
+        ),
+        // Phase F PR 2 (SYS-075 / SYS-079). Opt-in to the
+        // call-screening role so the Japan routine can intercept
+        // matched contacts. The role is opt-in on Android Q+;
+        // older OS versions silently skip the grant. The step
+        // is skippable: a user who declines stays on the next
+        // step (anchor mode) and can grant the role later from
+        // Settings.
+        _OnboardingStep(
+          title: l.onboardingStepCallScreeningTitle,
+          body: l.onboardingStepCallScreeningBody,
+          cta: l.onboardingStepCallScreeningCta,
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
-    if (_step < _steps.length) {
-      final s = _steps[_step];
+    final l = AppLocalizations.of(context);
+    final steps = _buildSteps(l);
+    if (_step < steps.length) {
+      final s = steps[_step];
       return Scaffold(
-        appBar: AppBar(title: const Text('Welcome to do it')),
+        appBar: AppBar(title: Text(l.onboardingAppBarTitle)),
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(Spacing.lg),
@@ -162,11 +165,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   FilledButton.tonal(
                     key: const ValueKey('onboarding.openAndroidSettings'),
                     onPressed: _inFlight ? null : _openAndroidSettings,
-                    child: const Text('Open Android settings'),
+                    child: Text(l.onboardingOpenAndroidSettingsCta),
                   ),
                   const SizedBox(height: Spacing.sm),
                 ],
-                TextButton(onPressed: _handleSkip, child: const Text('Skip')),
+                TextButton(
+                  onPressed: _handleSkip,
+                  child: Text(l.onboardingSkipCta),
+                ),
               ],
             ),
           ),
@@ -175,7 +181,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
     // Last step — anchor mode + theme + finish.
     return Scaffold(
-      appBar: AppBar(title: const Text('Last step')),
+      appBar: AppBar(title: Text(l.onboardingLastStepAppBarTitle)),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(Spacing.lg),
@@ -371,7 +377,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   /// exits the onboarding flow entirely — that split is
   /// regression-tested by `onboarding_permission_wiring_test.dart`.
   void _handleSkip() {
-    if (_step >= _steps.length - 1) {
+    if (_step >= _kStepCount - 1) {
       setState(() => _step++);
     } else {
       widget.onDone();
