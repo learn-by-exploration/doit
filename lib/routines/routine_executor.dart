@@ -60,7 +60,11 @@ import 'package:doit/triggers/trigger.dart'
         TriggerLocationExit,
         TriggerScreenOff,
         TriggerScreenOn;
-import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
+import 'package:doit/reminders/alarm_scheduler.dart';
+import 'package:doit/reminders/notification_service.dart';
+import 'package:doit/services/reminder_service.dart';
+import 'package:flutter/foundation.dart'
+    show ValueListenable, ValueNotifier, debugPrint, kDebugMode;
 import 'package:meta/meta.dart';
 
 /// The executor singleton. One per app process; lives for
@@ -83,6 +87,37 @@ class RoutineExecutor {
 
   // entityId → automations
   final Map<String, List<Automation>> _registry = HashMap();
+
+  // v1.1 (SYS-082). Pending `ActionOpenApp` requests queued
+  // by the dispatch path. The executor is a non-Flutter
+  // singleton; it cannot push routes directly, so it appends
+  // a `RoutineOpenAppRequest` here and a home-screen listener
+  // (PR 6's `RoutineBanner`) drains the list on resume + on
+  // each append. The list is unmodifiable from the consumer's
+  // perspective; only [appendOpenApp] (or the test-only
+  // [resetForTesting]) mutates it.
+  final ValueNotifier<List<RoutineOpenAppRequest>> _pendingOpenApp =
+      ValueNotifier<List<RoutineOpenAppRequest>>(<RoutineOpenAppRequest>[]);
+  ValueListenable<List<RoutineOpenAppRequest>> get pendingOpenApp =>
+      _pendingOpenApp;
+
+  /// Append a `RoutineOpenAppRequest` to the pending queue.
+  /// Fires the `ValueListenable` notification. Internal;
+  /// `_dispatchAction` is the only caller.
+  void appendOpenApp(RoutineOpenAppRequest req) {
+    final next = <RoutineOpenAppRequest>[..._pendingOpenApp.value, req];
+    _pendingOpenApp.value = List<RoutineOpenAppRequest>.unmodifiable(next);
+  }
+
+  /// Clear the pending `ActionOpenApp` queue. Called by
+  /// the home-screen `RoutineBanner` after it has pushed
+  /// the requested routes via `Navigator.pushNamed`.
+  /// Idempotent; safe to call when the queue is already
+  /// empty.
+  void clearPendingOpenApp() {
+    if (_pendingOpenApp.value.isEmpty) return;
+    _pendingOpenApp.value = const <RoutineOpenAppRequest>[];
+  }
 
   StreamSubscription<GeofenceEvent>? _geofenceSub;
   StreamSubscription<DeviceStateSnapshot>? _deviceStateSub;
@@ -143,6 +178,7 @@ class RoutineExecutor {
     lastDeviceState = null;
     lastIsBusy = null;
     _registry.clear();
+    _pendingOpenApp.value = const <RoutineOpenAppRequest>[];
   }
 
   /// Attach [automations] to [entityId] (a Do/Event/Person
@@ -242,6 +278,9 @@ class RoutineExecutor {
           continue;
         }
         _controller.add(AutomationFired(automation: a, at: now));
+        // v1.1 (SYS-082). Dispatch the action side-effect for
+        // every matched automation, not just call events.
+        unawaited(_dispatchAction(a));
       }
     });
   }
@@ -281,6 +320,8 @@ class RoutineExecutor {
         }
         if (!_deviceStateMatches(trigger, current, previous)) continue;
         _controller.add(AutomationFired(automation: a, at: now));
+        // v1.1 (SYS-082). Dispatch the action side-effect.
+        unawaited(_dispatchAction(a));
       }
     });
   }
@@ -365,6 +406,8 @@ class RoutineExecutor {
         }
         if (!_calendarMatches(trigger, event, previousIsBusy)) continue;
         _controller.add(AutomationFired(automation: a, at: now));
+        // v1.1 (SYS-082). Dispatch the action side-effect.
+        unawaited(_dispatchAction(a));
       }
     });
   }
@@ -452,14 +495,11 @@ class RoutineExecutor {
           continue;
         }
         _controller.add(AutomationFired(automation: a, at: now));
-        // Phase F PR 1 wires `ActionCallIntercept` and
-        // `ActionOverrideSilent` to the live
-        // [CallInterceptorService] side-effects. The two
-        // action leaves are dispatched inline (in addition
-        // to the AutomationFired event for any debug
-        // subscribers) so a configured Japan routine
-        // actually does something at runtime.
-        unawaited(_dispatchCallAction(a));
+        // v1.1 (SYS-082). Dispatch the action side-effect.
+        // Phase F PR 1 wired only `ActionOverrideSilent` +
+        // `ActionCallIntercept` here; the generalized
+        // `_dispatchAction` handles all five leaves.
+        unawaited(_dispatchAction(a));
       }
     });
   }
@@ -478,40 +518,87 @@ class RoutineExecutor {
         contactIds: CallInterceptorService.instance.contactIds,
       );
 
-  /// Dispatch a call-related action's side-effect. The
-  /// matching engine already emitted an `AutomationFired`
-  /// event on the broadcast stream; this method is the
-  /// actual platform invocation.
+  /// Dispatch the action side-effect for [a]. v1.1
+  /// (SYS-082) generalizes Phase F PR 1's
+  /// `_dispatchCallAction` (which only handled
+  /// `ActionOverrideSilent` + `ActionCallIntercept`) into
+  /// a five-leaf switch over the sealed [Action] type.
   ///
-  ///   - `ActionOverrideSilent` snaps the ringer to the
-  ///     configured target mode.
-  ///   - `ActionCallIntercept` is currently a no-op on
-  ///     the executor side (the Kotlin `CallScreeningService`
-  ///     already routed the call); it exists so the
-  ///     routine UI can light up a "Japan routine fired"
-  ///     affordance. Phase F PR 2 wires the dismiss
-  ///     → `restorePriorRinger()` path.
-  Future<void> _dispatchCallAction(Automation a) async {
+  /// Each leaf is wrapped in [_safe] so a platform
+  /// exception (`CallInterceptorService` not initialized,
+  /// `NotificationService` not initialized, etc.) is
+  /// swallowed behind [kDebugMode] and the matching engine's
+  /// `AutomationFired` event still fires — the UI side
+  /// always sees the fire.
+  ///
+  ///   - `ActionOverrideSilent` snaps the ringer via
+  ///     `CallInterceptorService.setRingerMode`.
+  ///   - `ActionNotify` shows a system notification via
+  ///     `ReminderService.instance.notifications.show`.
+  ///   - `ActionFullscreen` is a no-op on the executor
+  ///     side; routines have no parent Do row to anchor
+  ///     a full-screen activity. The `AutomationFired`
+  ///     event drives the home-screen `RoutineBanner`
+  ///     (PR 6) instead.
+  ///   - `ActionCallIntercept` is a no-op on the executor
+  ///     side; the Kotlin `CallScreeningService` already
+  ///     routed the call. Kept for future analytics /
+  ///     debug affordances (ADR-019).
+  ///   - `ActionOpenApp` appends a `RoutineOpenAppRequest`
+  ///     to [pendingOpenApp]; the home-screen listener
+  ///     drains it on resume + on each append.
+  Future<void> _dispatchAction(Automation a) async {
     final action = a.action;
     if (action is ActionOverrideSilent) {
-      try {
+      await _safe('setRingerMode', () async {
         await CallInterceptorService.instance.setRingerMode(
           _toRingerMode(action.targetMode),
         );
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint(
-            'RoutineExecutor._dispatchCallAction: '
-            'setRingerMode failed: $e',
-          );
-        }
+      });
+    } else if (action is ActionNotify) {
+      await _safe('showNotification', () async {
+        // ReminderService wraps NotificationService. The
+        // singleton init gate throws `StateError` if the
+        // app's `main.dart` did not call
+        // `ReminderService.init(...)`; that throws out of
+        // this closure and `_safe` swallows it behind
+        // `kDebugMode`.
+        await ReminderService.instance.notifications.show(
+          ReminderEvent(
+            habitId: a.id,
+            habitName: action.title,
+            body: action.body,
+            at: DateTime.now(),
+            alarmId: const AlarmId(-1),
+          ),
+        );
+      });
+    } else if (action is ActionFullscreen) {
+      // Surfaced via the home-screen RoutineBanner; executor
+      // is non-Flutter. AutomationFired event already
+      // published; banner listener picks it up.
+    } else if (action is ActionCallIntercept) {
+      // No-op on the executor side (ADR-019): the Kotlin
+      // CallScreeningService already routed the call. The
+      // AutomationFired event drives the debug chip.
+    } else if (action is ActionOpenApp) {
+      appendOpenApp(
+        RoutineOpenAppRequest(route: action.route, at: DateTime.now()),
+      );
+    }
+  }
+
+  /// Swallow a platform-exception and `debugPrint` behind
+  /// [kDebugMode]. Used by [_dispatchAction] so a single
+  /// broken service does not break the dispatch chain.
+  Future<void> _safe(String label, Future<void> Function() fn) async {
+    try {
+      await fn();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('RoutineExecutor._dispatchAction($label) failed: $e');
       }
     }
-    // ActionCallIntercept is a no-op on the executor side:
-    // the Kotlin service already routed the call. The
-    // matching engine's AutomationFired event drives the
-    // UI feedback (a debug "Japan routine fired" chip on
-    // the home screen / settings debug screen).
   }
 
   /// Map the model's `SilentMode` enum to the

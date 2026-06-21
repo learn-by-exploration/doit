@@ -509,6 +509,32 @@ class AutomationFired {
 }
 
 // ---------------------------------------------------------------------------
+// v1.1 (SYS-082) — open-app request envelope.
+// ---------------------------------------------------------------------------
+
+/// A request from the routine dispatcher for the home screen
+/// (or any shell navigator listener) to push a Flutter
+/// route. Produced when an automation with `ActionOpenApp`
+/// fires; consumed by the home-screen `RoutineBanner` widget.
+///
+/// The executor is a singleton with no Flutter dependency;
+/// it cannot push routes directly. Instead it appends a
+/// `RoutineOpenAppRequest` to a `ValueListenable` that the
+/// home screen drains on resume + on each change.
+@immutable
+class RoutineOpenAppRequest {
+  const RoutineOpenAppRequest({required this.route, required this.at});
+
+  /// The route to navigate to (e.g., `/event` or `do/<id>`).
+  /// Forwarded verbatim to `Navigator.pushNamed`.
+  final String route;
+
+  /// When the request was produced. Wall-clock at the call
+  /// site.
+  final DateTime at;
+}
+
+// ---------------------------------------------------------------------------
 // Validation exceptions.
 // ---------------------------------------------------------------------------
 

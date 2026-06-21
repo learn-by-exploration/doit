@@ -32,6 +32,7 @@ import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/widgets/category_chip.dart';
 import 'package:doit/widgets/reliability_banner.dart';
+import 'package:doit/widgets/routine_banner.dart';
 import 'package:doit/screens/add_habit.dart';
 import 'package:doit/screens/add_person.dart';
 import 'package:doit/screens/settings.dart';
@@ -160,6 +161,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         child: Column(
           children: [
             ReliabilityBanner.fromService(),
+            const RoutineBanner(),
             const _AddAnchorButton(),
             Expanded(
               child: FutureBuilder<List<Do>>(

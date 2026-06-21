@@ -2461,3 +2461,197 @@ the two.
   visits *every* entry (order-independent) so
   two structurally-equal maps always hash
   equal.
+
+## ADR-026 — v1.1: `ActionOpenApp` dispatch + `RoutineOpenAppRequest` + `RoutineBanner` widget (SYS-082)
+
+Date: 2026-06-21. Status: Accepted.
+Refs: SYS-082, ADR-025 (the
+`RoutineConfig` envelope), v1_1_handoff_from_v1_0g.md,
+`lib/routines/routine_executor.dart`,
+`lib/routines/routine.dart`,
+`lib/widgets/routine_banner.dart`,
+`lib/screens/home.dart`.
+
+### Context
+
+v1.0 / Phase C PR 1 (ADR-021) shipped a five-leaf
+sealed `Action` hierarchy. v1.0 / Phase F PR 1
+shipped a `_dispatchCallAction` (later
+`_dispatchAction`) that handled only the two
+call-related leaves (`ActionCallIntercept`,
+`ActionOverrideSilent`) — the other three were
+emitted into the matching engine's stream but
+had no side-effect wiring. v1.1 (SYS-082) wires
+the remaining three leaves and ships a real
+quick-action UX: a routine may now carry an
+`ActionOpenApp` that, when fired, pushes a
+named route on the home-screen navigator.
+
+### Decision
+
+**1. One dispatch function, five leaves.**
+`_dispatchAction(Automation a)` in
+`lib/routines/routine_executor.dart` is a single
+`is`-switch over the sealed `Action` type. Each
+leaf's side effect goes through the existing
+service seam (e.g. `ReminderService.instance.notifications.show`
+for `ActionNotify`,
+`CallInterceptorService.instance.setRingerMode`
+for `ActionOverrideSilent`). Each leaf is wrapped
+in a `_safe(label, fn)` helper that swallows
+platform exceptions behind `kDebugMode`'s
+`debugPrint`, so a single broken service does
+not break the dispatch chain — the matching
+engine's `AutomationFired` event still fires, and
+the UI side always sees the fire.
+
+**2. `ActionFullscreen` and `ActionCallIntercept`
+stay no-ops on the executor side.** Both have a
+side-effect path that already lives below the
+executor (`FullScreenActivity` in Kotlin for
+`ActionFullscreen`; `CallScreeningService` for
+`ActionCallIntercept`). The executor's job is
+limited to publishing `AutomationFired` so
+listeners (the home screen, the debug chip) can
+react. Future analytics / debug affordances
+attach to the `AutomationFired` event, not to a
+new side-effect path.
+
+**3. `ActionOpenApp` carries a `route` string,
+not a `Route` object.** The model is pure Dart
+and must not import `package:flutter/*`. The
+route is a string like `/settings/routines`
+that the home-screen `Navigator.pushNamed` looks
+up. The model's `validate()` asserts the route
+starts with `/`.
+
+**4. `RoutineOpenAppRequest` is a value class.**
+`{ route, at }` is enough to drive the drain. It
+is immutable, has structural `==`, and lives in
+`lib/routines/routine.dart` alongside the other
+routine-domain classes.
+
+**5. The executor owns a
+`ValueNotifier<List<RoutineOpenAppRequest>>`
+(`pendingOpenApp`).** The executor cannot push
+routes itself (it is a non-Flutter singleton;
+pulling `package:flutter/material.dart` into
+`lib/routines/` is the wrong layer boundary per
+`.claude/rules/lib-routines.md`). Instead it
+appends a `RoutineOpenAppRequest` to
+`pendingOpenApp`. A Flutter-side consumer
+drains the list.
+
+**6. The drain lives in a dedicated
+`RoutineBanner` widget.** Three reasons (in
+priority order):
+
+- **Layer boundary.** The executor cannot
+  depend on `Navigator`; the widget is the
+  natural home for the side effect.
+- **Single consumer.** The home screen is
+  currently the only consumer, but a future
+  widget-host activity (Wear OS, Android Auto,
+  the settings debug screen) will also drain
+  the queue. Putting the drain in a widget
+  means each consumer just adds
+  `const RoutineBanner()` to its tree.
+- **Passive.** When the queue is empty, the
+  banner renders `SizedBox.shrink()`. No
+  layout cost in the steady state.
+
+**7. The banner captures `NavigatorState`
+synchronously inside `build`, before the
+post-frame callback.** This is the load-bearing
+detail. The `ValueListenableBuilder` rebuild
+fires when the queue is appended to; the
+rebuild schedules a `addPostFrameCallback`
+that calls `navigator.pushNamed(req.route)`. If
+`Navigator.of(context, ...)` is called inside
+the post-frame callback, a teardown between
+build and post-frame throws "Looking up a
+deactivated widget's ancestor is unsafe." By
+capturing the `NavigatorState` while the
+builder context is still mounted, the callback
+can push routes safely even if the banner's
+own element is gone by the time the callback
+runs.
+
+**8. The banner drains FIFO and clears
+atomically.** Each `pushNamed` is wrapped in
+`try { ... } on Object catch (_) { ... }` so a
+single push failure does not break the chain
+(a misconfigured route is the caller's
+problem, not the dispatcher's). After all
+pushes (or all swallows), the banner calls
+`executor.clearPendingOpenApp()` which is
+idempotent.
+
+**9. The home screen places the banner
+directly under `ReliabilityBanner.fromService()`
+in its Column.** Both are passive listeners;
+both are zero-cost in the steady state.
+
+### Why not push from the executor via a
+`GlobalKey<NavigatorState>`?
+
+- `GlobalKey` ownership is fragile in a
+  multi-Navigator app (root vs. nested
+  navigators), and the executor has no
+  business knowing which navigator is
+  "current".
+- A side-effecting executor would couple
+  every test to a `MaterialApp` / `Navigator`
+  setUp. Today, the executor's tests are
+  pure-Dart and run in < 1 s.
+- The widget approach is one-line to add
+  to any future consumer (settings debug
+  screen, widget-host activity). The
+  `GlobalKey` approach would force every
+  consumer to register the same key.
+
+### Why not put the drain logic in
+`HomeScreen.initState` as a
+`ValueListenable` listener?
+
+- The drain needs a `Navigator`, and
+  `HomeScreen` has one. But every future
+  consumer (settings, widget-host) would
+  duplicate the same listener wiring.
+- A dedicated widget is testable in
+  isolation: a `pumpWidget(MaterialApp(home:
+  Scaffold(body: RoutineBanner())))` is
+  enough; the home screen is not.
+
+### Lessons (project-wide).
+
+- **The post-frame callback is not a
+  re-entry into `build`.** Treat it as
+  top-level code: anything `BuildContext`-derived
+  must be captured before the callback.
+  `NavigatorState` is a stable Element
+  handle, so it survives the frame
+  boundary; `BuildContext` does not.
+- **"Expose a `ValueListenable`" is the
+  default seam for a non-Flutter singleton
+  that needs a Flutter-side side effect.**
+  Three concrete wins: (a) the singleton
+  stays Flutter-free, (b) the consumer
+  decides when to drain (e.g. on
+  resume), (c) tests can drop in a stub
+  `ValueListenable` and avoid the widget
+  tree entirely.
+- **`is`-switch on a sealed class is the
+  exhaustive default.** `_dispatchAction`
+  is one function with five branches; no
+  visitor pattern, no enum, no table
+  dispatch. Sealed classes were designed
+  for this.
+- **Capture, don't reach, across async
+  gaps.** The `_safe` wrapper, the
+  captured `NavigatorState`, the captured
+  `executor` reference — all three are
+  the same pattern: resolve dependencies
+  synchronously at the call site, then
+  use the resolved value inside the async
+  closure.

@@ -308,9 +308,7 @@ void main() {
       // (user cancelled). The test asserts the picker was
       // called via the platform seam.
       var pickerCalled = 0;
-      FilePicker.platform = _ScriptedFilePicker(
-        onCall: () => pickerCalled++,
-      );
+      FilePicker.platform = _ScriptedFilePicker(onCall: () => pickerCalled++);
       addTearDown(() {
         // Restore the default FilePicker via a fresh
         // concrete subclass so subsequent tests in this
