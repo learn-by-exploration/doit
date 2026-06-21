@@ -49,6 +49,7 @@ import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/trigger.dart';
 import 'package:doit/widgets/calendar_picker.dart';
 import 'package:doit/widgets/location_picker.dart';
+import 'package:doit/widgets/automation_reliability_badge.dart';
 
 class AddEventScreen extends StatefulWidget {
   const AddEventScreen({super.key, this.existing, this.initialPayload});
@@ -618,11 +619,17 @@ class _EventRoutineRow extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       leading: const Icon(Icons.bolt_outlined),
       title: Text(summary),
-      trailing: IconButton(
-        key: const ValueKey('add_event.remove_routine'),
-        tooltip: 'Remove',
-        icon: const Icon(Icons.close),
-        onPressed: onRemove,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AutomationReliabilityBadge(automation: automation),
+          IconButton(
+            key: const ValueKey('add_event.remove_routine'),
+            tooltip: 'Remove',
+            icon: const Icon(Icons.close),
+            onPressed: onRemove,
+          ),
+        ],
       ),
     );
   }

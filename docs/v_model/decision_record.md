@@ -3016,3 +3016,164 @@ without changing the call site.
   Offset(0, -80))` after a radio-tap
   re-render clears the overlap so the
   Save button is fully tappable.
+
+## ADR-029: Per-automation reliability badge (v1.1f)
+
+**Status:** Accepted (2026-06-21). Lands in v1.1f.
+
+### Context
+
+v1.0 ships an app-wide `Reliability` enum
+(`lib/reminders/alarm_scheduler.dart`) that answers the
+question "can the system wake us up at the right time?".
+The answer is driven by exact-alarm grant + Doze + battery
+optimisation. It is rendered by `ReliabilityBanner`
+(`lib/widgets/reliability_banner.dart`) on the home screen
+and in Settings.
+
+That enum is per-device, not per-automation. A user can
+have an `optimal` global state and still have one routine
+that will never fire because `ACCESS_COARSE_LOCATION` was
+revoked (the geofence trigger), or `READ_CALENDAR` was
+revoked (the calendar trigger), or `ACTION_IGNORE_BATTERY_OPTIMIZATION`
+was unset for a device-state trigger that needs a
+foreground service.
+
+In v1.0 the user has no in-app way to see "this specific
+routine has a permission problem". The settings page has
+the global permission tile, but it does not link from a
+routine row. The routine list rows render only an icon and
+a summary; a routine that will never fire is visually
+indistinguishable from one that will.
+
+v1.0 sign-off (`docs/v_model/v1_0_release_baseline.md`)
+explicitly listed "per-automation reliability badges" as
+a v1.1 follow-up.
+
+### Decision
+
+Add a new `AutomationReliability` enum
+(`lib/routines/automation_reliability.dart`) with three
+states — `optimal` / `degraded` / `unknown` — that mirrors
+the v1.0 `Reliability` semantics on purpose so the
+existing banner and the new badge share visual language.
+
+The enum is populated by a pure function
+`automationReliability(Automation automation, {required
+Map<PermissionKind, PermissionResult?> statuses})`. The
+function is exhaustive over the sealed `Trigger`
+hierarchy via `_requiredPermissionForTrigger` —
+`TriggerLocation*` maps to `PermissionKind.location`,
+`TriggerCalendarEvent*` to `PermissionKind.calendar`,
+`TriggerDeviceState*` / `TriggerCallIncoming*` /
+`TriggerTimeOfDay` return `null` (no runtime gate). The
+switch is the canonical reference for "which triggers gate
+a permission"; adding a new leaf without updating it is a
+compile-time error.
+
+The new badge widget
+(`lib/widgets/automation_reliability_badge.dart`) lives in
+`lib/widgets/`, not in `lib/routines/`. Rationale:
+`lib/routines/` is the executor / model layer
+(`.claude/rules/lib-routines.md`: Flutter-free). The badge
+is a UI surface; it imports `package:flutter/material.dart`
+and reads `Theme.of(context).colorScheme.*`. Putting it in
+`lib/widgets/` mirrors the `ReliabilityBanner` convention.
+
+The badge wraps its body in a `ValueListenableBuilder`
+over `PermissionService.instance.statuses`. The map is
+already a `ValueNotifier<Map<PermissionKind, PermissionResult?>>`
+that fires on every permission probe, so the badge
+reactively re-renders after the user grants or revokes a
+permission without the parent screen having to call
+`setState`.
+
+For `optimal` the badge renders `SizedBox.shrink` —
+matching the `ReliabilityBanner` convention of hiding
+itself when the system is in a good state. The common case
+(most routines are `optimal`) must not clutter the
+trailing slot.
+
+For `degraded` / `unknown` the badge renders a 40×40 dp
+`IconButton` (touch target). The icon + colour tokens
+match `ReliabilityBanner`: `Icons.warning_amber_rounded`
+in `colorScheme.onErrorContainer` for `degraded`, a fresh
+`Icons.info_outline` in `colorScheme.onSecondaryContainer`
+for `unknown` (the existing banner does not render
+`unknown` — the enum defines it but the widget never
+visits that case, so a new colour token is needed here).
+
+The badge accepts an optional `onTap` callback. The three
+add screens (`add_habit` / `add_person` / `add_event`)
+do not pass one at v1.1f; a follow-up PR will pass one
+that opens an `AlertDialog` with the rationale + a deep
+link to Settings → Permissions for that specific kind.
+The badge is non-interactive when `onTap` is null (the
+`IconButton.onPressed` is null).
+
+The trailing slot of the three `_RoutineRow` widgets is
+restructured from a single `IconButton` into a `Row(
+mainAxisSize: MainAxisSize.min, children: [badge,
+remove])`. The `ValueKey` of the remove button is
+preserved across all three screens so existing widget tests
+that target `find.byKey('add_habit.remove_routine')`
+continue to find it.
+
+### Alternatives considered
+
+- **Reuse the existing `Reliability` enum directly.**
+  Rejected: `lib/routines/` → `lib/reminders/` would be a
+  new cross-cutting dependency for a 3-line enum, and the
+  semantics are genuinely different (per-automation vs.
+  per-device). Two parallel enums are clearer.
+- **Per-trigger enum values (LocationReliability,
+  CalendarReliability, ...).** Rejected: most triggers
+  share the same three states; collapsing them into one
+  enum keeps the badge's switch exhaustive and tiny.
+- **Skip the badge; rely on the global
+  `ReliabilityBanner` + the existing settings tile.**
+  Rejected: the user cannot tell from a routine row which
+  permission is missing. The settings tile is global; the
+  badge is per-row. Both are needed.
+- **Build the badge as a coloured `Container` instead of
+  an `IconButton`.** Rejected: the 40×40 dp touch target
+  requirement (`.claude/rules/lib-screens.md`: ≥ 48dp
+  recommended, 40dp minimum for trailing slots) is easier
+  to hit with an `IconButton`'s built-in
+  `BoxConstraints(minWidth: 40, minHeight: 40)`. A
+  `Container` would need a manual `InkWell` wrapper.
+- **Render the badge as a `Tooltip` instead of a
+  Semantics label + `IconButton.tooltip`.** Rejected: the
+  badge already renders an icon, the tooltip is the
+  established pattern in the codebase (mirrors
+  `ReliabilityBanner`).
+
+### Lessons
+
+- **A `ValueListenableBuilder` over the singleton's
+  `ValueNotifier` is enough for reactivity** — no need
+  for a `ChangeNotifier`, `Provider`, or a `Stream`.
+  `PermissionService.statuses` already fires on every
+  probe; the badge just subscribes.
+- **The exhaustive sealed-hierarchy switch is the
+  contract.** Both the impl and the test pin "which
+  triggers gate a permission" via a single switch
+  statement. If a future contributor adds a new
+  `TriggerCallIncoming` leaf without updating
+  `_requiredPermissionForTrigger`, the build breaks — a
+  feature, not a bug.
+- **`IconButton(onPressed: null)` renders the icon as
+  disabled-but-visible.** This is the right behaviour for
+  the v1.1f "non-interactive badge" mode (the parent
+  screen hasn't decided whether to wire the dialog yet).
+  A `Container` or a `GestureDetector(onTap: null)` would
+  hide the icon entirely.
+- **Parallel enums that share semantics are OK.** The
+  `Reliability` (v1.0) and `AutomationReliability` (v1.1f)
+  enums both have `optimal` / `degraded` / `unknown`. They
+  live in different files, have different constructors,
+  and answer different questions, but the visual surface
+  (`ReliabilityBanner` + `AutomationReliabilityBadge`)
+  treats them the same. This is a deliberate naming choice
+  to make a future merge (if the global enum ever
+  disappears) cheap.

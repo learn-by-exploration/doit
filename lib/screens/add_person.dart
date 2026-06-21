@@ -45,6 +45,7 @@ import 'package:doit/triggers/trigger.dart';
 import 'package:doit/widgets/calendar_picker.dart';
 import 'package:doit/widgets/location_picker.dart';
 import 'package:doit/widgets/permission_sheet.dart';
+import 'package:doit/widgets/automation_reliability_badge.dart';
 
 class AddPersonScreen extends StatefulWidget {
   const AddPersonScreen({super.key, this.personId, this.initialPayload});
@@ -583,11 +584,17 @@ class _PersonRoutineRow extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       leading: const Icon(Icons.bolt_outlined),
       title: Text(summary),
-      trailing: IconButton(
-        key: const ValueKey('add_person.remove_routine'),
-        tooltip: 'Remove',
-        icon: const Icon(Icons.close),
-        onPressed: onRemove,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AutomationReliabilityBadge(automation: automation),
+          IconButton(
+            key: const ValueKey('add_person.remove_routine'),
+            tooltip: 'Remove',
+            icon: const Icon(Icons.close),
+            onPressed: onRemove,
+          ),
+        ],
       ),
     );
   }

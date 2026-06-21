@@ -40,6 +40,7 @@ import 'package:doit/widgets/category_chip.dart';
 import 'package:doit/widgets/calendar_picker.dart';
 import 'package:doit/widgets/icon_picker.dart';
 import 'package:doit/widgets/location_picker.dart';
+import 'package:doit/widgets/automation_reliability_badge.dart';
 
 class AddHabitScreen extends StatefulWidget {
   const AddHabitScreen({super.key, this.habitId, this.initialPayload});
@@ -1411,11 +1412,17 @@ class _RoutineRow extends StatelessWidget {
       leading: const Icon(Icons.bolt_outlined),
       title: Text(summary),
       subtitle: Text(actionLabel),
-      trailing: IconButton(
-        key: const ValueKey('add_habit.remove_routine'),
-        tooltip: 'Remove',
-        icon: const Icon(Icons.close),
-        onPressed: onRemove,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AutomationReliabilityBadge(automation: automation),
+          IconButton(
+            key: const ValueKey('add_habit.remove_routine'),
+            tooltip: 'Remove',
+            icon: const Icon(Icons.close),
+            onPressed: onRemove,
+          ),
+        ],
       ),
     );
   }
