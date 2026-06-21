@@ -1,12 +1,11 @@
 // Tests for the TemplatesScreen catalog.
 //
-// Covers (per WF-032 / SYS-067):
+// Covers (per WF-032 / SYS-067 + v1.1d / SYS-083):
 //   - All 25 built-in cards render after the first seed.
 //   - Tapping the "Do" filter chip hides event / person /
 //     routine cards.
-//   - Tapping the "Routine" filter chip shows the
-//     "Coming in v1.1" badge instead of the "Use this"
-//     button.
+//   - Tapping the "Routine" filter chip shows a "Use this"
+//     button for every routine template (#16 + #17..#21).
 //   - Tapping a do card's "Use this" button routes to
 //     AddHabitScreen with the payload pre-filled.
 
@@ -103,48 +102,51 @@ void main() {
     expect(find.text('Coming in v1.1'), findsNothing);
   });
 
-  testWidgets('Routine filter chip shows the "Coming in v1.1" badge', (
-    tester,
-  ) async {
-    await _setupDb(tester);
-    await tester.pumpWidget(_wrap());
-    await _waitForCatalogReady(tester);
-    await tester.tap(find.byKey(const ValueKey('templates.filter.routine')));
-    await tester.pump();
-    // Phase F PR 2 (SYS-075) special-cases template #16
-    // ("Japan silent mode") to a real apply UX (the
-    // AddRoutineScreen), so it now renders a "Use this" button
-    // instead of the "Coming in v1.1" badge. The remaining 5
-    // routine templates (17..21) still carry the badge — their
-    // apply UX lands in v1.1. Verify #16 first (it is at the
-    // top of the routine filter and renders without scrolling),
-    // then scroll to mount and count the remaining 5.
-    expect(
-      find.byKey(const ValueKey('template_card.t_builtin_16.use')),
-      findsOneWidget,
-      reason:
-          'Phase F PR 2 (SYS-075) special-cases template #16 ("Japan '
-          'silent mode") to a real apply UX — it should render a '
-          '"Use this" button instead of the "Coming in v1.1" badge.',
-    );
-    final gridFinder = find.byType(GridView);
-    final mounted = <String>{};
-    for (var scroll = 0; scroll < 30; scroll++) {
-      for (var i = 1; i <= 25; i++) {
-        final id = 't_builtin_${i.toString().padLeft(2, '0')}';
-        if (find
-            .byKey(ValueKey('template_card.$id.coming_soon'))
-            .evaluate()
-            .isNotEmpty) {
-          mounted.add(id);
-        }
-      }
-      if (mounted.length >= 5) break;
-      await tester.drag(gridFinder, const Offset(0, -600));
+  testWidgets(
+    'Routine filter chip shows a "Use this" button for every routine template',
+    (tester) async {
+      await _setupDb(tester);
+      await tester.pumpWidget(_wrap());
+      await _waitForCatalogReady(tester);
+      await tester.tap(find.byKey(const ValueKey('templates.filter.routine')));
       await tester.pump();
-    }
-    expect(mounted.length, 5);
-  });
+      // v1.1d (SYS-083 / ADR-027) replaced the v1.0 "Coming in
+      // v1.1" badge with a "Use this" button on every routine
+      // template (#16 = Japan silent mode → AddRoutineScreen;
+      // #17..#21 = generic → RoutineApplyScreen). Verify #16
+      // first (it is at the top of the routine filter and renders
+      // without scrolling), then scroll to mount and count the
+      // remaining 5.
+      expect(
+        find.byKey(const ValueKey('template_card.t_builtin_16.use')),
+        findsOneWidget,
+        reason:
+            'Phase F PR 2 (SYS-075) special-cases template #16 ("Japan '
+            'silent mode") to a real apply UX — it should render a '
+            '"Use this" button.',
+      );
+      final gridFinder = find.byType(GridView);
+      final mounted = <String>{};
+      for (var scroll = 0; scroll < 30; scroll++) {
+        for (var i = 1; i <= 25; i++) {
+          final id = 't_builtin_${i.toString().padLeft(2, '0')}';
+          if (find
+              .byKey(ValueKey('template_card.$id.use'))
+              .evaluate()
+              .isNotEmpty) {
+            mounted.add(id);
+          }
+        }
+        if (mounted.length >= 6) break;
+        await tester.drag(gridFinder, const Offset(0, -600));
+        await tester.pump();
+      }
+      // All 6 routine templates (#16 + #17..#21) carry a
+      // "Use this" button.
+      expect(mounted.length, 6);
+      expect(find.text('Coming in v1.1'), findsNothing);
+    },
+  );
 
   testWidgets('Tapping a do card pushes AddHabitScreen with pre-fill', (
     tester,

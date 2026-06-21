@@ -1,7 +1,9 @@
 // Templates catalog screen — the user picks a curated template
 // to bootstrap a new do / event / person. Routine templates
-// are visible but disabled with a "Coming in v1.1" badge
-// (the apply UX lands in Phase C+).
+// route to the generic apply UX ([RoutineApplyScreen]) for
+// templates #17..#21 (v1.1 / SYS-083), or the dedicated
+// Japan apply screen ([AddRoutineScreen]) for template #16
+// (v1.0 / Phase F PR 2 / SYS-075).
 //
 // Per WF-032 (Phase B PR 2). Backed by
 // [TemplateRepository.instance.listAll] and seeded on first
@@ -21,6 +23,7 @@ import 'package:doit/screens/add_event.dart';
 import 'package:doit/screens/add_habit.dart';
 import 'package:doit/screens/add_person.dart';
 import 'package:doit/screens/add_routine.dart';
+import 'package:doit/screens/routine_apply.dart';
 import 'package:doit/services/template_repository.dart';
 import 'package:doit/templates/template.dart';
 import 'package:doit/templates/template_library.dart';
@@ -241,9 +244,10 @@ class _TemplateCard extends StatelessWidget {
   Future<void> _onUse(BuildContext context) async {
     final t = template;
     // Phase F PR 2 (SYS-075): template #16 ("Japan silent
-    // mode") routes to the dedicated AddRoutineScreen instead
-    // of the generic routine snackbar. Every other routine
-    // template (17..21) keeps the v1.1 badge + snackbar.
+    // mode") routes to the dedicated AddRoutineScreen.
+    // v1.1d (SYS-083): templates #17..#21 route to the
+    // generic RoutineApplyScreen. Both paths use the
+    // material page route pattern.
     if (t.id == 't_builtin_16') {
       if (!context.mounted) return;
       await Navigator.of(
@@ -277,13 +281,16 @@ class _TemplateCard extends StatelessWidget {
           ),
         );
       case TemplateEntityType.routine:
-        // Routine apply UX lands in Phase C+; routine
-        // templates render the "Coming in v1.1" badge
-        // and the tap is a no-op.
+        // v1.1d (SYS-083): the generic apply UX. Decodes
+        // the template's `payloadJson` envelope and shows
+        // a Save / Update / Delete form. See
+        // `lib/routines/routine_template_payload.dart`.
         if (!context.mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Routines land in v1.1.')));
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => RoutineApplyScreen(template: t),
+          ),
+        );
     }
   }
 
@@ -317,36 +324,9 @@ class _TrailingAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Phase F PR 2 (SYS-075): template #16 has a real apply
-    // UX (the AddRoutineScreen) — suppress the "Coming in
-    // v1.1" badge and render the "Use this" button instead.
-    if (template.id == 't_builtin_16') {
-      return SizedBox(
-        width: double.infinity,
-        child: FilledButton.tonal(
-          key: ValueKey('template_card.${template.id}.use'),
-          onPressed: onUse,
-          child: const Text('Use this'),
-        ),
-      );
-    }
-    if (template.entityType == TemplateEntityType.routine) {
-      return Container(
-        key: ValueKey('template_card.${template.id}.coming_soon'),
-        padding: const EdgeInsets.symmetric(
-          horizontal: Spacing.sm,
-          vertical: Spacing.xs,
-        ),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          'Coming in v1.1',
-          style: Theme.of(context).textTheme.labelSmall,
-        ),
-      );
-    }
+    // Phase F PR 2 (SYS-075) + v1.1d (SYS-083): all routine
+    // templates (#16 + #17..#21) have a real apply UX. The
+    // "Coming in v1.1" badge is gone.
     return SizedBox(
       width: double.infinity,
       child: FilledButton.tonal(

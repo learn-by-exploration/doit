@@ -236,4 +236,29 @@ void main() {
     await SettingsService.instance.setRoutine(_cfg(_t17));
     expect(fired, greaterThanOrEqualTo(1));
   });
+
+  test('deleteRoutine removes the entry from the in-memory map and '
+      'SharedPreferences', () async {
+    await SettingsService.instance.setRoutine(_cfg(_t17));
+    await SettingsService.instance.setRoutine(_cfg(_t18));
+    expect(SettingsService.instance.routines.value.length, 2);
+
+    await SettingsService.instance.deleteRoutine(_t17);
+
+    final map = SettingsService.instance.routines.value;
+    expect(map.length, 1);
+    expect(map.containsKey(_t17), false);
+    expect(map.containsKey(_t18), true);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('doit.routine.$_t17'), isNull);
+    expect(prefs.getString('doit.routine.$_t18'), isNotNull);
+  });
+
+  test('deleteRoutine is a no-op for an unknown templateId', () async {
+    // No save first. deleteRoutine must not throw, and the
+    // in-memory map must stay empty.
+    await SettingsService.instance.deleteRoutine('t_builtin_unknown');
+    expect(SettingsService.instance.routines.value, isEmpty);
+  });
 }

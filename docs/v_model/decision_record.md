@@ -2655,3 +2655,206 @@ both are zero-cost in the steady state.
   synchronously at the call site, then
   use the resolved value inside the async
   closure.
+
+## ADR-027 — v1.1: Generic `RoutineApplyScreen` + `RoutineTemplatePayload` codec (SYS-083)
+
+**Date:** 2026-06-21. **Status:** Accepted.
+
+### Context
+
+The v1.0 sign-off left templates #17..#21
+(the five template-driven routines: calendar,
+location, device-state, charging, timer) with
+a "Coming in v1.1" badge — only template #16
+(Japan silent mode) had a real apply UX
+(`AddRoutineScreen`). v1.1d closes that gap.
+
+The naive path is "five screens, one per
+template". We instead ship **one generic
+screen + one codec**, then defer the
+per-template picker UIs to v1.1e+. This is
+the smallest viable scope that satisfies the
+"every routine template has a real apply
+button" outcome.
+
+### Decision
+
+**1. One value class for the template envelope.**
+`RoutineTemplatePayload` (in
+`lib/routines/routine_template_payload.dart`)
+decodes the template's `payloadJson` —
+`{k: 1, routine: {trigger, condition, action,
+note}}` — into `{templateId, name, description,
+trigger, condition, action, note}`. Structural
+`==` + `hashCode` + `toString` follow the
+project's value-class conventions.
+
+**2. Fail-soft decoding.** The decoder
+returns `null` on every defect path:
+malformed JSON, non-object envelope, missing
+`routine` key, non-object `routine`,
+non-string `trigger` / `action` / `condition`,
+empty `trigger` / `action`. Empty `condition`
+and `note` are tolerated (the screen renders
+"(no condition)" + omits the note paragraph).
+**No throw.** A malformed template is
+*expected* (user-authored templates, a
+half-built library row, a downgrade from a
+future schema), not a programming error.
+
+**3. `toRoutineConfig` emits the
+`routine_placeholder.v1` sentinel.** Both
+`triggerJson` and `actionJson` carry
+`{type: 'routine_placeholder.v1', kind: <trigger
+or action>, raw: <condition>}` (actionJson also
+has `note: <note>`). The runtime decodes this
+sentinel at dispatch time in a future PR; v1.1d
+ships only the persistence path.
+
+**4. One screen, six widgets.**
+`RoutineApplyScreen` is a `StatefulWidget`
+that:
+
+- shows the template name in the AppBar
+  and the description in the body,
+- renders trigger / condition / action as
+  three read-only `_Chip` widgets
+  (per-template picker UIs land in v1.1e+),
+- has a `SwitchListTile.adaptive` for the
+  enable toggle,
+- has a `FilledButton` whose label is
+  "Save" / "Update" depending on whether a
+  `RoutineConfig` already exists for the
+  templateId,
+- shows a `FilledButton.tonal` "Delete"
+  button only when an existing config is
+  present,
+- falls back to a `_MalformedView` (icon +
+  error copy) when the codec returns null.
+
+The screen is pure UI; persistence goes
+through `SettingsService.setRoutine` /
+`deleteRoutine` (the singleton-with-`_ready`
+pattern per `.claude/rules/lib-services.md`).
+The screen does NOT talk to the executor
+directly — that boundary is a follow-up
+PR (the executor is a non-Flutter singleton
+and consumes `SettingsService.routines`
+reactively).
+
+**5. `Navigator.of(context).canPop()` guards
+both pop calls.** The screen is always pushed
+in production (from `TemplatesScreen._onUse`),
+so `canPop` is true. But widget tests mount
+it as `MaterialApp.home` (no route to pop
+to), and `pop()` on the root route hangs
+the pop transition. The guard makes the
+root-mounted case a clean no-op while
+preserving the production pop.
+
+**6. The catalog reuses the existing
+`MaterialPageRoute` pattern.**
+`TemplatesScreen._onUse` already routes
+template #16 to `AddRoutineScreen`; v1.1d
+adds a switch arm for `TemplateEntityType.routine`
+that pushes `RoutineApplyScreen(template: t)`.
+The "Coming in v1.1" badge on the
+`_TrailingAction` button is replaced by the
+existing "Use this" button (the screen is
+now real, not stub).
+
+### Alternatives considered
+
+### Five per-template screens, one per trigger shape
+
+- **Pro.** Each screen can show a real picker
+  UI (a calendar event chooser for the
+  calendar trigger, a map for location, etc.).
+- **Con.** v1.1e is already scoped to ship
+  those pickers; doubling the surface area
+  before the picker layer exists is
+  premature. The "smallest viable" v1.1d
+  is the codec + Save/Update/Delete form
+  with read-only chips.
+- **Verdict.** Deferred. v1.1e..v1.1i
+  (the per-automation follow-ups) will
+  refactor the chips into real picker
+  widgets in-place.
+
+### Throw on malformed envelopes
+
+- **Pro.** Catches bugs at the library
+  row; a half-built template crashes the
+  apply screen instead of silently showing
+  a "could not load" view.
+- **Con.** The library is user-extensible
+  (templates can be imported from a
+  backup, shared between devices, authored
+  by hand). A malformed row should fail-
+  soft in the UI; the real validation
+  happens at save time on the canonical
+  side (the template repository's
+  `validateAtSave` rule).
+- **Verdict.** Rejected. Fail-soft matches
+  the project's "validate at save,
+  tolerate at read" rule (see
+  `docs/v_model/decision_record.md` ADR-018).
+
+### Put `RoutineTemplatePayload` in
+`lib/templates/` instead of
+`lib/routines/`
+
+- **Pro.** It's a template decoder.
+- **Con.** The trigger / condition / action
+  vocabulary is owned by `lib/routines/`
+  (the runtime codec in
+  `lib/routines/routine.dart`). A payload
+  decoder that lives in `lib/routines/`
+  can colocate with the shape definitions
+  it produces.
+- **Verdict.** Rejected. The decoder lives
+  in `lib/routines/routine_template_payload.dart`;
+  the file header cross-links both
+  directions.
+
+### Reuse `JapanRoutineConfig` / `AddRoutineScreen`
+
+- **Pro.** No new code.
+- **Con.** `JapanRoutineConfig` is the v1.0
+  three-key Japan-only schema
+  (`doit.japan_routine.enabled` etc.); the
+  template-driven flow is the v1.1
+  `doit.routine.<templateId>` schema
+  (SYS-080). Reusing the wrong class means
+  shipping the wrong key.
+- **Verdict.** Rejected. The two flows stay
+  separate on purpose; ADR-025 is explicit
+  about "the v1.1 routine-config key is
+  deliberately NOT a migration target".
+
+### Lessons (project-wide).
+
+- **The "smallest viable apply UX" is a
+  form, not a wizard.** A wizard feels
+  right ("Step 1: trigger, Step 2:
+  condition, Step 3: action") but it
+  pushes the picker complexity forward to
+  every step. A vertical form with read-only
+  chips is enough for v1.1d; the per-step
+  picker widgets slot into the existing
+  chip slots in v1.1e+.
+- **`canPop()` guards are cheap insurance
+  for tests.** A `Navigator.pop()` call
+  that hangs in widget tests is a common
+  time-sink (10-minute timeouts before the
+  harness gives up). A two-line guard
+  turns the hang into a clean no-op.
+- **`tester.runAsync` is the right seam
+  for "wait for the awaited Future".**
+  `pumpAndSettle()` waits for frames but
+  not microtasks, so an `await
+  setRoutine(...)` inside `_save` is
+  not guaranteed to be complete by the
+  time the assertion runs. `tester.pump()
+  + tester.runAsync(...) + tester.pump()`
+  is the established pattern.

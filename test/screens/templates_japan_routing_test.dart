@@ -1,20 +1,20 @@
 // Tests for the template #16 ("Japan silent mode") routing
 // short-circuit in TemplatesScreen
-// (v1.0 / Phase F PR 2 / SYS-075 / ADR-019 follow-up).
+// (v1.0 / Phase F PR 2 / SYS-075 / ADR-019 follow-up) and
+// the v1.1 (SYS-083) generic apply UX routing for
+// templates #17..#21.
 //
 // Drives the screen through its public surface (no private
-// widget re-export). Two assertions:
-//   - Tapping template #16 routes to AddRoutineScreen (not the
-//     generic routine snackbar).
-//   - The other routine templates (17..21) still show the
-//     "Coming in v1.1" snackbar (their apply UX lands in v1.1).
-//
-// The trailing-action badge is tested indirectly: the
-// "Coming in v1.1" snackbar is the same code path as the
-// routine fallback, so the routing-vs-short-circuit
-// distinction is fully covered.
+// widget re-export). Three assertions:
+//   - Tapping template #16 routes to AddRoutineScreen.
+//   - Tapping template #17 routes to RoutineApplyScreen (the
+//     v1.1 generic apply UX, SYS-083 / ADR-027).
+//   - Template #17 does NOT show the v1.0 "Coming in v1.1"
+//     snackbar (the snackbar was replaced by the generic
+//     apply UX in v1.1d).
 
 import 'package:doit/screens/add_routine.dart';
+import 'package:doit/screens/routine_apply.dart';
 import 'package:doit/screens/templates.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/db/schema.dart';
@@ -74,7 +74,7 @@ void main() {
     expect(find.byType(AddRoutineScreen), findsOneWidget);
   });
 
-  testWidgets('tapping template #17 still shows the v1.1 snackbar', (
+  testWidgets('tapping template #17 routes to the generic apply UX', (
     tester,
   ) async {
     await _setupDb(tester);
@@ -89,8 +89,14 @@ void main() {
 
     await tester.tap(cardFinder);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('Routines land in v1.1.'), findsOneWidget);
+    // v1.1d (SYS-083 / ADR-027): template #17 routes to the
+    // generic RoutineApplyScreen, not the v1.0 Japan-only
+    // AddRoutineScreen and not the v1.0 "Coming in v1.1"
+    // snackbar.
+    expect(find.byType(RoutineApplyScreen), findsOneWidget);
     expect(find.byType(AddRoutineScreen), findsNothing);
+    expect(find.text('Routines land in v1.1.'), findsNothing);
   });
 }

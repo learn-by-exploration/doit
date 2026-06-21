@@ -246,6 +246,21 @@ class SettingsService extends ChangeNotifier {
     );
   }
 
+  /// v1.1 (SYS-083). Remove a template-driven routine
+  /// configuration. Idempotent: deleting a template id that
+  /// was never saved is a no-op. The in-memory [routines]
+  /// notifier is updated synchronously, then the backing
+  /// store is cleared. Used by the generic apply UX
+  /// ([RoutineApplyScreen]) so the user can un-apply a
+  /// routine without re-installing the app.
+  Future<void> deleteRoutine(String templateId) async {
+    await _ready.future;
+    if (!routines.value.containsKey(templateId)) return;
+    final next = <String, RoutineConfig>{...routines.value}..remove(templateId);
+    routines.value = Map<String, RoutineConfig>.unmodifiable(next);
+    await _prefs.remove(_kRoutinesPrefix + templateId);
+  }
+
   /// Test helper. Resets the singleton's in-memory state so the
   /// next [init()] re-loads from the `SharedPreferences` backing
   /// store. Does **not** touch the backing store itself; tests
