@@ -9,7 +9,11 @@ publish_to: 'none'
 # v1.0 is the Routines + Japan silent-mode + Do rename milestone
 # (Phases A–F closed across 14 commits from `373913c` v1.0a.3 to
 # `ff56021` v1.0f.2; see docs/v_model/v1_0_release_baseline.md).
-version: 1.0.0+7
+# v1.1 / ADR-032 / SYS-088: bumped to 1.1.0+8 alongside the custom
+# app-icon + splash PR. The version code increments by one (no
+# skipped codes); the mirror-pin tests in `release_signing_test.dart`
+# pin both ends so a future drift fails CI.
+version: 1.1.0+8
 
 environment:
   sdk: ^3.12.0

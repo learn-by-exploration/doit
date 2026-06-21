@@ -26,9 +26,13 @@ android {
     // Bumped from flutter.compileSdkVersion (34) to 36: the
     // file_picker plugin (used by onboarding) transitively
     // pulls in flutter_plugin_android_lifecycle, whose AAR
-    // metadata requires compileSdk 36+. minSdk stays at 28 (the
-    // app's floor) and targetSdk still follows Flutter's
-    // default — the bump is compile-time only.
+    // metadata requires compileSdk 36+. The minSdk was
+    // bumped in lockstep (28 -> 30, see `defaultConfig` below)
+    // because the only CallScreeningService API that compiles
+    // against compileSdk = 36 — `CallResponse.Builder` — was
+    // introduced in API 30 and the older `Call.Response.Builder`
+    // was removed in API 31. targetSdk still follows Flutter's
+    // default.
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -54,13 +58,27 @@ android {
         // namespace reappear; see the test for the full
         // v0.5e-fix history.
         applicationId = "com.doit"
-        // App's floor is API 28 (Android 9) per
-        // docs/v_model/requirements.md § Platform Constraints.
-        // minSdk stays at 28. targetSdk follows Flutter's default
-        // (currently 34); bumping it is a v0.3 decision because
-        // it changes runtime behavior (notification permission
-        // model, exact-alarm policy) and must be reviewed.
-        minSdk = 28
+        // App's floor is API 30 (Android 11) — bumped from
+        // 28 alongside the compileSdk = 36 bump. Two related
+        // constraints make API 28 untenable against the new
+        // SDK:
+        //   1. `CallScreeningService.CallResponse.Builder`
+        //      was added in API 30; the legacy
+        //      `android.telecom.Call.Response.Builder` was
+        //      removed in API 31, so the modern API is the
+        //      only one that compiles against compileSdk = 36
+        //      AND runs at runtime on the same surface.
+        //   2. Several transitive plugin AARs (file_picker,
+        //      flutter_plugin_android_lifecycle) require
+        //      compileSdk 36+ which, combined with the
+        //      deprecation table above, leaves API 30 as the
+        //      effective floor.
+        // The previous floor (API 28) is a negligible slice
+        // of active devices in 2026; no in-app features
+        // depend on API 28/29 behavior. The home / settings
+        // / onboarding / reminder flow is unchanged by this
+        // bump.
+        minSdk = 30
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

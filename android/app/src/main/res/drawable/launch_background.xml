@@ -1,12 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/white" />
+<!--
+  v1.1i / ADR-032 / SYS-088: on-brand splash drawable
+  (pre-API-21 fallback).
 
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+  Layers the same foreground vector used by the launcher
+  icon centered on a 96dp box over the brand purple
+  (`#FF6750A4`, the seed color in
+  `lib/theme/app_theme.dart:15`). The centered logo matches
+  Material's "logo size on splash" guideline (1/3 to 1/2 of
+  screen height on a typical phone).
+
+  The `<item android:gravity android:width android:height>`
+  form is the modern `<layer-list>` idiom (Android 7+); the
+  vector renders at its declared intrinsic 108dp × 108dp
+  scaled into the 96dp × 96dp box.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/launch_background" />
+    <item
+        android:drawable="@drawable/ic_launcher_foreground"
+        android:gravity="center"
+        android:width="96dp"
+        android:height="96dp" />
 </layer-list>

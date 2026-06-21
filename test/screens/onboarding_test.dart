@@ -1,5 +1,6 @@
 // Tests for the OnboardingScreen.
 
+import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/reminders/full_screen_intent.dart';
@@ -192,6 +193,111 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('onboarding.finish')));
     await tester.pump();
     expect(doneCount, 1);
+  });
+
+  // v1.1h / ADR-031 / SYS-087 gap: the production
+  // `OnboardingScreen.build` builds 5 steps via
+  // `_buildSteps(AppLocalizations l)` (see
+  // `lib/screens/onboarding.dart`). Nothing in the existing
+  // test file pins that the on-screen titles come from the
+  // ARB catalog in the expected order — the older tests
+  // asserted ad-hoc strings like 'Welcome to do it' or
+  // 'Last step', which only proves *some* text rendered.
+  //
+  // This test walks all 5 steps and asserts each step's
+  // ARB title is visible at the right moment. If a future
+  // PR renames a key, removes a step, or duplicates a
+  // title across two steps, this test fails immediately.
+  // The `_kStepCount` constant is library-private so this
+  // is the cheapest UI-level guard we can build without
+  // leaking the constant.
+  testWidgets('all five ARB step titles are reachable in order', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(_wrap(onDone: () {}));
+    await tester.pump();
+    final context = tester.element(find.byType(OnboardingScreen));
+    final l = AppLocalizations.of(context);
+
+    // The 5 step titles, in walk order. Reused below to
+    // (a) assert each is visible before advancing and
+    // (b) check the 5 are distinct + non-empty after the
+    // walk.
+    final expectedTitles = <String>[
+      l.onboardingStepNotificationsTitle,
+      l.onboardingStepContactsTitle,
+      l.onboardingStepExactAlarmsTitle,
+      l.onboardingStepBackupFolderTitle,
+      l.onboardingStepCallScreeningTitle,
+    ];
+
+    Future<void> advance() async {
+      await tester.tap(find.byKey(const ValueKey('onboarding.next')));
+      await tester.pump();
+      // The CTA awaits a permission service call. The
+      // mocked `flutter.baseflow.com/permissions/methods`
+      // channel resolves in real time, so step out of the
+      // fake-async zone to drain the Future (same dance
+      // as the existing tests in this file).
+      await tester.runAsync(() async {
+        await Future<void>.delayed(Duration.zero);
+      });
+      await tester.pump();
+    }
+
+    // Steps 1..4: assert the title is visible, then advance.
+    for (var i = 0; i < 4; i++) {
+      expect(
+        find.text(expectedTitles[i]),
+        findsOneWidget,
+        reason:
+            'Onboarding step ${i + 1} must render its ARB title '
+            '"${expectedTitles[i]}" before advancing',
+      );
+      await advance();
+    }
+    // Step 5 (call-screening): the 4th `onboarding.next`
+    // tap lands here. The scripted `ScriptedCallSource`
+    // returns `scriptedRoleRequestGranted = false` by
+    // default, so the step stays put — leave via Skip
+    // (same pattern as the existing 'tapping Next advances
+    // through the steps' test).
+    expect(
+      find.text(expectedTitles[4]),
+      findsOneWidget,
+      reason:
+          'Onboarding step 5 must render its ARB title '
+          '"${expectedTitles[4]}" after four onboarding.next taps',
+    );
+    await tester.tap(find.text('Skip'));
+    await tester.pump();
+
+    // (a) All 5 step titles are distinct. Catches a
+    // copy-paste refactor that accidentally points two
+    // steps at the same ARB key (which would still render
+    // but would silently drop content for one of them).
+    expect(
+      expectedTitles.toSet().length,
+      5,
+      reason: 'All five onboarding steps must have distinct ARB titles',
+    );
+
+    // (b) All 5 step titles are non-empty. Catches the
+    // failure mode where the ARB key is present but the
+    // translation is unset (the gen-l10n build would warn
+    // but a passing build doesn't *prove* the strings are
+    // set — empty `""` values pass the analyzer).
+    for (final title in expectedTitles) {
+      expect(
+        title,
+        isNotEmpty,
+        reason: 'Every onboarding step title must be set in the ARB catalog',
+      );
+    }
   });
 }
 

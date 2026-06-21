@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Brand seed color used by the splash drawables
+  (both `drawable/launch_background.xml` and the
+  `drawable-v21/` variant). Extracted out of the
+  hex literal `#FF6750A4` because AAPT2 rejects
+  inline color values in `<item android:drawable>`
+  inside `drawable-v21/` resources; referencing a
+  named color resource works on every API level.
+  Mirrors the seed in `lib/theme/app_theme.dart:15`.
+-->
+<resources>
+    <color name="launch_background">#FF6750A4</color>
+</resources>

@@ -33,10 +33,23 @@ class MainActivity : FlutterActivity() {
         // Japan-routine automations based on the configured
         // contact list and ringer state.
         CallInterceptor.setAppContext(applicationContext)
+        // v1.1h-followup: `FlutterEngine.activity` getter was
+        // removed in the modern embedding. Pass the Activity
+        // explicitly so the screening-role request (which
+        // needs `startActivityForResult`) can find a live
+        // Activity to launch from. MainActivity is responsible
+        // for clearing the reference in onDestroy.
+        CallInterceptor.setActivity(this)
         CallInterceptor.attach(flutterEngine)
     }
 
     override fun onDestroy() {
+        // Drop the Activity reference so a destroyed
+        // Activity is not retained across configuration
+        // changes or process restarts. setActivity(null)
+        // is paired with setActivity(this) above; both
+        // happen in MainActivity only.
+        CallInterceptor.setActivity(null)
         CallInterceptor.detach()
         CalendarChannel.detach()
         DeviceStateChannel.detach()

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v1.1i / ADR-032 / SYS-088: status-bar notification icon.
+
+  Per-Android convention the notification icon is a flat
+  monochrome silhouette, white-on-transparent. The launcher
+  icon is the colorful one; the status-bar glyph is just
+  the 'd' shape (no check dot — the dot would be unreadable
+  at 24dp). Reference: `architecture_options.md:191-192`
+  (`drawable/ic_streak_notification.xml`).
+
+  The Kotlin-side notification channel init
+  (`streak.reminders` channel, `MainActivity.configureFlutterEngine`)
+  reads this resource by name; this file just lands on disk.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!--
+      Same glyph as the launcher foreground, minus the check
+      dot. Stem + bowl only. evenOdd fill carves the inner
+      counter.
+    -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="
+            M 23,24 L 29,24 L 29,84 L 23,84 Z
+            M 54,54 m -25,0 a 25,25 0 1,0 50,0 a 25,25 0 1,0 -50,0 Z
+            M 54,54 m -16,0 a 16,16 0 1,1 32,0 a 16,16 0 1,1 -32,0 Z
+        " />
+</vector>

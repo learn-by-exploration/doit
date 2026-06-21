@@ -1,5 +1,6 @@
 // Tests for the SettingsScreen.
 
+import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/reminders/full_screen_intent.dart';
@@ -127,6 +128,79 @@ void main() {
       await tester.tap(find.text('Light'));
       await tester.pumpAndSettle();
       expect(SettingsService.instance.themeMode.value, ThemeMode.light);
+    },
+  );
+
+  // v1.1h / ADR-031 / SYS-087 gap: v1.1h rewrote the
+  // `_ThemeModeTile` body from a `const [(ThemeMode.dark,
+  // 'Dark'), ...]` literal to a non-`const` list driven by
+  // `l.settingsThemeDark / Light / System`. The previous
+  // test only exercised the Light path; this test pins the
+  // ARB-driven list end-to-end — all three labels render
+  // AND tapping each one drives the matching
+  // `SettingsService.themeMode` value. If a future PR
+  // removes a label, mistypes a key, or drops a `RadioListTile`
+  // from the iteration, the corresponding `find.text(...)`
+  // or `expect(...)` line below fails.
+  testWidgets(
+    'theme tile renders all three ARB labels and tapping each updates '
+    'SettingsService.themeMode',
+    (tester) async {
+      _setPhoneSize(tester);
+      await tester.pumpWidget(_wrap());
+      await tester.pumpAndSettle();
+      final context = tester.element(find.byType(SettingsScreen));
+      final l = AppLocalizations.of(context);
+
+      // (1) All three ARB-driven labels render. We assert
+      // each by its localized string so a regression that
+      // falls back to the old hardcoded 'Dark / Light /
+      // System' (e.g. by reverting `_ThemeModeTile` to a
+      // `const` list) still passes this test — but a
+      // regression that drops a label fails it.
+      expect(
+        find.text(l.settingsThemeDark),
+        findsOneWidget,
+        reason: '_ThemeModeTile must render l.settingsThemeDark',
+      );
+      expect(
+        find.text(l.settingsThemeLight),
+        findsOneWidget,
+        reason: '_ThemeModeTile must render l.settingsThemeLight',
+      );
+      expect(
+        find.text(l.settingsThemeSystem),
+        findsOneWidget,
+        reason: '_ThemeModeTile must render l.settingsThemeSystem',
+      );
+
+      // (2) Each radio is wired — tapping it flips the
+      // SettingsService value to the matching ThemeMode.
+      // We exercise the cycle System → Light → Dark so the
+      // test confirms *all three* paths through the radio
+      // group, not just the Light path the existing test
+      // covers.
+      await tester.tap(find.text(l.settingsThemeSystem));
+      await tester.pumpAndSettle();
+      expect(
+        SettingsService.instance.themeMode.value,
+        ThemeMode.system,
+        reason: 'Tapping the System radio must set ThemeMode.system',
+      );
+      await tester.tap(find.text(l.settingsThemeLight));
+      await tester.pumpAndSettle();
+      expect(
+        SettingsService.instance.themeMode.value,
+        ThemeMode.light,
+        reason: 'Tapping the Light radio must set ThemeMode.light',
+      );
+      await tester.tap(find.text(l.settingsThemeDark));
+      await tester.pumpAndSettle();
+      expect(
+        SettingsService.instance.themeMode.value,
+        ThemeMode.dark,
+        reason: 'Tapping the Dark radio must set ThemeMode.dark',
+      );
     },
   );
 

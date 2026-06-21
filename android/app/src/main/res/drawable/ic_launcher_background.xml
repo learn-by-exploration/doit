@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v1.1i / ADR-032 / SYS-088: launcher background.
+
+  Solid brand purple `#FF6750A4` (mirrors
+  `lib/theme/app_theme.dart` `ColorScheme.fromSeed(seed:
+  0xFF6750A4, ...)`). Android applies the launcher icon mask
+  (circle, squircle, teardrop) at draw time, so we ship a
+  flat rectangle with no corner radius.
+
+  Width / height are 108dp to match the standard adaptive-icon
+  canvas.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FF6750A4"
+        android:pathData="M 0,0 L 108,0 L 108,108 L 0,108 Z" />
+</vector>

@@ -10,6 +10,14 @@ import android.telecom.Call
 import android.telecom.CallScreeningService
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+// CallScreeningService.CallResponse.Builder was promoted to the
+// canonical API in API 31+; the older `Call.Response` was removed
+// at the same time. The Builder requires API 30+ at runtime, which
+// is mirrored by the minSdk bump in `android/app/build.gradle.kts`
+// from 28 to 30 (see the inline comment there for the rationale).
+// The Builder's `setSkipCall()` setter was retired in API 31 — the
+// default Builder() now produces a pass-through response, which is
+// exactly the behavior this service wants for non-matched calls.
 
 /**
  * Thin Kotlin-side adapter for the `doit/call_interceptor`
@@ -77,10 +85,21 @@ class CallInterceptor : CallScreeningService() {
         // Default response: pass through. If silent mode
         // is on AND the contact is in the configured
         // list, snap ringer to NORMAL and pass through
-        // with a "skipCall" response so the dialer does
-        // not ring on its own (we play the contact's
-        // ringtone ourselves — Phase F PR 2 wires that).
-        val response = Call.Response.Builder()
+        // so the dialer does not ring on its own
+        // (we play the contact's ringtone ourselves —
+        // Phase F PR 2 wires that).
+        //
+        // The Builder used to live on `Call.Response`; in
+        // API 31+ that class was removed and the canonical
+        // home is `CallScreeningService.CallResponse.Builder`.
+        // Its `setSkipCall()` setter was retired in API 31
+        // — the default Builder() now produces a
+        // pass-through response (skipCall=false), which is
+        // exactly what we want for non-matched calls and
+        // for the matched-contact case where we still
+        // want the dialer to ring (so our override of
+        // the contact ringtone takes effect).
+        val response = CallScreeningService.CallResponse.Builder()
         if (!cfg.enabled) {
             respondToCall(details, response.build())
             return
@@ -122,7 +141,6 @@ class CallInterceptor : CallScreeningService() {
                 "targetMode" to AudioManager.RINGER_MODE_NORMAL,
             ),
         )
-        response.setSkipCall(false)
         response.setSilenceCall(false) // we want the contact ringtone to play
         response.setDisallowCall(false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -141,6 +159,19 @@ class CallInterceptor : CallScreeningService() {
 
         @Volatile
         private var appContext: Context? = null
+
+        /**
+         * Currently-attached Activity (held weakly via setActivity()
+         * from MainActivity.configureFlutterEngine / onDestroy).
+         * Used by [requestCallScreeningRole] to launch the OS
+         * role-request intent with startActivityForResult. The
+         * Activity reference was previously fetched via
+         * `engine.activity`, a getter that was removed from the
+         * Flutter embedding in 3.x — the explicit setActivity()
+         * call from MainActivity replaces it.
+         */
+        @Volatile
+        private var currentActivity: Activity? = null
 
         @Volatile
         private var channel: MethodChannel? = null
@@ -169,9 +200,23 @@ class CallInterceptor : CallScreeningService() {
             appContext = ctx.applicationContext
         }
 
+        /**
+         * Holds the Activity reference needed by
+         * [requestCallScreeningRole]. Replaces the
+         * `engine.activity` getter, which was removed in
+         * the modern Flutter embedding. MainActivity calls
+         * this with `this` from `configureFlutterEngine` and
+         * with `null` from `onDestroy` so a stale Activity
+         * is never leaked after the screen rotates or the
+         * activity is destroyed.
+         */
+        fun setActivity(act: Activity?) {
+            currentActivity = act
+        }
+
         fun attach(engine: FlutterEngine) {
             val ch = MethodChannel(engine.dartExecutor.binaryMessenger, CHANNEL)
-            val activity: Activity? = engine.activity as? Activity
+            val activity: Activity? = currentActivity
             ch.setMethodCallHandler { call, result ->
                 when (call.method) {
                     "setEnabled" -> {

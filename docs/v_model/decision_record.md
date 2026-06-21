@@ -3584,3 +3584,193 @@ The constraint set:
   + one smoke-test locale (Spanish) to prove the pipeline. A
   real translator picks the locales.
 
+## ADR-032 — v1.1i: Custom launcher icon + splash — hand-authored adaptive-icon vectors over `flutter_launcher_icons` (SYS-088)
+
+### Context
+
+`do it` ships at v1.0 with the default Flutter launcher icon
+(blue "F" on white) and a flat-color splash (white on light,
+`?android:colorBackground` on dark). The default icon does
+not match the brand seed (`#FF6750A4`, "muted purple —
+calm, slightly stubborn"; see `lib/theme/app_theme.dart:15`)
+and gives users no visual anchor in the launcher grid. The
+default splash flashes white for ~100ms before Flutter
+draws, which is jarring on the brand-purple theme.
+
+Three V-Model docs explicitly defer this work to v1.1:
+
+- `docs/v_model/plan.md:277-279` (Milestone 8 / v1.1 scope)
+- `docs/v_model/v1_0_release_baseline.md:227-228`
+  (out-of-scope-for-v1.0)
+- `docs/v_model/v0_5_release_baseline.md:231-234` (origin
+  of the deferral)
+
+Additionally `docs/v_model/architecture_options.md:191-192`
+calls out a notification-icon gap
+(`drawable/ic_streak_notification.xml`, "Custom monochrome
+white-on-transparent for the status bar; full-color for the
+app icon") that has never landed on disk. v1.1i closes that
+gap in the same PR.
+
+The user picked the visual direction in plan mode: lowercase
+'d' + small filled circle (the check dot), white foreground
+on the brand purple background. The 'd' fills ~66% of the
+108dp adaptive-icon safe zone; the dot sits at the
+bottom-right outside the 'd' bowl.
+
+### Decision
+
+Hand-author three vector drawables for the launcher icon
+(in `android/app/src/main/res/drawable/`):
+
+1. **`ic_launcher_background.xml`** — solid brand purple
+   `#FF6750A4`. A single `<path>` rectangle, 108dp × 108dp
+   viewport.
+2. **`ic_launcher_foreground.xml`** — the white 'd' + dot
+   glyph. A single `<path>` with four subpaths (the stem
+   rectangle, the outer bowl circle, the inner bowl circle,
+   the dot circle) using `fillType="evenOdd"`. Coordinates:
+   stem x ∈ [23, 29], y ∈ [24, 84]; bowl center (54, 54),
+   outer R = 25, inner R = 16; dot center (80, 80), R = 4.
+   All content fits within the 66dp safe zone.
+3. **`ic_launcher_monochrome.xml`** — same glyph as the
+   foreground, painted pure white. Android 13+ themed icons
+   recolor this layer against the user's wallpaper-derived
+   tint and drop the background layer; the foreground glyph
+   stays visible.
+
+Then the adaptive-icon entry point at
+`mipmap-anydpi-v26/ic_launcher.xml`:
+
+```xml
+<adaptive-icon xmlns:android="...">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+</adaptive-icon>
+```
+
+`AndroidManifest.xml:66`'s
+`android:icon="@mipmap/ic_launcher"` reference is unchanged;
+Android resolves that to the adaptive-icon XML on API 26+
+and to the legacy `mipmap-*/ic_launcher.png` files on API
+21..25. The five legacy PNGs (the Flutter default 48..192px
+fallbacks) are NOT deleted; they continue to ship as the
+pre-26 fallback.
+
+Both `drawable/launch_background.xml` and
+`drawable-v21/launch_background.xml` are rewritten as a
+`<layer-list>`:
+
+```xml
+<layer-list xmlns:android="...">
+    <item android:drawable="@color/launch_background" />
+    <item
+        android:drawable="@drawable/ic_launcher_foreground"
+        android:gravity="center"
+        android:width="96dp"
+        android:height="96dp" />
+</layer-list>
+```
+
+The brand purple `#FF6750A4` is extracted into a named
+color resource `@color/launch_background` in
+`values/colors.xml` because AAPT2 rejects inline color
+values in `<item android:drawable>` inside `drawable-v21/`
+resources (only `@drawable/...`, `@color/...`, and `@android:color/...`
+are accepted as drawable references); a named resource
+works on every API level. The `?android:colorBackground`
+reference in the API 21+ variant is dropped — keeping the
+splash on-brand beats flipping it to the theme's dark
+background.
+
+The pre-existing
+`android/app/src/main/res/drawable/ic_streak_notification.xml`
+resource gap (referenced by `architecture_options.md:191-192`
+and by the Kotlin-side notification-channel init for the
+`streak.reminders` channel) is closed: a monochrome
+white-on-transparent copy of the foreground glyph with the
+check dot dropped (the dot is unreadable at 24dp).
+
+`pubspec.yaml` and `lib/build_info.dart` move from
+`1.0.0+7` to `1.1.0+8`. The mirror-pin tests in
+`test/release_signing_test.dart` (`pubspec.yaml` +
+`lib/build_info.dart` agreement) update in lockstep.
+
+### Consequences
+
+- **One vector per layer.** Android's adaptive-icon
+  infrastructure scales vectors natively; the launcher
+  renders crisply at every density.
+- **Per-density regeneration deferred to v1.2.** The five
+  legacy `mipmap-*/ic_launcher.png` files stay as the
+  Flutter default; a v1.2 follow-up can regenerate them
+  from the master vector if a pre-26 device needs on-brand
+  visuals.
+- **AOSP launcher mask applied at draw time.** Circle
+  (Pixel launcher), squircle (Samsung), teardrop (Xiaomi)
+  — the brand purple + 'd' + dot composition clips
+  uniformly against each launcher shape.
+- **Themed icons (Android 13+) use the monochrome layer.**
+  Users with themed icons enabled see the 'd' + dot
+  silhouette tinted against their wallpaper palette; the
+  brand purple is dropped.
+- **The brand seed lives in three places.** `lib/theme/app_theme.dart:15`
+  defines `0xFF6750A4` as the `ColorScheme.fromSeed` seed,
+  `values/colors.xml` defines `<color name="launch_background">#FF6750A4</color>`,
+  and `drawable/ic_launcher_background.xml` + the
+  `launch_background` color resource hardcode `#FF6750A4`
+  (vector drawables do not consume color resources at draw
+  time — the fillColor is a literal). A v1.2 follow-up could
+  promote the seed into a build-config constant so the
+  launcher + theme + colors.xml stay in sync. Not blocking
+  for v1.1i.
+- **No new permissions.** The icon + splash changes are
+  pure Android resource edits; no manifest change beyond
+  the existing `@mipmap/ic_launcher` reference.
+- **No `flutter_launcher_icons` package.** Direct
+  hand-authored vector XMLs are simpler and produce
+  crisper output at every density (the package would
+  regenerate the vectors into PNGs anyway).
+- **No `flutter_native_splash` package.** The Android-side
+  `LaunchTheme` + `<layer-list>` is the lower-ceremony path
+  (one layer-list change vs a `flutter_native_splash:` block
+  in pubspec + a build_runner pass + a generated
+  `splash.dart`). The trade is a 5-minute Flutter-vs-Android
+  divergence on splash timing (the Android splash is
+  ~100ms faster than the Flutter-managed one).
+
+### Alternatives considered
+
+- **`flutter_launcher_icons` package.** Auto-generates the
+  per-density PNGs from a master asset. The package adds
+  build-step ceremony (a `flutter_launcher_icons:` block in
+  `pubspec.yaml`, a `pubspec.lock` entry, a `dart run
+  flutter_launcher_icons` step on every asset change). For
+  a developer/designer hybrid where the developer is also
+  the designer, hand-authored XMLs are faster and produce
+  sharper output (Android scales vectors natively; the
+  package regenerates the vectors into PNGs anyway, with a
+  quality loss at the edges).
+- **`flutter_native_splash` package.** Generates the
+  per-platform splash drawables from a single
+  `flutter_native_splash:` block in `pubspec.yaml`. Same
+  build-step ceremony argument applies; plus the Android
+  side already has the `LaunchTheme` + `<layer-list>`
+  mechanism for this, so adding a package is
+  duplicative-of-infrastructure.
+- **Hand-rasterized per-density PNGs.** Five PNGs at
+  mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi (48/72/96/144/192px) plus
+  the adaptive-icon XML. Strict superset of the v1.1i
+  approach (we keep the PNGs as the API 21..25 fallback
+  anyway, but we don't regenerate them). The downside is
+  the PNGs go out of sync with the master vector on every
+  redesign; the upside is a pre-26 device gets on-brand
+  visuals today. Deferred to v1.2.
+- **The 'two-petal' / 'number 1' design alternatives
+  weighed in plan mode.** A "two-petal" mark and a
+  "stylized 1" were both rejected as harder to read at
+  24dp than the 'd' + dot. The 'd' is the lowercase
+  initial of the 'do' brand entity; the dot is the
+  completion signal.
+

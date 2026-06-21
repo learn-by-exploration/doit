@@ -220,7 +220,7 @@ void main() {
     );
   });
 
-  test('pubspec.yaml name is "doit" and version is 1.0.0+7 (v1.0g)', () {
+  test('pubspec.yaml name is "doit" and version is 1.1.0+8 (v1.1i)', () {
     final pubspec = _read('pubspec.yaml');
     expect(
       pubspec,
@@ -231,12 +231,12 @@ void main() {
     );
     expect(
       pubspec,
-      contains('version: 1.0.0+7'),
+      contains('version: 1.1.0+8'),
       reason:
-          'v1.0g bumped the version from 0.5.0+6 to 1.0.0+7 to mark '
-          'the Routines + Japan silent-mode + Do rename milestone. '
-          'Six v1.0 phases (A–F) closed across 14 commits from '
-          '`373913c` v1.0a.3 to `ff56021` v1.0f.2.',
+          'v1.1i bumped the version from 1.0.0+7 to 1.1.0+8 to mark '
+          'the custom app-icon + splash milestone (ADR-032 / SYS-088). '
+          'A drift back to 1.0.0+7 would indicate a forgotten version '
+          'bump on a future v1.x change.',
     );
     expect(
       pubspec,
@@ -245,17 +245,17 @@ void main() {
     );
   });
 
-  test('lib/build_info.dart mirrors pubspec 1.0.0+7 (v1.0g)', () {
+  test('lib/build_info.dart mirrors pubspec 1.1.0+8 (v1.1i)', () {
     final info = _read('lib/build_info.dart');
     expect(
       info,
-      contains("kAppVersion = '1.0.0'"),
-      reason: 'lib/build_info.dart must mirror pubspec.yaml version (1.0.0).',
+      contains("kAppVersion = '1.1.0'"),
+      reason: 'lib/build_info.dart must mirror pubspec.yaml version (1.1.0).',
     );
     expect(
       info,
-      contains('kAppVersionCode = 7'),
-      reason: 'lib/build_info.dart must mirror pubspec.yaml versionCode (7).',
+      contains('kAppVersionCode = 8'),
+      reason: 'lib/build_info.dart must mirror pubspec.yaml versionCode (8).',
     );
   });
 
@@ -377,6 +377,77 @@ void main() {
       main,
       contains('runApp(const DoItApp());'),
       reason: 'main() must mount `DoItApp` (was `StreakApp`).',
+    );
+  });
+
+  // ── v1.1i adaptive-icon + app-name pins ─────────────────────────
+  // v1.1i ships a custom launcher icon (adaptive-icon XML +
+  // 3 vector layers) and a custom splash drawable. The
+  // release_signing_test mirrors the mirror-pin pattern from
+  // v0.5a / v1.0g / v1.1h: assert that the manifest still
+  // references `@mipmap/ic_launcher` (Android resolves that to
+  // the new adaptive-icon XML on API 26+), and pin the app
+  // name + version together so a v1.2+ bump surfaces here too.
+
+  test('AndroidManifest icon reference resolves to the adaptive-icon XML '
+      'on API 26+ (v1.1i)', () {
+    final manifest = _read('android/app/src/main/AndroidManifest.xml');
+    expect(
+      manifest,
+      contains('android:icon="@mipmap/ic_launcher"'),
+      reason:
+          'Manifest must keep `@mipmap/ic_launcher` as the icon '
+          'reference; Android resolves that to '
+          '`mipmap-anydpi-v26/ic_launcher.xml` on API 26+ (the '
+          'v1.1i adaptive-icon XML) and to the legacy '
+          '`mipmap-*/ic_launcher.png` files on API 21..25.',
+    );
+    final adaptiveIcon = _read(
+      'android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml',
+    );
+    expect(
+      adaptiveIcon,
+      contains('<adaptive-icon'),
+      reason: 'The API 26+ entry point must be an <adaptive-icon> XML',
+    );
+    expect(
+      adaptiveIcon,
+      contains('@drawable/ic_launcher_background'),
+      reason: 'adaptive-icon must reference the brand-purple background',
+    );
+    expect(
+      adaptiveIcon,
+      contains('@drawable/ic_launcher_foreground'),
+      reason:
+          'adaptive-icon must reference the white-on-transparent foreground',
+    );
+    expect(
+      adaptiveIcon,
+      contains('@drawable/ic_launcher_monochrome'),
+      reason:
+          'adaptive-icon must reference the monochrome layer for '
+          'Android 13+ themed icons',
+    );
+  });
+
+  test('app_name + kAppVersion are pinned together at v1.1i', () {
+    final strings = _read('android/app/src/main/res/values/strings.xml');
+    final buildInfo = _read('lib/build_info.dart');
+    final pubspec = _read('pubspec.yaml');
+    expect(
+      strings,
+      contains('<string name="app_name">do it</string>'),
+      reason: 'app_name must remain "do it" (v0.5a rename).',
+    );
+    expect(
+      buildInfo,
+      contains("kAppVersion = '1.1.0'"),
+      reason: 'kAppVersion must be 1.1.0 (v1.1i bump).',
+    );
+    expect(
+      pubspec,
+      contains('version: 1.1.0+8'),
+      reason: 'pubspec.yaml version must be 1.1.0+8 (v1.1i bump).',
     );
   });
 }

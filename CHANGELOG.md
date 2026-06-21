@@ -518,6 +518,104 @@ on iOS (the role is Android-only; iOS is a v1.1+ port
 candidate), per-call notification customization
 (v1.1+).
 
+### v1.1i — Custom app icon + splash (adaptive icon + brand color)
+
+The default Flutter launcher icon (blue "F" on white) and
+the white-on-dark splash no longer match the brand seed
+(`#FF6750A4`). v1.1i ships a hand-authored vector
+adaptive-icon (lowercase white 'd' + small check dot on
+the brand purple) and an on-brand splash that layers the
+same foreground centered on the purple background. The
+pre-existing `ic_streak_notification.xml` resource gap
+(`docs/v_model/architecture_options.md:191-192`) is
+closed in the same PR.
+
+**What's new**
+
+- **Adaptive icon (API 26+).** New
+  `mipmap-anydpi-v26/ic_launcher.xml` is the
+  `<adaptive-icon>` entry point. It references three
+  vector layers:
+  - `drawable/ic_launcher_background.xml` — solid brand
+    purple `#FF6750A4` on the 108dp adaptive-icon canvas.
+  - `drawable/ic_launcher_foreground.xml` — a white
+    sans-serif lowercase 'd' glyph (stem at x ∈ [23, 29],
+    bowl centered on (54, 54) with outer radius 25 and
+    inner radius 16, evenOdd fill carves the counter) plus
+    a small filled check dot at (80, 80), radius 4. The 'd'
+    represents the 'do' brand entity; the dot represents
+    completion.
+  - `drawable/ic_launcher_monochrome.xml` — same glyph as
+    the foreground, paint pure white. Android 13+ themed
+    icons recolor this layer against the user's
+    wallpaper-derived tint; we ship the foreground glyph
+    only (no brand purple), so the themed-icon system
+    paints the 'd' against the wallpaper tint and drops the
+    background layer entirely.
+- **Legacy density buckets.** The five
+  `mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png`
+  files (the Flutter default 48..192px PNGs) stay in
+  place as the API 21..25 fallback. `@mipmap/ic_launcher`
+  in `AndroidManifest.xml:66` continues to resolve to the
+  adaptive-icon XML on API 26+ and to the PNG on API 21..25.
+  A v1.2 follow-up can regenerate the PNGs from the master
+  vector if a pre-26 device needs on-brand visuals.
+- **Splash drawables (API 21+).** Both
+  `drawable/launch_background.xml` (the pre-API-21
+  fallback) and `drawable-v21/launch_background.xml` are
+  rewritten as a `<layer-list>` that paints the brand
+  purple first (via a new named color resource
+  `@color/launch_background` defined in
+  `values/colors.xml`, which AAPT2 requires because inline
+  color values are rejected inside `drawable-v21/`
+  `<item android:drawable>`), then layers the foreground
+  vector centered on a 96dp × 96dp box (Material's "logo
+  size on splash" guideline). The `?android:colorBackground`
+  reference in the API 21+ variant is dropped — keeping the
+  splash on-brand beats flipping it to the theme's dark
+  background.
+- **Notification icon (status bar).** New
+  `drawable/ic_streak_notification.xml` is a monochrome
+  white-on-transparent version of the launcher glyph, with
+  the check dot dropped (the dot is unreadable at 24dp).
+  This is the resource name
+  `architecture_options.md:191-192` calls out as the
+  status-bar icon for the `streak.reminders` notification
+  channel; the Kotlin-side channel init reads it by name.
+- **Version bump.** `pubspec.yaml` and
+  `lib/build_info.dart` move from `1.0.0+7` to `1.1.0+8`.
+  The mirror-pin assertions in
+  `test/release_signing_test.dart` (`pubspec.yaml` +
+  `lib/build_info.dart` agreement) update in lockstep; two
+  new tests pin the `AndroidManifest.xml` icon reference +
+  the `app_name` + `kAppVersion` trio together.
+- **Tests.** New `test/app_icon_test.dart` (9 filesystem
+  tests — adaptive-icon manifest + three-layer references,
+  foreground white-on-transparent, background brand
+  purple, monochrome pure white (no brand purple), the
+  notification icon shape and 24dp size, all five legacy
+  density buckets present, both splash drawables reference
+  the `@color/launch_background` named resource + the
+  centered foreground, `values/colors.xml` defines
+  `launch_background` as the brand purple). The
+  `test/release_signing_test.dart` mirror-pin tests
+  update (1.0.0+7 → 1.1.0+8) and two new tests pin the
+  manifest icon reference + app_name + kAppVersion trio.
+
+**Not in this release:** per-density PNG regeneration from
+the master vector (v1.2 follow-up; the legacy PNGs stay as
+the API 21..25 fallback in the meantime), iOS App Store
+icon assets (v1.1+ port candidate; iOS is not in v1.1
+scope), light-theme icon variant (v1.2 follow-up; dark
+theme is the v1.0 default).
+
+ADR-032 / SYS-088. See `docs/v_model/decision_record.md`
+ADR-032 for the hand-authored-vector choice (over
+`flutter_launcher_icons` / `flutter_native_splash`),
+`docs/v_model/requirements.md` SYS-088 for the
+behavioral contract, and `docs/v_model/architecture_options.md:191-192`
+for the notification-icon resource reference.
+
 ### v0.5a — rename to "do it"
 
 App-level rename. The app's display name, package id, directory,
