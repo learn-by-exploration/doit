@@ -44,7 +44,7 @@ void main() {
 
   /// Phone-sized viewport so the `_PermissionsRow` tiles
   /// fit without needing to scroll.
-  void _setPhoneSize(WidgetTester tester) {
+  void setPhoneSize(WidgetTester tester) {
     tester.view.physicalSize = const Size(1080, 3200);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -110,7 +110,7 @@ void main() {
   testWidgets(
     'the tile renders the "Not held" status when the role is not held',
     (tester) async {
-      _setPhoneSize(tester);
+      setPhoneSize(tester);
       source.scriptedRoleHeld = false;
       await tester.pumpWidget(_wrap());
       // Multiple pump + runAsync cycles to let the
@@ -140,7 +140,7 @@ void main() {
   testWidgets('the tile renders the "Held" status when the role is held', (
     tester,
   ) async {
-    _setPhoneSize(tester);
+    setPhoneSize(tester);
     source.scriptedRoleHeld = true;
     await tester.pumpWidget(_wrap());
     for (var i = 0; i < 5; i++) {
@@ -160,7 +160,7 @@ void main() {
   });
 
   testWidgets('tapping "Grant" calls requestCallScreeningRole', (tester) async {
-    _setPhoneSize(tester);
+    setPhoneSize(tester);
     source.scriptedRoleHeld = false;
     source.scriptedRoleRequestGranted = false;
     await tester.pumpWidget(_wrap());
@@ -190,7 +190,7 @@ void main() {
     'the tile re-probes when the lifecycle resumes (returning from the OS '
     'role dialog)',
     (tester) async {
-      _setPhoneSize(tester);
+      setPhoneSize(tester);
       source.scriptedRoleHeld = false;
       await tester.pumpWidget(_wrap());
       for (var i = 0; i < 5; i++) {

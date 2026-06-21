@@ -2294,3 +2294,170 @@ phases).**
   schema has not yet been versioned in the
   field. Defer the rename to a v1.0 minor
   bump; never to a v1.x patch.
+
+## ADR-025 — v1.1: `RoutineConfig` value class for template-driven routines (templates #17–#21)
+
+**Date:** 2026-06-21.
+**Status:** Accepted (lands across v1.1a — the
+value class + JSON codec + ADR — and v1.1b — the
+`SettingsService.setRoutine` / `getRoutine` wire).
+**Supersedes:** None.
+**Refs:** SYS-080 (this ADR writes the SYS row);
+[v1_1_handoff_from_v1_0g.md](v1_1_handoff_from_v1_0g.md);
+`lib/services/routine_config.dart`.
+
+**Context.** v1.0 introduced 25 curated templates
+across four kinds (Do / Event / Person / Routine).
+The first 16 are auto-creating: tapping a template
+in `lib/screens/templates.dart` writes a new row
+and lands the user on the relevant editor. The
+last 5 — **templates #17..#21**, the *Routine*
+kind — were stubbed in v1.0 with a curated copy
+block but no apply UX: tapping a routine template
+read out the description and bailed, because the
+backend (the routine apply UX) was not yet wired.
+
+v1.1 wires the routine apply UX end-to-end. The
+core data shape is *one row per template id*,
+holding the user's chosen trigger / condition /
+action triple (all three already JSON-serializable
+via `triggerToJson` / `conditionToJson` /
+`actionToJson` in `lib/routines/routine.dart`).
+The natural persistence is `SharedPreferences`
+keyed by `doit.routine.<templateId>`, so each
+template's row updates in place on re-save (no row
+identity churn, no FK gymnastics).
+
+**Decision.** A new `RoutineConfig` value class in
+`lib/services/routine_config.dart` (not a Drift
+row, not a `HabitRepository`-style entity) with
+five fields:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `templateId` | `String` | The stable identifier; the SharedPreferences key suffix. |
+| `triggerJson` | `Map<String, Object?>` | The output of `triggerToJson(...)`. |
+| `conditionJson` | `Map<String, Object?>?` | `null` means "no gating condition"; the routine fires on every matching trigger event. |
+| `actionJson` | `Map<String, Object?>` | The output of `actionToJson(...)`. |
+| `enabled` | `bool` | The user-facing master toggle; defaults to `true`. |
+
+The class is `@immutable`, has a `copyWith`, a
+`toJson` / `fromJson` codec (version-free; each
+per-shape JSON object carries its own `type`
+discriminator), structural `operator ==`, and a
+deterministic `hashCode`.
+
+**Why a value class and not a Drift row.** Two
+reasons:
+
+1. The user's routine config is *owned by the
+   template id*, not by a server-minted id. A
+   fresh `copyWith` should round-trip through
+   SharedPreferences and overwrite the same key —
+   exactly what a value class + `setString`
+   gives us. A Drift row would require either a
+   server-minted id or `INSERT OR REPLACE` keyed
+   on the templateId, plus a parallel migration
+   when the schema bumps. Both are heavier than
+   they need to be for 5 rows.
+2. The class is a *snapshot* of the user's choices
+   at apply-time. The runtime re-decodes the JSON
+   triples through `triggerFromJson` /
+   `conditionFromJson` / `actionFromJson` at fire
+   time; the runtime never holds a `RoutineConfig`
+   in memory. The class is a *config envelope*,
+   not a domain entity.
+
+**Why `SharedPreferences` and not the settings
+JSON file (the `SettingsService` blob).** The
+settings blob is a v1.0 artifact that holds
+user-tunable strings and booleans (theme, sound,
+japan-routine flag). Routines are JSON objects;
+putting them inside the settings blob would force
+a `SettingsService.routines: Map<String, Object?>`
+key and a per-template read-modify-write through
+the settings codec. One-key-per-template is
+strictly simpler and stays out of the settings
+codec's review surface.
+
+**Why `JapanRoutineConfig` is NOT migrated to the
+new format.** v1.0 / Phase F PR 2 already shipped
+`JapanRoutineConfig` with its own three legacy keys
+(`doit.japan_routine.enabled`,
+`doit.japan_routine.contactIds`,
+`doit.japan_routine.targetMode`). The class has a
+distinct lifecycle (only one Japan routine exists
+per install; it is curated, not template-driven;
+its apply UX was the user's on-ramp to the
+v1.0/Phase F feature). Migrating it to
+`RoutineConfig` would either rename the legacy
+keys — invalidating every v1.0 backup file in the
+field — or require a parallel reader that prefers
+the new key when both are present. Neither is
+worth the risk for v1.1. `JapanRoutineConfig`
+stays on its three legacy keys; the v1.1 apply UX
+is for templates #17..#21 only.
+
+**Hash determinism.** The first draft of
+`hashCode` used `Object.hashAllUnordered`, which
+turns out to be **non-deterministic across calls
+on Dart 3.12** (it uses a randomized accumulator
+for hash-collision-attack resistance — verified
+with a standalone repro that printed three
+different values for the same input on three
+calls). A value class whose `hashCode` is
+non-deterministic is unfit for `Set` /
+`Map<RoutineConfig, ...>` use, so the class
+implements its own order-independent map hash
+(`_mapHash`): sort the keys lexicographically,
+fold `(h * 31 + k.hashCode) * 31 + v.hashCode`
+across the sorted entries with a 30-bit mask.
+That is deterministic and stays in sync with
+`_mapEquals`, which is also order-insensitive at
+the top level. A null `conditionJson` is hashed
+as a `-1` sentinel so `null != {}` in hash terms
+too — `Object.hash(...)` XOR would have collapsed
+the two.
+
+**Lessons (project-wide).**
+
+- **Default to one-key-per-thing in
+  `SharedPreferences` before reaching for a
+  table.** The natural temptation when something
+  "looks like a row" is to add a Drift table.
+  For 5-or-fewer rows that all update in place
+  and share no schema with the rest of the app,
+  SharedPreferences is the right call. Reserve
+  Drift rows for entities with a domain
+  identity (a server-minted id, FKs to other
+  entities, query patterns).
+- **Validate the deterministic-hash assumption
+  for `Object.hash*` helpers.** A simple
+  `expect(obj.hashCode, obj.hashCode)` test
+  would have caught `Object.hashAllUnordered`
+  in the first PR. Add a one-line stability
+  test to every value class — it's three lines
+  and prevents a class of bugs that are
+  invisible to `==` but disastrous for `Set` /
+  `Map` usage.
+- **The legacy-keys policy from `JapanRoutineConfig`
+  is now a project pattern.** v1.1 has two
+  precedent classes of "config" that sit on
+  SharedPreferences: structured JSON triples in
+  one-key-per-template (this ADR), and primitive
+  trios in three-legacy-keys (ADR-019 follow-up).
+  Both are fine; the dividing line is whether
+  the value is *a single triple* (three legacy
+  keys are clearer) or *N triples keyed by an id*
+  (one-key-per-id is clearer). Document the
+  rule in `lib-services.md` next time the rules
+  doc is touched.
+- **`Map.hashCode` is identity-based on Dart, but
+  that does not mean structural equality is
+  identity-based.** A class can have structural
+  `==` and a deterministic `hashCode`; the
+  two need not match the underlying map's
+  identity. Just be sure your hash function
+  visits *every* entry (order-independent) so
+  two structurally-equal maps always hash
+  equal.
