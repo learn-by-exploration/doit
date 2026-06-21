@@ -202,62 +202,101 @@ setting in `_GeolocatorPositionSource`).
   the permission is denied, with a one-tap deep link to
   the permission settings.
 
-### Device-state (Phase D — planned)
+### Device-state (Phase D — shipped, ADR-022)
 
-The `DeviceStateProbe` Kotlin channel emits reactive
-broadcasts for charging state and ringer mode (the two
-`Intent.ACTION_*` broadcasts the OS actually fires), and
-polls the rest at 60-second cadence (ADR-022). Polling for
-battery range / BT device / Wi-Fi SSID / headphones / app
-foreground is acceptable because every state change is
-persisted as a snapshot; the polling loop is the heartbeat
-that detects missed reactive broadcasts.
+The `DeviceStateChannel` Kotlin bridge is **reactive-first**:
+it registers a `BroadcastReceiver` for the seven
+device-state broadcasts the OS actually fires, and emits
+a `DeviceStateSnapshot` to Dart via a `Stream` for each.
+Per ADR-022, the executor never polls; the 60-second
+polling slot is reserved for the Settings → Triggers
+debug screen only. The seven reactive sources are:
 
-- **Latency budget:** reactive events fire within ±5s of
-  the OS broadcast; polled events within ±65s of the
-  actual state change.
-- **Doze behavior:** reactive broadcasts (charging, ringer
-  mode) fire even in Doze; polled states are sampled when
-  Doze releases a maintenance window, so a 60s cadence can
-  stretch to 15 minutes in Doze. The debug screen surfaces
-  "polling paused for Doze" copy.
+- `ACTION_POWER_CONNECTED` / `ACTION_POWER_DISCONNECTED`
+  — charging state.
+- `BATTERY_LOW` / `BATTERY_OKAY` — battery-range edges.
+- `ACTION_HEADSET_PLUG` — headphones.
+- `BluetoothDevice.ACTION_ACL_CONNECTED` /
+  `ACTION_ACL_DISCONNECTED` — paired BT device.
+- `WifiManager.NETWORK_STATE_CHANGED_ACTION` — Wi-Fi SSID.
+- `AudioManager.RINGER_MODE_CHANGED_ACTION` — ringer mode.
+
+Foreground-app detection (`PACKAGE_USAGE_STATS`) is a
+**best-effort** v1.0 entry; the trigger fires on the
+"package was foreground" reactive broadcast, which the
+OS delivers without the permission. A user who has not
+granted `PACKAGE_USAGE_STATS` sees a v1.0 banner on the
+debug screen but the routine still runs.
+
+- **Latency budget:** all 7 reactive sources fire within
+  ±1s of the OS broadcast (no polling drift).
+- **Doze behavior:** reactive broadcasts fire even in
+  Doze; if the device is in Doze the Dart isolate is
+  suspended, so the next routine match runs when the
+  isolate wakes. The debug screen surfaces "isolate
+  asleep" copy when it detects a > 30s gap.
 - **Permission revoke:** `BLUETOOTH_CONNECT` is the only
   runtime permission Phase D adds. A revoke surfaces the
   same banner pattern as coarse-location (SYS-077).
 
-### Calendar (Phase E — planned)
+### Calendar (Phase E — shipped, ADR-023)
 
-The `CalendarProbe` polls the local
-`CalendarContract.Instances` view every 5 minutes for the
-next 24-hour window. Calendar changes propagate within one
-poll cycle; the user can force a refresh from the debug
-screen.
+The `CalendarChannel` Kotlin bridge is **reactive**:
+it registers a `ContentObserver` on
+`CalendarContract.Instances` (the local view, no
+`device_calendar` dependency). Per ADR-023, the OS calls
+us back when an instance row is inserted / updated /
+deleted; we match the change against the registered
+`TriggerCalendarEvent` set on the main isolate. No
+5-minute poll in production. The debug screen has a
+"Force re-scan" button that triggers a manual scan for
+parity with the original poll UX.
 
-- **Latency budget:** ±2 minutes of the event boundary
-  (5-minute poll, plus the OS's own calendar sync
-  freshness — Google Calendar sync runs every ~15
-  minutes).
-- **Permission revoke:** `READ_CALENDAR` revoke pauses
-  the poll; the next re-grant resumes from the current
-  window. The banner pattern is the same as the other
-  permissions.
+- **Latency budget:** sub-second from the OS notification
+  to the routine dispatch (no polling jitter). The user's
+  perceived latency is bounded by their calendar
+  provider's sync freshness (Google Calendar syncs every
+  ~15 minutes).
+- **Doze behavior:** `ContentObserver` callbacks fire
+  even in Doze; if the Dart isolate is suspended the
+  match runs when the isolate wakes. The debug screen
+  surfaces "isolate asleep" copy.
+- **Permission revoke:** `READ_CALENDAR` revoke stops the
+  observer entirely; the next re-grant resumes. The
+  banner pattern is the same as the other permissions.
 
-### Call-screening (Phase F — planned)
+### Call-screening (Phase F — shipped, ADR-019 + 019 follow-up)
 
-`CallInterceptor` is a `CallScreeningService` — the OS
-hands the call event to the service in real time, before
-the dialer sees it. Reliability is bounded by the OS, not
-by us.
+`CallInterceptor` is a Kotlin `CallScreeningService`
+declared in `AndroidManifest.xml` with the
+`BIND_SCREENING_SERVICE` permission and the
+`ROLE_CALL_SCREENING` role. Per ADR-019, this is the
+right shape for incoming-call matching and ringer-mode
+override; `PhoneAccount` is for *outgoing* calls. Per
+ADR-019 follow-up, the routine config lives in
+`SharedPreferences` (not in `automationsJson`) because
+the interceptor reads it on every call, before the Dart
+isolate is warm.
 
-- **Latency budget:** synchronous; the call event is
-  delivered to the service before it is delivered to the
-  dialer, so the routine can snap the ringer and launch
-  the full-screen UI in time.
-- **Permission revoke:** the call-screening role is a
-  user-granted role (not a runtime permission). The
-  Settings → Permissions tile surfaces a "Role not
-  granted" banner with a one-tap deep link to
+- **Latency budget:** synchronous — the OS delivers the
+  call event to `onScreenCall(...)` before the dialer
+  sees it. The routine matches, snaps the ringer via
+  `AudioManager.setRingerMode(RINGER_MODE_SILENT)` (or
+  `RINGER_MODE_VIBRATE`), and returns the
+  `CallResponse` with the appropriate
+  `CallScreeningService.Response` flags. Sub-100ms total.
+- **Role not granted:** the user may install v1.0 and
+  grant `READ_PHONE_STATE` / `ANSWER_PHONE_CALLS` but
+  decline the call-screening role. The interceptor
+  registers as a no-op: incoming calls pass through
+  untouched, the routine's notification still fires (the
+  Dart `ActionNotify` arm), but the silent-mode override
+  is skipped. The Settings → Permissions tile surfaces a
+  "Role not granted" banner with a one-tap deep link to
   `RoleManager.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING)`.
+- **Dart isolate warm-up:** the interceptor does not
+  depend on the Dart isolate. The Japan routine config is
+  read from `SharedPreferences` on every call.
 
 ## Timezone and DST
 

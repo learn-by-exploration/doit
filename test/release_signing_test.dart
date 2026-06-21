@@ -220,7 +220,7 @@ void main() {
     );
   });
 
-  test('pubspec.yaml name is "doit" and version is 0.5.0+6 (v0.5a)', () {
+  test('pubspec.yaml name is "doit" and version is 1.0.0+7 (v1.0g)', () {
     final pubspec = _read('pubspec.yaml');
     expect(
       pubspec,
@@ -231,10 +231,12 @@ void main() {
     );
     expect(
       pubspec,
-      contains('version: 0.5.0+6'),
+      contains('version: 1.0.0+7'),
       reason:
-          'v0.5a bumped the version from 0.4.0+5 to 0.5.0+6 to mark '
-          'the rename + permission-wiring milestone.',
+          'v1.0g bumped the version from 0.5.0+6 to 1.0.0+7 to mark '
+          'the Routines + Japan silent-mode + Do rename milestone. '
+          'Six v1.0 phases (A–F) closed across 14 commits from '
+          '`373913c` v1.0a.3 to `ff56021` v1.0f.2.',
     );
     expect(
       pubspec,
@@ -243,17 +245,17 @@ void main() {
     );
   });
 
-  test('lib/build_info.dart mirrors pubspec 0.5.0+6 (v0.5a)', () {
+  test('lib/build_info.dart mirrors pubspec 1.0.0+7 (v1.0g)', () {
     final info = _read('lib/build_info.dart');
     expect(
       info,
-      contains("kAppVersion = '0.5.0'"),
-      reason: 'lib/build_info.dart must mirror pubspec.yaml version (0.5.0).',
+      contains("kAppVersion = '1.0.0'"),
+      reason: 'lib/build_info.dart must mirror pubspec.yaml version (1.0.0).',
     );
     expect(
       info,
-      contains('kAppVersionCode = 6'),
-      reason: 'lib/build_info.dart must mirror pubspec.yaml versionCode (6).',
+      contains('kAppVersionCode = 7'),
+      reason: 'lib/build_info.dart must mirror pubspec.yaml versionCode (7).',
     );
   });
 

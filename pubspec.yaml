@@ -6,9 +6,10 @@ publish_to: 'none'
 
 # do it is a personal-use Android habit app. iOS is v0.2+ scope. The
 # version and build number are overridden by `flutter build` flags.
-# v0.5 is the rename-to-"do it" + permission-wiring milestone
-# (see docs/v_model/plan.md).
-version: 0.5.0+6
+# v1.0 is the Routines + Japan silent-mode + Do rename milestone
+# (Phases A–F closed across 14 commits from `373913c` v1.0a.3 to
+# `ff56021` v1.0f.2; see docs/v_model/v1_0_release_baseline.md).
+version: 1.0.0+7
 
 environment:
   sdk: ^3.12.0

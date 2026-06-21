@@ -1198,3 +1198,106 @@ leaves + `READ_CALENDAR` rationale), SYS-069 (Trigger
 sealed hierarchy), SYS-072 (RoutineExecutor
 dispatching `TriggerCalendarEvent*`).
 
+## WF-036 — Configure a device-state routine (v1.0 / Phase D PR 2)
+
+**Preconditions:**
+- `BLUETOOTH_CONNECT` is granted (the rationale screen
+  on the Settings → Permissions tile explains why — to
+  detect connected BT devices; no audio / call history
+  data is read).
+- The user is on the AddDoScreen / AddEventScreen /
+  AddPersonScreen (the Routines section is universal).
+- The `RoutinesSection` widget is in the empty state
+  (no automation registered for this entity yet) or in
+  the populated state (adding a second / third routine).
+
+**Main flow (six steps):**
+1. Tap "Add a device-state routine" in the Routines
+   section. The `DeviceStatePicker` sheet slides up
+   over the form.
+2. Pick a trigger shape from the seven supported by
+   Phase D PR 2: `charging` / `batteryRange` /
+   `bluetoothDevice` / `wifiSsid` / `headphones` /
+   `ringerMode` / `foregroundApp`. The picker surfaces
+   one tile per shape with the matching icon + a
+   one-line description. The `foregroundApp` tile has
+   an "Best-effort" tag (the `PACKAGE_USAGE_STATS`
+   permission is v1.1; v1.0 fires on the OS
+   `ACTION_FOREGROUND_SERVICE` reactive broadcast
+   without the permission).
+3. Set the trigger details. The fields depend on the
+   shape picked in step 2:
+   - `charging` → radio (charging / disconnecting).
+   - `batteryRange` → two sliders (low %, high %);
+     the routine fires when the battery crosses either
+     threshold.
+   - `bluetoothDevice` → text field (device name or
+     MAC prefix; saved as a `BluetoothDeviceMatcher`).
+   - `wifiSsid` → text field (SSID; saved as a
+     `SsidMatcher`).
+   - `headphones` → radio (plugged / unplugged).
+   - `ringerMode` → radio (silent / vibrate / normal).
+   - `foregroundApp` → text field (package name; saved
+     as a `ForegroundAppMatcher`).
+4. Set the condition (optional): time window +
+   day-of-week + AND/OR group. The condition builder
+   is the same one used by `TriggerLocation*` and
+   `TriggerCalendarEvent*` (sealed `Condition` from
+   v1.0c.1, SYS-070).
+5. Set the action: `ActionNotify` (default) or any
+   other marker leaf from v1.0c.1 (SYS-071).
+6. Save the routine. The sheet pops; the Routines
+   section now shows the new entry with the trigger
+   shape icon + the condition summary + the action
+   label. The routine is persisted to the entity's
+   `automationsJson` envelope.
+
+**Postconditions:**
+- The new entry is in the entity's `automationsJson`
+  with `kAutomationFormatVersion = 1`.
+- `DeviceStateService.instance` (the Dart-side
+  adapter over the `DeviceStateChannel.kt` bridge) is
+  subscribed to the relevant broadcast (the executor
+  subscribes once at app start, and matches each
+  `DeviceStateSnapshot` against the registered
+  automation set; see `lib/routines/routine_executor.dart`'s
+  `_onDeviceState` predicate).
+- A snapshot fires within ±1s of the next matching OS
+  broadcast; the routine's `ActionNotify` shows a
+  notification on the home screen.
+- The routine round-trips through backup / restore
+  (the envelope is plain JSON in the existing backup
+  format; no schema bump needed).
+
+**Failure modes:**
+- `BLUETOOTH_CONNECT` denied at the sheet gate → the
+  rationale re-surfaces; no routine is added.
+- The matching broadcast never fires on the user's
+  device (e.g., the device has no BT radio) → no
+  notification ever; the routine entry sits in the
+  Routines section as "armed". A `TriggerDeviceState`
+  debug row on the Settings → Triggers screen
+  surfaces "0 broadcasts in last hour" so the user
+  knows the trigger is silent.
+- User revokes `BLUETOOTH_CONNECT` mid-flight → the
+  `DeviceStateService` logs the `PlatformException`
+  on the next snapshot and continues; pending
+  `bluetoothDevice` routines silently miss (a v1.1
+  follow-up for per-automation reliability badges).
+
+**Why no live broadcast dashboard in the picker:**
+Phase D PR 2 ships the minimum-viable device-state
+UX. The picker lets the user pick the trigger shape
+and details; the live broadcast dashboard is on the
+Settings → Triggers screen (a separate debug surface).
+A future v1.1 enhancement could add an inline "last
+seen: 5 minutes ago, charging" preview tile in the
+picker, but Phase D ships the picker without it.
+
+**Requirements covered:** SYS-073 (7 device-state
+trigger shapes + `BLUETOOTH_CONNECT` rationale),
+SYS-069 (Trigger sealed hierarchy), SYS-070 (sealed
+Condition), SYS-071 (sealed Action), SYS-077 (cross-
+reference to the BLUETOOTH_CONNECT banner pattern in
+`notification_reliability.md`).
+

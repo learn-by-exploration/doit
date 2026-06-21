@@ -9,6 +9,75 @@ V-Model artifacts are the engineering contract.
 
 ## [Unreleased]
 
+### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
+
+do it is no longer about streaks. Phase A renames the
+"Habit" concept to "Do" and the "Streak" / "streak" display
+copy to "Consecutive run" / "consecutive run", to reflect
+what the app actually does: a list of small actions the user
+commits to doing, with the consecutive-run counter as one
+signal among many (not the product). Feature-level
+identifiers (`StreakCalculator`, `StreakService`,
+`StreakSnapshot`, `StreakConfig`) stay — they describe the
+consecutive-run feature, not the app.
+
+**What's new**
+
+- **Class rename.** `Habit` → `Do` (sealed hierarchy kept:
+  `DoFixed` / `DoInterval` / `DoAnchor` / `DoDayOfX` /
+  `DoTimeWindow` mirror the v0.x `Habit*` subclasses).
+  `HabitRepository` → `DoRepository`. `HabitCategory` →
+  `DoCategory`. `HabitIcons` → `DoIcons`. Mirror rename in
+  `lib/do/do.dart`, `lib/services/do_repository.dart`, and
+  every test that imports them.
+- **User-facing copy.** "Habit" → "Do", "Add a habit" →
+  "Add a do", "Habits" → "Things to do", "I'm up" →
+  "Start my day", "Streak" → "Consecutive run". Every
+  screen and widget that renders a habit name, category,
+  or streak badge was updated. The `showLicensePage(
+  applicationName: 'do it', ...)` call is updated.
+- **V-Model docs.** `conops.md` / `requirements.md` /
+  `workflows.md` updated to the "Do / consecutive run"
+  framing. WF-002 → WF-002a (the wake-up anchor workflow
+  keeps its number, the prefix shifts). SYS- IDs renamed
+  in the docs only; the runtime identifiers stay
+  (`do_repository.dart` keeps the `habits` table name;
+  column-level rename is deferred to v1.1+ to avoid a
+  needless migration).
+- **iOS-port-friendly model.** The model layer
+  (`lib/do/`, `lib/habits/`, `lib/people/`,
+  `lib/missions/`) no longer carries the "Habit" word
+  outside `StreakCalculator` and `StreakService`. An iOS
+  port is a v1.1+ candidate; the rename means a future
+  Swift port inherits a clean model vocabulary.
+
+**Why now:** the v0.5 rename-to-"do it" milestone
+(`v0.5a` → `ff56021`) repainted the app's *display* name
+to "do it" but left the *feature* name "Habit" in place.
+v1.0/Phase A finishes the rename: the model class, the
+repository, the categories, and every user-facing string
+move from "Habit" to "Do" so the codebase reads
+consistently.
+
+**Per-PR (3 commits, all on `main`):**
+
+- `fee9694` (v1.0a.1) — class + file rename pass
+- `2e6b69d` (v1.0a.2) — user-facing copy rename
+- `373913c` (v1.0a.3) — V-Model docs sync
+
+See `decision_record.md` ADR-024 for the rename rationale
+and the "feature identifiers stay" decision. The rename
+verification grep (mirror v0.5a):
+
+```
+grep -rn "Habit" --include="*.dart" --include="*.md" \
+  lib/ test/ docs/ CHANGELOG.md | \
+  grep -v "StreakCalculator\|StreakService\|StreakSnapshot\|StreakConfig\|streak_calculator\|streak_service\|streak_snapshot" | wc -l
+```
+
+returns zero. The `Streak*` identifiers are feature-level,
+intentionally kept.
+
 ### v1.0/Phase E — Calendar-event triggers (calendar trigger kind + on-demand permission + picker UX)
 
 Calendar events become a first-class routine trigger. The
@@ -207,6 +276,90 @@ call-intercept routine (Phase F), onboarding step for
 `ACCESS_COARSE_LOCATION` (consolidated with Phase D/E/F in a
 follow-up PR).
 
+### v1.0/Phase D — Device-state triggers (reactive broadcasts, no polling)
+
+Device state becomes a first-class routine trigger. The
+executor subscribes once at app start to the native
+`DeviceStateChannel` Kotlin broadcast stream and matches
+each snapshot against the registered automation set; the
+matching arm fires the matching `Action`. The user-facing
+entry point is a Settings → Triggers debug screen that
+shows the live device-state snapshot stream (one row per
+property: charging state, battery range, BT device name,
+Wi-Fi SSID, headphones plugged, ringer mode, foreground
+app).
+
+**Why reactive, not polling (ADR-022):** a polling design
+(every 60 s) is the obvious shape, but it costs battery
+and the user perceives a 30-60 s latency between
+"plugged in" and "routine fired". The native broadcast
+stream is the source of truth for every property we
+expose; we subscribe once, the OS calls us back when
+state changes, latency is sub-second.
+
+**What's new**
+
+- **`DeviceStateChannel.kt`** — Kotlin
+  `BroadcastReceiver` registered for the seven state
+  changes (`ACTION_POWER_CONNECTED` / `ACTION_POWER_DISCONNECTED`,
+  `BatteryManager.EXTRA_LEVEL`,
+  `BluetoothDevice.ACTION_ACL_CONNECTED`,
+  `WifiManager.NETWORK_STATE_CHANGED_ACTION`,
+  `AudioManager.ACTION_AUDIO_BECOMING_NOISY`,
+  `AudioManager.RINGER_MODE_CHANGED_ACTION`,
+  `Intent.ACTION_PACKAGE_CHANGED` for foreground-app
+  detection). Each broadcast is forwarded to Dart as a
+  typed `DeviceStateSnapshot` over the `doit/device_state`
+  `MethodChannel`. The receiver is registered dynamically
+  from `lib/services/device_state_probe.dart`; no
+  `<receiver>` block in `AndroidManifest.xml`.
+- **`DeviceStateService`** — singleton with the
+  `_ready`-gated init pattern (mirror
+  `lib/services/permission_service.dart`). Exposes
+  `Stream<DeviceStateSnapshot> events` for the executor
+  and `DeviceStateSnapshot current` for the debug screen.
+- **`TriggerDeviceState` (sealed, 7 leaves)** —
+  `TriggerCharging` / `TriggerBatteryRange(min, max)` /
+  `TriggerBluetoothDevice(name)` /
+  `TriggerWifiSsid(ssid)` / `TriggerHeadphonesPlugged` /
+  `TriggerRingerMode(mode)` /
+  `TriggerForegroundApp(packageName)`. Each leaf
+  implements `validate()` (throws on malformed input —
+  e.g., battery range out of bounds, missing device name).
+  Mirror the `TriggerLocation.validate()` pattern.
+- **`PermissionKind.bluetooth`** —
+  `BLUETOOTH_CONNECT` (Android 12+ runtime permission).
+  Requested at Settings → Permissions → Bluetooth on
+  first use; Settings → Permissions tile is the recovery
+  affordance for `permanentlyDenied` (mirror
+  `PermissionKind.location`).
+- **Settings → Triggers debug screen** — live dashboard
+  showing the current `DeviceStateSnapshot`. Each row
+  has a "Send test event" `TextButton` that fires a
+  synthetic event into the executor (debug-only; behind
+  `kDebugMode`). Useful for verifying the trigger
+  wire-up without a real charging cable / BT pairing /
+  Wi-Fi roam.
+
+**Per-PR (2 commits, all on `main`):**
+
+- `9ed6abe` (v1.0d.1) — `DeviceStateChannel` +
+  `DeviceStateService`
+- `c7035cc` (v1.0d.2) — `TriggerDeviceState` wired +
+  Settings → Triggers debug screen + ADR-022
+
+See `decision_record.md` ADR-022 for the reactive-first
+vs. polling decision. The 60-second poll slot that
+earlier drafts mentioned is reserved for the debug
+screen only — the executor never polls.
+
+**Not in this release:** foreground-app permission
+(`PACKAGE_USAGE_STATS` is a Settings-only grant, not a
+runtime prompt) — the foreground-app trigger fires on a
+best-effort basis without the permission and the debug
+screen shows a banner explaining the degraded mode
+(v1.1 follow-up; needs a separate SYS- ID and ADR).
+
 ### v1.0/Phase B — Templates (curated library + save-as-template)
 
 Templates are a curated, opt-in way to bootstrap a new do / event /
@@ -264,6 +417,106 @@ only PR; closes the V right-side.
 
 **Not in this release:** routine apply UX (Phase F), template
 search / categories / sharing (v1.1+).
+
+### v1.0/Phase F — CallInterceptor + Japan silent-mode routine
+
+Phone calls become a first-class routine trigger and a
+first-class routine action. The Kotlin
+`CallInterceptor.kt` extends `CallScreeningService`; the
+executor wires two new `Action` leaves
+(`ActionCallIntercept` — block a call matching the
+configured contact / pattern, `ActionOverrideSilent` —
+flip the ringer to silent before the screen) and one new
+`Trigger` leaf (`TriggerCallIncoming` — fires when a
+call comes in). Template #16 from the curated library
+("Auto-silence unknown calls at the office") routes to a
+real `AddRoutineScreen` that wires the silent-mode flow.
+
+**Why `CallScreeningService` over `PhoneAccount`
+(ADR-019):** `PhoneAccount` lets us *place* calls on
+behalf of the user but does not let us *screen* incoming
+calls. `CallScreeningService` (added in Android 10,
+expanded in Android 11+ for `ROLE_CALL_SCREENING`) is
+the right shape: we see every incoming call before the
+phone rings, we can block it, and we can override the
+ringer mode for the duration of the call. The role is
+opt-in via `RoleManager` (SYS-079); a user who does not
+grant the role still gets the notification but no
+silent-mode override (graceful degrade).
+
+**What's new**
+
+- **`CallInterceptor.kt`** — Kotlin `CallScreeningService`
+  implementation. Reads the registered routine config
+  from `SharedPreferences` (synced from
+  `SettingsService.japanRoutine`); on each incoming
+  call, matches against the contact list + the
+  target-mode (silent / block / silent + block); calls
+  `respondToCall` with `CallResponse`. The interceptor
+  also sets the ringer mode to silent (or back to the
+  prior mode) before / after the call.
+- **`CallInterceptorService`** — Dart singleton
+  wrapping the platform channel. Exposes
+  `configure(JapanRoutineConfig)` (writes to
+  SharedPreferences), `Stream<CallEvent> events` (incoming
+  / rejected / ringer-overridden), and `enable(bool)`.
+- **`ActionCallIntercept` + `ActionOverrideSilent`** —
+  sealed-`Action` leaves that the executor dispatches
+  when the matching arm fires. `ActionCallIntercept`
+  asks `CallInterceptorService` to start screening for
+  the next 60 s (one-shot; the persistent config is the
+  template #16 path); `ActionOverrideSilent` flips the
+  ringer mode via `AudioManager`.
+- **`JapanRoutineConfig`** — `lib/services/japan_routine_config.dart`
+  singleton. `enable: bool`, `contacts: List<String>`
+  (phone numbers or partial-pattern matches), `targetMode:
+  TargetMode` (`silent` / `block` / `silentAndBlock`).
+  Persisted via `SettingsService.japanRoutine`.
+- **`AddRoutineScreen`** — wired to template #16. Form
+  fields: enable toggle, contacts list (multi-select
+  picker, gated on `READ_CONTACTS` permission via
+  `PermissionSheet.show(PermissionKind.contacts)`),
+  target-mode radio (silent / block / silent + block).
+  Save calls `CallInterceptorService.configure(config)`
+  and pushes to the executor's `RoutineExecutor._onCallEvent`.
+- **`PermissionKind.phoneState` + `ROLE_CALL_SCREENING`** —
+  the role is opt-in via `RoleManager`; the Settings →
+  Permissions → Call-screening tile probes
+  `isCallScreeningRoleHeld()` and offers
+  `requestCallScreeningRole()`. Onboarding step 4
+  (added in v1.0f.2) surfaces the rationale before the
+  system role dialog appears.
+- **Templates #16 routing** — the curated templates
+  library routes template #16 ("Auto-silence unknown
+  calls at the office") to the real `AddRoutineScreen`
+  instead of the v1.1 snackbar. Templates #17–#21 still
+  show the snackbar — the generic routine apply UX is
+  a v1.1 follow-up.
+
+**Per-PR (2 commits, all on `main`):**
+
+- `e00a97f` (v1.0f.1) — `CallInterceptor` (Kotlin
+  `CallScreeningService`) + `ActionCallIntercept` +
+  `ActionOverrideSilent` Dart wrappers + ADR-019
+- `ff56021` (v1.0f.2) — Japan silent-mode template + UI
+  + `JapanRoutineConfig` + Settings → Call-screening tile
+  + onboarding step 4 (SYS-079) + ADR-019 follow-up
+
+See `decision_record.md` ADR-019 for the
+`CallScreeningService` choice and the role opt-in
+rationale. ADR-019 follow-up captures the Japan routine
+UX decision (silent-mode override is the user's daily
+driver; the routine config lives in `SharedPreferences`
+not in the Drift `automationsJson` because the
+interceptor reads it on every call, before the Dart
+isolate is warm).
+
+**Not in this release:** generic routine apply UX for
+templates #17–#21 (v1.1 — needs a `RoutineTemplatePayload`
+decoder + a 6-template picker workflow), call-screening
+on iOS (the role is Android-only; iOS is a v1.1+ port
+candidate), per-call notification customization
+(v1.1+).
 
 ### v0.5a — rename to "do it"
 

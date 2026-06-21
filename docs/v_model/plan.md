@@ -169,3 +169,130 @@ intentionally incomplete for that slice.
 - **Right-side gate.** `docs/v_model/v0_5_release_checklist.md`
   is updated; the v0.5e on-device verification is still
   pending the user attaching the SM-S918B.
+
+## Milestone 7 — v1.0: Routines + Japan silent-mode + Do rename
+
+- **Date:** 2026-06-21.
+- **Status:** **in flight**. All six v1.0 work items
+  (Phases A–F) are closed at the `ff56021` tip + the
+  `7157707` status-doc commit. The release-prep PR
+  (v1.0g, this milestone's sign-off commit) ships the
+  version bump, CHANGELOG fill-in, and the left-side
+  baseline + right-side gate docs.
+- **What v1.0 ships.** Four user-facing themes on top of
+  the v0.5 + v0.4 contract-closure foundation:
+  - **Routines are first-class.** Every do / event /
+    person gets a `Trigger` / `Condition` / `Action`
+    automation list. Five trigger kinds (time of day,
+    location enter / exit, device-state, calendar
+    event, call incoming) are wired to a single
+    `RoutineExecutor` (Phases C, D, E, F).
+  - **Japan silent-mode is a real routine.** Template
+    #16 routes to a working `AddRoutineScreen` that
+    configures `CallInterceptor` via
+    `ROLE_CALL_SCREENING` (Phase F).
+  - **The Habit → Do rename finishes.** Class names,
+    user-facing copy, and V-Model docs all move from
+    "Habit / Streak" to "Do / Consecutive run". DB
+    column names are unchanged to avoid a needless
+    v2→v3 migration (Phase A; ADR-024).
+  - **Templates carry the curated library.** 25
+    templates seeded on first run, save-as-template
+    UX, catalog UI (Phase B).
+- **The 14 v1.0 commits.** `373913c` v1.0a.3 →
+  `ff56021` v1.0f.2 + `7157707` status-doc log. The
+  full list lives in
+  [`implementation_status.md`](implementation_status.md)
+  Phase log table.
+- **The 7 v1.0 ADRs.** ADR-019 (CallScreeningService),
+  ADR-019 follow-up (Japan routine UX + role opt-in),
+  ADR-020 (template JSON envelope, `kTemplateFormatVersion = 1`),
+  ADR-021 (geolocator for coarse-only geofence),
+  ADR-022 (reactive device-state broadcasts, no
+  polling), ADR-023 (reactive `ContentObserver` for
+  calendar, no 5-min poll), ADR-024 (Habit → Do rename).
+- **The 11 v1.0 SYS- IDs.** SYS-067 (25 templates
+  seeded) → SYS-076 (PermissionKind.location coarse)
+  + SYS-079 (call-screening role opt-in).
+- **v1.0 release APK + on-device verification
+  (v1.0h).** The user's hands-on step. Lighter than
+  v0.5e because the `applicationId` did not change —
+  the install is an upgrade, not a fresh install; no
+  uninstall is needed. The five-step smoke:
+  1. Launch the app; observe `1.0.0 (7)` in About.
+  2. Tap a Phase B template; verify the catalog UI +
+     save-as-template.
+  3. Add a Phase C location routine; verify geofence
+     fires.
+  4. Add a Phase D device-state routine; verify the
+     trigger fires.
+  5. Tap a Phase F Japan template; verify the
+     silent-mode routine runs during a real call.
+- **Left-side doc.**
+  [`v1_0_release_baseline.md`](v1_0_release_baseline.md).
+- **Right-side gate.**
+  [`v1_0_release_checklist.md`](v1_0_release_checklist.md).
+- **Sign-off.** Pending the user's hands-on `v1.0h`
+  pass. The checklist `§ Sign-off` line is the gate.
+
+## Milestone 8 — v1.1: Polish + expansion (stub)
+
+- **Date:** _planned v1.1a commit_.
+- **Status:** stub. v1.1 is the polish / expansion
+  milestone that follows v1.0 sign-off. The candidate
+  list below is the working set; v1.1a is whichever
+  item the user picks first.
+- **Candidate scope (v1.1 working set):**
+  - **Map widget in `LocationPicker`.** Add a map
+    preview (OpenStreetMap tile layer via `flutter_map`;
+    no Google Play Services key). v1.0 ships the radius
+    picker without the map; v1.1 adds the map for visual
+    confirmation of the geofence footprint.
+  - **Per-automation reliability badges.** The executor
+    surfaces a global `Reliability.degraded` banner today;
+    v1.1 surfaces per-automation badges so the user can
+    see which routine is in the degraded mode without
+    opening the debug screen.
+  - **Generic routine apply UX for templates #17–#21.**
+    v1.0f.2 routes only template #16 (Japan) to a real
+    `AddRoutineScreen`; templates #17–#21 still show the
+    "v1.1 follow-up" snackbar. v1.1 lands the
+    `RoutineTemplatePayload` decoder + a 6-template
+    picker workflow.
+  - **Foreground-app permission
+    (`PACKAGE_USAGE_STATS`).** v1.0 fires the
+    `TriggerDeviceState` for foreground-app on a
+    best-effort basis; v1.1 adds the
+    `PACKAGE_USAGE_STATS` permission flow with a
+    dedicated SYS- ID + ADR. The permission is a
+    special-access permission — the rationale + opt-in
+    UX is non-trivial.
+  - **i18n.** All v1.0 copy is hard-coded English. v1.1
+    extracts the user-facing strings to ARB files and
+    ships at least one non-English locale (the user's
+    preference).
+  - **Wear OS / Android Auto.** Out of v1.0 scope.
+    v1.1+ candidate; depends on whether the user wants
+    a phone-only or wrist-or-car experience.
+  - **New app icon + splash.** v1.0 ships with the
+    default Flutter icon. v1.1 adds a custom icon +
+    splash (no new permissions).
+  - **Multi-user / multi-device sync.** Out of project
+    scope; deferred to v2.0+.
+- **Why v1.1 is its own milestone, not bundled into
+  v1.0.** v1.0 closed the four-theme foundation
+  (Routines, Japan silent-mode, Do rename, Templates).
+  Each v1.1 follow-up is a meaningful feature on its
+  own; bundling them into v1.0 would have doubled the
+  commit count and required two on-device
+  verification cycles on the user's primary phone.
+  v1.1 keeps each follow-up PR-sized and gets one APK
+  install per feature.
+- **Open questions** (deferred to v1.1a):
+  - Map provider choice (`google_maps_flutter` with
+    Play Services key vs `flutter_map` with
+    OpenStreetMap).
+  - i18n scope (only the user's preferred locale, or
+    a full Latin + CJK baseline).
+  - Wear OS target (companion tile on the watch face,
+    or a standalone wear-app).
