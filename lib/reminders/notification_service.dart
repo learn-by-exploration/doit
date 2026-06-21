@@ -21,6 +21,12 @@ import 'package:meta/meta.dart';
 
 /// A reminder to surface. The widget layer composes this; the
 /// service renders it.
+///
+/// v1.1 adds an optional [body] field used by routine-fired
+/// notifications (Phase C/D/E routines whose action is
+/// `ActionNotify`). The field defaults to `null` and the
+/// existing habit-reminder path (Phase A) keeps the
+/// Kotlin-side body derivation.
 @immutable
 class ReminderEvent {
   const ReminderEvent({
@@ -29,12 +35,19 @@ class ReminderEvent {
     required this.at,
     required this.alarmId,
     this.strongMode = false,
+    this.body,
   });
   final String habitId;
   final String habitName;
   final DateTime at;
   final AlarmId alarmId;
   final bool strongMode;
+
+  /// Optional body text. When `null` (the default), the
+  /// platform side derives the body from the habit. When
+  /// non-null (routine fires), the value is used as the
+  /// notification body verbatim.
+  final String? body;
 }
 
 /// Public surface for the notification service.

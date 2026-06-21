@@ -12,14 +12,23 @@
 // rebuilding the entire app. The class also implements
 // [ChangeNotifier] so it can be exposed via
 // `ChangeNotifierProvider` (per .claude/rules/lib-screens.md).
+//
+// v1.1 (SYS-080) adds the [routines] registry: a per-template
+// map of `RoutineConfig` values, keyed by template id, persisted
+// under `doit.routine.<templateId>`. The registry is independent
+// of the v1.0 [japanRoutine] config — ADR-025 captures the
+// "no migration" decision.
 
 import 'dart:async' show Completer;
+import 'dart:convert' show jsonDecode, jsonEncode;
 
-import 'package:flutter/foundation.dart' show ChangeNotifier, ValueNotifier;
+import 'package:flutter/foundation.dart'
+    show ChangeNotifier, ValueNotifier, debugPrint, kDebugMode;
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:doit/services/japan_routine_config.dart';
+import 'package:doit/services/routine_config.dart';
 import 'package:doit/triggers/trigger.dart' show SilentMode;
 
 /// Singleton holder for user-tweakable settings. The runtime
@@ -72,6 +81,16 @@ class SettingsService extends ChangeNotifier {
   final ValueNotifier<JapanRoutineConfig> japanRoutine =
       ValueNotifier<JapanRoutineConfig>(JapanRoutineConfig.defaults);
 
+  /// v1.1 (SYS-080). The user's template-driven routine
+  /// configurations, keyed by template id. Empty at first
+  /// launch; populated by [setRoutine]. The map is exposed
+  /// as a [ValueNotifier] so widgets / `RoutineExecutor`
+  /// can `addListener` on changes. The map value is
+  /// unmodifiable; mutations go through [setRoutine] so
+  /// the persistence layer stays in sync.
+  final ValueNotifier<Map<String, RoutineConfig>> routines =
+      ValueNotifier<Map<String, RoutineConfig>>(<String, RoutineConfig>{});
+
   /// Init gate (`Completer<void> _ready`). Public reads wait on
   /// this before touching the underlying [SharedPreferences]
   /// instance. Pattern: see .claude/rules/lib-services.md §2.
@@ -94,6 +113,12 @@ class SettingsService extends ChangeNotifier {
   static const String _kJapanRoutineTargetModeKey =
       'doit.japan_routine.target_mode';
 
+  /// v1.1 (SYS-080). Prefix for per-template routine keys. The
+  /// full key is `_kRoutinesPrefix + templateId`. One key per
+  /// template; each value is the JSON encoding of a
+  /// [RoutineConfig] (see `RoutineConfig.toJson`).
+  static const String _kRoutinesPrefix = 'doit.routine.';
+
   /// Idempotent init. Loads the persisted values; safe to call
   /// multiple times (the gate is completed on the first call and
   /// subsequent calls are no-ops).
@@ -103,6 +128,7 @@ class SettingsService extends ChangeNotifier {
     firstLaunchCompleted.value =
         _prefs.getBool(_kFirstLaunchCompletedKey) ?? false;
     japanRoutine.value = _loadJapanRoutine();
+    routines.value = _loadRoutines();
     if (!_ready.isCompleted) _ready.complete();
   }
 
@@ -126,6 +152,36 @@ class SettingsService extends ChangeNotifier {
       contactIds: List<String>.unmodifiable(contactIds),
       targetMode: targetMode,
     );
+  }
+
+  /// v1.1 (SYS-080). Walk every SharedPreferences key under
+  /// [_kRoutinesPrefix] and decode each as a [RoutineConfig].
+  /// Malformed payloads are dropped (and `debugPrint`-logged
+  /// behind [kDebugMode]) so a single bad row does not
+  /// invalidate the whole install.
+  Map<String, RoutineConfig> _loadRoutines() {
+    final out = <String, RoutineConfig>{};
+    for (final k in _prefs.getKeys()) {
+      if (!k.startsWith(_kRoutinesPrefix)) continue;
+      final raw = _prefs.getString(k);
+      if (raw == null) continue;
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is! Map) {
+          throw const FormatException('expected JSON object');
+        }
+        final cfg = RoutineConfig.fromJson(decoded.cast<String, Object?>());
+        out[cfg.templateId] = cfg;
+      } on FormatException catch (e) {
+        if (kDebugMode) {
+          debugPrint(
+            'SettingsService._loadRoutines: ignoring malformed '
+            'value at $k: $e',
+          );
+        }
+      }
+    }
+    return Map<String, RoutineConfig>.unmodifiable(out);
   }
 
   /// Mark the first-launch onboarding as complete. Persists the
@@ -170,6 +226,26 @@ class SettingsService extends ChangeNotifier {
     await _prefs.setString(_kJapanRoutineTargetModeKey, config.targetMode.name);
   }
 
+  /// v1.1 (SYS-080). Persist a template-driven routine
+  /// configuration. The [config]'s `templateId` is the
+  /// SharedPreferences key suffix; saving the same template
+  /// twice overwrites the prior value. The in-memory
+  /// [routines] notifier is updated synchronously before the
+  /// await on `_prefs.setString` so listeners (e.g., the
+  /// `RoutineExecutor`) see the new value immediately.
+  Future<void> setRoutine(RoutineConfig config) async {
+    await _ready.future;
+    final next = <String, RoutineConfig>{
+      ...routines.value,
+      config.templateId: config,
+    };
+    routines.value = Map<String, RoutineConfig>.unmodifiable(next);
+    await _prefs.setString(
+      _kRoutinesPrefix + config.templateId,
+      jsonEncode(config.toJson()),
+    );
+  }
+
   /// Test helper. Resets the singleton's in-memory state so the
   /// next [init()] re-loads from the `SharedPreferences` backing
   /// store. Does **not** touch the backing store itself; tests
@@ -183,6 +259,7 @@ class SettingsService extends ChangeNotifier {
     firstLaunchCompleted.value = false;
     backupFolderUri.value = null;
     japanRoutine.value = JapanRoutineConfig.defaults;
+    routines.value = const <String, RoutineConfig>{};
     // Allow a subsequent init() to re-load from the backing
     // store. Re-creating the completer is the standard pattern
     // when the gate has not yet been awaited in tests.
