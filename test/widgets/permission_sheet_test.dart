@@ -98,6 +98,15 @@ class _RecordingBridge implements ReminderBridge {
 
   @override
   Future<void> cancelNotification(int alarmId) async {}
+
+  @override
+  Future<void> schedulePreAlarm({
+    required int alarmId,
+    required int leadTimeSeconds,
+  }) async {}
+
+  @override
+  Future<void> cancelPreAlarms(int alarmId) async {}
 }
 
 Widget _wrap() => MaterialApp(theme: AppTheme.dark, home: const _Host());

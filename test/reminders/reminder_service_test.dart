@@ -155,4 +155,125 @@ void main() {
     await ReminderService.instance.rescheduleAll();
     expect(bridge.rescheduleCount, 1);
   });
+
+  // ── v1.2j / Phase 10 / SYS-107 ─────────────────────────────
+
+  test('schedulePreAlarms enqueues both 5-min and 1-min heads-ups when '
+      'fireAt is 10 min away', () async {
+    final bridge = FakeReminderBridge();
+    final s = ReminderService(
+      scheduler: FakeAlarmScheduler(),
+      notifications: FakeNotificationService(),
+      fullScreen: FakeFullScreenIntent(),
+      anchor: FakeAnchorDetector(),
+      bridge: bridge,
+    );
+    await ReminderService.init(s);
+    final now = DateTime(2026, 6, 23, 9);
+    final fireAt = now.add(const Duration(minutes: 10));
+    await ReminderService.instance.schedulePreAlarms(
+      alarmId: const AlarmId(42),
+      fireAt: fireAt,
+      now: now,
+    );
+    expect(bridge.schedulePreAlarmCalls, hasLength(2));
+    expect(bridge.schedulePreAlarmCalls[0].alarmId, 42);
+    expect(bridge.schedulePreAlarmCalls[0].leadTimeSeconds, 5 * 60);
+    expect(bridge.schedulePreAlarmCalls[1].alarmId, 42);
+    expect(bridge.schedulePreAlarmCalls[1].leadTimeSeconds, 60);
+  });
+
+  test(
+    'schedulePreAlarms skips the 5-min heads-up when fireAt is 3 min away',
+    () async {
+      final bridge = FakeReminderBridge();
+      final s = ReminderService(
+        scheduler: FakeAlarmScheduler(),
+        notifications: FakeNotificationService(),
+        fullScreen: FakeFullScreenIntent(),
+        anchor: FakeAnchorDetector(),
+        bridge: bridge,
+      );
+      await ReminderService.init(s);
+      final now = DateTime(2026, 6, 23, 9);
+      final fireAt = now.add(const Duration(minutes: 3));
+      await ReminderService.instance.schedulePreAlarms(
+        alarmId: const AlarmId(42),
+        fireAt: fireAt,
+        now: now,
+      );
+      expect(bridge.schedulePreAlarmCalls, hasLength(1));
+      expect(bridge.schedulePreAlarmCalls.single.leadTimeSeconds, 60);
+    },
+  );
+
+  test(
+    'schedulePreAlarms skips both heads-ups when fireAt is 30 s away',
+    () async {
+      final bridge = FakeReminderBridge();
+      final s = ReminderService(
+        scheduler: FakeAlarmScheduler(),
+        notifications: FakeNotificationService(),
+        fullScreen: FakeFullScreenIntent(),
+        anchor: FakeAnchorDetector(),
+        bridge: bridge,
+      );
+      await ReminderService.init(s);
+      final now = DateTime(2026, 6, 23, 9);
+      final fireAt = now.add(const Duration(seconds: 30));
+      await ReminderService.instance.schedulePreAlarms(
+        alarmId: const AlarmId(42),
+        fireAt: fireAt,
+        now: now,
+      );
+      expect(bridge.schedulePreAlarmCalls, isEmpty);
+    },
+  );
+
+  test('cancelPreAlarms forwards to bridge.cancelPreAlarms', () async {
+    final bridge = FakeReminderBridge();
+    final s = ReminderService(
+      scheduler: FakeAlarmScheduler(),
+      notifications: FakeNotificationService(),
+      fullScreen: FakeFullScreenIntent(),
+      anchor: FakeAnchorDetector(),
+      bridge: bridge,
+    );
+    await ReminderService.init(s);
+    await ReminderService.instance.cancelPreAlarms(const AlarmId(42));
+    expect(bridge.cancelPreAlarmsCalls, [42]);
+  });
+
+  test('schedulePreAlarms swallows a bridge failure per ADR-013', () async {
+    final bridge = _ThrowingPreAlarmBridge();
+    final s = ReminderService(
+      scheduler: FakeAlarmScheduler(),
+      notifications: FakeNotificationService(),
+      fullScreen: FakeFullScreenIntent(),
+      anchor: FakeAnchorDetector(),
+      bridge: bridge,
+    );
+    await ReminderService.init(s);
+    final now = DateTime(2026, 6, 23, 9);
+    final fireAt = now.add(const Duration(minutes: 10));
+    // Must not throw.
+    await ReminderService.instance.schedulePreAlarms(
+      alarmId: const AlarmId(42),
+      fireAt: fireAt,
+      now: now,
+    );
+  });
+}
+
+/// Test bridge variant whose `schedulePreAlarm` throws —
+/// used to pin the ADR-013 swallow path in
+/// `ReminderService.schedulePreAlarms`.
+class _ThrowingPreAlarmBridge extends FakeReminderBridge {
+  @override
+  Future<void> schedulePreAlarm({
+    required int alarmId,
+    required int leadTimeSeconds,
+  }) async {
+    throw Exception('simulated platform-channel error');
+  }
 }

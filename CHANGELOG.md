@@ -628,6 +628,91 @@ $ flutter test
 (Test count: 957 → 964 — 4 `refresh()` tests + 3
 lifecycle observer tests.)
 
+### v1.2j — DST transition banner + streak-recovery card + 5-min/1-min pre-notification
+
+Phase 10 of the v1.2 code-TODO closure (`30-phase
+roadmap`). Three small UX improvements, all centered on
+the "user missed something, here is how we handled it"
+banner subsystem:
+
+- **DST transition banner** (`lib/widgets/dst_transition_banner.dart`)
+  — one-shot card that surfaces when the schedule
+  engine silently reschedules one or more habit times
+  because of a clock change. Singular copy for one
+  drop, plural copy for two+. Renders
+  `SizedBox.shrink()` when the list is empty (zero
+  layout cost in the steady state).
+- **Streak-recovery card** (`lib/widgets/streak_recovery_card.dart`)
+  — one-shot card that surfaces when the consecutive
+  counter reports 3+ missed days on a habit. The
+  primary "I'm back" `FilledButton` and a dismiss
+  `IconButton` keyed by `habitId` let the user resume
+  or shelve the card without going through Settings.
+- **Pre-notification heads-up**
+  (`lib/services/reminder_service.dart`) — a new
+  `ReminderService.schedulePreAlarms({alarmId, fireAt, now})`
+  method enqueues a 5-min heads-up when the lead time
+  is `> 5 * 60 s` and a 1-min heads-up when the lead
+  time is `> 60 s`; lead times at or below those
+  thresholds are silently skipped. A new
+  `ReminderService.cancelPreAlarms(alarmId)` forwards
+  to the bridge so a cancelled habit leaves no
+  dangling pre-alarms. The `ReminderBridge` interface
+  gains `schedulePreAlarm({alarmId, leadTimeSeconds})`
+  and `cancelPreAlarms(alarmId)` abstract methods; the
+  Dart side does NOT call `DateTime.now()` directly —
+  the caller passes the reference time so the method
+  is unit-testable.
+
+**SYS-IDs**
+
+- SYS-105 — DST transition banner.
+- SYS-106 — Streak-recovery card.
+- SYS-107 — 5-min + 1-min pre-notification heads-up.
+
+**Files**
+
+- New `lib/widgets/dst_transition_banner.dart` (86%
+  coverage).
+- New `lib/widgets/streak_recovery_card.dart` (83%
+  coverage).
+- `lib/services/reminder_service.dart` (85%
+  coverage) — adds `schedulePreAlarms` and
+  `cancelPreAlarms`.
+- `lib/reminders/reminder_bridge.dart` — adds
+  `schedulePreAlarm` and `cancelPreAlarms` abstract
+  methods; both production (`PlatformReminderBridge`)
+  and test (`FakeReminderBridge`) implement them.
+- Updated test fakes (`_RecordingBridge` in
+  `test/widgets/permission_sheet_test.dart`,
+  `_ThrowingReminderBridge` in
+  `test/services/platform_notification_service_test.dart`)
+  to satisfy `non_abstract_class_inherits_abstract_member`.
+- New `test/widgets/dst_transition_banner_test.dart`
+  (5 tests).
+- New `test/widgets/streak_recovery_card_test.dart`
+  (2 tests).
+- `test/reminders/reminder_service_test.dart` (+5
+  tests; includes `_ThrowingPreAlarmBridge` for the
+  ADR-013 swallow path).
+- Updated `docs/v_model/requirements.md` with the
+  SYS-105, SYS-106, SYS-107 rows.
+
+**3-gate verification**
+
+```
+$ dart format --output=none --set-exit-if-changed .
+Formatted 210 files (0 changed) in 0.74 seconds.
+$ flutter analyze --fatal-infos
+No issues found! (ran in 1.3s)
+$ flutter test
+00:30 +978: All tests passed!
+```
+
+(Test count: 964 → 978 — 5 DST banner tests + 2
+recovery-card tests + 5 pre-notification tests; 3-gate
+green with zero analyzer findings.)
+
 ### v1.2f — `ActionFullscreen` + `ActionCallIntercept` real implementations + Person pauseUntil UI + DoFixed weekday display
 
 Phases 6b–6e of the v1.2 code-TODO closure

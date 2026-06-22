@@ -149,4 +149,13 @@ class _ThrowingReminderBridge implements ReminderBridge {
   @override
   Future<void> openIgnoreBatteryOptimizations() async =>
       throw UnimplementedError();
+
+  @override
+  Future<void> schedulePreAlarm({
+    required int alarmId,
+    required int leadTimeSeconds,
+  }) async => throw UnimplementedError();
+
+  @override
+  Future<void> cancelPreAlarms(int alarmId) async => throw UnimplementedError();
 }
