@@ -413,6 +413,15 @@ class _PermissionTile extends StatelessWidget {
         // updates when the user toggles it on in the
         // background.
         await service.refreshUsageStats();
+      case PermissionKind.callScreening:
+        // v1.2 / SYS-075 + SYS-079 follow-up:
+        // ROLE_CALL_SCREENING is a system role held via
+        // `RoleManager`. The re-probe re-reads the role
+        // state from the platform side and refreshes the
+        // cached status so the tile updates when the user
+        // toggles the role in Settings → Default apps →
+        // Caller ID & spam app.
+        await service.refreshCallScreening();
       case PermissionKind.backupFolder:
         // The backup folder is not a runtime permission;
         // it's a SAF picker. The re-pick is handled in

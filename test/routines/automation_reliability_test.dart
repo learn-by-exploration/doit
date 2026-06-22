@@ -1,5 +1,6 @@
 // Tests for the per-automation reliability derivation
-// (v1.1f / SYS-085).
+// (v1.1f / SYS-085; v1.2 extends with `TriggerForegroundApp`
+// + `TriggerCallIncoming*` permission gates).
 //
 // Covers:
 //   - Every Trigger leaf × each permission state (granted /
@@ -44,6 +45,11 @@ const _callIncomingTrigger = TriggerCallIncomingAny();
 
 const _timeOfDayTrigger = TriggerTimeOfDay(hour: 9, minute: 0);
 
+const _foregroundAppTrigger = TriggerForegroundApp(
+  packageName: 'com.instagram.android',
+  label: 'Instagram',
+);
+
 // ---------------------------------------------------------------------------
 // Statuses fixtures
 // ---------------------------------------------------------------------------
@@ -60,6 +66,8 @@ Map<PermissionKind, PermissionResult?> _statuses({
   PermissionResult? exactAlarm = _granted,
   PermissionResult? backupFolder = _granted,
   PermissionResult? batteryOptimization = _granted,
+  PermissionResult? usageStats = _granted,
+  PermissionResult? callScreening = _granted,
 }) => {
   PermissionKind.notifications: notifications,
   PermissionKind.contacts: contacts,
@@ -68,6 +76,8 @@ Map<PermissionKind, PermissionResult?> _statuses({
   PermissionKind.batteryOptimization: batteryOptimization,
   PermissionKind.location: location,
   PermissionKind.calendar: calendar,
+  PermissionKind.usageStats: usageStats,
+  PermissionKind.callScreening: callScreening,
 };
 
 Automation _automation(Trigger trigger) => Automation(
@@ -210,14 +220,97 @@ void main() {
     });
   });
 
-  group('TriggerCallIncoming (role, deferred to v1.2)', () {
-    test('any statuses → optimal (no runtime gate at v1.1f)', () {
+  group('TriggerCallIncoming (v1.2 — gated by callScreening role)', () {
+    test('granted callScreening → optimal', () {
       expect(
         automationReliability(
           _automation(_callIncomingTrigger),
-          statuses: _statuses(location: _denied, calendar: _denied),
+          statuses: _statuses(),
         ),
         AutomationReliability.optimal,
+      );
+    });
+
+    test('denied callScreening → degraded', () {
+      expect(
+        automationReliability(
+          _automation(_callIncomingTrigger),
+          statuses: _statuses(callScreening: _denied),
+        ),
+        AutomationReliability.degraded,
+      );
+    });
+
+    test('permanentlyDenied callScreening → degraded', () {
+      expect(
+        automationReliability(
+          _automation(_callIncomingTrigger),
+          statuses: _statuses(callScreening: _permanentlyDenied),
+        ),
+        AutomationReliability.degraded,
+      );
+    });
+
+    test('null callScreening (unprobed) → unknown', () {
+      expect(
+        automationReliability(
+          _automation(_callIncomingTrigger),
+          statuses: _statuses(callScreening: null),
+        ),
+        AutomationReliability.unknown,
+      );
+    });
+
+    test('callScreening denied but location granted → still degraded '
+        '(only the relevant permission matters)', () {
+      expect(
+        automationReliability(
+          _automation(_callIncomingTrigger),
+          statuses: _statuses(callScreening: _denied),
+        ),
+        AutomationReliability.degraded,
+      );
+    });
+  });
+
+  group('TriggerForegroundApp (v1.2 — gated by PACKAGE_USAGE_STATS)', () {
+    test('granted usageStats → optimal', () {
+      expect(
+        automationReliability(
+          _automation(_foregroundAppTrigger),
+          statuses: _statuses(),
+        ),
+        AutomationReliability.optimal,
+      );
+    });
+
+    test('denied usageStats → degraded', () {
+      expect(
+        automationReliability(
+          _automation(_foregroundAppTrigger),
+          statuses: _statuses(usageStats: _denied),
+        ),
+        AutomationReliability.degraded,
+      );
+    });
+
+    test('permanentlyDenied usageStats → degraded', () {
+      expect(
+        automationReliability(
+          _automation(_foregroundAppTrigger),
+          statuses: _statuses(usageStats: _permanentlyDenied),
+        ),
+        AutomationReliability.degraded,
+      );
+    });
+
+    test('null usageStats (unprobed) → unknown', () {
+      expect(
+        automationReliability(
+          _automation(_foregroundAppTrigger),
+          statuses: _statuses(usageStats: null),
+        ),
+        AutomationReliability.unknown,
       );
     });
   });

@@ -236,6 +236,16 @@ Map<String, Object?> triggerToJson(Trigger t) {
       return <String, Object?>{'type': 'callIncomingKnownContact'};
     case TriggerCallIncomingUnknownContact():
       return <String, Object?>{'type': 'callIncomingUnknownContact'};
+    case TriggerForegroundApp(:final packageName, :final label):
+      return <String, Object?>{
+        'type': 'foregroundApp',
+        'packageName': packageName,
+        // `label` is UI-only; it round-trips through JSON
+        // so the templates picker can re-render with the
+        // same user-facing name, but [==] / [hashCode] are
+        // on `packageName` alone.
+        'label': label,
+      };
   }
 }
 
@@ -306,6 +316,11 @@ Trigger triggerFromJson(Map<String, Object?> j) {
       return const TriggerCallIncomingKnownContact();
     case 'callIncomingUnknownContact':
       return const TriggerCallIncomingUnknownContact();
+    case 'foregroundApp':
+      return TriggerForegroundApp(
+        packageName: j['packageName'] as String,
+        label: (j['label'] as String?) ?? '',
+      );
     default:
       throw FormatException('Unknown trigger.type: $type');
   }

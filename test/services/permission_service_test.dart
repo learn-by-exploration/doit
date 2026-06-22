@@ -53,6 +53,7 @@
 //   `super(token: _token)`), so the platform setter's
 //   `verifyToken` check passes.
 
+import 'package:doit/services/call_interceptor.dart';
 import 'package:doit/services/permission_result.dart';
 import 'package:doit/services/permission_service.dart';
 import 'package:file_picker/file_picker.dart';
@@ -194,6 +195,19 @@ void main() {
 
   tearDown(() {
     messenger.setMockMethodCallHandler(permissionsChannel, null);
+    // Clear the v1.2 special-access channel mocks so they
+    // don't leak into the next test (each test sets its own
+    // scripted handler; without this, the next test's
+    // handler would be ignored because the prior handler
+    // takes precedence).
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('doit/device_state'),
+      null,
+    );
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('doit/call_interceptor'),
+      null,
+    );
   });
 
   // ── requestX → sealed PermissionResult mapping ───────────────
@@ -434,4 +448,203 @@ void main() {
           'again" affordance.',
     );
   });
+
+  // ── v1.2: usageStats + callScreening (special-access probes) ──
+
+  test('init() seeds usageStats and callScreening in [statuses] '
+      'as denied(canOpenSettings: true)', () async {
+    await PermissionService.instance.init();
+    expect(
+      PermissionService.instance.statuses.value[PermissionKind.usageStats],
+      isA<PermissionResultDenied>(),
+      reason:
+          '`usageStats` defaults to denied(canOpenSettings: true) '
+          'because the OS does not show a runtime prompt for it.',
+    );
+    expect(
+      PermissionService.instance.statuses.value[PermissionKind.callScreening],
+      isA<PermissionResultDenied>(),
+      reason:
+          '`callScreening` defaults to denied(canOpenSettings: true) '
+          'because the role is not auto-granted at install time.',
+    );
+  });
+
+  test('requestUsageStats deep-links to the usage-access Settings page '
+      'via UsageStatsService (SYS-086 / ADR-030)', () async {
+    // Mock the `doit/device_state` method channel that
+    // `UsageStatsService`'s method-channel source talks to.
+    // Mock MUST be in place before init() so the fire-and-forget
+    // probe inside init() doesn't hang waiting on a missing
+    // method-channel handler.
+    const deviceStateChannel = MethodChannel('doit/device_state');
+    var openedCount = 0;
+    messenger.setMockMethodCallHandler(deviceStateChannel, (call) async {
+      switch (call.method) {
+        case 'openUsageAccessSettings':
+          openedCount++;
+          return true;
+        case 'isUsageStatsGranted':
+          return false;
+        default:
+          return null;
+      }
+    });
+    await PermissionService.instance.init();
+    final ok = await PermissionService.instance.requestUsageStats();
+    expect(ok, isTrue);
+    expect(
+      openedCount,
+      1,
+      reason: 'requestUsageStats must invoke exactly once.',
+    );
+  });
+
+  test('refreshUsageStats merges an "isGranted=true" probe into '
+      '[statuses] (SYS-086 / ADR-030)', () async {
+    // Mock MUST be in place before init() so the fire-and-forget
+    // probe inside init() doesn't hang waiting on a missing
+    // method-channel handler.
+    const deviceStateChannel = MethodChannel('doit/device_state');
+    messenger.setMockMethodCallHandler(deviceStateChannel, (call) async {
+      switch (call.method) {
+        case 'isUsageStatsGranted':
+          return true;
+        case 'openUsageAccessSettings':
+          return true;
+        default:
+          return null;
+      }
+    });
+    await PermissionService.instance.init();
+    await PermissionService.instance.refreshUsageStats();
+    expect(
+      PermissionService.instance.statuses.value[PermissionKind.usageStats],
+      isA<PermissionResultGranted>(),
+    );
+  });
+
+  test('refreshUsageStats merges an "isGranted=false" probe into '
+      '[statuses]', () async {
+    const deviceStateChannel = MethodChannel('doit/device_state');
+    messenger.setMockMethodCallHandler(deviceStateChannel, (call) async {
+      switch (call.method) {
+        case 'isUsageStatsGranted':
+          return false;
+        case 'openUsageAccessSettings':
+          return true;
+        default:
+          return null;
+      }
+    });
+    await PermissionService.instance.init();
+    await PermissionService.instance.refreshUsageStats();
+    expect(
+      PermissionService.instance.statuses.value[PermissionKind.usageStats],
+      isA<PermissionResultDenied>(),
+    );
+  });
+
+  test('requestCallScreening fires the OS role flow via '
+      'CallInterceptorService (SYS-075 + SYS-079 follow-up)', () async {
+    // Mock MUST be in place before init() so the fire-and-forget
+    // `CallInterceptorService.instance` constructor / init probe
+    // doesn't hang waiting on a missing method-channel handler.
+    const callInterceptorChannel = MethodChannel('doit/call_interceptor');
+    var requestCount = 0;
+    messenger.setMockMethodCallHandler(callInterceptorChannel, (call) async {
+      switch (call.method) {
+        case 'requestCallScreeningRole':
+          requestCount++;
+          return true;
+        // The CallInterceptorService init path probes several
+        // sub-methods; mock them all so init doesn't hang.
+        case 'startStream':
+        case 'stopStream':
+        case 'setEnabled':
+        case 'setContactIds':
+        case 'getRingerMode':
+        case 'setRingerMode':
+        case 'restorePriorRinger':
+        case 'isCallScreeningRoleHeld':
+          return false;
+        default:
+          return null;
+      }
+    });
+    // Init CallInterceptorService so its own `_ready` Completer
+    // completes (the service is a separate singleton with its
+    // own gate; the v1.2 permission probes await it).
+    await CallInterceptorService.instance.init();
+    await PermissionService.instance.init();
+    final granted = await PermissionService.instance.requestCallScreening();
+    expect(granted, isTrue);
+    expect(
+      requestCount,
+      1,
+      reason: 'requestCallScreening must invoke the role flow exactly once.',
+    );
+  });
+
+  test(
+    'refreshCallScreening merges "role-held=true" into [statuses]',
+    () async {
+      const callInterceptorChannel = MethodChannel('doit/call_interceptor');
+      messenger.setMockMethodCallHandler(callInterceptorChannel, (call) async {
+        switch (call.method) {
+          case 'isCallScreeningRoleHeld':
+            return true;
+          case 'startStream':
+          case 'stopStream':
+          case 'setEnabled':
+          case 'setContactIds':
+          case 'getRingerMode':
+          case 'setRingerMode':
+          case 'restorePriorRinger':
+          case 'requestCallScreeningRole':
+            return false;
+          default:
+            return null;
+        }
+      });
+      await CallInterceptorService.instance.init();
+      await PermissionService.instance.init();
+      await PermissionService.instance.refreshCallScreening();
+      expect(
+        PermissionService.instance.statuses.value[PermissionKind.callScreening],
+        isA<PermissionResultGranted>(),
+      );
+    },
+  );
+
+  test(
+    'refreshCallScreening merges "role-held=false" into [statuses]',
+    () async {
+      const callInterceptorChannel = MethodChannel('doit/call_interceptor');
+      messenger.setMockMethodCallHandler(callInterceptorChannel, (call) async {
+        switch (call.method) {
+          case 'isCallScreeningRoleHeld':
+            return false;
+          case 'startStream':
+          case 'stopStream':
+          case 'setEnabled':
+          case 'setContactIds':
+          case 'getRingerMode':
+          case 'setRingerMode':
+          case 'restorePriorRinger':
+          case 'requestCallScreeningRole':
+            return false;
+          default:
+            return null;
+        }
+      });
+      await CallInterceptorService.instance.init();
+      await PermissionService.instance.init();
+      await PermissionService.instance.refreshCallScreening();
+      expect(
+        PermissionService.instance.statuses.value[PermissionKind.callScreening],
+        isA<PermissionResultDenied>(),
+      );
+    },
+  );
 }
