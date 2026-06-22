@@ -477,6 +477,9 @@ class _AddPersonGroupScreenState extends State<AddPersonGroupScreen> {
                       key: ValueKey('group.member.${p.id}'),
                       title: Text(p.id),
                       subtitle: Text('lookup ${p.lookupKey}'),
+                      secondary: p.isPausedAt(DateTime.now())
+                          ? const _PersonPausedChip()
+                          : null,
                       value: _selected.contains(p.id),
                       onChanged: (v) {
                         setState(() {
@@ -600,5 +603,19 @@ class _AddPersonGroupScreenState extends State<AddPersonGroupScreen> {
       default:
         return const SizedBox.shrink();
     }
+  }
+}
+
+/// v1.2f / Phase 6: tiny chip rendered on the per-person
+/// row of the group-member picker when the person is
+/// currently paused. Mirrors the visual language of the
+/// group-level "Paused" chip rendered on the
+/// `_GroupCard` (a [Chip] with the same label).
+class _PersonPausedChip extends StatelessWidget {
+  const _PersonPausedChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Chip(label: Text('Paused'));
   }
 }

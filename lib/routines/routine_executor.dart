@@ -548,15 +548,20 @@ class RoutineExecutor {
   ///     `CallInterceptorService.setRingerMode`.
   ///   - `ActionNotify` shows a system notification via
   ///     `ReminderService.instance.notifications.show`.
-  ///   - `ActionFullscreen` is a no-op on the executor
-  ///     side; routines have no parent Do row to anchor
-  ///     a full-screen activity. The `AutomationFired`
-  ///     event drives the home-screen `RoutineBanner`
-  ///     (PR 6) instead.
-  ///   - `ActionCallIntercept` is a no-op on the executor
-  ///     side; the Kotlin `CallScreeningService` already
-  ///     routed the call. Kept for future analytics /
-  ///     debug affordances (ADR-019).
+  ///   - `ActionFullscreen` (v1.2f / Phase 6) opens a
+  ///     full-screen overlay via
+  ///     `ReminderService.instance.fullScreen
+  ///     .showRoutineOverlay(...)`. The
+  ///     `AutomationFired` event still drives the
+  ///     home-screen `RoutineBanner`; the overlay is the
+  ///     escalation path.
+  ///   - `ActionCallIntercept` (v1.2f / Phase 6) records
+  ///     the routine's intercept decision via
+  ///     `CallInterceptorService.recordRoutineDecision(...)`
+  ///     for the debug chip and any future analytics.
+  ///     The Kotlin `CallScreeningService` already routed
+  ///     the call (ADR-019); the executor does NOT
+  ///     re-route or touch the ringer here.
   ///   - `ActionOpenApp` appends a `RoutineOpenAppRequest`
   ///     to [pendingOpenApp]; the home-screen listener
   ///     drains it on resume + on each append.
@@ -587,13 +592,27 @@ class RoutineExecutor {
         );
       });
     } else if (action is ActionFullscreen) {
-      // Surfaced via the home-screen RoutineBanner; executor
-      // is non-Flutter. AutomationFired event already
-      // published; banner listener picks it up.
+      // v1.2f / Phase 6: open a routine-fired full-screen
+      // overlay. The overlay carries no Do/MissionChain —
+      // routine actions are not anchored to a habit — so
+      // the title/body are null by default. A follow-up
+      // (post-v1.2f) may add an `ActionFullscreen(title:
+      // String, body: String)` payload so routine authors
+      // can customize the overlay copy.
+      await _safe('showRoutineOverlay', () async {
+        await ReminderService.instance.fullScreen.showRoutineOverlay();
+      });
     } else if (action is ActionCallIntercept) {
-      // No-op on the executor side (ADR-019): the Kotlin
-      // CallScreeningService already routed the call. The
-      // AutomationFired event drives the debug chip.
+      // v1.2f / Phase 6: record the routine's decision on
+      // the call service. The Kotlin side already routed
+      // the call; the executor's job is to surface the
+      // routine decision for analytics / debug. Does NOT
+      // touch the ringer (ADR-019).
+      await _safe('recordRoutineDecision', () async {
+        await CallInterceptorService.instance.recordRoutineDecision(
+          action.decision,
+        );
+      });
     } else if (action is ActionOpenApp) {
       appendOpenApp(
         RoutineOpenAppRequest(route: action.route, at: DateTime.now()),

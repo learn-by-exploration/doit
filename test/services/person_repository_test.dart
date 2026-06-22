@@ -141,5 +141,48 @@ void main() {
       final back = await PersonRepository.instance.getById('p1');
       expect(back, isNull);
     });
+
+    // v1.2f / Phase 6: round-trip the optional pause
+    // (`pausedUntil_millis` column). The read path now
+    // round-trips a DateTime through the repository; the
+    // UI surfaces it via `_PersonPauseRow` in
+    // `add_person.dart` and a per-person "Paused" chip in
+    // `person_groups.dart`.
+    test('round-trips pausedUntil as millisecondsSinceEpoch', () async {
+      final pausedUntil = DateTime(2027, 1, 1, 23, 59);
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p-paused',
+          lookupKey: 'k-paused',
+          channel: const ChannelDialer('+15555550199'),
+          cadence: const EveryNDays(7),
+          createdAt: DateTime(2026),
+          pausedUntil: pausedUntil,
+        ),
+      );
+      final back =
+          await PersonRepository.instance.getById('p-paused') as ContactPerson;
+      expect(back.pausedUntil, pausedUntil);
+      expect(back.isPausedAt(DateTime(2026, 6)), isTrue);
+      expect(back.isPausedAt(DateTime(2028)), isFalse);
+    });
+
+    test('clearPausedUntil removes the pause via copyWith', () async {
+      final pausedUntil = DateTime(2027, 1, 1, 23, 59);
+      final p = ContactPerson(
+        id: 'p-cleared',
+        lookupKey: 'k-cleared',
+        channel: const ChannelDialer('+15555550199'),
+        cadence: const EveryNDays(7),
+        createdAt: DateTime(2026),
+        pausedUntil: pausedUntil,
+      );
+      final cleared = p.copyWith(clearPausedUntil: true);
+      expect(cleared.pausedUntil, isNull);
+      // The other fields are preserved.
+      expect(cleared.id, 'p-cleared');
+      expect(cleared.cadence, const EveryNDays(7));
+      expect(cleared.channel, const ChannelDialer('+15555550199'));
+    });
   });
 }
