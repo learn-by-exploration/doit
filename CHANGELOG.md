@@ -482,6 +482,85 @@ $ flutter test
 (No code changes; the test suite still matches v1.2f's
 952/952 baseline.)
 
+### v1.2h — Per-automation reliability badge `AlertDialog` on tap
+
+Phase 8 of the v1.2 code-TODO closure (`30-phase roadmap`).
+The v1.1f `AutomationReliabilityBadge` (SYS-085) was
+rendered but non-interactive; v1.2h wires the badge's
+`onTap` callback (in all three add screens) to a new
+`AlertDialog` that disambiguates the three remediation
+paths a routine can need:
+
+- **Trigger-side permission denied / unknown** — the
+  dialog shows the matching `PermissionKind` title + the
+  current status (Granted / Denied / Permanently denied /
+  Not yet probed) + the rationale copy from the canonical
+  `permissionKindMeta` module + an "Open settings" CTA
+  that calls `PermissionService.openAppSettings()` (or
+  `requestUsageStats()` for the special-access kind,
+  since `usageStats` has no generic app-settings page).
+- **No permission gate** — today only `TriggerTimeOfDay`,
+  where reliability lives in the app-wide `Reliability`
+  enum. The dialog surfaces a "this trigger does not need
+  a runtime permission" note and hides the Open settings
+  CTA.
+- **Action-side permission** — v1.2+ future work
+  (`ActionOverrideSilent` needs `ACCESS_NOTIFICATION_POLICY`,
+  contact-requiring actions need `READ_CONTACTS`); not
+  shipped in v1.2h.
+
+**What's new**
+
+- New `lib/widgets/automation_reliability_dialog.dart` —
+  `showAutomationReliabilityDialog(BuildContext, {required Automation})`
+  builds an `AlertDialog` with kind title + status + rationale
+  body + Close / Open settings CTAs. Pure `StatelessWidget`
+  (no `setState`, no `Future`-side-effects on the render
+  path); the Open settings CTA calls the matching
+  `PermissionService.requestX` / `openAppSettings` method
+  via a small private `_openSettings(context, kind)` helper
+  and closes the dialog.
+- New `lib/services/permission_kind_meta.dart` — promotes
+  the prior private `_KindMeta` / `_meta` constants from
+  `permission_sheet.dart` to a public
+  `permissionKindMeta: Map<PermissionKind, PermissionKindMeta>`
+  module so `PermissionSheet` (v0.6) and this dialog
+  share one source of truth for per-`PermissionKind`
+  title + icon + rationale copy. Includes a new
+  `PermissionKind.calendar` entry that the prior
+  private map had been missing (a test caught the gap
+  before it shipped).
+- Wired `onTap: () => showAutomationReliabilityDialog(...)`
+  on every `AutomationReliabilityBadge` in
+  `lib/screens/add_habit.dart`, `lib/screens/add_person.dart`,
+  and `lib/screens/add_event.dart`.
+- Wrapped the Open settings `FilledButton` in
+  `Semantics(button: true, label: 'Open settings',
+  excludeSemantics: true)` so the SYS-062 a11y scanner
+  (10-line lookahead) finds the label and TalkBack reads
+  it as a button.
+- New `test/widgets/automation_reliability_dialog_test.dart`
+  — 4 widget tests covering location / calendar /
+  usage-stats / time-of-day triggers, each pinned to
+  the matching title + status + rationale body + CTA
+  wiring.
+- Updated `docs/v_model/requirements.md` with the
+  `SYS-103` row (per-automation reliability badge
+  AlertDialog).
+
+**3-gate verification**
+
+```
+$ dart format --output=none --set-exit-if-changed .
+$ flutter analyze --fatal-infos
+No issues found! (ran in 1.3s)
+$ flutter test
+00:19 +957: All tests passed!
+```
+
+(Test count: 952 → 957 — 4 dialog tests + 1 a11y scan
+of the new widget.)
+
 ### v1.2f — `ActionFullscreen` + `ActionCallIntercept` real implementations + Person pauseUntil UI + DoFixed weekday display
 
 Phases 6b–6e of the v1.2 code-TODO closure
