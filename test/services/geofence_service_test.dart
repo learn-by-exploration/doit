@@ -328,4 +328,36 @@ void main() {
       await sub.cancel();
     });
   });
+
+  // ── v1.2d / Phase 4: PositionSource.dispose contract ──
+  group('PositionSource.dispose contract', () {
+    test(
+      'GeofenceService cancels its own subscription on resetForTesting '
+      '(service owns the subscription; source.dispose is independent)',
+      () async {
+        final controller = StreamController<Position>();
+        final source = ScriptedPositionSource(controller);
+        // Use the singleton directly. The prior tests in this
+        // file leave _sub pending; cancelling here is idempotent.
+        final svc = GeofenceService.instance;
+        svc.resetForTesting();
+        svc.debugSetPositionSource(source);
+        await svc.init();
+        // Sanity: register works after init.
+        await svc.register(
+          const TriggerLocationEnter(
+            geofenceId: 'g2',
+            label: 'Home',
+            latitude: 37.7749,
+            longitude: -122.4194,
+            radiusMeters: 1000,
+          ),
+        );
+        expect(svc.registeredIds, contains('g2'));
+        // resetForTesting must cancel _sub and not crash
+        // even though the source is mid-listen.
+        svc.resetForTesting();
+      },
+    );
+  });
 }
