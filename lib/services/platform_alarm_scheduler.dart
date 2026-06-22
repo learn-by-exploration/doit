@@ -43,6 +43,7 @@ import 'dart:async';
 
 import 'package:doit/events/event.dart';
 import 'package:doit/do/do.dart';
+import 'package:doit/do/proof_mode.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
 
@@ -66,6 +67,16 @@ class PlatformAlarmScheduler implements AlarmScheduler {
   /// from the local DB; the Dart side clears the mirror to
   /// match.
   final Map<AlarmId, DateTime> _scheduled = <AlarmId, DateTime>{};
+
+  /// v1.2e / Phase 5: richer mirror that also carries the
+  /// metadata the inbound `fireAlarm` handler needs to
+  /// render a notification without a DB round-trip
+  /// (habit / event name, strong-mode bit, originating
+  /// event id). The two mirrors are kept in lockstep;
+  /// every `schedule`/`cancel`/`rescheduleAll` updates
+  /// both.
+  final Map<AlarmId, ScheduledAlarm> _firingEntries =
+      <AlarmId, ScheduledAlarm>{};
 
   /// Cache for the [reliability] getter. Cleared on every
   /// explicit re-probe (the `request` re-probe path in
@@ -92,12 +103,20 @@ class PlatformAlarmScheduler implements AlarmScheduler {
     );
     final AlarmId effective = returned == id.value ? id : AlarmId(returned);
     _scheduled[effective] = at;
+    _firingEntries[effective] = ScheduledAlarm(
+      id: effective,
+      habitId: habit.id,
+      at: at,
+      habitName: habit.name,
+      strongMode: habit.proofMode is StrongProof,
+    );
     return effective;
   }
 
   @override
   Future<void> cancel(AlarmId id) async {
     _scheduled.remove(id);
+    _firingEntries.remove(id);
     await _bridge.cancelAlarm(id.value);
   }
 
@@ -112,6 +131,7 @@ class PlatformAlarmScheduler implements AlarmScheduler {
     // default; a WorkManager fallback would return a
     // different id, which we surface to the caller.
     final DateTime? original = _scheduled[id];
+    final ScheduledAlarm? originalEntry = _firingEntries[id];
     if (original == null) {
       // The mirror is out of sync with the platform
       // (e.g., the alarm was armed by the Kotlin
@@ -135,6 +155,16 @@ class PlatformAlarmScheduler implements AlarmScheduler {
     );
     final AlarmId effective = returned == id.value ? id : AlarmId(returned);
     _scheduled[effective] = newAt;
+    if (originalEntry != null) {
+      _firingEntries[effective] = ScheduledAlarm(
+        id: effective,
+        habitId: originalEntry.habitId,
+        at: newAt,
+        habitName: originalEntry.habitName,
+        strongMode: originalEntry.strongMode,
+        eventId: originalEntry.eventId,
+      );
+    }
     return effective;
   }
 
@@ -147,6 +177,7 @@ class PlatformAlarmScheduler implements AlarmScheduler {
     // bridge for every pending alarm) or falls back to the
     // `now + delay` heuristic.
     _scheduled.clear();
+    _firingEntries.clear();
     // Re-probe reliability eagerly so the next
     // `reliability` read is fresh (the Kotlin side re-reads
     // the WHITELIST state on each probe).
@@ -163,6 +194,13 @@ class PlatformAlarmScheduler implements AlarmScheduler {
     );
     final AlarmId effective = returned == id.value ? id : AlarmId(returned);
     _scheduled[effective] = at;
+    _firingEntries[effective] = ScheduledAlarm(
+      id: effective,
+      habitId: 'event:${event.id}',
+      at: at,
+      habitName: event.name,
+      eventId: event.id,
+    );
     return effective;
   }
 
@@ -170,7 +208,13 @@ class PlatformAlarmScheduler implements AlarmScheduler {
   Future<void> cancelEvent(String eventId) async {
     final AlarmId id = AlarmId(eventId.hashCode & 0x7FFFFFFF);
     _scheduled.remove(id);
+    _firingEntries.remove(id);
     await _bridge.cancelAlarm(id.value);
+  }
+
+  @override
+  Future<ScheduledAlarm?> lookupForFire(AlarmId id) async {
+    return _firingEntries[id];
   }
 
   @override

@@ -416,6 +416,124 @@ notification-icon resource reference.
 
 ## [Unreleased]
 
+### v1.2e — `NotificationService.dismiss` + `PlatformNotificationService.show` real implementations
+
+Phase 5 of the v1.2 code-TODO closure (`30-phase roadmap`).
+The Phase-A production wiring left both `NotificationService.show`
+and `dismiss` as no-ops. v1.2e wires them through to the Kotlin
+`ReminderChannelProxy` (`showNotification` + `cancelNotification`
+method-channel calls) and adds the inbound `fireAlarm` adapter
+that the Kotlin `AlarmReceiver` invokes to render a notification
+when an alarm fires.
+
+**What's new**
+
+- **Bridge surface (Dart).** `ReminderBridge.showNotification` and
+  `ReminderBridge.cancelNotification` added to the abstract
+  bridge. `PlatformReminderBridge` invokes the matching
+  method-channel calls. `FakeReminderBridge` records every call.
+- **`PlatformNotificationService`.** `show` forwards
+  `(alarmId, habitName, body, strongMode)` to
+  `bridge.showNotification`; `dismiss(id)` forwards `id.value` to
+  `bridge.cancelNotification`. Both wrap the bridge call in a
+  `kDebugMode`-gated try/catch per ADR-013 so a missing platform
+  handler never crashes `main()`.
+- **Inbound adapter.** `main.dart` constructs a
+  `_ReminderInboundAdapter` and passes it to
+  `PlatformReminderBridge(inbound: …)`. The Kotlin
+  `AlarmReceiver.onReceive` invokes
+  `ReminderChannelProxy.fireAlarm(ctx, alarmId)`, which calls
+  `channel?.invokeMethod("fireAlarm", …)`; the Dart dispatch
+  routes to `adapter.onFireAlarm(alarmId)` →
+  `ReminderService.onFireAlarm(AlarmId(alarmId))`.
+- **`ReminderService.onFireAlarm`.** Looks up the scheduled
+  entry via `AlarmScheduler.lookupForFire`, builds a
+  `ReminderEvent`, calls `notifications.show(event)`, then
+  either:
+    - **Habit-fired**: re-schedules via
+      `habit.nextOccurrence(entry.at)` + `scheduler.schedule`,
+      and for strong-mode habits also launches the full-screen
+      intent via `fullScreen.show(habit, chain)`.
+    - **Event-fired**: archives via
+      `EventRepository.instance.archive(eventId, DateTime.now())`.
+- **Alarm scheduler mirror.** `PlatformAlarmScheduler` now
+  keeps a richer Dart-side mirror
+  (`Map<AlarmId, ScheduledAlarm>`) carrying `habitName`,
+  `strongMode`, and `eventId` so `onFireAlarm` can render the
+  notification without a DB round-trip. `cancel` and
+  `rescheduleAll` clear the mirror in lockstep with the
+  existing `Map<AlarmId, DateTime>` mirror used by `snooze`.
+  The `AlarmScheduler` interface gains
+  `lookupForFire(AlarmId) → ScheduledAlarm?`; both
+  `FakeAlarmScheduler` and `PlatformAlarmScheduler` implement
+  it.
+- **Kotlin `MainActivity.buildReminderNotification`.** New
+  static helper that builds the `NotificationCompat.Builder`
+  with channel id `doit.reminders`, title = `habitName`, body
+  = `body ?? "Time for <habitName>"`, "Done" action for soft
+  mode / "Open" action for strong mode, high priority,
+  `autoCancel`. `ReminderChannelProxy.showNotification`
+  delegates to it. `MainActivity.configureFlutterEngine`
+  registers the channel idempotently at app start.
+- **Kotlin `ReminderChannelProxy.cancelNotification`.** New
+  handler that calls `NotificationManager.cancel(alarmId)`
+  with the id-matched cancel (never the most-recent).
+- **Tests (936 passing).** +16 over v1.2d:
+    - `test/services/platform_notification_service_test.dart`
+      (new, 5 tests) pins the dismiss / show chain:
+      `NotificationService.show/dismiss` →
+      `PlatformNotificationService` → `ReminderBridge`.
+    - `test/services/platform_alarm_scheduler_test.dart` (+6
+      tests) pins `lookupForFire` (unknown id, habit entry,
+      strong-mode bit, event entry, cancel clears, rescheduleAll
+      clears).
+    - `test/services/reminder_service_test.dart` (+5 tests)
+      pins `onFireAlarm` (unknown id no-op, habit alarm shows
+      notification + re-schedules next occurrence, strong-mode
+      launches full-screen intent, event alarm archives,
+      missing habit shows but does not re-schedule).
+    - `test/widgets/permission_sheet_test.dart` adds the two
+      new bridge methods to the local `_RecordingBridge`
+      stub.
+
+**Coverage** (touched files)
+
+- `lib/services/platform_notification_service.dart`: 100%
+- `lib/services/platform_alarm_scheduler.dart`: 100%
+- `lib/services/reminder_service.dart`: 82.4% (above the 80%
+  floor)
+- `lib/reminders/alarm_scheduler.dart` / `reminder_bridge.dart`:
+  covered by the bridge-surface tests.
+
+**3-gate verification**
+
+```
+$ dart format --output=none --set-exit-if-changed .
+Formatted 199 files (0 changed) in 0.72 seconds.
+
+$ flutter analyze --fatal-infos
+Analyzing doit...
+No issues found! (ran in 1.1s)
+
+$ flutter test
+00:27 +936: All tests passed!
+```
+
+**V-Model traceability** (this PR)
+
+- `WF-028` (test reminder button) — touched.
+- `WF-030` (alarm-fires-this-many-seconds path) — covered.
+- New `SYS-098` candidate: "Alarm fire → notification
+  render path" — the inbound handler that
+  `AlarmReceiver.onReceive` calls via the method channel.
+
+**Deferred** (v1.2 candidates, not closed by v1.2e)
+
+- Strong-mode full-screen launch is best-effort; the Kotlin
+  side's `FullScreenActivity` host is v1.2e-minimal and will
+  be hardened in a follow-up PR that adds the
+  `USE_FULL_SCREEN_INTENT` permission on API 34+ (Phase 6).
+
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 
 do it is no longer about streaks. Phase A renames the
