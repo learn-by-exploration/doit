@@ -647,4 +647,131 @@ void main() {
       );
     },
   );
+
+  // ── refresh() / v1.2i / Phase 9 / SYS-104 ────────────────────
+
+  test(
+    'refresh() re-probes every permission_handler kind in parallel',
+    () async {
+      probeStatus = PermissionStatus.granted;
+      // Init runs the first probe; refresh runs a second.
+      await PermissionService.instance.init();
+      final firstProbeCount = permissionsCalls
+          .where((c) => c.method == 'checkPermissionStatus')
+          .length;
+      expect(firstProbeCount, greaterThan(0));
+
+      // Toggle the probe to denied so we can prove refresh
+      // wrote a fresh value.
+      probeStatus = PermissionStatus.denied;
+      await PermissionService.instance.refresh();
+
+      final secondProbeCount = permissionsCalls
+          .where((c) => c.method == 'checkPermissionStatus')
+          .length;
+      // Exactly six more checkPermissionStatus calls (one
+      // per `permission_handler` kind in the batch).
+      expect(
+        secondProbeCount - firstProbeCount,
+        6,
+        reason:
+            'refresh() must probe every permission_handler '
+            'kind (notifications, contacts, exactAlarm, '
+            'batteryOptimization, location, calendar).',
+      );
+      expect(
+        PermissionService.instance.statuses.value[PermissionKind.notifications],
+        isA<PermissionResultDenied>(),
+        reason:
+            'After refresh() with the scripted denied probe, '
+            'every kind must reflect the fresh value.',
+      );
+    },
+  );
+
+  test('refresh() merges granted status for every kind', () async {
+    probeStatus = PermissionStatus.denied;
+    await PermissionService.instance.init();
+    probeStatus = PermissionStatus.granted;
+    await PermissionService.instance.refresh();
+    for (final kind in [
+      PermissionKind.notifications,
+      PermissionKind.contacts,
+      PermissionKind.exactAlarm,
+      PermissionKind.batteryOptimization,
+      PermissionKind.location,
+      PermissionKind.calendar,
+    ]) {
+      expect(
+        PermissionService.instance.statuses.value[kind],
+        isA<PermissionResultGranted>(),
+        reason: 'Kind $kind must reflect the fresh granted probe.',
+      );
+    }
+  });
+
+  test('refresh() swallows a single probe failure without aborting '
+      'the batch', () async {
+    probeStatus = PermissionStatus.denied;
+    await PermissionService.instance.init();
+    // Throw on the FIRST checkPermissionStatus call of the
+    // refresh batch (the notifications probe). The other
+    // five kinds must still complete and merge into
+    // statuses.
+    var firstCallSeen = false;
+    messenger.setMockMethodCallHandler(permissionsChannel, (call) async {
+      if (call.method == 'checkPermissionStatus' && !firstCallSeen) {
+        firstCallSeen = true;
+        throw PlatformException(code: 'TEST_THROWN');
+      }
+      permissionsCalls.add(call);
+      return probeStatus.value;
+    });
+    probeStatus = PermissionStatus.granted;
+    await PermissionService.instance.refresh();
+    // The notifications entry kept its prior (denied)
+    // value because the probe failed. The other five kinds
+    // flipped to granted.
+    expect(
+      PermissionService.instance.statuses.value[PermissionKind.notifications],
+      isA<PermissionResultDenied>(),
+      reason:
+          'A failed notifications probe must NOT upgrade the '
+          'cached status (a failed probe is not a downgrade).',
+    );
+    expect(
+      PermissionService.instance.statuses.value[PermissionKind.calendar],
+      isA<PermissionResultGranted>(),
+      reason: 'A throw on the first probe must NOT abort the batch.',
+    );
+  });
+
+  test('refresh() also re-probes usageStats and callScreening', () async {
+    // Mock both special-access channels to grant.
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('doit/device_state'),
+      (call) async {
+        if (call.method == 'isUsageStatsGranted') return true;
+        return null;
+      },
+    );
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('doit/call_interceptor'),
+      (call) async {
+        if (call.method == 'isCallScreeningRoleHeld') return true;
+        return false;
+      },
+    );
+    await CallInterceptorService.instance.init();
+    await PermissionService.instance.init();
+    await PermissionService.instance.refresh();
+    expect(
+      PermissionService.instance.statuses.value[PermissionKind.usageStats],
+      isA<PermissionResultGranted>(),
+    );
+    expect(
+      PermissionService.instance.statuses.value[PermissionKind.callScreening],
+      isA<PermissionResultGranted>(),
+    );
+  });
 }
