@@ -274,7 +274,8 @@ once at app start to the native
 transition against the registered automation set. A
 revoked `READ_CALENDAR` is a silent miss — there is no
 per-automation reliability badge for calendar triggers
-in v1.0 (a v1.1 follow-up). The `CalendarContract`
+in v1.0 (deferred to v1.2+; v1.1f landed the
+location-triggered badge only). The `CalendarContract`
 platform side fires on the system-managed event
 boundaries (typically < 5s of the wall-clock event
 start/end); we do not retry dropped calendar edges.
