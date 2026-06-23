@@ -90,6 +90,14 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
   // `People.automations_json`.
   List<Automation> _automations = const <Automation>[];
 
+  /// v1.2f / Phase 6: optional `pausedUntil` timestamp.
+  /// While the wall clock is before this instant, the
+  /// scheduler does not fire reminders for this person.
+  /// `null` = not paused. Mirrors the pattern in
+  /// `add_habit.dart` (`_PauseRow`); rendered in the form
+  /// whenever a contact has been picked.
+  DateTime? _pausedUntil;
+
   bool get _isEdit => widget.personId != null;
 
   @override
@@ -124,6 +132,7 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
           _everyNDays = cadence.nDays;
         }
         _automations = person.automations;
+        _pausedUntil = person.pausedUntil;
       }
       _lastSaved = person;
     });
@@ -233,6 +242,29 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
                 () => _automations = List.of(_automations)..removeAt(idx),
               ),
             ),
+            // v1.2f / Phase 6: optional pause. While the
+            // wall clock is before `_pausedUntil`, the
+            // scheduler does not fire reminders for this
+            // person. Mirrors `_PauseRow` in
+            // `add_habit.dart`. Visible whenever a
+            // contact has been picked (i.e. the form
+            // has a meaningful row to pause).
+            if (_pickedName != null) ...[
+              const SizedBox(height: Spacing.lg),
+              const Divider(),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+                child: Text(
+                  'Pause',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              _PersonPauseRow(
+                pausedUntil: _pausedUntil,
+                onPick: _pickPauseUntil,
+                onClear: () => setState(() => _pausedUntil = null),
+              ),
+            ],
           ],
         ),
       ),
@@ -309,6 +341,11 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
       channel: ChannelDialer(_pickedPhone!),
       cadence: EveryNDays(_everyNDays),
       createdAt: _lastSaved?.createdAt ?? now,
+      // v1.2f / Phase 6: round-trip the optional pause.
+      // The model exposes `clearPausedUntil` on copyWith
+      // for the edit-mode reset path; here we just hand
+      // the field through.
+      pausedUntil: _pausedUntil,
       automations: _automations,
     );
     await PersonRepository.instance.save(person);
@@ -320,6 +357,25 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
     await _registerRoutines(person.id);
     if (!mounted) return;
     Navigator.of(context).pop();
+  }
+
+  /// v1.2f / Phase 6: open the OS date picker so the user
+  /// can pick a `pausedUntil` timestamp. Mirrors
+  /// `_pickPauseUntil` in `add_habit.dart`. Stores the
+  /// picked date at end-of-day so the pause covers the
+  /// full selected day.
+  Future<void> _pickPauseUntil() async {
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: _pausedUntil ?? DateTime.now().add(const Duration(days: 7)),
+    );
+    if (picked != null) {
+      setState(
+        () => _pausedUntil = picked.add(const Duration(hours: 23, minutes: 59)),
+      );
+    }
   }
 
   /// Open the [LocationPicker] modal and append the result
@@ -596,6 +652,53 @@ class _PersonRoutineRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// v1.2f / Phase 6: pause row for the Add/Edit person form.
+/// Mirrors `_PauseRow` in `add_habit.dart`. The "Paused
+/// until" date picker is exposed via [onPick]; the
+/// "Resume" button appears only when the person is
+/// currently paused.
+class _PersonPauseRow extends StatelessWidget {
+  const _PersonPauseRow({
+    required this.pausedUntil,
+    required this.onPick,
+    required this.onClear,
+  });
+
+  final DateTime? pausedUntil;
+  final VoidCallback onPick;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final paused = pausedUntil;
+    return Row(
+      children: [
+        Expanded(
+          child: ListTile(
+            key: const ValueKey('add_person.pause_row'),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Paused until'),
+            subtitle: Text(
+              paused == null
+                  ? '(not paused)'
+                  : '${paused.year}-'
+                        '${paused.month.toString().padLeft(2, '0')}-'
+                        '${paused.day.toString().padLeft(2, '0')}',
+            ),
+            onTap: onPick,
+          ),
+        ),
+        if (paused != null)
+          TextButton(
+            key: const ValueKey('add_person.pause_resume'),
+            onPressed: onClear,
+            child: const Text('Resume'),
+          ),
+      ],
     );
   }
 }

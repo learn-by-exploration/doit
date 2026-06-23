@@ -87,6 +87,29 @@ void main() {
     expect(find.text('Stretch'), findsOneWidget);
   });
 
+  // v1.2f / Phase 6e / SYS-102: the tile subtitle for a
+  // `DoFixed` should now include the weekday set, not just
+  // the time. Widget-level smoke test — full coverage lives
+  // in `test/do/do_description_test.dart`.
+  testWidgets('DoFixed tile subtitle shows the weekday set '
+      '(v1.2f / Phase 6e / SYS-102)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 6),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 3, 5},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    expect(find.text('Mon, Wed, Fri · 09:00'), findsOneWidget);
+  });
+
   testWidgets('renders the reliability banner', (tester) async {
     await _resetDb(tester);
     await tester.pumpWidget(_wrap());

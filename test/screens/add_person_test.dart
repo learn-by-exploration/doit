@@ -250,4 +250,17 @@ void main() {
       findsOneWidget,
     );
   });
+
+  // v1.2f / Phase 6: the pause row is hidden until a
+  // contact has been picked. This is a quick smoke test
+  // that proves the section's visibility gating is right
+  // — full picker interaction is covered above.
+  testWidgets('Pause section is hidden until a contact is picked '
+      '(v1.2f / Phase 6)', (tester) async {
+    await _resetDb(tester);
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    expect(find.text('Pause'), findsNothing);
+    expect(find.byKey(const ValueKey('add_person.pause_row')), findsNothing);
+  });
 }
