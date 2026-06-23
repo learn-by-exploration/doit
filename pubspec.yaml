@@ -13,7 +13,9 @@ publish_to: 'none'
 # app-icon + splash PR. The version code increments by one (no
 # skipped codes); the mirror-pin tests in `release_signing_test.dart`
 # pin both ends so a future drift fails CI.
-version: 1.1.0+8
+# v1.2: bumped to 1.2.0+9 across 13 v1.2a..m sub-entries (the
+# code-TODO closure pass). The mirror-pin tests pin both ends.
+version: 1.2.0+9
 
 environment:
   sdk: ^3.12.0

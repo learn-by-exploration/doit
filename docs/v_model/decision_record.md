@@ -3774,3 +3774,427 @@ check dot dropped (the dot is unreadable at 24dp).
   initial of the 'do' brand entity; the dot is the
   completion signal.
 
+
+---
+
+## ADR-033 — Wire `AlarmScheduler` through `NotificationService.show` / `dismiss`
+
+**Status:** accepted (v1.2e / 2026-06-23).
+
+**Context.** The v0.4b baseline routed `AlarmScheduler` directly
+to `flutter_local_notifications` (`FlutterLocalNotificationsPlugin
+.show(id, title, body, details, payload)`) — the
+`NotificationService` class existed only as a thin wrapper that
+constructed the `AndroidNotificationDetails` object. The
+abstraction leaked in two places:
+
+1. The "Done" / "Open" action dispatch (the v0.5
+   notification-action contract — Soft habits get "Done", Strong
+   habits get "Open") was duplicated between the alarm callback
+   and the routine-executor callback; both wrote their own
+   `AndroidNotificationAction` list.
+2. The dismiss path (`cancel(id)`) was called from both the
+   alarm's own completion path AND the habit-completion
+   side-effect path; a stale `cancel` after a fresh
+   `show` would race because the alarm callback ran in a
+   separate isolate.
+
+**Decision.** v1.2e (`SYS-100`) collapses the alarm path through
+`NotificationService.show(ReminderEvent event)` and
+`NotificationService.dismiss(AlarmId id)`. `AlarmScheduler`
+holds a reference to the `NotificationService` singleton and
+calls it instead of `flutter_local_notifications` directly. The
+two methods are:
+
+- `show(ReminderEvent event)` — builds the
+  `AndroidNotificationDetails` (channel id `doit.reminders`,
+  importance high, the new monochrome `ic_streak_notification`
+  icon, the per-mode action list), then calls
+  `flutterLocalNotificationsPlugin.show(event.id, title, body,
+  details)`.
+- `dismiss(AlarmId id)` — calls
+  `flutterLocalNotificationsPlugin.cancel(id.value)` and emits
+  a `NotificationDismissed` event for any in-flight routine
+  listeners.
+
+The `ReminderEvent` value class is a pure-Dart sealed
+family (`ReminderEventAlarm`, `ReminderEventRoutine`,
+`ReminderEventTest`) so the model tests cover the routing logic
+without touching the platform channel.
+
+**Consequences.** The two duplicated action-list constructors
+collapse to one (the `NotificationService` owns the per-mode
+copy). The dismiss race is gone because both paths now
+serialize through the singleton's internal `Completer<void>
+_ready`. The trade is a small method-call overhead per alarm
+fire — measured at < 0.5 ms in the v1.2e integration tests,
+well under the alarm's 1-second jitter budget.
+
+**Alternatives considered.**
+
+- **Keep the direct `flutter_local_notifications` path in
+  `AlarmScheduler`** — would have left the duplication and the
+  dismiss race in place.
+- **Move the action-list logic into `AlarmScheduler`** — the
+  alarm callback is the wrong layer to know about habit modes
+  (a Strong habit's alarm might trigger before the routine's
+  Strong-mode flag has been read).
+
+---
+
+## ADR-034 — Extend `Action` sealed hierarchy with `ActionFullscreen` + `ActionCallIntercept` leaves
+
+**Status:** accepted (v1.2f / 2026-06-23).
+
+**Context.** The v0.4b `Action` sealed hierarchy had 5 leaves
+(`ActionNotify`, `ActionOverrideSilent`, `ActionSendMessage`,
+`ActionLaunchUrl`, `ActionNone`). The 30-phase roadmap called
+for two more leaves that the Phase-5 routine executor needed:
+
+1. **`ActionFullscreen(route)`** — opens a Flutter route in a
+   full-screen activity (the strong-mode reliability path; the
+   user can't dismiss the alarm without completing the route's
+   mission). v0.4b's `FullScreenActivity` was scaffolded but
+   no `Action` leaf dispatched to it.
+2. **`ActionCallIntercept(personId)`** — when a call comes in
+   from a `personId`-matching contact, the routine intercepts
+   the call (the Japan silent-mode pattern). v0.4b's
+   `CallInterceptor.kt` was scaffolded but no `Action` leaf
+   dispatched to it.
+
+**Decision.** v1.2f (`SYS-101`, `SYS-102`) extends `Action`
+with the two leaves. `RoutineExecutor._dispatchAction(Action)`
+grows the exhaustive switch by two arms; the compile-time
+exhaustiveness check (`sealed` + Dart 3 pattern matching)
+catches any future drift.
+
+**Consequences.** The routine executor can now drive both the
+strong-mode full-screen and the call-interception paths from
+the user's routine-config YAML. The `RoutineConfig` codec is
+unchanged — the new leaves are encoded as
+`{type: 'fullscreen', route: '/mission'}` and
+`{type: 'call_intercept', person_id: 'p_123'}` JSON envelopes
+that the existing `RoutineConfig.fromJson` factory handles via
+the new switch arms.
+
+**Alternatives considered.**
+
+- **Reuse `ActionLaunchUrl` with a magic URL scheme** — would
+  have avoided the sealed-hierarchy growth but the
+  full-screen intent needs a `PendingIntent` from the platform
+  side, not a URL parse.
+- **Add a single `ActionPlatform` leaf with a free-form
+  payload** — would have lost the Dart-3 exhaustiveness check
+  and the model tests would have to enumerate the
+  payload shapes by hand.
+
+---
+
+## ADR-035 — `AutomationReliabilityDialog` on tap (per-automation reliability details)
+
+**Status:** accepted (v1.2h / 2026-06-23).
+
+**Context.** v1.1f (SYS-085 / ADR-029) shipped
+`AutomationReliabilityBadge` — a 40×40 dp `IconButton` that
+shows the per-automation reliability state (optimal hidden,
+degraded warning-amber, unknown info-outline). The badge was
+non-interactive beyond visual feedback; the user could see
+that an automation was degraded but had no path to "fix it".
+
+**Decision.** v1.2h (`SYS-103`) wires the badge's `onTap`
+callback to open `AutomationReliabilityDialog` — an
+`AlertDialog` that renders:
+
+1. The trigger's required `PermissionKind` (if any) — read
+   from `_requiredPermissionForTrigger`.
+2. The current `PermissionResult` for that kind — read from
+   `PermissionService.instance.statuses`.
+3. Rationale copy — read from `AppLocalizations` (the
+   v1.1h i18n catalog has a `permissionRationale<Kind>` key per
+   kind).
+4. An "Open settings" CTA that deep-links to the relevant OS
+   settings screen (`Settings.ACTION_APPLICATION_DETAILS_SETTINGS`
+   for normal permissions, `Settings.ACTION_USAGE_ACCESS_SETTINGS`
+   for `PACKAGE_USAGE_STATS`, `Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`
+   for `USE_FULL_SCREEN_INTENT`).
+
+The dialog is **trigger-side only** — action-side
+permission disambiguation (the `ActionOverrideSilent` →
+`ACCESS_NOTIFICATION_POLICY`, the contact-requiring actions →
+`READ_CONTACTS`) is explicitly deferred to a v1.x follow-up
+(see `feature.md` §2.2). The `TriggerCallIncoming*`
+reliability arm is also deferred until
+`PermissionService.callScreening` is fully probed (see
+`feature.md` §2.3).
+
+**Consequences.** The user can now act on a degraded
+automation without leaving the app. The deep-link CTA is the
+same pattern as the v1.1g `UsageStatsService.openSettings()`
+method. The trade is a new dialog widget + 8 widget tests +
+8 integration tests (~250 lines) for a UX surface that only
+appears when a badge is tapped.
+
+**Alternatives considered.**
+
+- **Inline expansion below the badge** — would have avoided
+  the dialog but the screen real estate is constrained and
+  the inline copy would have conflicted with the row's
+  trailing remove button.
+- **Navigate to the Settings screen's permission tile** —
+  would have been one tap shorter but loses the
+  trigger-specific context (the user would have to find the
+  right tile among 7+ permission tiles).
+
+---
+
+## ADR-036 — `PermissionLifecycleReProbe` + `PermissionService.refresh()` for `AppLifecycleState.resumed`
+
+**Status:** accepted (v1.2i / 2026-06-23).
+
+**Context.** v1.1g's permission probe ran once at app start
+(via `PermissionService.init()`). When the user toggled a
+permission in OS settings and came back to the app, the
+in-app badge stayed at the stale state until the next cold
+launch. The user reported this in the v1.1k retrospective as
+"the badge lies — I granted the permission and the badge
+still says degraded".
+
+**Decision.** v1.2i (`SYS-104`) adds `PermissionService.refresh()`,
+which re-probes every `PermissionKind` and emits a fresh
+`statuses` snapshot to all subscribed `ValueListenable`s.
+A new `WidgetsBindingObserver` (`lib/app/app_lifecycle_observer.dart`)
+calls `refresh()` on `AppLifecycleState.resumed`, with a
+special-case for the cold-launch first `resumed` (the initial
+probe in `main()` already ran, so the first `resumed` is a
+no-op).
+
+**Consequences.** The user toggles a permission in OS
+settings → comes back to do it → the badge updates within
+~50 ms of `resumed`. The trade is a per-`resumed` probe
+overhead of ~5–15 ms (measured across 7 `PermissionKind`s)
+plus the `WidgetsBindingObserver` boilerplate.
+
+**Alternatives considered.**
+
+- **Listen to `Intent.ACTION_USER_PRESENT` (the unlock
+  broadcast)** — would have fired earlier than `resumed`
+  but the broadcast is not guaranteed on all OEMs.
+- **Poll every 5 s in a `Timer.periodic`** — would have
+  avoided the lifecycle hook but the battery cost was
+  unacceptable (every 5 s × 7 kinds × ~5 ms = ~7 mAh/day).
+- **Use a `MethodChannel` listener from the Kotlin side** —
+  would have been push-based but the permission-change
+  broadcast is `android.intent.action.PACKAGE_CHANGED` for
+  some kinds and `Settings.ACTION_*` for others; the
+  heterogeneity made the lifecycle hook simpler.
+
+---
+
+## ADR-037 — `DstTransitionBanner` on home screen (24-hour-ahead DST warning)
+
+**Status:** accepted (v1.2j / 2026-06-23).
+
+**Context.** The DST transition policy (see
+`docs/v_model/notification_reliability.md §DST`) was
+documented in v0.4b but the user had no in-app indicator that
+DST was imminent. The routine executor's `nextOccurrence`
+correctly shifted the fire time after a DST boundary (the
+test `test/habits/schedule_test.dart` covered this
+explicitly), but the user was surprised when a "9 AM" reminder
+fired at "8 AM" or "10 AM" on the transition day.
+
+**Decision.** v1.2j ships `DstTransitionBanner` — a small
+`Container` rendered at the top of `HomeScreen` when the
+device's local zone enters or exits DST within the next 24
+hours. The copy reads "Heads up: DST ends tonight. Your
+morning routine may fire one hour later." (the AppLocalizations
+key `dstTransitionBanner` ships in both `en` and `es`).
+
+**Consequences.** The user has a 24-hour advance notice that
+DST will shift their routine times. The banner auto-dismisses
+once the transition has passed (the next `nextOccurrence` call
+returns the post-DST time and the banner's `shouldShow` returns
+false). The trade is one extra widget on the home screen
+(only visible for ~2 days per year).
+
+**Alternatives considered.**
+
+- **A heads-up notification instead of an in-app banner** —
+  would have reached the user even when the app was closed
+  but the user reported in the v1.0h retrospective that
+  "heads-up notifications for non-event things are noise".
+- **Just shift the routine time silently** — would have
+  preserved the v0.4b behavior but the surprise reaction
+  was the user complaint that triggered this ADR.
+
+---
+
+## ADR-038 — `StreakRecoveryCard` on home screen (back-fillable missed day)
+
+**Status:** accepted (v1.2j / 2026-06-23).
+
+**Context.** v0.5b shipped the streak-calculator's grace
+window (3-hour post-deadline before the streak breaks). The
+user could back-fill a missed day inside the grace window via
+the habit-detail screen, but the affordance was hidden — the
+user had to know to look for it. The v1.1k retrospective
+called this out as the #1 "I thought I lost my streak"
+support ticket.
+
+**Decision.** v1.2j ships `StreakRecoveryCard` — a
+`tappable Card` rendered between the habit list and the
+`DstTransitionBanner` when at least one habit has a
+back-fillable missed day (the streak calculator's
+`brokenAt` is non-null AND the back-fill date is within
+the grace window). Tapping the card opens the
+`HabitDetailScreen`'s back-fill flow, pre-populated with the
+missed date.
+
+**Consequences.** The "I thought I lost my streak" ticket
+path is now one tap from the home screen. The trade is one
+extra widget on the home screen + 4 widget tests.
+
+**Alternatives considered.**
+
+- **Auto-back-fill on app open** — would have been the
+  zero-tap path but the v0.5b decision to require an
+  explicit user action stands (auto-back-fill would let
+  the app lie about completion, which is the entire point
+  of a streak).
+- **A push notification** — same noise complaint as
+  ADR-037.
+
+---
+
+## ADR-039 — `PreNotificationHeadsUp` (5-min / 1-min heads-up channel)
+
+**Status:** accepted (v1.2j / 2026-06-23).
+
+**Context.** The user reported in the v1.1k retrospective
+that "the alarm catches me off guard — I want a heads-up so
+I can finish what I'm doing before the alarm fires". v0.4b's
+notification fired exactly once at the scheduled time; there
+was no heads-up.
+
+**Decision.** v1.2j adds `PreNotificationHeadsUp` — a
+low-importance heads-up notification 5 min and 1 min before
+each scheduled reminder. The heads-up uses a separate
+`doit.pre_notifications` channel at default importance
+(no full-screen intent, no sound); the title is "Coming up:
+<habit name>" and the body is "in 5 min" / "in 1 min". The
+user can disable per-habit in the habit-detail screen's
+settings tab (a new "Pre-notifications" toggle that defaults
+to on).
+
+**Consequences.** The user has a 5-min and 1-min heads-up
+before each reminder. The trade is a new notification
+channel + a 2× scheduling overhead per alarm (the heads-up
+schedule is a separate `AlarmScheduler.schedule` call). The
+user can opt out per-habit if the heads-up is noisy.
+
+**Alternatives considered.**
+
+- **A single 2-min heads-up** — would have been half the
+  scheduling overhead but the user explicitly asked for
+  "5 min AND 1 min" in the retrospective feedback.
+- **A heads-up notification at the same channel as the main
+  alarm** — would have confused the per-mode "Done" /
+  "Open" action contract.
+
+---
+
+## ADR-040 — Shared `MissionWrongAttempts` module (uniform 3-wrong take-a-break across Math + Type)
+
+**Status:** accepted (v1.2l / 2026-06-23).
+
+**Context.** v0.4b's Math + Type missions each tracked their
+own wrong-attempt counter. Both used "3 wrong attempts then
+take a 60-second break" but the constants were duplicated
+and the `SnackBar` + `Timer` implementation was forked —
+Math used a custom `Duration.zero`-aware timer; Type used
+the platform `Timer.run`. The two implementations had
+drifted: Math's break was 60 s, Type's was 30 s (a v0.4b
+oversight). v1.1k caught this when the user reported
+"sometimes the break is twice as long as other times".
+
+**Decision.** v1.2l (`SYS-109`) ships
+`lib/missions/mission_wrong_attempts.dart` — a shared module
+that owns the "max wrong attempts before take-a-break"
+policy + the take-a-break `SnackBar` + the `Timer`. The
+Math + Type missions that were each tracking their own
+wrong-attempt counter now consume the shared module.
+
+The opt-in pattern is deliberate: Shake / Hold / Memory have
+no "wrong attempt" notion (Shake counts shake events; Hold
+counts seconds held; Memory counts matched pairs). The
+shared module is consumed only by the missions that have a
+"wrong" state — the future-proof shape for similar shared
+modules is "owned by the consumers, exposed as a parameter".
+
+**Consequences.** The 60-second break is now uniform across
+Math + Type. The trade is one new module + 5 new tests +
+the cross-mission refactor. The opt-in pattern means the
+other 3 missions have zero touch surface with this module.
+
+**Alternatives considered.**
+
+- **A base class for all 5 missions** — would have forced
+  Shake / Hold / Memory to inherit a wrong-attempt
+  abstraction they don't have.
+- **A `Mission` mixin** — Dart's mixin semantics would have
+  required each consumer to remember to apply the mixin;
+  the shared module is more explicit.
+
+---
+
+## ADR-041 — `CompletionLogSection` for review + undo (last-7-days, best-effort routine reversal)
+
+**Status:** accepted (v1.2m / 2026-06-23).
+
+**Context.** The user reported in the v1.1k retrospective
+"I mark something done by mistake and have to dig into the
+database to undo it" — there was no in-app undo for an
+accidental completion. v0.5b's `CompletionLogService` was
+append-only; there was a `removeEntry` method but it was not
+exposed in the UI.
+
+**Decision.** v1.2m (`SYS-110`) ships
+`lib/screens/completion_log_section.dart` — a new widget
+rendered on the home screen under the habit list. It shows
+the last 7 days of completion entries grouped by date with a
+per-entry "Undo" button. Undo:
+
+1. Removes the completion log entry.
+2. Decrements the streak (via `StreakCalculator.compute` with
+   the updated log).
+3. Cancels the in-flight notification (if any) via
+   `NotificationService.dismiss`.
+4. Reverses the routine's side effects (if any) — the
+   routine's already-fired `Action` is logged in the
+   `RoutineExecutor`'s audit log but **not** reversed; only
+   the streak + log + notification are guaranteed to be
+   reversed.
+
+The best-effort routine reversal is documented in the
+widget's copy ("Routine actions are not reversed — only the
+streak and notification are undone"). The trade is
+honesty about what's reversible vs. what isn't.
+
+**Consequences.** The user can undo an accidental
+completion in one tap. The trade is one new widget + the
+audit-log infrastructure for routine reversals. The
+best-effort contract is the same shape as the v0.4c.1
+backup restore (which reverses the DB writes but not any
+post-restore side effects).
+
+**Alternatives considered.**
+
+- **A confirmation dialog before undo** — would have added a
+  tap but the user explicitly asked for "one tap to undo"
+  in the retrospective.
+- **Reverse the routine's already-fired `Action`** — would
+  have required every `Action` leaf to grow a `reverse()`
+  method; the v0.4b `Action` sealed hierarchy is not
+  designed for that (the side effects of `ActionNotify` /
+  `ActionOverrideSilent` / `ActionSendMessage` are not
+  reversible in general).

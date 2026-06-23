@@ -7,6 +7,35 @@ checklist (`v<major>_<minor>_release_checklist.md`). This changelog
 is the user-facing summary of what shipped in each release; the
 V-Model artifacts are the engineering contract.
 
+## [1.2.0] — 2026-06-23 — Code-TODO closure
+
+Thirteen v1.2 sub-entries (v1.2a..v1.2m) ship the
+remaining code-TODO closure pass over the v1.1
+foundation. The headline themes: **wire-up** (the
+NotificationService show/dismiss path, the routine
+Action leaves, BOOT_COMPLETED coverage confirmation),
+**UX completeness** (Person pauseUntil UI,
+DoFixed weekday display, DST transition banner,
+streak-recovery card, pre-notification heads-up),
+**reliability disambiguation** (per-automation
+AlertDialog on tap, AppLifecycleState.resumed
+re-probe hook), and **edit affordances** (hard
+delete with confirm, completion-log review + undo,
+uniform 3-wrong take-a-break across Math + Type).
+Version `1.1.0+8` → `1.2.0+9`. 1001 / 1001 tests,
+`dart format` clean, `flutter analyze --fatal-infos`
+clean. Right-side gate: `v1_2_release_checklist.md`
++ `implementation_status.md` rows v1.2a..v1.2m.
+Left-side baseline: `v1_2_release_baseline.md`.
+ADRs 033-041 (decision_record.md) + SYS-098-110
+(requirements.md) were appended in this cycle. No
+new permissions, no `INTERNET`. The deferred
+items (strong-mode full-screen hardening,
+action-side permission disambiguation,
+`google_maps_flutter` map tiles, native Spanish
+translator, Wear OS, iOS port) are tracked in
+[`feature.md`](feature.md) §2-4 as v1.x candidates.
+
 ## [1.1.0] — 2026-06-21 — Polish + expansion
 
 Nine v1.1 sub-entries (v1.1a through v1.1i) ship nine
@@ -1203,7 +1232,6 @@ best-effort basis without the permission and the debug
 screen shows a banner explaining the degraded mode
 (v1.1 follow-up; needs a separate SYS- ID and ADR).
 
-<<<<<<< HEAD
 ### v1.2m — WF-025 edit completion log (Phase 11c)
 
 Phase 11c of the v1.2 code-TODO closure (`30-phase
@@ -1237,7 +1265,7 @@ completion is the cause of a streak break.
   day."` (honest; not punitive). The cancel button is
   the default action visually; the destructive button
   reuses the theme's error color.
-=======
+
 ### v1.2l — WF-030 uniform 3-wrong take-a-break (Phase 11b)
 
 Phase 11b of the v1.2 code-TODO closure (`30-phase
@@ -1267,13 +1295,11 @@ user never sees a behavior gap between Math and Type.
   do not have a "wrong attempt" notion (they time-out
   instead of failing per-attempt). The shared module is
   documented as opt-in for any future mission kind.
->>>>>>> origin/main
 
-**3-gate verification**
+**3-gate verification (consolidated for v1.2l + v1.2m)**
 
 ```
 $ dart format --output=none --set-exit-if-changed .
-<<<<<<< HEAD
 Formatted 215 files (0 changed) in 0.76 seconds.
 $ flutter analyze --fatal-infos
 No issues found! (ran in 1.1s)
@@ -1281,26 +1307,14 @@ $ flutter test
 00:24 +1001: All tests passed!
 ```
 
-(Test count: 995 → 1001 — 5 widget tests on
-`CompletionLogSection` (empty-state, populated + sort
-order, dialog open, cancel, confirm + snackbar + DB
-removal); 3-gate green with zero analyzer findings.)
-=======
-Formatted 213 files (0 changed) in 0.77 seconds.
-$ flutter analyze --fatal-infos
-No issues found! (ran in 1.1s)
-$ flutter test
-00:22 +995: All tests passed!
-```
-
-(Test count: 984 → 995 — 9 unit tests for
+(Test count: 984 → 1001 — 9 unit tests for
 `MissionWrongAttempts` (constant, getter/setter, error-label,
 custom-maxWrong, nudge-copy) + 2 widget tests on the Type
 mission (auto-fail on 3rd wrong + per-attempt label
-decrement); the 3 existing Math widget tests are unchanged
-but now exercise the shared module; 3-gate green with zero
+decrement) + 5 widget tests on `CompletionLogSection`
+(empty-state, populated + sort order, dialog open, cancel,
+confirm + snackbar + DB removal); 3-gate green with zero
 analyzer findings.)
->>>>>>> origin/main
 
 ### v1.0/Phase B — Templates (curated library + save-as-template)
 
