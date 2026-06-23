@@ -416,6 +416,42 @@ notification-icon resource reference.
 
 ## [Unreleased]
 
+### v1.2j — DST transition banner + streak-recovery card + 5-min/1-min pre-notification
+
+Phase 10 of the v1.2 code-TODO closure (`30-phase
+roadmap`). Three small UX improvements, all centered on
+the "user missed something, here is how we handled it"
+banner subsystem:
+
+- **DST transition banner** (`lib/widgets/dst_transition_banner.dart`)
+  — one-shot card that surfaces when the schedule
+  engine silently reschedules one or more habit times
+  because of a clock change. Singular copy for one
+  drop, plural copy for two+. Renders
+  `SizedBox.shrink()` when the list is empty (zero
+  layout cost in the steady state).
+- **Streak-recovery card** (`lib/widgets/streak_recovery_card.dart`)
+  — one-shot card that surfaces when the consecutive
+  counter reports 3+ missed days on a habit. The
+  primary "I'm back" `FilledButton` and a dismiss
+  `IconButton` keyed by `habitId` let the user resume
+  or shelve the card without going through Settings.
+- **Pre-notification heads-up**
+  (`lib/services/reminder_service.dart`) — a new
+  `ReminderService.schedulePreAlarms({alarmId, fireAt, now})`
+  method enqueues a 5-min heads-up when the lead time
+  is `> 5 * 60 s` and a 1-min heads-up when the lead
+  time is `> 60 s`; lead times at or below those
+  thresholds are silently skipped. A new
+  `ReminderService.cancelPreAlarms(alarmId)` forwards
+  to the bridge so a cancelled habit leaves no
+  dangling pre-alarms. The `ReminderBridge` interface
+  gains `schedulePreAlarm({alarmId, leadTimeSeconds})`
+  and `cancelPreAlarms(alarmId)` abstract methods; the
+  Dart side does NOT call `DateTime.now()` directly —
+  the caller passes the reference time so the method
+  is unit-testable.
+
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 
 do it is no longer about streaks. Phase A renames the
