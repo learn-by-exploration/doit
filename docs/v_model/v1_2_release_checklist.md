@@ -231,6 +231,28 @@ functionality. Re-run:
 - [ ] `PACKAGE_USAGE_STATS` permission rationale +
       deep-link. (v1.1g.)
 
+## SYS- exit criteria (left-side ↔ right-side traceability)
+
+Every SYS- ID added in v1.2 maps to a verifiable test or
+on-device check. The `requirements.md` row carries the
+canonical mapping; this table mirrors it for quick sign-off:
+
+| SYS- ID | v1.2 sub-entry | Verification (test or on-device check) |
+| --- | --- | --- |
+| SYS-098 | v1.2e | `test/services/platform_notification_service_test.dart` (5) + `platform_alarm_scheduler_test.dart` `lookupForFire` group (6) + `reminder_service_test.dart` `onFireAlarm` group (5) + on-device "Test reminder" check |
+| SYS-099 | v1.2f | `test/routines/action_dispatch_test.dart` (2 — ActionFullscreen records envelope + missing-plugin swallowed) + on-device routine with `ActionFullscreen(route: '/mission')` fires overlay |
+| SYS-100 | v1.2f | `test/routines/action_dispatch_test.dart` (2 — ActionCallIntercept records one decision per fire + 4 `CallInterceptDecision` value coverage) + `test/routines/call_dispatch_test.dart` (1 updated) + on-device routine fires `recordRoutineDecision` on incoming call |
+| SYS-101 | v1.2f | `test/services/person_repository_test.dart` (2 — round-trip + `clearPausedUntil`) + `test/screens/add_person_test.dart` (1 — Pause section hidden until contact picked) + on-device pause UI cycle |
+| SYS-102 | v1.2f | `test/do/do_description_test.dart` (10 — every-day / weekdays / weekends / single / arbitrary / non-`DoFixed` branches) + `test/screens/home_test.dart` (1 — `{1,3,5}` DoFixed tile subtitle) + on-device weekday chips on `DoFixed` habit |
+| SYS-103 | v1.2h | `test/widgets/automation_reliability_dialog_test.dart` (4 — location / calendar / usage-stats / time-of-day) + `test/a11y/semantics_labels_test.dart` SYS-062 scanner |
+| SYS-104 | v1.2i | `test/services/permission_lifecycle_observer_test.dart` (3) + `test/services/permission_service_test.dart` (4 — `refresh()` re-probes all kinds / merges granted / swallows single failure / re-probes usage-stats + call-screening separately) + on-device Settings → Permissions cycle |
+| SYS-105 | v1.2j | `test/widgets/dst_transition_banner_test.dart` (5 — empty / singular / plural / forward vs backward glyph / dismiss) + on-device DST-zone switch within next 24 h |
+| SYS-106 | v1.2j | `test/widgets/streak_recovery_card_test.dart` (2 — `< 3 missed days` renders nothing / primary + close fire callbacks) + on-device 3+ missed days card |
+| SYS-107 | v1.2j | `test/reminders/reminder_service_test.dart` (5 — both heads-ups when lead > 5 min / 1-min only when 5 min ≥ lead > 1 min / no-op when lead ≤ 1 min / `cancelPreAlarms` forwards / `MissingPluginException` swallowed) + on-device 6-min-ahead reminder |
+| SYS-108 | v1.2k | `test/screens/add_habit_delete_test.dart` (6 — new-do has no entry / edit shows `Delete…` / confirm dialog renders name + warning / Cancel keeps / Delete calls `deleteById` + pops / failure snackbar + no pop) + on-device delete confirm flow |
+| SYS-109 | v1.2l | `test/missions/mission_attempts_test.dart` (9) + `test/screens/mission_math_test.dart` (3 existing, now via shared module) + `test/screens/mission_type_test.dart` (2 new) + on-device Math + Type 3-wrong cycle |
+| SYS-110 | v1.2m | `test/widgets/completion_log_section_test.dart` (5 — empty / 3 rows newest-first / delete icon opens confirm / Cancel keeps / Confirm calls `deleteById` + snackbar) + on-device edit-screen completion log review + undo |
+
 ## Sign-off
 
 When every check above is green, the user accepts the build
