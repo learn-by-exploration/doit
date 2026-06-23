@@ -118,6 +118,67 @@ class ReminderService {
     await scheduler.rescheduleAll();
   }
 
+  /// v1.2j / Phase 10 / SYS-107. Schedules the 5-minute +
+  /// 1-minute pre-alarm heads-up pair for a reminder that
+  /// will fire at [fireAt]. Each pre-alarm is a one-shot
+  /// `WorkManager` task on the platform side that posts a
+  /// low-importance notification on the same
+  /// `doit.reminders` channel. The actual [alarmId] alarm
+  /// fires later as usual; the heads-up is purely
+  /// advisory.
+  ///
+  /// The caller passes the `alarmId` (assigned by the
+  /// scheduler) and the absolute `fireAt` epoch ms. The
+  /// service derives the lead times from `fireAt` minus
+  /// `now` and only enqueues heads-ups that land in the
+  /// future (a heads-up at `fireAt - 5 minutes` is a no-op
+  /// if `fireAt` is only 3 minutes away — the 5-minute
+  /// heads-up is silently skipped). The Dart side does NOT
+  /// call `DateTime.now()` directly — the caller passes
+  /// the reference time so this method is testable.
+  Future<void> schedulePreAlarms({
+    required AlarmId alarmId,
+    required DateTime fireAt,
+    required DateTime now,
+  }) async {
+    await _ready.future;
+    final lead5 = fireAt.difference(now);
+    final lead1 = lead5;
+    if (lead5.inSeconds > 5 * 60) {
+      try {
+        await bridge.schedulePreAlarm(
+          alarmId: alarmId.value,
+          leadTimeSeconds: 5 * 60,
+        );
+      } catch (_) {
+        /* ADR-013 */
+      }
+    }
+    if (lead1.inSeconds > 60) {
+      try {
+        await bridge.schedulePreAlarm(
+          alarmId: alarmId.value,
+          leadTimeSeconds: 60,
+        );
+      } catch (_) {
+        /* ADR-013 */
+      }
+    }
+  }
+
+  /// v1.2j / Phase 10 / SYS-107. Cancel every pending
+  /// pre-alarm heads-up for [alarmId]. Called from
+  /// [cancel] (the user dismissed the underlying alarm)
+  /// and from the habit-completion flow.
+  Future<void> cancelPreAlarms(AlarmId alarmId) async {
+    await _ready.future;
+    try {
+      await bridge.cancelPreAlarms(alarmId.value);
+    } catch (_) {
+      /* ADR-013 */
+    }
+  }
+
   /// Probe and cache the current reliability state.
   Future<Reliability> probeReliability() async {
     await _ready.future;

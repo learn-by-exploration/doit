@@ -87,6 +87,39 @@ abstract class ReminderBridge {
   /// [PermissionService.requestIgnoreBatteryOptimizations]
   /// (SYS-068).
   Future<void> openIgnoreBatteryOptimizations();
+
+  /// Schedule a heads-up notification that fires
+  /// [leadTimeSeconds] before the matching [alarmId] fires.
+  /// The platform enqueues a one-shot `WorkManager` task
+  /// (NOT an `AlarmManager` alarm — these are advisory and
+  /// exact-on-the-second is not required). When the heads-
+  /// up fires, the platform posts a low-importance
+  /// notification on the same `doit.reminders` channel
+  /// with the habit name + a "coming up in N minutes" body
+  /// and a single "Dismiss" action. The actual [alarmId]
+  /// alarm fires later as usual; the heads-up is purely
+  /// advisory.
+  ///
+  /// The Dart side enqueues the 5-minute heads-up and the
+  /// 1-minute heads-up as two separate `schedulePreAlarm`
+  /// calls; the Kotlin side deduplicates by
+  /// `(alarmId, leadTimeSeconds)` so a second
+  /// `schedulePreAlarm(alarmId, 300)` overwrites the first.
+  /// Canceling [alarmId] via [cancelAlarm] also cancels
+  /// any pending heads-ups for that alarm.
+  ///
+  /// v1.2j / Phase 10 / SYS-107.
+  Future<void> schedulePreAlarm({
+    required int alarmId,
+    required int leadTimeSeconds,
+  });
+
+  /// Cancel every pending heads-up for [alarmId]. The
+  /// platform iterates over the persisted `(alarmId,
+  /// leadTimeSeconds)` pairs and cancels each. Called when
+  /// the user dismisses the underlying alarm via
+  /// `cancelAlarm` or when the habit is completed.
+  Future<void> cancelPreAlarms(int alarmId);
 }
 
 /// Inbound callbacks from Kotlin to Dart. The Dart side
@@ -212,6 +245,22 @@ class PlatformReminderBridge implements ReminderBridge {
   Future<void> openIgnoreBatteryOptimizations() async {
     await _channel.invokeMethod<void>('openIgnoreBatteryOptimizations');
   }
+
+  @override
+  Future<void> schedulePreAlarm({
+    required int alarmId,
+    required int leadTimeSeconds,
+  }) async {
+    await _channel.invokeMethod<void>('schedulePreAlarm', {
+      'alarmId': alarmId,
+      'leadTimeSeconds': leadTimeSeconds,
+    });
+  }
+
+  @override
+  Future<void> cancelPreAlarms(int alarmId) async {
+    await _channel.invokeMethod<void>('cancelPreAlarms', {'alarmId': alarmId});
+  }
 }
 
 /// Test bridge — records every call.
@@ -225,6 +274,10 @@ class FakeReminderBridge implements ReminderBridge {
   showNotificationCalls =
       <({int alarmId, String habitName, String? body, bool strongMode})>[];
   final List<int> cancelNotificationCalls = <int>[];
+
+  final List<({int alarmId, int leadTimeSeconds})> schedulePreAlarmCalls =
+      <({int alarmId, int leadTimeSeconds})>[];
+  final List<int> cancelPreAlarmsCalls = <int>[];
   int openIgnoreBatteryOptimizationsCalls = 0;
   int rescheduleCount = 0;
   Reliability reliability = Reliability.optimal;
@@ -290,5 +343,21 @@ class FakeReminderBridge implements ReminderBridge {
   @override
   Future<void> openIgnoreBatteryOptimizations() async {
     openIgnoreBatteryOptimizationsCalls++;
+  }
+
+  @override
+  Future<void> schedulePreAlarm({
+    required int alarmId,
+    required int leadTimeSeconds,
+  }) async {
+    schedulePreAlarmCalls.add((
+      alarmId: alarmId,
+      leadTimeSeconds: leadTimeSeconds,
+    ));
+  }
+
+  @override
+  Future<void> cancelPreAlarms(int alarmId) async {
+    cancelPreAlarmsCalls.add(alarmId);
   }
 }
