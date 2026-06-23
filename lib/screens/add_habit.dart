@@ -63,10 +63,29 @@ class AddHabitScreen extends StatefulWidget {
   State<AddHabitScreen> createState() => _AddHabitScreenState();
 }
 
+/// Public alias for the screen's state, so widget tests
+/// can pin `@visibleForTesting` overrides (e.g.,
+/// `deleteOverride`) without depending on the private
+/// `_AddHabitScreenState`.
+typedef AddHabitScreenState = _AddHabitScreenState;
+
 class _AddHabitScreenState extends State<AddHabitScreen> {
   final _nameCtrl = TextEditingController();
   final _nameKey = GlobalKey();
   String? _nameError;
+
+  /// Test-only override for the delete path. When set, the
+  /// screen calls this instead of `DoRepository.deleteById`
+  /// so a widget test can exercise the failure branch
+  /// without monkey-patching the singleton.
+  @visibleForTesting
+  Future<void> Function(String id)? deleteOverride;
+
+  /// Test-only read of the loaded `Do` in edit mode.
+  /// Returns `null` if the screen is in add mode or the
+  /// load has not finished yet.
+  @visibleForTesting
+  Do? get debugOriginal => _original;
 
   // Schedule-type discriminator + per-type fields.
   String _scheduleType = 'fixed';
@@ -247,6 +266,8 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
               onSelected: (a) {
                 if (a == _HabitMenuAction.saveAsTemplate) {
                   _saveAsTemplate();
+                } else if (a == _HabitMenuAction.delete) {
+                  _confirmAndDelete();
                 }
               },
               itemBuilder: (_) => const [
@@ -254,6 +275,11 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
                   key: ValueKey('add_habit.save_as_template'),
                   value: _HabitMenuAction.saveAsTemplate,
                   child: Text('Save as template'),
+                ),
+                PopupMenuItem<_HabitMenuAction>(
+                  key: ValueKey('add_habit.delete'),
+                  value: _HabitMenuAction.delete,
+                  child: Text('Delete…'),
                 ),
               ],
             ),
@@ -998,6 +1024,58 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  // --- delete (WF-022) -------------------------------------------
+
+  /// Confirm with the user, then hard-delete the do and its
+  /// completion log rows. Pops the route with `true` so the
+  /// caller (home screen) knows to refresh immediately.
+  Future<void> _confirmAndDelete() async {
+    final original = _original;
+    if (original == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final name = original.name;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        key: const ValueKey('add_habit.delete.confirm'),
+        title: Text('Delete "$name"?'),
+        content: const Text(
+          'This will remove the do and its completion log. '
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            key: const ValueKey('add_habit.delete.cancel'),
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            key: const ValueKey('add_habit.delete.confirm_button'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final delete = deleteOverride ?? DoRepository.instance.deleteById;
+      await delete(original.id);
+    } on Object catch (_) {
+      // Defensive: the platform path can fail. Show a snack
+      // and stay on the screen so the user can retry.
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Delete failed. Please try again.')),
+      );
+      return;
+    }
+    navigator.pop(true);
+  }
+
   // --- save-as-template ------------------------------------------
 
   Future<void> _saveAsTemplate() async {
@@ -1121,7 +1199,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   }
 }
 
-enum _HabitMenuAction { saveAsTemplate }
+enum _HabitMenuAction { saveAsTemplate, delete }
 
 class _SaveAsTemplateDialog extends StatefulWidget {
   const _SaveAsTemplateDialog({required this.defaultName});
