@@ -136,6 +136,29 @@ void main() {
       }
     });
 
+    test('ForegroundApp leaf (v1.2 / SYS-086 follow-up)', () {
+      const t = TriggerForegroundApp(
+        packageName: 'com.instagram.android',
+        label: 'Instagram',
+      );
+      // Round-trip equality is on `packageName` alone (label
+      // is UI-only). The JSON form carries both, but the
+      // reconstructed leaf must compare equal to the source
+      // via the [==] contract.
+      final back = triggerFromJson(triggerToJson(t)) as TriggerForegroundApp;
+      expect(back.packageName, 'com.instagram.android');
+      expect(back.label, 'Instagram');
+      expect(back, equals(t));
+    });
+
+    test('ForegroundApp with empty label round-trips', () {
+      const t = TriggerForegroundApp(packageName: 'com.example.app');
+      final back = triggerFromJson(triggerToJson(t)) as TriggerForegroundApp;
+      expect(back.packageName, 'com.example.app');
+      expect(back.label, '');
+      expect(back, equals(t));
+    });
+
     test('Condition And/Or are binary', () {
       final c = ConditionAnd(
         ConditionDayOfWeek(const {1, 2}),

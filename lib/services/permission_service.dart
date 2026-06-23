@@ -49,6 +49,7 @@ import 'package:permission_handler/permission_handler.dart';
 // without a rename hack).
 import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
 
+import 'package:doit/services/call_interceptor.dart';
 import 'package:doit/services/permission_result.dart';
 import 'package:doit/services/usage_stats_service.dart';
 
@@ -117,6 +118,24 @@ enum PermissionKind {
   /// always `true` because the deep-link target is well-
   /// defined (`Settings.ACTION_USAGE_ACCESS_SETTINGS`).
   usageStats,
+
+  /// `ROLE_CALL_SCREENING` (v1.2 / SYS-075 + SYS-079 follow-up).
+  /// Not a runtime permission in the `permission_handler`
+  /// sense — it is a system role held via
+  /// `RoleManager.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING)`.
+  /// The probe goes through
+  /// `CallInterceptorService.isCallScreeningRoleHeld` →
+  /// Kotlin `doit/call_interceptor.isCallScreeningRoleHeld`
+  /// (a `RoleManager.createCallScreeningRole` check).
+  /// The reliability badge for `TriggerCallIncoming*`
+  /// leaves reads this kind's status (the v1.1f badge
+  /// deferred this check to v1.2 with the note "fold in
+  /// `PermissionKind.callScreening` once the role is wired
+  /// through `PermissionService`"). The `canOpenSettings`
+  /// payload is `true` because the deep-link target is
+  /// `RoleManager.createRequestRoleIntent` (the OS shows
+  /// its own dialog; no app-side Settings path is needed).
+  callScreening,
 }
 
 /// Singleton holder for the permission / SAF seam. The
@@ -165,7 +184,13 @@ class PermissionService {
         PermissionKind.location: const PermissionResultDenied(
           canOpenSettings: true,
         ),
+        PermissionKind.calendar: const PermissionResultDenied(
+          canOpenSettings: true,
+        ),
         PermissionKind.usageStats: const PermissionResultDenied(
+          canOpenSettings: true,
+        ),
+        PermissionKind.callScreening: const PermissionResultDenied(
           canOpenSettings: true,
         ),
       });
@@ -200,6 +225,9 @@ class PermissionService {
         canOpenSettings: true,
       ),
       PermissionKind.usageStats: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
+      PermissionKind.callScreening: const PermissionResultDenied(
         canOpenSettings: true,
       ),
     };
@@ -237,6 +265,16 @@ class PermissionService {
       // result into [statuses] (the Settings tile rebuilds
       // from the ValueNotifier).
       unawaited(_refreshUsageStatsAfterInit());
+      // v1.2 follow-up to v1.0/Phase F PR 2 (SYS-075 /
+      // SYS-079): `ROLE_CALL_SCREENING` is a system role,
+      // not a `permission_handler` permission. The probe
+      // goes through `CallInterceptorService
+      // .isCallScreeningRoleHeld` → Kotlin
+      // `doit/call_interceptor.isCallScreeningRoleHeld`
+      // (a `RoleManager.createCallScreeningRole` check).
+      // Same fire-and-forget rationale as
+      // `usageStats` above.
+      unawaited(_refreshCallScreeningAfterInit());
     } catch (_) {
       // v0.4b-release-fix / ADR-013 follow-up: a thrown
       // platform-channel error must not crash `main()`. The
@@ -421,6 +459,37 @@ class PermissionService {
     statuses.value = next;
   }
 
+  /// v1.2 / SYS-075 + SYS-079 follow-up. Fires the OS role
+  /// request flow for `ROLE_CALL_SCREENING`. The OS dialog
+  /// is asynchronous (the user has to navigate the role
+  /// picker); callers re-probe via [refreshCallScreening]
+  /// when the app resumes. Returns `true` if the role was
+  /// already held, or the user just granted it; `false`
+  /// otherwise (declined dialog, role unavailable on this
+  /// device, missing plugin).
+  Future<bool> requestCallScreening() async {
+    await ready;
+    return CallInterceptorService.instance.requestCallScreeningRole();
+  }
+
+  /// v1.2 / SYS-075 + SYS-079 follow-up. Re-probes
+  /// `ROLE_CALL_SCREENING`. Used by the app-resume handler
+  /// so the per-automation reliability badge for
+  /// `TriggerCallIncoming*` leaves reflects the user's
+  /// most recent toggle without a full restart.
+  Future<void> refreshCallScreening() async {
+    await ready;
+    final granted = await CallInterceptorService.instance
+        .isCallScreeningRoleHeld();
+    final next = <PermissionKind, PermissionResult?>{
+      ...statuses.value,
+      PermissionKind.callScreening: granted
+          ? const PermissionResultGranted()
+          : const PermissionResultDenied(canOpenSettings: true),
+    };
+    statuses.value = next;
+  }
+
   /// Probe helper for [init]. Called after `_ready` is
   /// completed so the result merges into [statuses] via
   /// [refreshUsageStats]'s `ValueNotifier` write. Returns
@@ -435,6 +504,19 @@ class PermissionService {
     // default set in [init].
     try {
       await refreshUsageStats();
+    } catch (_) {
+      // v0.4b-release-fix / ADR-013 follow-up: never let a
+      // platform-channel error crash the post-init probe.
+    }
+  }
+
+  /// Probe helper for [init] (v1.2 / SYS-075 follow-up).
+  /// Same fire-and-forget rationale as
+  /// `_refreshUsageStatsAfterInit` above.
+  Future<void> _refreshCallScreeningAfterInit() async {
+    await ready;
+    try {
+      await refreshCallScreening();
     } catch (_) {
       // v0.4b-release-fix / ADR-013 follow-up: never let a
       // platform-channel error crash the post-init probe.
@@ -514,6 +596,12 @@ class PermissionService {
         canOpenSettings: true,
       ),
       PermissionKind.calendar: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
+      PermissionKind.usageStats: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
+      PermissionKind.callScreening: const PermissionResultDenied(
         canOpenSettings: true,
       ),
     };

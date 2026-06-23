@@ -26,6 +26,16 @@
 // `unknown`) on purpose so the existing `ReliabilityBanner`
 // and the new `AutomationReliabilityBadge` render with the
 // same visual language.
+//
+// v1.2 (SYS-086 / ADR-030 follow-up) folds in two new
+// trigger-permission mappings that v1.1f deferred:
+//   - `TriggerForegroundApp` → `PermissionKind.usageStats`.
+//   - `TriggerCallIncoming*` → `PermissionKind.callScreening`
+//     (the role check, not the (still-out-of-scope)
+//     `READ_PHONE_STATE`). The badge now reports `degraded`
+//     when the role is not held; the home banner still
+//     reports the app-wide `Reliability` enum for the
+//     cross-cutting "system is unable to wake us" signal.
 
 import 'package:doit/routines/routine.dart';
 import 'package:doit/services/permission_result.dart';
@@ -66,11 +76,12 @@ enum AutomationReliability {
 ///   - `TriggerDeviceState*` → no runtime gate (the device-state
 ///     probe reads `BroadcastReceiver`s, not a runtime grant);
 ///     `optimal`.
-///   - `TriggerCallIncoming*` → call-screening is a role, not a
-///     runtime permission; the badge defers to the app-wide
-///     `Reliability.degraded` banner (v1.2 will fold this in
-///     with a new `PermissionKind.callScreening` once the role
-///     is wired through `PermissionService`).
+///   - `TriggerCallIncoming*` → `PermissionKind.callScreening`
+///     (the role probe through `CallInterceptorService
+///     .isCallScreeningRoleHeld`; v1.2 wiring).
+///   - `TriggerForegroundApp` → `PermissionKind.usageStats`
+///     (the special-access permission through
+///     `UsageStatsService.isGranted`; v1.2 wiring).
 ///   - `TriggerTimeOfDay` → alarm system reliability; the
 ///     `AlarmScheduler.reliability` getter is the source of
 ///     truth here, but we default to `optimal` in this
@@ -107,9 +118,11 @@ PermissionKind? _requiredPermissionForTrigger(Trigger trigger) {
     TriggerLocation() => PermissionKind.location,
     // Calendar observer needs read-calendar.
     TriggerCalendarEvent() => PermissionKind.calendar,
-    // Call-screening is a role, not a runtime permission;
-    // deferred to v1.2 (see file header).
-    TriggerCallIncoming() => null,
+    // Call-screening role (v1.2 wiring — was `null` in v1.1f).
+    TriggerCallIncoming() => PermissionKind.callScreening,
+    // Foreground-app trigger (v1.2 addition — gated by
+    // `PACKAGE_USAGE_STATS`).
+    TriggerForegroundApp() => PermissionKind.usageStats,
     // Device-state probes read public broadcasts; no runtime
     // permission gates them.
     TriggerDeviceState() => null,
