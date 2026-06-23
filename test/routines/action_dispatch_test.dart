@@ -170,10 +170,13 @@ void main() {
 
   // ── ActionFullscreen ────────────────────────────────────────────
 
-  test('ActionFullscreen is a no-op on the executor side', () async {
-    // The executor does not touch the full-screen intent. The
-    // AutomationFired event drives the home-screen RoutineBanner
-    // listener (PR 6).
+  test('ActionFullscreen opens a routine-fired overlay via '
+      'ReminderService.fullScreen.showRoutineOverlay', () async {
+    // v1.2f / Phase 6: the executor now wires
+    // ActionFullscreen to the routine-overlay seam. The
+    // AutomationFired event still drives the home-screen
+    // RoutineBanner listener; the overlay is the
+    // escalation path.
     final fakeFullScreen = FakeFullScreenIntent();
     ReminderService.resetForTesting();
     await ReminderService.init(
@@ -194,19 +197,47 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(fired, hasLength(1));
-    // FullScreenIntent.show is NOT called from the executor
-    // for routines (no parent Do row to anchor a full-screen
-    // activity).
+    // The routine-overlay seam receives one call. Title
+    // and body are null (no Do/MissionChain to anchor
+    // them).
+    expect(fakeFullScreen.routineOverlays, hasLength(1));
+    expect(fakeFullScreen.routineOverlays.single.title, isNull);
+    expect(fakeFullScreen.routineOverlays.single.body, isNull);
+    // The habit-side seam (show) is unchanged.
     expect(fakeFullScreen.launches, isEmpty);
     await sub.cancel();
   });
 
+  test(
+    'ActionFullscreen swallows StateError when ReminderService is not init',
+    () async {
+      // ADR-013: a missing service must NOT break the
+      // AutomationFired stream.
+      ReminderService.resetForTesting();
+      executor.register('do-1', [_callAnyWith(const ActionFullscreen())]);
+      final fired = <AutomationFired>[];
+      final sub = executor.events.listen(fired.add);
+
+      source.push(_call());
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fired, hasLength(1));
+      await sub.cancel();
+
+      // Restore for tearDown.
+      await ReminderService.init(reminder);
+    },
+  );
+
   // ── ActionCallIntercept ─────────────────────────────────────────
 
-  test('ActionCallIntercept is a no-op on the executor side', () async {
-    // ADR-019: the Kotlin CallScreeningService already routed
-    // the call. The executor must not re-route or call into
-    // the call service again.
+  test('ActionCallIntercept records the routine decision via '
+      'CallInterceptorService.recordRoutineDecision', () async {
+    // v1.2f / Phase 6: the executor now wires
+    // ActionCallIntercept to a post-call hook on the
+    // call-screening service. The decision is captured
+    // for analytics / debug; the ringer is untouched
+    // (ADR-019).
     executor.register('do-1', [
       _callAnyWith(
         const ActionCallIntercept(decision: CallInterceptDecision.mute),
@@ -219,11 +250,37 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(fired, hasLength(1));
-    // The executor does not push anything onto the call
-    // service's state. The ScriptedCallSource is unchanged.
+    // The scripted source records the decision.
+    expect(source.routineDecisions, [CallInterceptDecision.mute]);
+    // The ringer is NOT touched (ADR-019).
     expect(source.lastRingerMode, isNull);
     await sub.cancel();
   });
+
+  test(
+    'ActionCallIntercept captures every CallInterceptDecision variant',
+    () async {
+      // Map each variant to one call and confirm the
+      // recording is order-preserving.
+      for (final decision in CallInterceptDecision.values) {
+        executor.resetForTesting();
+        await executor.init();
+        executor.register('do-1', [
+          _callAnyWith(ActionCallIntercept(decision: decision)),
+        ]);
+        final fired = <AutomationFired>[];
+        final sub = executor.events.listen(fired.add);
+
+        source.push(_call(number: '+1${decision.index}5550000'));
+        await Future<void>.delayed(Duration.zero);
+
+        expect(fired, hasLength(1), reason: 'fire for $decision');
+        expect(source.routineDecisions.last, decision, reason: 'for $decision');
+        expect(source.lastRingerMode, isNull, reason: 'ringer for $decision');
+        await sub.cancel();
+      }
+    },
+  );
 
   // ── ActionOpenApp ───────────────────────────────────────────────
 
