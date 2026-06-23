@@ -60,28 +60,31 @@ a single `v1_2_30_phase_roadmap.md` doc is a v1.2+ follow-up
 
 ## 3. Requirements (SYS- IDs)
 
-v1.2 added 13 requirements rows to `requirements.md`:
+v1.2 added 13 requirements rows to `requirements.md` (the
+`requirements.md` mapping is the source of truth — every
+other doc in this folder is required to match):
 
 - **SYS-098** (v1.2e / Phase 5) — alarm fire → notification
   render path wire-up.
-- **SYS-099** (v1.2e / Phase 5) — `NotificationService.dismiss`
-  wires the cancel path through the singleton.
-- **SYS-100** (v1.2e / Phase 5) — `NotificationService.show`
-  builds the `AndroidNotificationDetails` with the per-mode
-  action list.
-- **SYS-101** (v1.2f / Phase 6b) — `ActionFullscreen` leaf.
-- **SYS-102** (v1.2f / Phase 6b) — `ActionCallIntercept`
-  leaf.
+- **SYS-099** (v1.2f / Phase 6b) — `ActionFullscreen` leaf
+  wired through `ReminderService.fullScreen.showRoutineOverlay()`.
+- **SYS-100** (v1.2f / Phase 6c) — `ActionCallIntercept`
+  leaf wired through
+  `CallInterceptorService.recordRoutineDecision(decision)`.
+- **SYS-101** (v1.2f / Phase 6d) — `Person.pausedUntil` UI
+  on the Add Person screen + `ContactPerson.copyWith` round-trip.
+- **SYS-102** (v1.2f / Phase 6e) — `DoFixed` weekday display
+  via the new pure `describeDo(Do h)` helper.
 - **SYS-103** (v1.2h / Phase 8) — per-automation
   `AutomationReliabilityDialog` on tap.
 - **SYS-104** (v1.2i / Phase 9) — `PermissionService.refresh()`
   + `WidgetsBindingObserver` re-probe hook.
-- **SYS-105** (v1.2g / Phase 7) — `MY_PACKAGE_REPLACED`
-  arm of `BootReceiver`.
-- **SYS-106** (v1.2h / Phase 8) — deep-link CTA in the
-  reliability dialog.
-- **SYS-107** (v1.2i / Phase 9) — `AppLifecycleState.resumed`
-  cold-launch no-op.
+- **SYS-105** (v1.2j / Phase 10) — `DstTransitionBanner` on
+  the home screen (24-hour-ahead DST warning).
+- **SYS-106** (v1.2j / Phase 10) — `StreakRecoveryCard` on
+  the home screen (back-fillable missed day, 3+ missed days).
+- **SYS-107** (v1.2j / Phase 10) — pre-notification 5-min /
+  1-min heads-up channel.
 - **SYS-108** (v1.2k / Phase 11a) — hard-delete affordance
   on edit screen with confirm dialog.
 - **SYS-109** (v1.2l / Phase 11b) — shared
@@ -178,4 +181,5 @@ which is explicitly deferred (Phase 6a).
   updated in lockstep.
 
 The version code increments by one (no skipped codes),
-mirroring the v1.0 → v1.0.0+7 and v1.1 → v1.1.0+8 bumps.
+mirroring the v1.0 → v1.0.0+7 and v1.1.0+8 → v1.2.0+9 bumps
+(the v1.1 line is what we increment from).

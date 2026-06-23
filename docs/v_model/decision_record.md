@@ -3799,7 +3799,7 @@ abstraction leaked in two places:
    `show` would race because the alarm callback ran in a
    separate isolate.
 
-**Decision.** v1.2e (`SYS-100`) collapses the alarm path through
+**Decision.** v1.2e (`SYS-098`) collapses the alarm path through
 `NotificationService.show(ReminderEvent event)` and
 `NotificationService.dismiss(AlarmId id)`. `AlarmScheduler`
 holds a reference to the `NotificationService` singleton and
@@ -3862,7 +3862,7 @@ for two more leaves that the Phase-5 routine executor needed:
    `CallInterceptor.kt` was scaffolded but no `Action` leaf
    dispatched to it.
 
-**Decision.** v1.2f (`SYS-101`, `SYS-102`) extends `Action`
+**Decision.** v1.2f (`SYS-099`, `SYS-100`) extends `Action`
 with the two leaves. `RoutineExecutor._dispatchAction(Action)`
 grows the exhaustive switch by two arms; the compile-time
 exhaustiveness check (`sealed` + Dart 3 pattern matching)
@@ -4118,7 +4118,7 @@ oversight). v1.1k caught this when the user reported
 "sometimes the break is twice as long as other times".
 
 **Decision.** v1.2l (`SYS-109`) ships
-`lib/missions/mission_wrong_attempts.dart` — a shared module
+`lib/missions/mission_attempts.dart` — a shared module
 that owns the "max wrong attempts before take-a-break"
 policy + the take-a-break `SnackBar` + the `Timer`. The
 Math + Type missions that were each tracking their own

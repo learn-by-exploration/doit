@@ -534,71 +534,6 @@ when an alarm fires.
 - `lib/reminders/alarm_scheduler.dart` / `reminder_bridge.dart`:
   covered by the bridge-surface tests.
 
-### v1.2k — WF-022 hard delete with confirm (Phase 11a)
-
-Phase 11a of the v1.2 code-TODO closure (`30-phase
-roadmap`). Closes the B3 item: the edit screen now offers
-a hard-delete affordance with a confirm dialog that names
-the do and warns about completion-log loss.
-
-**What's new**
-
-- **`AddHabitScreen` (edit mode) popup menu** — the menu
-  now exposes a `Delete…` entry only when the screen is in
-  edit mode (`habitId != null`). New-do mode has no menu
-  entry; the only way to discard a new do is to navigate
-  back without saving.
-- **`_confirmAndDelete` flow** — tapping the menu entry
-  opens an `AlertDialog` titled `Delete "<name>"?` with
-  destructive copy ("This will remove the do and its
-  completion log. This cannot be undone."). Cancel keeps
-  the screen and the row intact; Delete calls
-  `DoRepository.instance.deleteById(habitId)` and pops
-  the route with `true`.
-- **Failure-path** — if `deleteById` throws (e.g., a
-  platform DB error), the screen shows a `Delete failed.
-  Please try again.` snackbar and stays mounted so the
-  user can retry without re-typing anything.
-- **Home-screen refresh hook** — `HomeScreen._onTileTap`
-  now `await`s `Navigator.push<bool>`; when the edit
-  screen pops with `true`, the home list refreshes
-  immediately so the deleted tile disappears without
-  waiting for the next `AppLifecycleState.resumed`.
-- **Test-only seams** — `AddHabitScreenState.deleteOverride`
-  (`Future<void> Function(String id)?`) and the public
-  typedef `AddHabitScreenState = _AddHabitScreenState`
-  let widget tests exercise the failure branch without
-  monkey-patching the repository singleton.
-
-**3-gate verification**
-
-```
-$ dart format --output=none --set-exit-if-changed .
-Formatted 199 files (0 changed) in 0.72 seconds.
-
-$ flutter analyze --fatal-infos
-Analyzing doit...
-No issues found! (ran in 1.1s)
-
-$ flutter test
-00:27 +936: All tests passed!
-```
-
-**V-Model traceability** (this PR)
-
-- `WF-028` (test reminder button) — touched.
-- `WF-030` (alarm-fires-this-many-seconds path) — covered.
-- New `SYS-098` candidate: "Alarm fire → notification
-  render path" — the inbound handler that
-  `AlarmReceiver.onReceive` calls via the method channel.
-
-**Deferred** (v1.2 candidates, not closed by v1.2e)
-
-- Strong-mode full-screen launch is best-effort; the Kotlin
-  side's `FullScreenActivity` host is v1.2e-minimal and will
-  be hardened in a follow-up PR that adds the
-  `USE_FULL_SCREEN_INTENT` permission on API 34+ (Phase 6).
-
 ### v1.2f — `ActionFullscreen` + `ActionCallIntercept` real implementations + Person pauseUntil UI + DoFixed weekday display
 
 Phases 6b–6e of the v1.2 code-TODO closure
@@ -664,6 +599,7 @@ items: every `Action` leaf now has a real side effect.
   model-purity rule from
   [`.claude/rules/lib-do.md`](.claude/rules/lib-do.md)
   (no Flutter imports).
+
 ### v1.2g — BOOT_COMPLETED re-arm confirmation + calendar trigger badge coverage closeout
 
 Phase 7 of the v1.2 code-TODO closure (`30-phase roadmap`).
@@ -881,6 +817,154 @@ the menu gating, dialog open, cancel, delete-pop, and
 delete-failure paths; 3-gate green with zero analyzer
 findings.)
 
+### v1.2k — WF-022 hard delete with confirm (Phase 11a)
+
+Phase 11a of the v1.2 code-TODO closure (`30-phase
+roadmap`). Closes the B3 item: the edit screen now offers
+a hard-delete affordance with a confirm dialog that names
+the do and warns about completion-log loss.
+
+**What's new**
+
+- **`AddHabitScreen` (edit mode) popup menu** — the menu
+  now exposes a `Delete…` entry only when the screen is in
+  edit mode (`habitId != null`). New-do mode has no menu
+  entry; the only way to discard a new do is to navigate
+  back without saving.
+- **`_confirmAndDelete` flow** — tapping the menu entry
+  opens an `AlertDialog` titled `Delete "<name>"?` with
+  destructive copy ("This will remove the do and its
+  completion log. This cannot be undone."). Cancel keeps
+  the screen and the row intact; Delete calls
+  `DoRepository.instance.deleteById(habitId)` and pops
+  the route with `true`.
+- **Failure-path** — if `deleteById` throws (e.g., a
+  platform DB error), the screen shows a `Delete failed.
+  Please try again.` snackbar and stays mounted so the
+  user can retry without re-typing anything.
+- **Home-screen refresh hook** — `HomeScreen._onTileTap`
+  now `await`s `Navigator.push<bool>`; when the edit
+  screen pops with `true`, the home list refreshes
+  immediately so the deleted tile disappears without
+  waiting for the next `AppLifecycleState.resumed`.
+- **Test-only seams** — `AddHabitScreenState.deleteOverride`
+  (`Future<void> Function(String id)?`) and the public
+  typedef `AddHabitScreenState = _AddHabitScreenState`
+  let widget tests exercise the failure branch without
+  monkey-patching the repository singleton.
+
+**3-gate verification**
+
+```
+$ dart format --output=none --set-exit-if-changed .
+Formatted 199 files (0 changed) in 0.72 seconds.
+
+$ flutter analyze --fatal-infos
+Analyzing doit...
+No issues found! (ran in 1.1s)
+
+$ flutter test
+00:27 +936: All tests passed!
+```
+
+**V-Model traceability** (this PR)
+
+- `WF-028` (test reminder button) — touched.
+- `WF-030` (alarm-fires-this-many-seconds path) — covered.
+- New `SYS-098` candidate: "Alarm fire → notification
+  render path" — the inbound handler that
+  `AlarmReceiver.onReceive` calls via the method channel.
+
+**Deferred** (v1.2 candidates, not closed by v1.2e)
+
+- Strong-mode full-screen launch is best-effort; the Kotlin
+  side's `FullScreenActivity` host is v1.2e-minimal and will
+  be hardened in a follow-up PR that adds the
+  `USE_FULL_SCREEN_INTENT` permission on API 34+ (Phase 6).
+
+### v1.2l — WF-030 uniform 3-wrong take-a-break (Phase 11b)
+
+Phase 11b of the v1.2 code-TODO closure (`30-phase
+roadmap`). Closes the B2 item: every mission that tracks
+"wrong attempt" semantics now uses the same counter, the
+same nudge copy, and the same auto-fail threshold — the
+user never sees a behavior gap between Math and Type.
+
+**What's new**
+
+- **`MissionWrongAttempts`** (`lib/missions/mission_attempts.dart`,
+  pure Dart, no Flutter) — a tiny state container with
+  `recordWrong()` (returns `true` when the caller should
+  auto-fail), `errorLabel()` (returns the inline error
+  string for the current state), `remaining`, `wrongCount`,
+  and `budgetExhausted`. The constant `kMissionMaxWrongAttempts = 3`
+  is the single source of truth (overridable per-instance
+  via the `maxWrong` constructor arg).
+- **`Math` and `Type` mission screens** — both replaced
+  their inline `_wrongCount` field with `MissionWrongAttempts`.
+  Both surface the shared copy `"Wrong. N attempt(s) left."`
+  for the first two attempts and `"Take a break. The mission
+  will end."` (the `missionTakeBreakNudge` constant) on
+  the third / final attempt, then pop with `null` to
+  auto-fail the chain.
+- **Out of scope for this PR** — Shake, Hold, and Memory
+  do not have a "wrong attempt" notion (they time-out
+  instead of failing per-attempt). The shared module is
+  documented as opt-in for any future mission kind.
+
+**3-gate verification (consolidated for v1.2l + v1.2m)**
+
+```
+$ dart format --output=none --set-exit-if-changed .
+Formatted 215 files (0 changed) in 0.76 seconds.
+$ flutter analyze --fatal-infos
+No issues found! (ran in 1.1s)
+$ flutter test
+00:24 +1001: All tests passed!
+```
+
+(Test count: 984 → 1001 — 9 unit tests for
+`MissionWrongAttempts` (constant, getter/setter, error-label,
+custom-maxWrong, nudge-copy) + 2 widget tests on the Type
+mission (auto-fail on 3rd wrong + per-attempt label
+decrement) + 5 widget tests on `CompletionLogSection`
+(empty-state, populated + sort order, dialog open, cancel,
+confirm + snackbar + DB removal); 3-gate green with zero
+analyzer findings.)
+
+### v1.2m — WF-025 edit completion log (Phase 11c)
+
+Phase 11c of the v1.2 code-TODO closure (`30-phase
+roadmap`). Closes the B6 item: the user can now review and
+undo an accidental completion from the edit-habit screen
+without leaving the screen. The completion log is the
+source of truth for streak calculation, so this also gives
+the user the simplest recovery path when a wrong-day
+completion is the cause of a streak break.
+
+**What's new**
+
+- **`CompletionLogSection`** (`lib/widgets/completion_log_section.dart`,
+  new StatefulWidget) — renders the most-recent
+  `kCompletionLogSectionMaxRows = 30` completions for the
+  habit as a list. Each row shows the day, the completion
+  time, and the source (`manual` / `notification` /
+  `mission` / `rest_day`); a trailing delete icon opens
+  a confirm dialog. Empty log shows `"No completions yet."`;
+  an older-row cap of 30 keeps the section scannable on a
+  dense streak and surfaces `"N older entries are hidden."`
+  below the list when the cap hides rows.
+- **`AddHabitScreen` (edit mode)** — the new section is
+  rendered after the pause row, separated by a `Divider`,
+  only in the `_isEdit` branch. A successful delete shows
+  a `"Completion removed."` snackbar; a failure shows
+  `"Could not delete entry."` (no row removed).
+- **Soft tone, no streak-shaming** — the dialog copy is
+  `"Delete this completion?"` followed by a row description
+  that ends with `"This will shorten your streak by one
+  day."` (honest; not punitive). The cancel button is
+  the default action visually; the destructive button
+  reuses the theme's error color.
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 
 do it is no longer about streaks. Phase A renames the
@@ -1231,90 +1315,6 @@ runtime prompt) — the foreground-app trigger fires on a
 best-effort basis without the permission and the debug
 screen shows a banner explaining the degraded mode
 (v1.1 follow-up; needs a separate SYS- ID and ADR).
-
-### v1.2m — WF-025 edit completion log (Phase 11c)
-
-Phase 11c of the v1.2 code-TODO closure (`30-phase
-roadmap`). Closes the B6 item: the user can now review and
-undo an accidental completion from the edit-habit screen
-without leaving the screen. The completion log is the
-source of truth for streak calculation, so this also gives
-the user the simplest recovery path when a wrong-day
-completion is the cause of a streak break.
-
-**What's new**
-
-- **`CompletionLogSection`** (`lib/widgets/completion_log_section.dart`,
-  new StatefulWidget) — renders the most-recent
-  `kCompletionLogSectionMaxRows = 30` completions for the
-  habit as a list. Each row shows the day, the completion
-  time, and the source (`manual` / `notification` /
-  `mission` / `rest_day`); a trailing delete icon opens
-  a confirm dialog. Empty log shows `"No completions yet."`;
-  an older-row cap of 30 keeps the section scannable on a
-  dense streak and surfaces `"N older entries are hidden."`
-  below the list when the cap hides rows.
-- **`AddHabitScreen` (edit mode)** — the new section is
-  rendered after the pause row, separated by a `Divider`,
-  only in the `_isEdit` branch. A successful delete shows
-  a `"Completion removed."` snackbar; a failure shows
-  `"Could not delete entry."` (no row removed).
-- **Soft tone, no streak-shaming** — the dialog copy is
-  `"Delete this completion?"` followed by a row description
-  that ends with `"This will shorten your streak by one
-  day."` (honest; not punitive). The cancel button is
-  the default action visually; the destructive button
-  reuses the theme's error color.
-
-### v1.2l — WF-030 uniform 3-wrong take-a-break (Phase 11b)
-
-Phase 11b of the v1.2 code-TODO closure (`30-phase
-roadmap`). Closes the B2 item: every mission that tracks
-"wrong attempt" semantics now uses the same counter, the
-same nudge copy, and the same auto-fail threshold — the
-user never sees a behavior gap between Math and Type.
-
-**What's new**
-
-- **`MissionWrongAttempts`** (`lib/missions/mission_attempts.dart`,
-  pure Dart, no Flutter) — a tiny state container with
-  `recordWrong()` (returns `true` when the caller should
-  auto-fail), `errorLabel()` (returns the inline error
-  string for the current state), `remaining`, `wrongCount`,
-  and `budgetExhausted`. The constant `kMissionMaxWrongAttempts = 3`
-  is the single source of truth (overridable per-instance
-  via the `maxWrong` constructor arg).
-- **`Math` and `Type` mission screens** — both replaced
-  their inline `_wrongCount` field with `MissionWrongAttempts`.
-  Both surface the shared copy `"Wrong. N attempt(s) left."`
-  for the first two attempts and `"Take a break. The mission
-  will end."` (the `missionTakeBreakNudge` constant) on
-  the third / final attempt, then pop with `null` to
-  auto-fail the chain.
-- **Out of scope for this PR** — Shake, Hold, and Memory
-  do not have a "wrong attempt" notion (they time-out
-  instead of failing per-attempt). The shared module is
-  documented as opt-in for any future mission kind.
-
-**3-gate verification (consolidated for v1.2l + v1.2m)**
-
-```
-$ dart format --output=none --set-exit-if-changed .
-Formatted 215 files (0 changed) in 0.76 seconds.
-$ flutter analyze --fatal-infos
-No issues found! (ran in 1.1s)
-$ flutter test
-00:24 +1001: All tests passed!
-```
-
-(Test count: 984 → 1001 — 9 unit tests for
-`MissionWrongAttempts` (constant, getter/setter, error-label,
-custom-maxWrong, nudge-copy) + 2 widget tests on the Type
-mission (auto-fail on 3rd wrong + per-attempt label
-decrement) + 5 widget tests on `CompletionLogSection`
-(empty-state, populated + sort order, dialog open, cancel,
-confirm + snackbar + DB removal); 3-gate green with zero
-analyzer findings.)
 
 ### v1.0/Phase B — Templates (curated library + save-as-template)
 
