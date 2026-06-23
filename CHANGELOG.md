@@ -545,19 +545,6 @@ the do and warns about completion-log loss.
 
 ```
 $ dart format --output=none --set-exit-if-changed .
-<<<<<<< HEAD
-Formatted 211 files (0 changed) in 0.74 seconds.
-$ flutter analyze --fatal-infos
-No issues found! (ran in 1.3s)
-$ flutter test
-00:22 +984: All tests passed!
-```
-
-(Test count: 978 → 984 — 6 new widget tests covering
-the menu gating, dialog open, cancel, delete-pop, and
-delete-failure paths; 3-gate green with zero analyzer
-findings.)
-=======
 Formatted 199 files (0 changed) in 0.72 seconds.
 
 $ flutter analyze --fatal-infos
@@ -852,7 +839,18 @@ banner subsystem:
   Dart side does NOT call `DateTime.now()` directly —
   the caller passes the reference time so the method
   is unit-testable.
->>>>>>> origin/main
+
+Formatted 211 files (0 changed) in 0.74 seconds.
+$ flutter analyze --fatal-infos
+No issues found! (ran in 1.3s)
+$ flutter test
+00:22 +984: All tests passed!
+```
+
+(Test count: 978 → 984 — 6 new widget tests covering
+the menu gating, dialog open, cancel, delete-pop, and
+delete-failure paths; 3-gate green with zero analyzer
+findings.)
 
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 
@@ -1205,6 +1203,41 @@ best-effort basis without the permission and the debug
 screen shows a banner explaining the degraded mode
 (v1.1 follow-up; needs a separate SYS- ID and ADR).
 
+<<<<<<< HEAD
+### v1.2m — WF-025 edit completion log (Phase 11c)
+
+Phase 11c of the v1.2 code-TODO closure (`30-phase
+roadmap`). Closes the B6 item: the user can now review and
+undo an accidental completion from the edit-habit screen
+without leaving the screen. The completion log is the
+source of truth for streak calculation, so this also gives
+the user the simplest recovery path when a wrong-day
+completion is the cause of a streak break.
+
+**What's new**
+
+- **`CompletionLogSection`** (`lib/widgets/completion_log_section.dart`,
+  new StatefulWidget) — renders the most-recent
+  `kCompletionLogSectionMaxRows = 30` completions for the
+  habit as a list. Each row shows the day, the completion
+  time, and the source (`manual` / `notification` /
+  `mission` / `rest_day`); a trailing delete icon opens
+  a confirm dialog. Empty log shows `"No completions yet."`;
+  an older-row cap of 30 keeps the section scannable on a
+  dense streak and surfaces `"N older entries are hidden."`
+  below the list when the cap hides rows.
+- **`AddHabitScreen` (edit mode)** — the new section is
+  rendered after the pause row, separated by a `Divider`,
+  only in the `_isEdit` branch. A successful delete shows
+  a `"Completion removed."` snackbar; a failure shows
+  `"Could not delete entry."` (no row removed).
+- **Soft tone, no streak-shaming** — the dialog copy is
+  `"Delete this completion?"` followed by a row description
+  that ends with `"This will shorten your streak by one
+  day."` (honest; not punitive). The cancel button is
+  the default action visually; the destructive button
+  reuses the theme's error color.
+=======
 ### v1.2l — WF-030 uniform 3-wrong take-a-break (Phase 11b)
 
 Phase 11b of the v1.2 code-TODO closure (`30-phase
@@ -1234,11 +1267,25 @@ user never sees a behavior gap between Math and Type.
   do not have a "wrong attempt" notion (they time-out
   instead of failing per-attempt). The shared module is
   documented as opt-in for any future mission kind.
+>>>>>>> origin/main
 
 **3-gate verification**
 
 ```
 $ dart format --output=none --set-exit-if-changed .
+<<<<<<< HEAD
+Formatted 215 files (0 changed) in 0.76 seconds.
+$ flutter analyze --fatal-infos
+No issues found! (ran in 1.1s)
+$ flutter test
+00:24 +1001: All tests passed!
+```
+
+(Test count: 995 → 1001 — 5 widget tests on
+`CompletionLogSection` (empty-state, populated + sort
+order, dialog open, cancel, confirm + snackbar + DB
+removal); 3-gate green with zero analyzer findings.)
+=======
 Formatted 213 files (0 changed) in 0.77 seconds.
 $ flutter analyze --fatal-infos
 No issues found! (ran in 1.1s)
@@ -1253,6 +1300,7 @@ mission (auto-fail on 3rd wrong + per-attempt label
 decrement); the 3 existing Math widget tests are unchanged
 but now exercise the shared module; 3-gate green with zero
 analyzer findings.)
+>>>>>>> origin/main
 
 ### v1.0/Phase B — Templates (curated library + save-as-template)
 

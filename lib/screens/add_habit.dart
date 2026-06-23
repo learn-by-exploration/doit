@@ -42,6 +42,7 @@ import 'package:doit/widgets/calendar_picker.dart';
 import 'package:doit/widgets/icon_picker.dart';
 import 'package:doit/widgets/location_picker.dart';
 import 'package:doit/widgets/automation_reliability_badge.dart';
+import 'package:doit/widgets/completion_log_section.dart';
 
 class AddHabitScreen extends StatefulWidget {
   const AddHabitScreen({super.key, this.habitId, this.initialPayload});
@@ -379,6 +380,13 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
                 onPick: _pickPauseUntil,
                 onClear: () => setState(() => _pausedUntil = null),
               ),
+              const SizedBox(height: Spacing.lg),
+              const Divider(),
+              // v1.2m (WF-025) — let the user undo an accidental
+              // completion without leaving the edit screen. The
+              // section is rendered ONLY in edit mode (the
+              // completion log is meaningless for a brand-new do).
+              CompletionLogSection(habitId: widget.habitId!),
             ],
           ],
         ),
