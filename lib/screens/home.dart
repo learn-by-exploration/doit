@@ -26,6 +26,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:doit/do/do.dart';
+import 'package:doit/do/do_description.dart';
 import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/do_repository.dart';
@@ -347,7 +348,7 @@ class _HabitTile extends StatelessWidget {
                       ),
                       const SizedBox(height: Spacing.xs),
                       Text(
-                        _describe(habit),
+                        describeDo(habit),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       if (habit is DoTimeWindow)
@@ -376,16 +377,6 @@ class _HabitTile extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _describe(Do h) {
-    return switch (h) {
-      DoFixed() => 'Fixed — ${h.time}',
-      DoInterval() => 'Every ${h.nDays} days',
-      DoAnchor() => 'Anchor',
-      DoDayOfX() => 'Day-of-X',
-      DoTimeWindow() => 'Window — ${h.start}–${h.end}',
-    };
   }
 }
 

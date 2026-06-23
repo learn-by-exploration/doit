@@ -44,6 +44,8 @@ import 'package:doit/triggers/trigger.dart'
         TriggerCallIncomingKnownContact,
         TriggerCallIncomingUnknownContact;
 
+import 'package:doit/triggers/action.dart' show CallInterceptDecision;
+
 // ---------------------------------------------------------------------------
 // Event surface
 // ---------------------------------------------------------------------------
@@ -236,6 +238,17 @@ abstract class CallSource {
   /// [isCallScreeningRoleHeld] when the user returns to the
   /// Settings screen.
   Future<bool> requestCallScreeningRole();
+
+  /// v1.2f / Phase 6: record a routine's
+  /// [CallInterceptDecision] for analytics / debug. Called
+  /// from `RoutineExecutor._dispatchAction` when an
+  /// `ActionCallIntercept` arm fires. The Kotlin
+  /// `CallScreeningService` already routed the call (the
+  /// decision is a no-op for the ringer); this method is
+  /// the post-call hook for the routine engine to surface
+  /// what it would have done. Does NOT touch the ringer
+  /// (ADR-019).
+  Future<void> recordRoutineDecision(CallInterceptDecision decision);
 }
 
 /// Production source: talks to the `doit/call_interceptor`
@@ -395,6 +408,19 @@ class _MethodChannelCallSource implements CallSource {
       return false;
     }
   }
+
+  @override
+  Future<void> recordRoutineDecision(CallInterceptDecision decision) async {
+    try {
+      await _channel.invokeMethod<void>('recordRoutineDecision', {
+        'decision': decision.name,
+      });
+    } on MissingPluginException catch (e) {
+      if (kDebugMode) {
+        debugPrint('CallSource.recordRoutineDecision: $e');
+      }
+    }
+  }
 }
 
 /// Test source: a hand-driven [StreamController] the unit
@@ -440,6 +466,12 @@ class ScriptedCallSource implements CallSource {
 
   /// Number of [requestCallScreeningRole] calls.
   int requestCallScreeningRoleCalls = 0;
+
+  /// v1.2f / Phase 6: every
+  /// [recordRoutineDecision] call (in invocation order).
+  /// `null` = never called.
+  final List<CallInterceptDecision> routineDecisions =
+      <CallInterceptDecision>[];
 
   /// Push an event to listeners. Mirrors the Kotlin
   /// `pushCallEvent` path.
@@ -493,6 +525,11 @@ class ScriptedCallSource implements CallSource {
   Future<bool> requestCallScreeningRole() async {
     requestCallScreeningRoleCalls++;
     return scriptedRoleRequestGranted;
+  }
+
+  @override
+  Future<void> recordRoutineDecision(CallInterceptDecision decision) async {
+    routineDecisions.add(decision);
   }
 }
 
@@ -602,6 +639,17 @@ class CallInterceptorService {
   Future<bool> requestCallScreeningRole() async {
     await ready;
     return _source!.requestCallScreeningRole();
+  }
+
+  /// v1.2f / Phase 6: post-call hook for the routine
+  /// engine. `RoutineExecutor._dispatchAction` calls this
+  /// when an `ActionCallIntercept` arm fires; the call is
+  /// already routed by the Kotlin `CallScreeningService`,
+  /// so the executor surfaces its decision for analytics /
+  /// debug. Does NOT touch the ringer (ADR-019).
+  Future<void> recordRoutineDecision(CallInterceptDecision decision) async {
+    await ready;
+    await _source!.recordRoutineDecision(decision);
   }
 
   /// Inject a source for tests. The default constructor

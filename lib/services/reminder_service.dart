@@ -19,6 +19,8 @@ import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/reminders/full_screen_intent.dart';
 import 'package:doit/reminders/notification_service.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
+import 'package:doit/services/do_repository.dart';
+import 'package:doit/services/event_repository.dart';
 import 'package:meta/meta.dart';
 
 @immutable
@@ -116,6 +118,67 @@ class ReminderService {
     await scheduler.rescheduleAll();
   }
 
+  /// v1.2j / Phase 10 / SYS-107. Schedules the 5-minute +
+  /// 1-minute pre-alarm heads-up pair for a reminder that
+  /// will fire at [fireAt]. Each pre-alarm is a one-shot
+  /// `WorkManager` task on the platform side that posts a
+  /// low-importance notification on the same
+  /// `doit.reminders` channel. The actual [alarmId] alarm
+  /// fires later as usual; the heads-up is purely
+  /// advisory.
+  ///
+  /// The caller passes the `alarmId` (assigned by the
+  /// scheduler) and the absolute `fireAt` epoch ms. The
+  /// service derives the lead times from `fireAt` minus
+  /// `now` and only enqueues heads-ups that land in the
+  /// future (a heads-up at `fireAt - 5 minutes` is a no-op
+  /// if `fireAt` is only 3 minutes away — the 5-minute
+  /// heads-up is silently skipped). The Dart side does NOT
+  /// call `DateTime.now()` directly — the caller passes
+  /// the reference time so this method is testable.
+  Future<void> schedulePreAlarms({
+    required AlarmId alarmId,
+    required DateTime fireAt,
+    required DateTime now,
+  }) async {
+    await _ready.future;
+    final lead5 = fireAt.difference(now);
+    final lead1 = lead5;
+    if (lead5.inSeconds > 5 * 60) {
+      try {
+        await bridge.schedulePreAlarm(
+          alarmId: alarmId.value,
+          leadTimeSeconds: 5 * 60,
+        );
+      } catch (_) {
+        /* ADR-013 */
+      }
+    }
+    if (lead1.inSeconds > 60) {
+      try {
+        await bridge.schedulePreAlarm(
+          alarmId: alarmId.value,
+          leadTimeSeconds: 60,
+        );
+      } catch (_) {
+        /* ADR-013 */
+      }
+    }
+  }
+
+  /// v1.2j / Phase 10 / SYS-107. Cancel every pending
+  /// pre-alarm heads-up for [alarmId]. Called from
+  /// [cancel] (the user dismissed the underlying alarm)
+  /// and from the habit-completion flow.
+  Future<void> cancelPreAlarms(AlarmId alarmId) async {
+    await _ready.future;
+    try {
+      await bridge.cancelPreAlarms(alarmId.value);
+    } catch (_) {
+      /* ADR-013 */
+    }
+  }
+
   /// Probe and cache the current reliability state.
   Future<Reliability> probeReliability() async {
     await _ready.future;
@@ -140,6 +203,101 @@ class ReminderService {
   Future<void> cancelTestReminder() async {
     await _ready.future;
     await scheduler.cancelForHabit('doit.test_reminder');
+  }
+
+  /// v1.2e / Phase 5: handler for the inbound `fireAlarm`
+  /// call from the Kotlin `AlarmReceiver`. Looks up the
+  /// scheduled entry, renders the notification (or
+  /// full-screen intent for strong-mode habits), then
+  /// either re-schedules the next habit occurrence or
+  /// archives a one-shot event.
+  ///
+  /// Returns normally if the entry is unknown (the mirror
+  /// was cleared by `rescheduleAll` and the Kotlin side
+  /// has not round-tripped a re-arming schedule yet — the
+  /// notification is silently skipped; reliability is
+  /// unaffected).
+  Future<void> onFireAlarm(AlarmId id) async {
+    await _ready.future;
+    final ScheduledAlarm? entry = await scheduler.lookupForFire(id);
+    if (entry == null) {
+      // Mirror was cleared. The Kotlin side will re-arm
+      // via rescheduleAll() on the next boot; nothing to
+      // do here.
+      return;
+    }
+
+    // Event-fired alarms are one-shot: archive and
+    // show. The strong-mode bit is unused (events do
+    // not have proof modes); the entry's `habitName`
+    // carries the event's display name.
+    final eventId = entry.eventId;
+    if (eventId != null) {
+      await notifications.show(
+        ReminderEvent(
+          habitId: entry.habitId,
+          habitName: entry.habitName ?? eventId,
+          at: entry.at,
+          alarmId: id,
+        ),
+      );
+      await EventRepository.instance.archive(eventId, DateTime.now());
+      return;
+    }
+
+    // Habit-fired alarm: render the notification (or
+    // full-screen intent for strong-mode), then queue
+    // the next occurrence.
+    final strong = entry.strongMode;
+    await notifications.show(
+      ReminderEvent(
+        habitId: entry.habitId,
+        habitName: entry.habitName ?? entry.habitId,
+        at: entry.at,
+        alarmId: id,
+        strongMode: strong,
+      ),
+    );
+
+    if (strong) {
+      // Strong-mode also opens the full-screen mission
+      // route. The Kotlin side does the actual launch on
+      // a separate signal; this call here is a
+      // best-effort hint so the Dart side can preload
+      // the mission UI before the activity opens.
+      final habit = await DoRepository.instance.getById(entry.habitId);
+      final mode = habit?.proofMode;
+      if (habit != null && mode is StrongProof) {
+        await fullScreen.show(habit, mode.chain);
+      }
+    }
+
+    final habit = await DoRepository.instance.getById(entry.habitId);
+    if (habit != null) {
+      final next = habit.nextOccurrence(entry.at);
+      if (next != null) {
+        await scheduler.schedule(habit, next);
+      }
+    }
+  }
+
+  /// `ReminderInbound` adapter — wires the
+  /// [PlatformReminderBridge] dispatch table to
+  /// [onFireAlarm]. Used from `main.dart`:
+  ///
+  /// ```dart
+  /// final bridge = PlatformReminderBridge(
+  ///   inbound: ReminderService.fireAlarmInbound,
+  /// )..install();
+  /// ```
+  ///
+  /// `rescheduleAll` is NOT routed through here; the
+  /// service exposes a public [rescheduleAll] the caller
+  /// wires to a separate callback if needed. Today the
+  /// Kotlin `BootReceiver` triggers rescheduleAll via
+  /// the bridge's own public method.
+  static Future<void> fireAlarmInbound(int alarmId) async {
+    await _instance?.onFireAlarm(AlarmId(alarmId));
   }
 
   /// A synthetic [DoFixed] used by the "Test reminder" button.
