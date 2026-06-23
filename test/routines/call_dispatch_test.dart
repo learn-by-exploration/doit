@@ -280,10 +280,11 @@ void main() {
     await sub.cancel();
   });
 
-  // ── ActionCallIntercept is a no-op on the executor side ───────
+  // ── ActionCallIntercept: routine decision recorded, ringer
+  // unchanged (v1.2f / Phase 6). ────────────────────────────────
 
-  test('ActionCallIntercept fires AutomationFired but does not touch the '
-      'ringer', () async {
+  test('ActionCallIntercept fires AutomationFired, records the decision, '
+      'and does not touch the ringer', () async {
     executor.register('do-1', [interceptTrigger()]);
     final fired = <AutomationFired>[];
     final sub = executor.events.listen(fired.add);
@@ -293,9 +294,11 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(fired, hasLength(1));
-    // No ringer change — ActionCallIntercept is a no-op on the
-    // executor side; the Kotlin screening service already routed
-    // the call.
+    // v1.2f / Phase 6: the executor now records the routine
+    // decision on the call service (analytics / debug).
+    expect(source.routineDecisions, hasLength(1));
+    // ADR-019: the ringer is unchanged — the Kotlin screening
+    // service already routed the call.
     expect(source.lastRingerMode, isNull);
     await sub.cancel();
   });

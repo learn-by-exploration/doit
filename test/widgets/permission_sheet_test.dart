@@ -89,6 +89,16 @@ class _RecordingBridge implements ReminderBridge {
   }
 
   @override
+  Future<void> showNotification({
+    required int alarmId,
+    required String habitName,
+    String? body,
+    bool strongMode = false,
+  }) async {}
+
+  @override
+  Future<void> cancelNotification(int alarmId) async {}
+
   Future<void> schedulePreAlarm({
     required int alarmId,
     required int leadTimeSeconds,
