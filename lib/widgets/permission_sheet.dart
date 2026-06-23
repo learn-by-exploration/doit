@@ -98,6 +98,14 @@ const Map<PermissionKind, _KindMeta> _meta = <PermissionKind, _KindMeta>{
         '(coming in v1.2). Android does not show a popup for this — '
         'you will need to toggle do it on in the next screen.',
   ),
+  PermissionKind.callScreening: _KindMeta(
+    title: 'Call screening',
+    icon: Icons.call_outlined,
+    rationale:
+        'Lets do it intercept incoming calls so it can silence the '
+        'ringer on contacts you choose. Android will ask you to '
+        'confirm do it as the call-screening app.',
+  ),
 };
 
 /// Public surface. Returns `true` when the permission is
@@ -216,6 +224,22 @@ class _PermissionSheetBodyState extends State<_PermissionSheetBody> {
             ? const PermissionResultDenied(canOpenSettings: true)
             : const PermissionResultPermanentlyDenied();
         break;
+      case PermissionKind.callScreening:
+        // v1.2 / SYS-075 + SYS-079 follow-up.
+        // `ROLE_CALL_SCREENING` is a system role held via
+        // `RoleManager.createRequestRoleIntent`. The "Allow"
+        // CTA fires the role-request flow; the OS dialog is
+        // asynchronous — callers re-probe via
+        // `refreshCallScreening` when the app resumes. The
+        // return value is "true if the launch resolved";
+        // map the success path to denied(canOpenSettings: true)
+        // so the sheet closes and the user sees the role
+        // chip on the Settings tile when they come back.
+        final opened = await PermissionService.instance.requestCallScreening();
+        result = opened
+            ? const PermissionResultDenied(canOpenSettings: true)
+            : const PermissionResultPermanentlyDenied();
+        break;
       case PermissionKind.backupFolder:
         // The SAF picker is handled by `requestBackupFolder`;
         // the sheet is never shown for this kind because
@@ -291,6 +315,17 @@ class _PermissionSheetBodyState extends State<_PermissionSheetBody> {
         await svc.refreshUsageStats();
         result =
             svc.statuses.value[PermissionKind.usageStats] ??
+            const PermissionResultDenied(canOpenSettings: true);
+        break;
+      case PermissionKind.callScreening:
+        // v1.2 / SYS-075 + SYS-079 follow-up. The OS role
+        // picker is asynchronous; we fire the role flow and
+        // re-probe. If the role is now held, the result is
+        // `granted`; otherwise it stays `denied`.
+        await svc.requestCallScreening();
+        await svc.refreshCallScreening();
+        result =
+            svc.statuses.value[PermissionKind.callScreening] ??
             const PermissionResultDenied(canOpenSettings: true);
         break;
       case PermissionKind.backupFolder:

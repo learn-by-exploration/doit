@@ -1,11 +1,13 @@
 // Unit tests for the Trigger sealed hierarchy.
 //
-// Covers the six top-level kinds and their inner leaves:
+// Covers the seven top-level kinds and their inner leaves:
 //   - TriggerTimeOfDay
 //   - TriggerLocationEnter / TriggerLocationExit
 //   - TriggerDeviceState (7 leaves)
 //   - TriggerCalendarEvent (4 leaves)
 //   - TriggerCallIncoming (3 leaves)
+//   - TriggerForegroundApp (v1.2 addition — SYS-086 / ADR-030
+//     follow-up; gated by `PermissionKind.usageStats`).
 // Plus the SilentMode enum.
 
 import 'package:doit/triggers/trigger.dart';
@@ -217,6 +219,71 @@ void main() {
       for (final l in leaves) {
         expect(l.validate(), same(l));
       }
+    });
+  });
+
+  group('TriggerForegroundApp (v1.2 / SYS-086 follow-up)', () {
+    test('validates a typical Android package id', () {
+      const t = TriggerForegroundApp(
+        packageName: 'com.instagram.android',
+        label: 'Instagram',
+      );
+      expect(t.validate(), same(t));
+      expect(t.packageName, 'com.instagram.android');
+      expect(t.label, 'Instagram');
+    });
+
+    test('accepts an empty label (label is UI-only)', () {
+      const t = TriggerForegroundApp(packageName: 'com.example.app');
+      expect(t.validate(), same(t));
+      expect(t.label, '');
+    });
+
+    test('rejects empty / whitespace-only packageName', () {
+      expect(
+        () => const TriggerForegroundApp(packageName: '').validate(),
+        throwsA(isA<TriggerForegroundAppEmptyPackage>()),
+      );
+      expect(
+        () => const TriggerForegroundApp(packageName: '   ').validate(),
+        throwsA(isA<TriggerForegroundAppEmptyPackage>()),
+      );
+    });
+
+    test('rejects packageName without a "." (not a valid Android id)', () {
+      expect(
+        () => const TriggerForegroundApp(packageName: 'instagram').validate(),
+        throwsA(isA<TriggerForegroundAppInvalidPackage>()),
+      );
+    });
+
+    test('equality is on packageName only (label is UI-only)', () {
+      const a = TriggerForegroundApp(
+        packageName: 'com.example.app',
+        label: 'Foo',
+      );
+      const b = TriggerForegroundApp(
+        packageName: 'com.example.app',
+        label: 'Bar',
+      );
+      const c = TriggerForegroundApp(
+        packageName: 'com.other.app',
+        label: 'Foo',
+      );
+      expect(a, equals(b));
+      expect(a, isNot(equals(c)));
+      expect(a.hashCode, b.hashCode);
+    });
+
+    test('rejects malformed shape via Automation.validate chain', () {
+      // Catches the runtime path that calls
+      // `trigger.validate()` from the executor (rather than
+      // the leaf's own `validate()`).
+      const malformed = TriggerForegroundApp(packageName: '');
+      expect(
+        () => malformed.validate(),
+        throwsA(isA<TriggerForegroundAppEmptyPackage>()),
+      );
     });
   });
 

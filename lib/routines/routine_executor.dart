@@ -52,6 +52,19 @@ import 'package:doit/triggers/trigger.dart'
         TriggerChargingStarted,
         TriggerChargingStopped,
         TriggerDeviceState,
+        // TriggerForegroundApp is intentionally shown here so
+        // the import block stays exhaustive with the sealed
+        // [Trigger] hierarchy. The actual dispatch path
+        // (`_onForegroundApp` over a future
+        // `DeviceStateService.events` `ForegroundAppChanged`
+        // stream) is a v1.2 follow-up — see
+        // `lib/triggers/trigger.dart` § 7 for the trigger
+        // spec and `lib/routines/automation_reliability.dart`
+        // for the reliability mapping. Suppress the
+        // `unused_shown_name` lint because the import is the
+        // contract.
+        // ignore: unused_shown_name
+        TriggerForegroundApp,
         TriggerFreeBusy,
         TriggerHeadphoneConnected,
         TriggerHeadphoneDisconnected,

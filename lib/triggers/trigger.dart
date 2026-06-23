@@ -2,7 +2,7 @@
 // Trigger / Condition / Action spine.
 //
 // A Trigger is the *event source* for a non-time-fired
-// automation. Per the Phase C PR 1 spec, there are six
+// automation. Per the Phase C PR 1 spec, there are seven
 // top-level kinds:
 //
 //   - TimeOfDay            — fires at a wall-clock time.
@@ -15,6 +15,20 @@
 //                            free-busy).
 //   - CallIncoming         — sealed inner (any / known
 //                            contact / unknown contact).
+//   - ForegroundApp        — v1.2 addition (SYS-086 / ADR-030
+//                            follow-up): fires when the user
+//                            opens a configured app. Gated by
+//                            the special-access
+//                            `PACKAGE_USAGE_STATS` permission
+//                            (PermissionKind.usageStats). The
+//                            matching engine watches the
+//                            `DeviceStateService.events` stream
+//                            for `ForegroundAppChanged`
+//                            snapshots; the predicate in
+//                            `routine_executor.dart` filters on
+//                            [packageName]. The shape is fixed
+//                            (no sealed inner) because the
+//                            matching surface is one app id.
 //
 // Each leaf implements a `validate()` for the cheap
 // invariant checks; runtime evaluation lives in
@@ -31,7 +45,7 @@
 
 import 'package:meta/meta.dart';
 
-/// Sealed base for the six trigger kinds. Add a new trigger
+/// Sealed base for the seven trigger kinds. Add a new trigger
 /// by adding a new subclass here (and a corresponding case in
 /// `RoutineExecutor.dispatch`).
 @immutable
@@ -382,6 +396,82 @@ final class TriggerCallIncomingUnknownContact extends TriggerCallIncoming {
 }
 
 // ---------------------------------------------------------------------------
+// 7. ForegroundApp — fires when the user opens a configured app.
+//
+// v1.2 addition. The match is exact on [packageName]
+// (e.g., `com.instagram.android`). The OS only reports the
+// foreground transition if the user has granted the
+// special-access `PACKAGE_USAGE_STATS` permission
+// (PermissionKind.usageStats); the v1.2 reliability badge
+// reads that kind's status and falls back to `degraded`
+// when the grant is missing. Until the device-state probe
+// wires the `ForegroundAppChanged` event (a v1.2 follow-up),
+// this trigger cannot fire on real hardware — the model
+// ships now so the routine executor / reliability code
+// stays exhaustive, and so the templates picker can show
+// the leaf as a planning placeholder.
+// ---------------------------------------------------------------------------
+
+/// Fires when the user opens the app whose Android package
+/// name equals [packageName]. The label is UI-only
+/// (rendered in the routine row + the trigger editor);
+/// equality is on [packageName] alone (case-sensitive, as
+/// the OS reports it).
+///
+/// Validation rules (see [validate]):
+///   - `packageName` MUST be non-empty after trim.
+///   - `packageName` MUST contain at least one `.` (a
+///     bare name like `instagram` is not a valid Android
+///     package id and would never match an OS event).
+///
+/// The trigger does NOT validate that the package is
+/// installed on the device — the OS may not have a record
+/// of an app the user has never opened. The matching
+/// engine treats "package not installed" as "no event,
+/// never fires" (the predicate returns `false` on every
+/// `ForegroundAppChanged` snapshot, silently).
+@immutable
+final class TriggerForegroundApp extends Trigger {
+  const TriggerForegroundApp({required this.packageName, this.label = ''});
+
+  /// Android package id (e.g., `com.instagram.android`).
+  /// Compared case-sensitively against the platform's
+  /// foreground-app reports.
+  final String packageName;
+
+  /// Human-readable label ("Instagram"). UI-only; not part
+  /// of [==] / [hashCode] so re-saving the same package
+  /// under a fresh label does not duplicate the
+  /// automation.
+  final String label;
+
+  @override
+  TriggerForegroundApp validate() {
+    if (packageName.trim().isEmpty) {
+      throw const TriggerForegroundAppEmptyPackage();
+    }
+    if (!packageName.contains('.')) {
+      throw TriggerForegroundAppInvalidPackage(packageName);
+    }
+    return this;
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! TriggerForegroundApp) return false;
+    return packageName == other.packageName;
+  }
+
+  @override
+  int get hashCode => packageName.hashCode;
+
+  @override
+  String toString() =>
+      'TriggerForegroundApp(packageName: $packageName, label: $label)';
+}
+
+// ---------------------------------------------------------------------------
 // SilentMode enum — shared by Trigger* and ActionOverrideSilent.
 // ---------------------------------------------------------------------------
 
@@ -455,4 +545,17 @@ final class TriggerBatteryInvalidPercent extends TriggerValidationException {
   const TriggerBatteryInvalidPercent(this.value)
     : super('percent must be in 0..100.');
   final int value;
+}
+
+final class TriggerForegroundAppEmptyPackage
+    extends TriggerValidationException {
+  const TriggerForegroundAppEmptyPackage()
+    : super('packageName must be non-empty (trimmed).');
+}
+
+final class TriggerForegroundAppInvalidPackage
+    extends TriggerValidationException {
+  const TriggerForegroundAppInvalidPackage(this.value)
+    : super('packageName must contain at least one ".".');
+  final String value;
 }
