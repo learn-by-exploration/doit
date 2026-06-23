@@ -1,9 +1,9 @@
 # `do it` — feature.md (remaining work)
 
 > Last updated: 2026-06-23.
-> Branch: `main` @ `3197b56` (clean working tree, up to date with `origin/main`).
+> Branch: `main` @ `acf9c32` (clean working tree, up to date with `origin/main`).
 > Test state: 1001/1001 passing. `dart format` clean. `flutter analyze --fatal-infos` clean.
-> Version in `pubspec.yaml` / `lib/build_info.dart`: `1.1.0+8`.
+> Version in `pubspec.yaml` / `lib/build_info.dart`: `1.2.0+9`.
 
 This file tracks everything that is **not yet shipped** and is not
 already covered by the V-Model docs (`docs/v_model/plan.md`,
