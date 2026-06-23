@@ -22,6 +22,24 @@
 //     v0.1 carve-out (see architecture_options.md §
 //     Permission Baseline).
 //
+// PositionSource disposal contract (v1.2d / Phase 4 cleanup):
+//   - `PositionSource.dispose()` is invoked by the service
+//     when it wants to release the source. The contract is
+//     "cancel any subscription the source itself owns and
+//     release platform resources" — but **the listener-side
+//     `StreamSubscription` is owned by `GeofenceService`,
+//     not by the source**, so `_GeolocatorPositionSource`'s
+//     implementation is a documented no-op (see below).
+//   - `GeofenceService` cancels `_sub` itself
+//     (`resetForTesting()`), so the source never sees a
+//     subscriber to clean up. A future `_GeolocatorPositionSource`
+//     that *does* own a native handle (e.g., a v2 migration to
+//     `Geolocator.getCurrentPosition` polling, or a fused
+//     location provider client) must override `dispose` and
+//     release the handle here. The abstract signature stays
+//     `Future<void> dispose()` so the service's call site does
+//     not change.
+//
 // Layer rules (per `.claude/rules/lib-services.md`):
 //   - Singleton with `Completer<void> _ready`.
 //   - `init()` is idempotent.
@@ -93,9 +111,13 @@ class _GeolocatorPositionSource implements PositionSource {
 
   @override
   Future<void> dispose() async {
-    // `Geolocator.getPositionStream` returns a single-subscription
-    // stream; cancellation happens on the listener side, so there
-    // is nothing to dispose here.
+    // The Geolocator position stream is single-subscription; the
+    // listener (`GeofenceService._sub`) cancels the subscription
+    // to release the underlying native handle. There is nothing
+    // for the source itself to dispose — `Geolocator.getPositionStream`
+    // does not hand us a teardown handle. If a future port (or a
+    // fused-location-client swap) returns a teardown handle, it
+    // must be released here.
   }
 }
 
