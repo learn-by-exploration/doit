@@ -392,3 +392,86 @@ intentionally incomplete for that slice.
   - Wear OS target → **deferred to v1.2** (Wear OS
     / Android Auto was not picked for v1.1; the
     phone-only experience ships first).
+
+## Milestone 9 — v1.2: Code-TODO closure (shipped)
+
+- **Date:** 2026-06-23.
+- **Status:** shipped. Thirteen sub-entries
+  (v1.2a..v1.2m) landed across the v1.2 cycle; this
+  milestone is the doc-only sign-off that flips the
+  milestone to `shipped` and finalises the CHANGELOG
+  `[1.2.0]` block. The implementation rows are in
+  `implementation_status.md` (rows v1.2a..v1.2m) and
+  the CHANGELOG entries are in `CHANGELOG.md` under
+  `## [Unreleased]`.
+- **Scope:** the code-TODO closure pass over the v1.1
+  foundation. Every `TODO` (and the Phase A wiring gap
+  it represented) is now either shipped, explicitly
+  deferred to a v1.x follow-up with a SYS- ID, or
+  tracked in [`feature.md`](../feature.md) §2-4.
+- **Headline themes:**
+  - **Wire-up** — the `NotificationService.show` /
+    `dismiss` path (v1.2e), the routine `Action` leaves
+    (`ActionFullscreen`, `ActionCallIntercept`, v1.2f),
+    BOOT_COMPLETED coverage confirmation (v1.2g).
+  - **UX completeness** — Person pauseUntil UI (v1.2f),
+    DoFixed weekday display (v1.2f), DST transition
+    banner (v1.2j), streak-recovery card (v1.2j),
+    pre-notification 5-min / 1-min heads-up (v1.2j).
+  - **Reliability disambiguation** — per-automation
+    `AlertDialog` on tap (v1.2h),
+    `AppLifecycleState.resumed` re-probe hook (v1.2i).
+  - **Edit affordances** — hard delete with confirm
+    (v1.2k), completion-log review + undo (v1.2m),
+    uniform 3-wrong take-a-break across Math + Type
+    (v1.2l).
+- **V-Model artifacts (this milestone):**
+  - `v1_2_release_baseline.md` (left-side) +
+    `v1_2_release_checklist.md` (right-side gate).
+  - `requirements.md` rows SYS-098..SYS-110 (appended
+    in v1.2e..v1.2m).
+  - `decision_record.md` rows ADR-033..ADR-041
+    (appended in this sign-off commit; see the
+    baseline for the per-ADR topics).
+  - `implementation_status.md` rows v1.2a..v1.2m.
+  - `CHANGELOG.md` `## [1.2.0]` block + a clean merge
+    of the v1.2l / v1.2m entry pair (the pre-sign-off
+    conflict at lines 1206-1303 is resolved).
+  - `pubspec.yaml` → `1.2.0+9`; `lib/build_info.dart`
+    mirrors; `test/release_signing_test.dart` mirror-
+    pin assertions updated in lockstep.
+- **Deferred (v1.x candidates, tracked in `feature.md`):**
+  - Strong-mode full-screen hardening (the
+    `USE_FULL_SCREEN_INTENT` permission on API 34+).
+  - Action-side permission disambiguation in the
+    `AutomationReliabilityDialog` (today the dialog
+    covers trigger-side only).
+  - `TriggerCallIncoming*` reliability arm once
+    `RoleManager` is wired through `PermissionService`.
+  - Native-Spanish-speaker translation of
+    `lib/l10n/app_es.arb` (v1.1h's smoke-test locale
+    is the only translation).
+  - `google_maps_flutter` map tiles for
+    `LocationMapPreview` (needs `INTERNET`).
+  - Legacy `mipmap-*/ic_launcher.png` regeneration
+    from the master vector.
+  - Light-theme icon variant.
+  - B9 — widget re-arm indicator (the project does
+    not yet ship a home widget).
+  - Home screen widget, iOS port, Wear OS, Argon2id
+    backup upgrade, backup format v2 → v3 — all
+    v1.x point-release candidates, NOT v2.0.
+- **No new permissions, no `INTERNET`.** The v1.2
+  cycle did not add any new `AndroidManifest.xml`
+  permission entries; the closest call was the
+  pre-existing `PACKAGE_USAGE_STATS` (v1.1g) which
+  is the only "special-access" permission do it
+  ships.
+- **Right-side gate (this milestone):**
+  [`v1_2_release_checklist.md`](v1_2_release_checklist.md).
+  The sign-off line at the bottom of that doc is the
+  moment the user accepts the build as the v1.2
+  release. v1.2x is the user's hands-on on-device
+  verification on the Android emulator (or a real
+  SM-S918B device), the same shape as v0.5e / v1.0h
+  / v1.1k.
