@@ -599,6 +599,58 @@ items: every `Action` leaf now has a real side effect.
   model-purity rule from
   [`.claude/rules/lib-do.md`](.claude/rules/lib-do.md)
   (no Flutter imports).
+### v1.2g — BOOT_COMPLETED re-arm confirmation + calendar trigger badge coverage closeout
+
+Phase 7 of the v1.2 code-TODO closure (`30-phase roadmap`).
+All three items the plan listed were already closed by
+prior PRs; this release is a documentation-only closeout
+that explicitly defers the one item that is genuinely
+out-of-scope (B9 — the Android home-widget re-arm
+indicator; the project does not yet ship a home widget).
+
+**Status of each sub-task**
+
+- **`RECEIVE_BOOT_COMPLETED` re-arm** — closed in v1.0.
+  `android/.../BootReceiver.kt` listens for
+  `ACTION_BOOT_COMPLETED`, `ACTION_LOCKED_BOOT_COMPLETED`,
+  `ACTION_MY_PACKAGE_REPLACED`, and
+  `ACTION_TIMEZONE_CHANGED` and routes every one of them
+  through `ReminderChannelProxy.rescheduleAll`. The Dart
+  inbound side (`ReminderBridge.onRescheduleAll`) is
+  covered by `test/reminders/reminder_bridge_test.dart`
+  ("inbound rescheduleAll dispatches to handler").
+- **Per-automation reliability badges for calendar triggers** —
+  closed in v1.1f. `_requiredPermissionForTrigger
+  (TriggerCalendarEvent) => PermissionKind.calendar` in
+  `lib/routines/automation_reliability.dart:120`; the
+  badge reads `PermissionService.statuses
+  [PermissionKind.calendar]` through the same
+  `ValueListenable` as the other permissions and flips
+  to `degraded` when the calendar permission is
+  `denied` / `permanentlyDenied`. Covered by three tests
+  in `test/routines/automation_reliability_test.dart`
+  (granted → optimal, denied → degraded, null →
+  unknown).
+- **Per-call notification customization** — closed in
+  v1.1b. `ActionNotify(title, body)` carries the
+  user-authored copy; `RoutineExecutor._dispatchAction`
+  builds a `ReminderEvent(habitName: action.title,
+  body: action.body)` and forwards it to
+  `NotificationService.show`. The body override is
+  end-to-end; the Kotlin side uses it verbatim. Covered
+  by `test/routines/action_dispatch_test.dart` —
+  "ActionNotify shows a system notification with title +
+  body".
+
+**Deferral**
+
+- **B9 — Widget re-arm indicator** — explicitly
+  deferred. The project does not yet ship an Android
+  home-screen widget; the first landing surface for the
+  re-arm indicator would be a widget. Tracking this in
+  the v2.0 platform-expansion batch (the home widget is
+  Phase 28 in the roadmap).
+
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 
 do it is no longer about streaks. Phase A renames the
