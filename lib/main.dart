@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter/material.dart';
 
 import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
 import 'package:doit/screens/home.dart';
 import 'package:doit/screens/onboarding.dart';
@@ -51,7 +52,17 @@ Future<void> main() async {
   //    a no-op stub — the Kotlin side does the real
   //    AlarmManager work and pings the Dart side when an
   //    alarm fires.
-  final bridge = PlatformReminderBridge()..install();
+  //
+  //    v1.2e / Phase 5: the bridge now carries an inbound
+  //    callback that the Kotlin `AlarmReceiver` invokes
+  //    via `ReminderChannelProxy.fireAlarm(alarmId)`. The
+  //    callback looks up the scheduled entry, renders
+  //    the notification (or full-screen intent for
+  //    strong-mode habits), then either re-schedules the
+  //    next habit occurrence or archives a one-shot event.
+  final bridge = PlatformReminderBridge(
+    inbound: const _ReminderInboundAdapter(),
+  )..install();
   await ReminderService.init(
     ReminderService(
       scheduler: PlatformAlarmScheduler(bridge),
@@ -203,5 +214,33 @@ class DoItApp extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// v1.2e / Phase 5: inbound adapter that wires the
+/// [PlatformReminderBridge] dispatch table to the
+/// `ReminderService.onFireAlarm` instance method. The
+/// `PlatformReminderBridge` constructor takes a
+/// `ReminderInbound?`; this class is the production
+/// implementation.
+///
+/// The adapter is a thin class (no state, just a method)
+/// so the bridge can hold it without creating a circular
+/// init dependency: `main.dart` constructs the adapter,
+/// the bridge, and the `ReminderService` in order, then
+/// sets the service on the adapter via a late-initialized
+/// reference. By the time the first `fireAlarm` arrives,
+/// the service is initialized.
+class _ReminderInboundAdapter implements ReminderInbound {
+  const _ReminderInboundAdapter();
+
+  @override
+  Future<void> onRescheduleAll() async {
+    await ReminderService.instance.rescheduleAll();
+  }
+
+  @override
+  Future<void> onFireAlarm(int alarmId) async {
+    await ReminderService.instance.onFireAlarm(AlarmId(alarmId));
   }
 }

@@ -20,6 +20,7 @@ import 'dart:async';
 
 import 'package:doit/events/event.dart';
 import 'package:doit/do/do.dart';
+import 'package:doit/do/proof_mode.dart';
 import 'package:meta/meta.dart';
 
 /// A stable identifier for a scheduled alarm. The alarm id is
@@ -93,6 +94,16 @@ abstract class AlarmScheduler {
   /// occurrence). Used by the "Cancel test reminder" button.
   Future<void> cancelForHabit(String habitId);
 
+  /// Look up the scheduled entry for [id]. The
+  /// `fireAlarm` inbound handler (Kotlin AlarmReceiver →
+  /// Dart `ReminderService.onFireAlarm`) uses this to
+  /// build a `ReminderEvent` without a DB round-trip.
+  /// Returns `null` if the id is not in the mirror
+  /// (e.g., the alarm was armed by the Kotlin side and
+  /// the Dart mirror was cleared by `rescheduleAll`).
+  /// v1.2e / Phase 5.
+  Future<ScheduledAlarm?> lookupForFire(AlarmId id);
+
   /// Current reliability state.
   Reliability get reliability;
 }
@@ -105,9 +116,31 @@ class ScheduledAlarm {
     required this.id,
     required this.habitId,
     required this.at,
+    this.habitName,
+    this.strongMode = false,
+    this.eventId,
   });
   final AlarmId id;
+
+  /// The owning habit id, or `'event:<eventId>'` for
+  /// event-scheduled alarms (mirrors the v0.2
+  /// `FakeAlarmScheduler.scheduleEvent` convention).
   final String habitId;
+
+  /// Optional human-readable name. Populated by the
+  /// production [PlatformAlarmScheduler] so the
+  /// `fireAlarm` inbound handler can render a notification
+  /// without a round-trip to the DB.
+  final String? habitName;
+
+  /// v1.2e / Phase 5: the strong-mode bit from the owning
+  /// habit. Drives the `Open` vs `Done` action on the
+  /// fired notification.
+  final bool strongMode;
+
+  /// The originating event id when this alarm belongs to
+  /// an event (not a habit). `null` for habits.
+  final String? eventId;
   final DateTime at;
 }
 
@@ -131,7 +164,15 @@ class FakeAlarmScheduler implements AlarmScheduler {
   @override
   Future<AlarmId> schedule(Do habit, DateTime at) async {
     final id = AlarmId(_nextId++);
-    _scheduled.add(ScheduledAlarm(id: id, habitId: habit.id, at: at));
+    _scheduled.add(
+      ScheduledAlarm(
+        id: id,
+        habitId: habit.id,
+        at: at,
+        habitName: habit.name,
+        strongMode: habit.proofMode is StrongProof,
+      ),
+    );
     return id;
   }
 
@@ -147,7 +188,14 @@ class FakeAlarmScheduler implements AlarmScheduler {
     final newAt = original.at.add(delay);
     final newId = AlarmId(_nextId++);
     _scheduled.add(
-      ScheduledAlarm(id: newId, habitId: original.habitId, at: newAt),
+      ScheduledAlarm(
+        id: newId,
+        habitId: original.habitId,
+        at: newAt,
+        habitName: original.habitName,
+        strongMode: original.strongMode,
+        eventId: original.eventId,
+      ),
     );
     _snoozed[id] = newId;
     _cancelled.add(id);
@@ -165,7 +213,13 @@ class FakeAlarmScheduler implements AlarmScheduler {
   Future<AlarmId> scheduleEvent(Event event, DateTime at) async {
     final id = AlarmId(_nextId++);
     _scheduled.add(
-      ScheduledAlarm(id: id, habitId: 'event:${event.id}', at: at),
+      ScheduledAlarm(
+        id: id,
+        habitId: 'event:${event.id}',
+        at: at,
+        habitName: event.name,
+        eventId: event.id,
+      ),
     );
     return id;
   }
@@ -173,6 +227,14 @@ class FakeAlarmScheduler implements AlarmScheduler {
   @override
   Future<void> cancelEvent(String eventId) async {
     _scheduled.removeWhere((a) => a.habitId == 'event:$eventId');
+  }
+
+  @override
+  Future<ScheduledAlarm?> lookupForFire(AlarmId id) async {
+    for (final entry in _scheduled) {
+      if (entry.id == id) return entry;
+    }
+    return null;
   }
 
   @override
