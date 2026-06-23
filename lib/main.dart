@@ -20,6 +20,7 @@ import 'package:doit/services/call_interceptor.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/geofence_service.dart';
 import 'package:doit/services/permission_service.dart';
+import 'package:doit/services/permission_lifecycle_observer.dart';
 import 'package:doit/services/platform_alarm_scheduler.dart';
 import 'package:doit/services/platform_full_screen_intent.dart';
 import 'package:doit/services/platform_notification_service.dart';
@@ -76,6 +77,15 @@ Future<void> main() async {
   //    (including the onboarding "Allow" buttons) would block
   //    on `await ready` indefinitely.
   await PermissionService.instance.init();
+
+  // 4a-bis. v1.2i / Phase 9 / SYS-104: register a
+  //    lifecycle observer that re-probes permissions when
+  //    the app resumes (the user just came back from
+  //    Settings → Special access → Usage access or the
+  //    OS role picker). The observer is process-scoped;
+  //    there is no dispose path. See
+  //    `lib/services/permission_lifecycle_observer.dart`.
+  WidgetsBinding.instance.addObserver(PermissionLifecycleReProbe());
 
   // 4a. v1.0 Phase C PR 2 (SYS-072 / ADR-021): init the
   //     geofence service. The service starts the platform
