@@ -505,10 +505,59 @@ when an alarm fires.
 - `lib/reminders/alarm_scheduler.dart` / `reminder_bridge.dart`:
   covered by the bridge-surface tests.
 
+### v1.2k — WF-022 hard delete with confirm (Phase 11a)
+
+Phase 11a of the v1.2 code-TODO closure (`30-phase
+roadmap`). Closes the B3 item: the edit screen now offers
+a hard-delete affordance with a confirm dialog that names
+the do and warns about completion-log loss.
+
+**What's new**
+
+- **`AddHabitScreen` (edit mode) popup menu** — the menu
+  now exposes a `Delete…` entry only when the screen is in
+  edit mode (`habitId != null`). New-do mode has no menu
+  entry; the only way to discard a new do is to navigate
+  back without saving.
+- **`_confirmAndDelete` flow** — tapping the menu entry
+  opens an `AlertDialog` titled `Delete "<name>"?` with
+  destructive copy ("This will remove the do and its
+  completion log. This cannot be undone."). Cancel keeps
+  the screen and the row intact; Delete calls
+  `DoRepository.instance.deleteById(habitId)` and pops
+  the route with `true`.
+- **Failure-path** — if `deleteById` throws (e.g., a
+  platform DB error), the screen shows a `Delete failed.
+  Please try again.` snackbar and stays mounted so the
+  user can retry without re-typing anything.
+- **Home-screen refresh hook** — `HomeScreen._onTileTap`
+  now `await`s `Navigator.push<bool>`; when the edit
+  screen pops with `true`, the home list refreshes
+  immediately so the deleted tile disappears without
+  waiting for the next `AppLifecycleState.resumed`.
+- **Test-only seams** — `AddHabitScreenState.deleteOverride`
+  (`Future<void> Function(String id)?`) and the public
+  typedef `AddHabitScreenState = _AddHabitScreenState`
+  let widget tests exercise the failure branch without
+  monkey-patching the repository singleton.
+
 **3-gate verification**
 
 ```
 $ dart format --output=none --set-exit-if-changed .
+<<<<<<< HEAD
+Formatted 211 files (0 changed) in 0.74 seconds.
+$ flutter analyze --fatal-infos
+No issues found! (ran in 1.3s)
+$ flutter test
+00:22 +984: All tests passed!
+```
+
+(Test count: 978 → 984 — 6 new widget tests covering
+the menu gating, dialog open, cancel, delete-pop, and
+delete-failure paths; 3-gate green with zero analyzer
+findings.)
+=======
 Formatted 199 files (0 changed) in 0.72 seconds.
 
 $ flutter analyze --fatal-infos
@@ -803,6 +852,7 @@ banner subsystem:
   Dart side does NOT call `DateTime.now()` directly —
   the caller passes the reference time so the method
   is unit-testable.
+>>>>>>> origin/main
 
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 

@@ -102,6 +102,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
+  /// Tap handler for a tile in normal (non-select) mode.
+  /// Opens the edit screen and, if the screen pops with
+  /// `true` (WF-022 hard delete), refreshes the home list
+  /// so the deleted tile disappears immediately.
+  Future<void> _onTileTap(String habitId) async {
+    final deleted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => AddHabitScreen(habitId: habitId)),
+    );
+    if (deleted == true) _refresh();
+  }
+
   Future<void> _completeSelected() async {
     final now = DateTime.now();
     for (final id in _selected) {
@@ -205,7 +216,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       onLongPress: () => _enterSelectMode(habits[i].id),
                       onTap: _selectMode
                           ? () => _toggleSelect(habits[i].id)
-                          : null,
+                          : () => _onTileTap(habits[i].id),
                     ),
                   );
                 },
@@ -290,15 +301,7 @@ class _HabitTile extends StatelessWidget {
         child: InkWell(
           key: ValueKey('habit_tile.${habit.id}'),
           borderRadius: BorderRadius.circular(12),
-          onTap:
-              onTap ??
-              () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => AddHabitScreen(habitId: habit.id),
-                  ),
-                );
-              },
+          onTap: onTap,
           onLongPress: onLongPress,
           child: Padding(
             padding: const EdgeInsets.all(Spacing.md),
