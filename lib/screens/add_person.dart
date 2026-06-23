@@ -46,6 +46,7 @@ import 'package:doit/widgets/calendar_picker.dart';
 import 'package:doit/widgets/location_picker.dart';
 import 'package:doit/widgets/permission_sheet.dart';
 import 'package:doit/widgets/automation_reliability_badge.dart';
+import 'package:doit/widgets/automation_reliability_dialog.dart';
 
 class AddPersonScreen extends StatefulWidget {
   const AddPersonScreen({super.key, this.personId, this.initialPayload});
@@ -587,7 +588,13 @@ class _PersonRoutineRow extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AutomationReliabilityBadge(automation: automation),
+          AutomationReliabilityBadge(
+            automation: automation,
+            onTap: () => showAutomationReliabilityDialog(
+              context,
+              automation: automation,
+            ),
+          ),
           IconButton(
             key: const ValueKey('add_person.remove_routine'),
             tooltip: 'Remove',

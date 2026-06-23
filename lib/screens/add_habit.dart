@@ -30,6 +30,7 @@ import 'package:doit/routines/routine_executor.dart';
 import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/geofence_service.dart';
 import 'package:doit/services/reminder_service.dart';
+import 'package:doit/widgets/automation_reliability_dialog.dart';
 import 'package:doit/services/template_repository.dart';
 import 'package:doit/templates/template.dart';
 import 'package:doit/templates/template_library.dart';
@@ -1415,7 +1416,13 @@ class _RoutineRow extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AutomationReliabilityBadge(automation: automation),
+          AutomationReliabilityBadge(
+            automation: automation,
+            onTap: () => showAutomationReliabilityDialog(
+              context,
+              automation: automation,
+            ),
+          ),
           IconButton(
             key: const ValueKey('add_habit.remove_routine'),
             tooltip: 'Remove',
