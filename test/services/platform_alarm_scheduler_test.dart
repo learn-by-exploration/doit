@@ -15,6 +15,7 @@
 import 'package:doit/events/event.dart';
 import 'package:doit/do/do.dart';
 import 'package:doit/do/proof_mode.dart';
+import 'package:doit/missions/chain.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
 import 'package:doit/services/platform_alarm_scheduler.dart';
@@ -37,6 +38,20 @@ DoFixed _makeHabit(String id) => DoFixed(
   createdAt: DateTime(2026, 6, 18),
   restDaysPerMonth: 2,
 );
+
+/// A trivial Strong chain (one TypeMission). Used by the
+/// `lookupForFire` tests to confirm strong-mode bits are
+/// captured. The chain does not need to be valid (no
+/// `validate()` is called); the scheduler only inspects
+/// `proofMode is StrongProof`.
+MissionChain _trivialChain() => MissionChain(const [
+  TypeMission(
+    id: 'm1',
+    label: 'Type OK',
+    timeout: Duration(seconds: 5),
+    expectedPhrase: 'OK',
+  ),
+]);
 
 void main() {
   group('PlatformAlarmScheduler', () {
@@ -229,6 +244,105 @@ void main() {
         // No probe has run; the getter returns `unknown` and
         // kicks off an unawaited probe for next time.
         expect(scheduler.reliability, Reliability.unknown);
+      });
+    });
+
+    // v1.2e / Phase 5: the inbound `fireAlarm` lookup
+    // table. Pinned because a regression here would silently
+    // skip the notification render — the Dart side has no
+    // other source of truth for "what does this alarmId
+    // belong to?".
+    group('lookupForFire (v1.2e / Phase 5)', () {
+      test('returns null for an unknown id', () async {
+        final scheduler = PlatformAlarmScheduler(FakeReminderBridge());
+        expect(await scheduler.lookupForFire(const AlarmId(9999)), isNull);
+      });
+
+      test(
+        'returns the habit entry after schedule (name, strongMode, at)',
+        () async {
+          final bridge = FakeReminderBridge();
+          final scheduler = PlatformAlarmScheduler(bridge);
+          final at = DateTime(2026, 6, 20, 9);
+          final id = await scheduler.schedule(_makeHabit('h1'), at);
+
+          final entry = await scheduler.lookupForFire(id);
+          expect(entry, isNotNull);
+          expect(entry!.habitId, 'h1');
+          expect(entry.at, at);
+          // _makeHabit is SoftProof → strongMode is false.
+          expect(entry.strongMode, isFalse);
+          expect(entry.eventId, isNull);
+          expect(entry.habitName, 'Test habit');
+        },
+      );
+
+      test('records strongMode=true for StrongProof habits', () async {
+        final bridge = FakeReminderBridge();
+        final scheduler = PlatformAlarmScheduler(bridge);
+        final strong = DoFixed(
+          id: 'h-strong',
+          name: 'Strong',
+          proofMode: StrongProof(_trivialChain()),
+          createdAt: DateTime(2026),
+          restDaysPerMonth: 2,
+          weekdays: const {1, 2, 3, 4, 5, 6, 7},
+          time: const DoTime(7, 30),
+        );
+        final at = DateTime(2026, 6, 20, 7, 30);
+        final id = await scheduler.schedule(strong, at);
+        final entry = await scheduler.lookupForFire(id);
+        expect(entry!.strongMode, isTrue);
+      });
+
+      test('event entries carry the eventId and the event name', () async {
+        final bridge = FakeReminderBridge();
+        final scheduler = PlatformAlarmScheduler(bridge);
+        final at = DateTime(2026, 6, 20, 9);
+        final event = Event(
+          id: 'evt_42',
+          name: 'Standup',
+          atMillis: at.millisecondsSinceEpoch,
+          leadTimeMillis: 0,
+          createdAtMillis: at.millisecondsSinceEpoch,
+        );
+        final id = await scheduler.scheduleEvent(event, at);
+        final entry = await scheduler.lookupForFire(id);
+        expect(entry, isNotNull);
+        expect(entry!.eventId, 'evt_42');
+        expect(entry.habitName, 'Standup');
+        expect(entry.habitId, 'event:evt_42');
+        expect(entry.strongMode, isFalse);
+      });
+
+      test('cancel removes the entry', () async {
+        final bridge = FakeReminderBridge();
+        final scheduler = PlatformAlarmScheduler(bridge);
+        final id = await scheduler.schedule(
+          _makeHabit('h1'),
+          DateTime(2026, 6, 20, 9),
+        );
+        expect(await scheduler.lookupForFire(id), isNotNull);
+        await scheduler.cancel(id);
+        expect(await scheduler.lookupForFire(id), isNull);
+      });
+
+      test('rescheduleAll clears every entry', () async {
+        final bridge = FakeReminderBridge();
+        final scheduler = PlatformAlarmScheduler(bridge);
+        final id1 = await scheduler.schedule(
+          _makeHabit('h1'),
+          DateTime(2026, 6, 20, 9),
+        );
+        final id2 = await scheduler.schedule(
+          _makeHabit('h2'),
+          DateTime(2026, 6, 21, 9),
+        );
+        expect(await scheduler.lookupForFire(id1), isNotNull);
+        expect(await scheduler.lookupForFire(id2), isNotNull);
+        await scheduler.rescheduleAll();
+        expect(await scheduler.lookupForFire(id1), isNull);
+        expect(await scheduler.lookupForFire(id2), isNull);
       });
     });
   });

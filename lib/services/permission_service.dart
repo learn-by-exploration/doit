@@ -490,6 +490,85 @@ class PermissionService {
     statuses.value = next;
   }
 
+  /// v1.2i / Phase 9: re-probes every permission the
+  /// service knows about. Called from the
+  /// `WidgetsBindingObserver` `resumed` hook in `main.dart`
+  /// so the Settings → Permissions tile and the per-
+  /// automation reliability badges reflect the user's most
+  /// recent toggle without a full restart.
+  ///
+  /// ADR-030's lesson: the fire-and-forget probe from
+  /// `init()` is stale by the time the user comes back from
+  /// toggling a permission in Settings → Special access →
+  /// Usage access (the most common flow that needs a
+  /// re-probe). The `resumed` hook is the cheapest signal
+  /// that the user came back to the app, and a single
+  /// re-probe is cheap.
+  ///
+  /// Parallelism note: each `Permission.X.status` call is
+  /// an independent platform-channel round-trip, so we
+  /// `Future.wait` over all six `permission_handler` kinds.
+  /// The two special-access kinds (`usageStats`,
+  /// `callScreening`) are sequenced AFTER the batch because
+  /// their `refreshX` methods are not idempotent with the
+  /// batch in the existing test mocks (they go through
+  /// separate channels and have their own swallow paths).
+  ///
+  /// A thrown platform-channel error from any single probe
+  /// is swallowed at the call site (`_safeProbe`) so a
+  /// missing plugin on one kind does NOT abort the others
+  /// (ADR-013 follow-up).
+  Future<void> refresh() async {
+    await ready;
+    try {
+      final results = await Future.wait<_ProbeOutcome>([
+        _safeProbe(
+          PermissionKind.notifications,
+          Permission.notification.status,
+        ),
+        _safeProbe(PermissionKind.contacts, Permission.contacts.status),
+        _safeProbe(
+          PermissionKind.exactAlarm,
+          Permission.scheduleExactAlarm.status,
+        ),
+        _safeProbe(
+          PermissionKind.batteryOptimization,
+          Permission.ignoreBatteryOptimizations.status,
+        ),
+        _safeProbe(PermissionKind.location, Permission.location.status),
+        _safeProbe(
+          PermissionKind.calendar,
+          Permission.calendarFullAccess.status,
+        ),
+      ]);
+      final next = Map<PermissionKind, PermissionResult?>.from(statuses.value);
+      for (final outcome in results) {
+        next[outcome.kind] = outcome.result;
+      }
+      statuses.value = next;
+    } catch (_) {
+      // Defense in depth: a throw from `Future.wait` itself
+      // (rather than from a single probe — `_safeProbe`
+      // already swallows per-probe) is treated as a
+      // best-effort no-op. The user can still re-open
+      // Settings → Permissions to retry the probe.
+    }
+    // The two special-access kinds are re-probed
+    // independently so a stale role / usage grant
+    // refreshes too. Each `refreshX` method swallows its
+    // own platform-channel error.
+    try {
+      await refreshUsageStats();
+    } catch (_) {
+      /* ADR-013 */
+    }
+    try {
+      await refreshCallScreening();
+    } catch (_) {
+      /* ADR-013 */
+    }
+  }
+
   /// Probe helper for [init]. Called after `_ready` is
   /// completed so the result merges into [statuses] via
   /// [refreshUsageStats]'s `ValueNotifier` write. Returns
@@ -520,6 +599,26 @@ class PermissionService {
     } catch (_) {
       // v0.4b-release-fix / ADR-013 follow-up: never let a
       // platform-channel error crash the post-init probe.
+    }
+  }
+
+  /// v1.2i / Phase 9 helper. Runs one `permission_handler`
+  /// probe and maps the result. Swallows any thrown
+  /// platform-channel error (ADR-013 follow-up) so a
+  /// missing plugin on one kind does NOT abort the batch
+  /// in [refresh].
+  Future<_ProbeOutcome> _safeProbe(
+    PermissionKind kind,
+    Future<PermissionStatus> probe,
+  ) async {
+    try {
+      final result = _mapStatus(await probe);
+      return _ProbeOutcome(kind, result);
+    } catch (_) {
+      // Swallow per-probe; the corresponding key in
+      // `statuses` keeps its prior value (a failed
+      // re-probe is NOT a downgrade).
+      return _ProbeOutcome(kind, statuses.value[kind]);
     }
   }
 
@@ -606,6 +705,19 @@ class PermissionService {
       ),
     };
   }
+}
+
+/// v1.2i / Phase 9: a single probe outcome from the
+/// parallel batch in [PermissionService.refresh]. Carries
+/// the kind so the caller can write the right key into the
+/// `statuses` map. The `result` is `null` only for the
+/// SAF-picker kind (today the batch does not include
+/// `backupFolder` because it is not a permission); kept
+/// nullable for forward-compatibility.
+class _ProbeOutcome {
+  const _ProbeOutcome(this.kind, this.result);
+  final PermissionKind kind;
+  final PermissionResult? result;
 }
 
 // (No top-level helper needed; the platform-interface call

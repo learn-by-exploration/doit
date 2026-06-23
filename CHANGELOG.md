@@ -416,6 +416,444 @@ notification-icon resource reference.
 
 ## [Unreleased]
 
+### v1.2e — `NotificationService.dismiss` + `PlatformNotificationService.show` real implementations
+
+Phase 5 of the v1.2 code-TODO closure (`30-phase roadmap`).
+The Phase-A production wiring left both `NotificationService.show`
+and `dismiss` as no-ops. v1.2e wires them through to the Kotlin
+`ReminderChannelProxy` (`showNotification` + `cancelNotification`
+method-channel calls) and adds the inbound `fireAlarm` adapter
+that the Kotlin `AlarmReceiver` invokes to render a notification
+when an alarm fires.
+
+**What's new**
+
+- **Bridge surface (Dart).** `ReminderBridge.showNotification` and
+  `ReminderBridge.cancelNotification` added to the abstract
+  bridge. `PlatformReminderBridge` invokes the matching
+  method-channel calls. `FakeReminderBridge` records every call.
+- **`PlatformNotificationService`.** `show` forwards
+  `(alarmId, habitName, body, strongMode)` to
+  `bridge.showNotification`; `dismiss(id)` forwards `id.value` to
+  `bridge.cancelNotification`. Both wrap the bridge call in a
+  `kDebugMode`-gated try/catch per ADR-013 so a missing platform
+  handler never crashes `main()`.
+- **Inbound adapter.** `main.dart` constructs a
+  `_ReminderInboundAdapter` and passes it to
+  `PlatformReminderBridge(inbound: …)`. The Kotlin
+  `AlarmReceiver.onReceive` invokes
+  `ReminderChannelProxy.fireAlarm(ctx, alarmId)`, which calls
+  `channel?.invokeMethod("fireAlarm", …)`; the Dart dispatch
+  routes to `adapter.onFireAlarm(alarmId)` →
+  `ReminderService.onFireAlarm(AlarmId(alarmId))`.
+- **`ReminderService.onFireAlarm`.** Looks up the scheduled
+  entry via `AlarmScheduler.lookupForFire`, builds a
+  `ReminderEvent`, calls `notifications.show(event)`, then
+  either:
+    - **Habit-fired**: re-schedules via
+      `habit.nextOccurrence(entry.at)` + `scheduler.schedule`,
+      and for strong-mode habits also launches the full-screen
+      intent via `fullScreen.show(habit, chain)`.
+    - **Event-fired**: archives via
+      `EventRepository.instance.archive(eventId, DateTime.now())`.
+- **Alarm scheduler mirror.** `PlatformAlarmScheduler` now
+  keeps a richer Dart-side mirror
+  (`Map<AlarmId, ScheduledAlarm>`) carrying `habitName`,
+  `strongMode`, and `eventId` so `onFireAlarm` can render the
+  notification without a DB round-trip. `cancel` and
+  `rescheduleAll` clear the mirror in lockstep with the
+  existing `Map<AlarmId, DateTime>` mirror used by `snooze`.
+  The `AlarmScheduler` interface gains
+  `lookupForFire(AlarmId) → ScheduledAlarm?`; both
+  `FakeAlarmScheduler` and `PlatformAlarmScheduler` implement
+  it.
+- **Kotlin `MainActivity.buildReminderNotification`.** New
+  static helper that builds the `NotificationCompat.Builder`
+  with channel id `doit.reminders`, title = `habitName`, body
+  = `body ?? "Time for <habitName>"`, "Done" action for soft
+  mode / "Open" action for strong mode, high priority,
+  `autoCancel`. `ReminderChannelProxy.showNotification`
+  delegates to it. `MainActivity.configureFlutterEngine`
+  registers the channel idempotently at app start.
+- **Kotlin `ReminderChannelProxy.cancelNotification`.** New
+  handler that calls `NotificationManager.cancel(alarmId)`
+  with the id-matched cancel (never the most-recent).
+- **Tests (936 passing).** +16 over v1.2d:
+    - `test/services/platform_notification_service_test.dart`
+      (new, 5 tests) pins the dismiss / show chain:
+      `NotificationService.show/dismiss` →
+      `PlatformNotificationService` → `ReminderBridge`.
+    - `test/services/platform_alarm_scheduler_test.dart` (+6
+      tests) pins `lookupForFire` (unknown id, habit entry,
+      strong-mode bit, event entry, cancel clears, rescheduleAll
+      clears).
+    - `test/services/reminder_service_test.dart` (+5 tests)
+      pins `onFireAlarm` (unknown id no-op, habit alarm shows
+      notification + re-schedules next occurrence, strong-mode
+      launches full-screen intent, event alarm archives,
+      missing habit shows but does not re-schedule).
+    - `test/widgets/permission_sheet_test.dart` adds the two
+      new bridge methods to the local `_RecordingBridge`
+      stub.
+
+**Coverage** (touched files)
+
+- `lib/services/platform_notification_service.dart`: 100%
+- `lib/services/platform_alarm_scheduler.dart`: 100%
+- `lib/services/reminder_service.dart`: 82.4% (above the 80%
+  floor)
+- `lib/reminders/alarm_scheduler.dart` / `reminder_bridge.dart`:
+  covered by the bridge-surface tests.
+
+### v1.2k — WF-022 hard delete with confirm (Phase 11a)
+
+Phase 11a of the v1.2 code-TODO closure (`30-phase
+roadmap`). Closes the B3 item: the edit screen now offers
+a hard-delete affordance with a confirm dialog that names
+the do and warns about completion-log loss.
+
+**What's new**
+
+- **`AddHabitScreen` (edit mode) popup menu** — the menu
+  now exposes a `Delete…` entry only when the screen is in
+  edit mode (`habitId != null`). New-do mode has no menu
+  entry; the only way to discard a new do is to navigate
+  back without saving.
+- **`_confirmAndDelete` flow** — tapping the menu entry
+  opens an `AlertDialog` titled `Delete "<name>"?` with
+  destructive copy ("This will remove the do and its
+  completion log. This cannot be undone."). Cancel keeps
+  the screen and the row intact; Delete calls
+  `DoRepository.instance.deleteById(habitId)` and pops
+  the route with `true`.
+- **Failure-path** — if `deleteById` throws (e.g., a
+  platform DB error), the screen shows a `Delete failed.
+  Please try again.` snackbar and stays mounted so the
+  user can retry without re-typing anything.
+- **Home-screen refresh hook** — `HomeScreen._onTileTap`
+  now `await`s `Navigator.push<bool>`; when the edit
+  screen pops with `true`, the home list refreshes
+  immediately so the deleted tile disappears without
+  waiting for the next `AppLifecycleState.resumed`.
+- **Test-only seams** — `AddHabitScreenState.deleteOverride`
+  (`Future<void> Function(String id)?`) and the public
+  typedef `AddHabitScreenState = _AddHabitScreenState`
+  let widget tests exercise the failure branch without
+  monkey-patching the repository singleton.
+
+**3-gate verification**
+
+```
+$ dart format --output=none --set-exit-if-changed .
+<<<<<<< HEAD
+Formatted 211 files (0 changed) in 0.74 seconds.
+$ flutter analyze --fatal-infos
+No issues found! (ran in 1.3s)
+$ flutter test
+00:22 +984: All tests passed!
+```
+
+(Test count: 978 → 984 — 6 new widget tests covering
+the menu gating, dialog open, cancel, delete-pop, and
+delete-failure paths; 3-gate green with zero analyzer
+findings.)
+=======
+Formatted 199 files (0 changed) in 0.72 seconds.
+
+$ flutter analyze --fatal-infos
+Analyzing doit...
+No issues found! (ran in 1.1s)
+
+$ flutter test
+00:27 +936: All tests passed!
+```
+
+**V-Model traceability** (this PR)
+
+- `WF-028` (test reminder button) — touched.
+- `WF-030` (alarm-fires-this-many-seconds path) — covered.
+- New `SYS-098` candidate: "Alarm fire → notification
+  render path" — the inbound handler that
+  `AlarmReceiver.onReceive` calls via the method channel.
+
+**Deferred** (v1.2 candidates, not closed by v1.2e)
+
+- Strong-mode full-screen launch is best-effort; the Kotlin
+  side's `FullScreenActivity` host is v1.2e-minimal and will
+  be hardened in a follow-up PR that adds the
+  `USE_FULL_SCREEN_INTENT` permission on API 34+ (Phase 6).
+
+### v1.2f — `ActionFullscreen` + `ActionCallIntercept` real implementations + Person pauseUntil UI + DoFixed weekday display
+
+Phases 6b–6e of the v1.2 code-TODO closure
+(`30-phase roadmap`). Closes the I20 / I21 / I26 + I27 / I28
+items: every `Action` leaf now has a real side effect.
+
+**What's new**
+
+- **`ActionFullscreen`** — the routine-fired full-screen
+  overlay now actually opens. `FullScreenIntent` gained
+  `showRoutineOverlay({title?, body?})`; `PlatformFullScreenIntent`
+  invokes a new `doit/full_screen` method-channel call
+  (`showRoutineOverlay`); the executor dispatches the leaf
+  by awaiting that call. Platform failures are swallowed
+  per ADR-013 — the executor still publishes the fire
+  event, only the side effect is suppressed.
+- **`ActionCallIntercept`** — the routine-fired call-screen
+  decision (`accept` / `mute` / `decline` / `silent`) now
+  drives the Kotlin `CallScreeningService` role.
+  `CallSource` gained `recordRoutineDecision`; the service
+  exposes a thin pass-through; the executor dispatches the
+  leaf by awaiting the pass-through.
+- **`Person.pausedUntil`** — per-person pause for cadence
+  reminders. The Add Person screen has a Pause section
+  visible only after a contact is picked; the Person Groups
+  screen renders a per-person "Paused" chip in the
+  multi-select picker. Drift schema migration `v5_to_v6`
+  adds a nullable `paused_until_millis` column on the
+  `person` table.
+- **DoFixed weekday set on the home tile** — the
+  one-line subtitle under each `DoFixed` habit now reads
+  `"Mon, Wed, Fri · 09:00"` (or `"Every day · 06:30"` /
+  `"Weekends · 10:00"` for the special-case sets) instead
+  of the prior `"Fixed — 06:30"` that dropped the weekday
+  set. The label is produced by a pure top-level function
+  `describeDo(Do)` in `lib/do/do_description.dart`.
+
+**Coverage**
+
+- 10 new tests in `test/do/do_description_test.dart` —
+  every-day / weekdays / weekends / single weekday /
+  arbitrary-subset / every non-`DoFixed` branch.
+- 1 new widget test in `test/screens/home_test.dart` —
+  end-to-end render of the weekday-set subtitle.
+- 2 new tests in `test/routines/action_dispatch_test.dart`
+  + 1 updated `test/routines/call_dispatch_test.dart` —
+  ActionFullscreen + ActionCallIntercept wiring.
+- 2 new tests in `test/services/person_repository_test.dart`
+  — `pausedUntil` round-trip + `clearPausedUntil` via
+  `copyWith`.
+- 1 new test in `test/screens/add_person_test.dart` —
+  pause-section visibility gates on a picked contact.
+
+**V-Model traceability**
+
+- SYS-099 (ActionFullscreen wiring),
+  SYS-100 (ActionCallIntercept wiring),
+  SYS-101 (Person pauseUntil),
+  SYS-102 (DoFixed weekday display) appended to
+  [`docs/v_model/requirements.md`](docs/v_model/requirements.md).
+- `lib/do/do_description.dart` is a new pure-Dart file
+  imported from `lib/screens/home.dart`; it follows the
+  model-purity rule from
+  [`.claude/rules/lib-do.md`](.claude/rules/lib-do.md)
+  (no Flutter imports).
+### v1.2g — BOOT_COMPLETED re-arm confirmation + calendar trigger badge coverage closeout
+
+Phase 7 of the v1.2 code-TODO closure (`30-phase roadmap`).
+All three items the plan listed were already closed by
+prior PRs; this release is a documentation-only closeout
+that explicitly defers the one item that is genuinely
+out-of-scope (B9 — the Android home-widget re-arm
+indicator; the project does not yet ship a home widget).
+
+**Status of each sub-task**
+
+- **`RECEIVE_BOOT_COMPLETED` re-arm** — closed in v1.0.
+  `android/.../BootReceiver.kt` listens for
+  `ACTION_BOOT_COMPLETED`, `ACTION_LOCKED_BOOT_COMPLETED`,
+  `ACTION_MY_PACKAGE_REPLACED`, and
+  `ACTION_TIMEZONE_CHANGED` and routes every one of them
+  through `ReminderChannelProxy.rescheduleAll`. The Dart
+  inbound side (`ReminderBridge.onRescheduleAll`) is
+  covered by `test/reminders/reminder_bridge_test.dart`
+  ("inbound rescheduleAll dispatches to handler").
+- **Per-automation reliability badges for calendar triggers** —
+  closed in v1.1f. `_requiredPermissionForTrigger
+  (TriggerCalendarEvent) => PermissionKind.calendar` in
+  `lib/routines/automation_reliability.dart:120`; the
+  badge reads `PermissionService.statuses
+  [PermissionKind.calendar]` through the same
+  `ValueListenable` as the other permissions and flips
+  to `degraded` when the calendar permission is
+  `denied` / `permanentlyDenied`. Covered by three tests
+  in `test/routines/automation_reliability_test.dart`
+  (granted → optimal, denied → degraded, null →
+  unknown).
+- **Per-call notification customization** — closed in
+  v1.1b. `ActionNotify(title, body)` carries the
+  user-authored copy; `RoutineExecutor._dispatchAction`
+  builds a `ReminderEvent(habitName: action.title,
+  body: action.body)` and forwards it to
+  `NotificationService.show`. The body override is
+  end-to-end; the Kotlin side uses it verbatim. Covered
+  by `test/routines/action_dispatch_test.dart` —
+  "ActionNotify shows a system notification with title +
+  body".
+
+**Deferral**
+
+- **B9 — Widget re-arm indicator** — explicitly
+  deferred. The project does not yet ship an Android
+  home-screen widget; the first landing surface for the
+  re-arm indicator would be a widget. Tracking this in
+  the v2.0 platform-expansion batch (the home widget is
+  Phase 28 in the roadmap).
+
+### v1.2h — Per-automation reliability badge `AlertDialog` on tap
+
+Phase 8 of the v1.2 code-TODO closure (`30-phase roadmap`).
+The v1.1f `AutomationReliabilityBadge` (SYS-085) was
+rendered but non-interactive; v1.2h wires the badge's
+`onTap` callback (in all three add screens) to a new
+`AlertDialog` that disambiguates the three remediation
+paths a routine can need:
+
+- **Trigger-side permission denied / unknown** — the
+  dialog shows the matching `PermissionKind` title + the
+  current status (Granted / Denied / Permanently denied /
+  Not yet probed) + the rationale copy from the canonical
+  `permissionKindMeta` module + an "Open settings" CTA
+  that calls `PermissionService.openAppSettings()` (or
+  `requestUsageStats()` for the special-access kind,
+  since `usageStats` has no generic app-settings page).
+- **No permission gate** — today only `TriggerTimeOfDay`,
+  where reliability lives in the app-wide `Reliability`
+  enum. The dialog surfaces a "this trigger does not need
+  a runtime permission" note and hides the Open settings
+  CTA.
+- **Action-side permission** — v1.2+ future work
+  (`ActionOverrideSilent` needs `ACCESS_NOTIFICATION_POLICY`,
+  contact-requiring actions need `READ_CONTACTS`); not
+  shipped in v1.2h.
+
+**What's new**
+
+- New `lib/widgets/automation_reliability_dialog.dart` —
+  `showAutomationReliabilityDialog(BuildContext, {required Automation})`
+  builds an `AlertDialog` with kind title + status + rationale
+  body + Close / Open settings CTAs. Pure `StatelessWidget`
+  (no `setState`, no `Future`-side-effects on the render
+  path); the Open settings CTA calls the matching
+  `PermissionService.requestX` / `openAppSettings` method
+  via a small private `_openSettings(context, kind)` helper
+  and closes the dialog.
+- New `lib/services/permission_kind_meta.dart` — promotes
+  the prior private `_KindMeta` / `_meta` constants from
+  `permission_sheet.dart` to a public
+  `permissionKindMeta: Map<PermissionKind, PermissionKindMeta>`
+  module so `PermissionSheet` (v0.6) and this dialog
+  share one source of truth for per-`PermissionKind`
+  title + icon + rationale copy. Includes a new
+  `PermissionKind.calendar` entry that the prior
+  private map had been missing (a test caught the gap
+  before it shipped).
+- Wired `onTap: () => showAutomationReliabilityDialog(...)`
+  on every `AutomationReliabilityBadge` in
+  `lib/screens/add_habit.dart`, `lib/screens/add_person.dart`,
+  and `lib/screens/add_event.dart`.
+- Wrapped the Open settings `FilledButton` in
+  `Semantics(button: true, label: 'Open settings',
+  excludeSemantics: true)` so the SYS-062 a11y scanner
+  (10-line lookahead) finds the label and TalkBack reads
+  it as a button.
+- New `test/widgets/automation_reliability_dialog_test.dart`
+  — 4 widget tests covering location / calendar /
+  usage-stats / time-of-day triggers, each pinned to
+  the matching title + status + rationale body + CTA
+  wiring.
+
+### v1.2i — AppLifecycleState.resumed re-probe hook for permissions
+
+Phase 9 of the v1.2 code-TODO closure (`30-phase roadmap`).
+ADR-030's lesson: the fire-and-forget probe from
+`PermissionService.init()` is stale by the time the user
+toggles a permission in Settings → Special access →
+Usage access (the most common flow that needs a
+re-probe). v1.2i wires a `WidgetsBindingObserver` so the
+Settings → Permissions tile and the per-automation
+reliability badges reflect the user's most recent
+toggle without a full restart.
+
+**What's new**
+
+- New `lib/services/permission_lifecycle_observer.dart`
+  with `PermissionLifecycleReProbe` — a stateless
+  `WidgetsBindingObserver` whose `didChangeAppLifecycleState
+  (resumed)` calls `PermissionService.refresh()` via
+  `unawaited(_safeRefresh())`. The observer tracks a
+  `_coldStartSeen` bool so the FIRST `resumed` event
+  (the OS bringing the app to the foreground after a
+  cold launch — `init()` has already probed) is a no-op;
+  every subsequent `resumed` (the user returning from
+  Settings) fires the re-probe. Non-resumed lifecycle
+  events (`paused`, `inactive`, `detached`) are ignored.
+- New `PermissionService.refresh()` method (v1.2i /
+  Phase 9 / SYS-104). Re-probes every
+  `permission_handler` kind in parallel via `Future.wait`
+  over six `_safeProbe` futures, then sequentially
+  re-probes `usageStats` and `callScreening`. Each
+  `_safeProbe` wraps `Permission.X.status` in
+  try/catch — a single probe failure keeps the prior
+  value (a failed re-probe is NOT a downgrade) and the
+  batch continues. ADR-013 follow-up.
+- Wired the observer in `lib/main.dart` immediately
+  after `PermissionService.instance.init()` completes:
+  `WidgetsBinding.instance.addObserver(PermissionLifecycleReProbe())`.
+  The observer is process-scoped (no `dispose`); a hot
+  restart replaces it via Flutter's framework reset.
+- New tests:
+  - `test/services/permission_lifecycle_observer_test.dart`
+    (3 tests: cold-start resumed is a no-op; second
+    resumed fires the `statuses` notifier; non-resumed
+    events are ignored).
+  - `test/services/permission_service_test.dart` (+4
+    tests: `refresh()` re-probes all six
+    `permission_handler` kinds; `refresh()` merges
+    granted into every kind; `refresh()` swallows a
+    single probe failure without aborting the batch;
+    `refresh()` re-probes `usageStats` and
+    `callScreening` separately).
+- Updated `docs/v_model/requirements.md` with the
+  `SYS-104` row.
+
+### v1.2j — DST transition banner + streak-recovery card + 5-min/1-min pre-notification
+
+Phase 10 of the v1.2 code-TODO closure (`30-phase
+roadmap`). Three small UX improvements, all centered on
+the "user missed something, here is how we handled it"
+banner subsystem:
+
+- **DST transition banner** (`lib/widgets/dst_transition_banner.dart`)
+  — one-shot card that surfaces when the schedule
+  engine silently reschedules one or more habit times
+  because of a clock change. Singular copy for one
+  drop, plural copy for two+. Renders
+  `SizedBox.shrink()` when the list is empty (zero
+  layout cost in the steady state).
+- **Streak-recovery card** (`lib/widgets/streak_recovery_card.dart`)
+  — one-shot card that surfaces when the consecutive
+  counter reports 3+ missed days on a habit. The
+  primary "I'm back" `FilledButton` and a dismiss
+  `IconButton` keyed by `habitId` let the user resume
+  or shelve the card without going through Settings.
+- **Pre-notification heads-up**
+  (`lib/services/reminder_service.dart`) — a new
+  `ReminderService.schedulePreAlarms({alarmId, fireAt, now})`
+  method enqueues a 5-min heads-up when the lead time
+  is `> 5 * 60 s` and a 1-min heads-up when the lead
+  time is `> 60 s`; lead times at or below those
+  thresholds are silently skipped. A new
+  `ReminderService.cancelPreAlarms(alarmId)` forwards
+  to the bridge so a cancelled habit leaves no
+  dangling pre-alarms. The `ReminderBridge` interface
+  gains `schedulePreAlarm({alarmId, leadTimeSeconds})`
+  and `cancelPreAlarms(alarmId)` abstract methods; the
+  Dart side does NOT call `DateTime.now()` directly —
+  the caller passes the reference time so the method
+  is unit-testable.
+>>>>>>> origin/main
+
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 
 do it is no longer about streaks. Phase A renames the

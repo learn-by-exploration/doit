@@ -33,80 +33,15 @@
 
 import 'package:flutter/material.dart';
 
+import 'package:doit/services/permission_kind_meta.dart';
 import 'package:doit/services/permission_result.dart';
 import 'package:doit/services/permission_service.dart';
 import 'package:doit/theme/app_theme.dart';
 
-/// Per-kind metadata. Title and rationale are kept in sync
-/// with the onboarding step bodies (`lib/screens/onboarding.dart`).
-class _KindMeta {
-  const _KindMeta({
-    required this.title,
-    required this.icon,
-    required this.rationale,
-  });
-
-  final String title;
-  final IconData icon;
-  final String rationale;
-}
-
-const Map<PermissionKind, _KindMeta> _meta = <PermissionKind, _KindMeta>{
-  PermissionKind.notifications: _KindMeta(
-    title: 'Notifications',
-    icon: Icons.notifications_outlined,
-    rationale:
-        'do it sends a daily reminder for each do. Android asks for '
-        'the notification permission once.',
-  ),
-  PermissionKind.contacts: _KindMeta(
-    title: 'Contacts',
-    icon: Icons.contacts_outlined,
-    rationale:
-        'If you add a "cadence" do — call Mom every Sunday — do it '
-        'reads the contact you pick. It never imports the whole address '
-        'book.',
-  ),
-  PermissionKind.exactAlarm: _KindMeta(
-    title: 'Exact alarms',
-    icon: Icons.alarm_outlined,
-    rationale:
-        'Exact alarms fire reminders on the minute, not up to 15 '
-        'minutes late. If you decline, do it falls back to a '
-        'best-effort schedule.',
-  ),
-  PermissionKind.batteryOptimization: _KindMeta(
-    title: 'Battery optimization',
-    icon: Icons.battery_saver_outlined,
-    rationale:
-        'Allowing do it to run in the background ensures your '
-        'reminders fire on time, even when your phone is in Doze mode.',
-  ),
-  PermissionKind.location: _KindMeta(
-    title: 'Location',
-    icon: Icons.location_on_outlined,
-    rationale:
-        'do it uses your approximate location to fire "do X when I '
-        'arrive at Y" routines. City-block accuracy is enough — '
-        'your location is never stored or sent off the device.',
-  ),
-  PermissionKind.usageStats: _KindMeta(
-    title: 'Usage access',
-    icon: Icons.query_stats_outlined,
-    rationale:
-        'Allows do it to fire "do X when I open app Y" routines '
-        '(coming in v1.2). Android does not show a popup for this — '
-        'you will need to toggle do it on in the next screen.',
-  ),
-  PermissionKind.callScreening: _KindMeta(
-    title: 'Call screening',
-    icon: Icons.call_outlined,
-    rationale:
-        'Lets do it intercept incoming calls so it can silence the '
-        'ringer on contacts you choose. Android will ask you to '
-        'confirm do it as the call-screening app.',
-  ),
-};
+/// Per-kind metadata. Title and rationale live in
+/// `permission_kind_meta.dart` so the
+/// `AutomationReliabilityBadge` dialog (v1.2h) can reuse the
+/// same copy.
 
 /// Public surface. Returns `true` when the permission is
 /// granted by the time the sheet closes (either because it
@@ -354,7 +289,7 @@ class _PermissionSheetBodyState extends State<_PermissionSheetBody> {
 
   @override
   Widget build(BuildContext context) {
-    final meta = _meta[widget.kind]!;
+    final meta = permissionKindMeta[widget.kind]!;
     final scheme = Theme.of(context).colorScheme;
     final isPermanentlyDenied = _status is PermissionResultPermanentlyDenied;
     final canOpenSettings =
