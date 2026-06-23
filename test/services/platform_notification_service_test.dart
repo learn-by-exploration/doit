@@ -154,10 +154,8 @@ class _ThrowingReminderBridge implements ReminderBridge {
   Future<void> schedulePreAlarm({
     required int alarmId,
     required int leadTimeSeconds,
-  }) async =>
-      throw UnimplementedError();
+  }) async => throw UnimplementedError();
 
   @override
-  Future<void> cancelPreAlarms(int alarmId) async =>
-      throw UnimplementedError();
+  Future<void> cancelPreAlarms(int alarmId) async => throw UnimplementedError();
 }
