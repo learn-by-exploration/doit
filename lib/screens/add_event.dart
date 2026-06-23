@@ -44,12 +44,13 @@ import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/template_repository.dart';
 import 'package:doit/routines/routine_executor.dart';
 import 'package:doit/templates/template.dart';
+import 'package:doit/widgets/automation_reliability_badge.dart';
+import 'package:doit/widgets/automation_reliability_dialog.dart';
 import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/trigger.dart';
 import 'package:doit/widgets/calendar_picker.dart';
 import 'package:doit/widgets/location_picker.dart';
-import 'package:doit/widgets/automation_reliability_badge.dart';
 
 class AddEventScreen extends StatefulWidget {
   const AddEventScreen({super.key, this.existing, this.initialPayload});
@@ -622,7 +623,13 @@ class _EventRoutineRow extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AutomationReliabilityBadge(automation: automation),
+          AutomationReliabilityBadge(
+            automation: automation,
+            onTap: () => showAutomationReliabilityDialog(
+              context,
+              automation: automation,
+            ),
+          ),
           IconButton(
             key: const ValueKey('add_event.remove_routine'),
             tooltip: 'Remove',
