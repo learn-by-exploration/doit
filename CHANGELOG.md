@@ -714,6 +714,60 @@ paths a routine can need:
   the matching title + status + rationale body + CTA
   wiring.
 
+### v1.2i — AppLifecycleState.resumed re-probe hook for permissions
+
+Phase 9 of the v1.2 code-TODO closure (`30-phase roadmap`).
+ADR-030's lesson: the fire-and-forget probe from
+`PermissionService.init()` is stale by the time the user
+toggles a permission in Settings → Special access →
+Usage access (the most common flow that needs a
+re-probe). v1.2i wires a `WidgetsBindingObserver` so the
+Settings → Permissions tile and the per-automation
+reliability badges reflect the user's most recent
+toggle without a full restart.
+
+**What's new**
+
+- New `lib/services/permission_lifecycle_observer.dart`
+  with `PermissionLifecycleReProbe` — a stateless
+  `WidgetsBindingObserver` whose `didChangeAppLifecycleState
+  (resumed)` calls `PermissionService.refresh()` via
+  `unawaited(_safeRefresh())`. The observer tracks a
+  `_coldStartSeen` bool so the FIRST `resumed` event
+  (the OS bringing the app to the foreground after a
+  cold launch — `init()` has already probed) is a no-op;
+  every subsequent `resumed` (the user returning from
+  Settings) fires the re-probe. Non-resumed lifecycle
+  events (`paused`, `inactive`, `detached`) are ignored.
+- New `PermissionService.refresh()` method (v1.2i /
+  Phase 9 / SYS-104). Re-probes every
+  `permission_handler` kind in parallel via `Future.wait`
+  over six `_safeProbe` futures, then sequentially
+  re-probes `usageStats` and `callScreening`. Each
+  `_safeProbe` wraps `Permission.X.status` in
+  try/catch — a single probe failure keeps the prior
+  value (a failed re-probe is NOT a downgrade) and the
+  batch continues. ADR-013 follow-up.
+- Wired the observer in `lib/main.dart` immediately
+  after `PermissionService.instance.init()` completes:
+  `WidgetsBinding.instance.addObserver(PermissionLifecycleReProbe())`.
+  The observer is process-scoped (no `dispose`); a hot
+  restart replaces it via Flutter's framework reset.
+- New tests:
+  - `test/services/permission_lifecycle_observer_test.dart`
+    (3 tests: cold-start resumed is a no-op; second
+    resumed fires the `statuses` notifier; non-resumed
+    events are ignored).
+  - `test/services/permission_service_test.dart` (+4
+    tests: `refresh()` re-probes all six
+    `permission_handler` kinds; `refresh()` merges
+    granted into every kind; `refresh()` swallows a
+    single probe failure without aborting the batch;
+    `refresh()` re-probes `usageStats` and
+    `callScreening` separately).
+- Updated `docs/v_model/requirements.md` with the
+  `SYS-104` row.
+
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 
 do it is no longer about streaks. Phase A renames the
