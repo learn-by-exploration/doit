@@ -59,6 +59,27 @@ abstract class ReminderBridge {
   /// v0.6; the Dart side calls this for strong-mode habits.
   Future<void> showFullScreen(String habitId);
 
+  /// Show (or update) the notification for [alarmId]. The
+  /// platform side builds the `NotificationCompat.Builder`
+  /// with [habitName] as the title, [body] as the body (or
+  /// a default `Time for <habitName>` when null), and the
+  /// `doit.reminders` channel. Strong-mode reminders add
+  /// the `Open` action; soft-mode add the `Done` action.
+  /// v1.2e / Phase 5.
+  Future<void> showNotification({
+    required int alarmId,
+    required String habitName,
+    String? body,
+    bool strongMode = false,
+  });
+
+  /// Cancel the active notification for [alarmId]. No-op if
+  /// no notification is currently showing for this id. The
+  /// cancel matches the alarmId, not the most-recent
+  /// notification (so canceling alarmId=7 does not also
+  /// cancel alarmId=8 if both are visible). v1.2e / Phase 5.
+  Future<void> cancelNotification(int alarmId);
+
   /// Open the system battery-optimization whitelist page
   /// (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`). The
   /// platform starts the activity synchronously; the result
@@ -166,6 +187,28 @@ class PlatformReminderBridge implements ReminderBridge {
   }
 
   @override
+  Future<void> showNotification({
+    required int alarmId,
+    required String habitName,
+    String? body,
+    bool strongMode = false,
+  }) async {
+    await _channel.invokeMethod<void>('showNotification', {
+      'alarmId': alarmId,
+      'habitName': habitName,
+      'body': body,
+      'strongMode': strongMode,
+    });
+  }
+
+  @override
+  Future<void> cancelNotification(int alarmId) async {
+    await _channel.invokeMethod<void>('cancelNotification', {
+      'alarmId': alarmId,
+    });
+  }
+
+  @override
   Future<void> openIgnoreBatteryOptimizations() async {
     await _channel.invokeMethod<void>('openIgnoreBatteryOptimizations');
   }
@@ -178,6 +221,10 @@ class FakeReminderBridge implements ReminderBridge {
       <({int alarmId, int epochMs})>[];
   final List<int> cancelAlarmCalls = <int>[];
   final List<String> showFullScreenCalls = <String>[];
+  final List<({int alarmId, String habitName, String? body, bool strongMode})>
+  showNotificationCalls =
+      <({int alarmId, String habitName, String? body, bool strongMode})>[];
+  final List<int> cancelNotificationCalls = <int>[];
   int openIgnoreBatteryOptimizationsCalls = 0;
   int rescheduleCount = 0;
   Reliability reliability = Reliability.optimal;
@@ -218,6 +265,26 @@ class FakeReminderBridge implements ReminderBridge {
   @override
   Future<void> showFullScreen(String habitId) async {
     showFullScreenCalls.add(habitId);
+  }
+
+  @override
+  Future<void> showNotification({
+    required int alarmId,
+    required String habitName,
+    String? body,
+    bool strongMode = false,
+  }) async {
+    showNotificationCalls.add((
+      alarmId: alarmId,
+      habitName: habitName,
+      body: body,
+      strongMode: strongMode,
+    ));
+  }
+
+  @override
+  Future<void> cancelNotification(int alarmId) async {
+    cancelNotificationCalls.add(alarmId);
   }
 
   @override
