@@ -4,12 +4,15 @@
 //
 // Per SYS-011 the user gets up to 3 wrong answers before the
 // mission auto-fails (the 4th wrong attempt pops with null).
+// The 3-wrong take-a-break is shared with the Type mission
+// via [MissionWrongAttempts] (WF-030 uniform).
 
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import 'package:doit/missions/mission.dart';
+import 'package:doit/missions/mission_attempts.dart';
 import 'package:doit/missions/mission_input.dart';
 import 'package:doit/missions/mission_result.dart';
 import 'package:doit/theme/app_theme.dart';
@@ -32,10 +35,8 @@ class _MissionMathScreenState extends State<MissionMathScreen> {
     math.Random(42),
   );
   final _ctrl = TextEditingController();
-  int _wrongCount = 0;
+  final _attempts = MissionWrongAttempts();
   String? _error;
-
-  static const _maxWrong = 3;
 
   @override
   void dispose() {
@@ -63,16 +64,12 @@ class _MissionMathScreenState extends State<MissionMathScreen> {
       Navigator.of(context).pop(MathInput(problem: _problem, answer: answer));
       return;
     }
-    final next = _wrongCount + 1;
-    if (next >= _maxWrong) {
-      // 4th wrong → auto-fail the chain.
+    final shouldAutoFail = _attempts.recordWrong();
+    if (shouldAutoFail) {
       Navigator.of(context).pop();
       return;
     }
-    setState(() {
-      _wrongCount = next;
-      _error = 'Wrong. ${_maxWrong - next} attempt(s) left.';
-    });
+    setState(() => _error = _attempts.errorLabel());
   }
 
   @override
