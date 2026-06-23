@@ -416,6 +416,72 @@ notification-icon resource reference.
 
 ## [Unreleased]
 
+### v1.2f — `ActionFullscreen` + `ActionCallIntercept` real implementations + Person pauseUntil UI + DoFixed weekday display
+
+Phases 6b–6e of the v1.2 code-TODO closure
+(`30-phase roadmap`). Closes the I20 / I21 / I26 + I27 / I28
+items: every `Action` leaf now has a real side effect.
+
+**What's new**
+
+- **`ActionFullscreen`** — the routine-fired full-screen
+  overlay now actually opens. `FullScreenIntent` gained
+  `showRoutineOverlay({title?, body?})`; `PlatformFullScreenIntent`
+  invokes a new `doit/full_screen` method-channel call
+  (`showRoutineOverlay`); the executor dispatches the leaf
+  by awaiting that call. Platform failures are swallowed
+  per ADR-013 — the executor still publishes the fire
+  event, only the side effect is suppressed.
+- **`ActionCallIntercept`** — the routine-fired call-screen
+  decision (`accept` / `mute` / `decline` / `silent`) now
+  drives the Kotlin `CallScreeningService` role.
+  `CallSource` gained `recordRoutineDecision`; the service
+  exposes a thin pass-through; the executor dispatches the
+  leaf by awaiting the pass-through.
+- **`Person.pausedUntil`** — per-person pause for cadence
+  reminders. The Add Person screen has a Pause section
+  visible only after a contact is picked; the Person Groups
+  screen renders a per-person "Paused" chip in the
+  multi-select picker. Drift schema migration `v5_to_v6`
+  adds a nullable `paused_until_millis` column on the
+  `person` table.
+- **DoFixed weekday set on the home tile** — the
+  one-line subtitle under each `DoFixed` habit now reads
+  `"Mon, Wed, Fri · 09:00"` (or `"Every day · 06:30"` /
+  `"Weekends · 10:00"` for the special-case sets) instead
+  of the prior `"Fixed — 06:30"` that dropped the weekday
+  set. The label is produced by a pure top-level function
+  `describeDo(Do)` in `lib/do/do_description.dart`.
+
+**Coverage**
+
+- 10 new tests in `test/do/do_description_test.dart` —
+  every-day / weekdays / weekends / single weekday /
+  arbitrary-subset / every non-`DoFixed` branch.
+- 1 new widget test in `test/screens/home_test.dart` —
+  end-to-end render of the weekday-set subtitle.
+- 2 new tests in `test/routines/action_dispatch_test.dart`
+  + 1 updated `test/routines/call_dispatch_test.dart` —
+  ActionFullscreen + ActionCallIntercept wiring.
+- 2 new tests in `test/services/person_repository_test.dart`
+  — `pausedUntil` round-trip + `clearPausedUntil` via
+  `copyWith`.
+- 1 new test in `test/screens/add_person_test.dart` —
+  pause-section visibility gates on a picked contact.
+
+**V-Model traceability**
+
+- SYS-099 (ActionFullscreen wiring),
+  SYS-100 (ActionCallIntercept wiring),
+  SYS-101 (Person pauseUntil),
+  SYS-102 (DoFixed weekday display) appended to
+  [`docs/v_model/requirements.md`](docs/v_model/requirements.md).
+- `lib/do/do_description.dart` is a new pure-Dart file
+  imported from `lib/screens/home.dart`; it follows the
+  model-purity rule from
+  [`.claude/rules/lib-do.md`](.claude/rules/lib-do.md)
+  (no Flutter imports).
+
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 
 do it is no longer about streaks. Phase A renames the
