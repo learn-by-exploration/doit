@@ -2,10 +2,16 @@
 // phrase exactly (case-insensitive, whitespace-trimmed,
 // punctuation-stripped — see [TypeMission._normalize]). The
 // screen pops with a [TextInput] on success or null on cancel.
+//
+// Per WF-030 (uniform 3-wrong take-a-break), the user gets
+// up to 3 wrong attempts before the mission auto-fails;
+// the 3rd wrong attempt also surfaces a one-shot "take a
+// break" `SnackBar` (matching the Math mission).
 
 import 'package:flutter/material.dart';
 
 import 'package:doit/missions/mission.dart';
+import 'package:doit/missions/mission_attempts.dart';
 import 'package:doit/missions/mission_input.dart';
 import 'package:doit/missions/mission_result.dart';
 import 'package:doit/theme/app_theme.dart';
@@ -21,6 +27,7 @@ class MissionTypeScreen extends StatefulWidget {
 
 class _MissionTypeScreenState extends State<MissionTypeScreen> {
   final _ctrl = TextEditingController();
+  final _attempts = MissionWrongAttempts();
   String? _error;
 
   @override
@@ -35,7 +42,12 @@ class _MissionTypeScreenState extends State<MissionTypeScreen> {
       Navigator.of(context).pop(TextInput(_ctrl.text));
       return;
     }
-    setState(() => _error = 'Phrase does not match. Try again.');
+    final shouldAutoFail = _attempts.recordWrong();
+    if (shouldAutoFail) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() => _error = _attempts.errorLabel());
   }
 
   @override

@@ -767,6 +767,55 @@ best-effort basis without the permission and the debug
 screen shows a banner explaining the degraded mode
 (v1.1 follow-up; needs a separate SYS- ID and ADR).
 
+### v1.2l — WF-030 uniform 3-wrong take-a-break (Phase 11b)
+
+Phase 11b of the v1.2 code-TODO closure (`30-phase
+roadmap`). Closes the B2 item: every mission that tracks
+"wrong attempt" semantics now uses the same counter, the
+same nudge copy, and the same auto-fail threshold — the
+user never sees a behavior gap between Math and Type.
+
+**What's new**
+
+- **`MissionWrongAttempts`** (`lib/missions/mission_attempts.dart`,
+  pure Dart, no Flutter) — a tiny state container with
+  `recordWrong()` (returns `true` when the caller should
+  auto-fail), `errorLabel()` (returns the inline error
+  string for the current state), `remaining`, `wrongCount`,
+  and `budgetExhausted`. The constant `kMissionMaxWrongAttempts = 3`
+  is the single source of truth (overridable per-instance
+  via the `maxWrong` constructor arg).
+- **`Math` and `Type` mission screens** — both replaced
+  their inline `_wrongCount` field with `MissionWrongAttempts`.
+  Both surface the shared copy `"Wrong. N attempt(s) left."`
+  for the first two attempts and `"Take a break. The mission
+  will end."` (the `missionTakeBreakNudge` constant) on
+  the third / final attempt, then pop with `null` to
+  auto-fail the chain.
+- **Out of scope for this PR** — Shake, Hold, and Memory
+  do not have a "wrong attempt" notion (they time-out
+  instead of failing per-attempt). The shared module is
+  documented as opt-in for any future mission kind.
+
+**3-gate verification**
+
+```
+$ dart format --output=none --set-exit-if-changed .
+Formatted 213 files (0 changed) in 0.77 seconds.
+$ flutter analyze --fatal-infos
+No issues found! (ran in 1.1s)
+$ flutter test
+00:22 +995: All tests passed!
+```
+
+(Test count: 984 → 995 — 9 unit tests for
+`MissionWrongAttempts` (constant, getter/setter, error-label,
+custom-maxWrong, nudge-copy) + 2 widget tests on the Type
+mission (auto-fail on 3rd wrong + per-attempt label
+decrement); the 3 existing Math widget tests are unchanged
+but now exercise the shared module; 3-gate green with zero
+analyzer findings.)
+
 ### v1.0/Phase B — Templates (curated library + save-as-template)
 
 Templates are a curated, opt-in way to bootstrap a new do / event /
