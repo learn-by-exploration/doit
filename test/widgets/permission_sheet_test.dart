@@ -87,6 +87,25 @@ class _RecordingBridge implements ReminderBridge {
   Future<void> openIgnoreBatteryOptimizations() async {
     openIgnoreBatteryOptimizationsCalls++;
   }
+
+  @override
+  Future<void> showNotification({
+    required int alarmId,
+    required String habitName,
+    String? body,
+    bool strongMode = false,
+  }) async {}
+
+  @override
+  Future<void> cancelNotification(int alarmId) async {}
+
+  Future<void> schedulePreAlarm({
+    required int alarmId,
+    required int leadTimeSeconds,
+  }) async {}
+
+  @override
+  Future<void> cancelPreAlarms(int alarmId) async {}
 }
 
 Widget _wrap() => MaterialApp(theme: AppTheme.dark, home: const _Host());
