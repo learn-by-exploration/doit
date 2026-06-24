@@ -14,6 +14,14 @@
 // - 4-hour debounce: a second anchor event within 4 hours of
 //   the first is silently dropped.
 //
+// WF-026 (Phase 11e): an evening anchor ("I'm winding
+// down") is a parallel concept. The morning and evening
+// debounce counters are independent — a morning "I'm up"
+// does not block the evening "I'm winding down", and vice
+// versa. First-unlock mode only fires the morning anchor;
+// the evening anchor is manual-only by design (Android does
+// not expose a stable "winding down" event).
+//
 // This file is a pure-Dart model. The platform-side listener
 // (Kotlin) writes into the detector via a method channel.
 
@@ -40,13 +48,23 @@ abstract class AnchorDetector {
   /// Stop listening. [lastAnchor] remains.
   void stop();
 
-  /// The most recent anchor event. Null if none has fired in
-  /// this session or since the last [reset].
+  /// The most recent morning-anchor event. Null if none has
+  /// fired in this session or since the last [reset].
   DateTime? get lastAnchor;
 
-  /// Mark "now" as the anchor (manual mode). Returns the new
-  /// anchor time, or null if the 4-hour debounce is in effect.
+  /// The most recent evening-anchor event. Null if none has
+  /// fired since the last [reset]. WF-026 (Phase 11e).
+  DateTime? get lastEveningAnchor;
+
+  /// Mark "now" as the morning anchor (manual mode). Returns
+  /// the new anchor time, or null if the 4-hour debounce is
+  /// in effect.
   DateTime? markNow();
+
+  /// Mark "now" as the evening anchor (manual mode). Returns
+  /// the new anchor time, or null if the 4-hour evening
+  /// debounce is in effect. WF-026 (Phase 11e).
+  DateTime? markEveningNow();
 
   /// Reset the detector (used in tests and on settings change).
   void reset();
@@ -63,6 +81,7 @@ abstract class AnchorDetector {
 class FakeAnchorDetector implements AnchorDetector {
   AnchorMode _mode = AnchorMode.manual;
   DateTime? _lastAnchor;
+  DateTime? _lastEveningAnchor;
   final StreamController<AnchorEvent> _ctrl =
       StreamController<AnchorEvent>.broadcast();
 
@@ -86,6 +105,9 @@ class FakeAnchorDetector implements AnchorDetector {
   DateTime? get lastAnchor => _lastAnchor;
 
   @override
+  DateTime? get lastEveningAnchor => _lastEveningAnchor;
+
+  @override
   DateTime? markNow() {
     final now = DateTime.now();
     if (_lastAnchor != null && now.difference(_lastAnchor!) < debounceWindow) {
@@ -97,8 +119,24 @@ class FakeAnchorDetector implements AnchorDetector {
   }
 
   @override
+  DateTime? markEveningNow() {
+    // WF-026 (Phase 11e). Independent debounce counter from
+    // the morning anchor — a morning "I'm up" does not
+    // block the evening "I'm winding down", and vice versa.
+    final now = DateTime.now();
+    if (_lastEveningAnchor != null &&
+        now.difference(_lastEveningAnchor!) < debounceWindow) {
+      return null;
+    }
+    _lastEveningAnchor = now;
+    _ctrl.add(AnchorEvent(now));
+    return now;
+  }
+
+  @override
   void reset() {
     _lastAnchor = null;
+    _lastEveningAnchor = null;
   }
 
   @override

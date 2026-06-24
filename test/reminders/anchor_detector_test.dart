@@ -61,4 +61,67 @@ void main() {
       d.stop();
     });
   });
+
+  // WF-026 (Phase 11e). The evening anchor ("I'm winding
+  // down") is a parallel manual anchor with its own debounce
+  // counter. The morning and evening counters do NOT share
+  // debounce state — a morning "I'm up" does not block the
+  // evening "I'm winding down".
+  group('FakeAnchorDetector (evening anchor)', () {
+    test('markEveningNow records the first evening anchor', () {
+      final d = FakeAnchorDetector();
+      final t = d.markEveningNow();
+      expect(t, isNotNull);
+      expect(d.lastEveningAnchor, t);
+    });
+
+    test('markEveningNow within debounce returns null', () {
+      final d = FakeAnchorDetector(debounceWindow: const Duration(seconds: 1));
+      final t0 = d.markEveningNow();
+      expect(t0, isNotNull);
+      final t1 = d.markEveningNow();
+      expect(t1, isNull);
+      expect(d.lastEveningAnchor, t0);
+    });
+
+    test('morning and evening debounce counters are independent', () {
+      final d = FakeAnchorDetector(debounceWindow: const Duration(seconds: 1));
+      final tm = d.markNow();
+      expect(tm, isNotNull);
+      // The morning anchor fires; the evening anchor should
+      // still fire because the debounce is per-anchor.
+      final te = d.markEveningNow();
+      expect(te, isNotNull);
+      expect(d.lastAnchor, tm);
+      expect(d.lastEveningAnchor, te);
+    });
+
+    test('morning debounce does not affect evening debounce', () {
+      final d = FakeAnchorDetector(debounceWindow: const Duration(seconds: 1));
+      d.markNow(); // first morning anchor
+      // Second morning call within debounce returns null.
+      expect(d.markNow(), isNull);
+      // Evening anchor still works because it has its own
+      // counter.
+      expect(d.markEveningNow(), isNotNull);
+    });
+
+    test('evening debounce does not affect morning debounce', () {
+      final d = FakeAnchorDetector(debounceWindow: const Duration(seconds: 1));
+      d.markEveningNow(); // first evening anchor
+      expect(d.markEveningNow(), isNull);
+      expect(d.markNow(), isNotNull);
+    });
+
+    test('reset clears both morning and evening anchors', () {
+      final d = FakeAnchorDetector();
+      d.markNow();
+      d.markEveningNow();
+      expect(d.lastAnchor, isNotNull);
+      expect(d.lastEveningAnchor, isNotNull);
+      d.reset();
+      expect(d.lastAnchor, isNull);
+      expect(d.lastEveningAnchor, isNull);
+    });
+  });
 }

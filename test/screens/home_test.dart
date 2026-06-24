@@ -251,4 +251,34 @@ void main() {
     final log = await CompletionLogService.instance.listForHabit('h_perday');
     expect(log.length, 1);
   });
+
+  // WF-026 (Phase 11e). The evening anchor button ("I'm
+  // winding down") is rendered on the home screen below the
+  // morning "I'm up" button. Tapping it records an evening
+  // anchor via AnchorDetector.markEveningNow.
+  testWidgets('Home shows the evening anchor button (WF-026 / Phase 11e)', (
+    tester,
+  ) async {
+    await _resetDb(tester);
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    // Both buttons are present.
+    expect(find.byKey(const ValueKey('home.im_up')), findsOneWidget);
+    expect(find.byKey(const ValueKey('home.im_down')), findsOneWidget);
+    expect(find.text("I'm up"), findsOneWidget);
+    expect(find.text("I'm winding down"), findsOneWidget);
+  });
+
+  testWidgets('Tapping "I\'m winding down" surfaces a confirmation snackbar', (
+    tester,
+  ) async {
+    await _resetDb(tester);
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('home.im_down')));
+    await tester.pumpAndSettle();
+    expect(find.text('Marked as winding down.'), findsOneWidget);
+    // The detector recorded the anchor.
+    expect(ReminderService.instance.anchor.lastEveningAnchor, isNotNull);
+  });
 }

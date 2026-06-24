@@ -244,7 +244,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           children: [
             ReliabilityBanner.fromService(),
             const RoutineBanner(),
+            // WF-026 (Phase 11e). Morning ("I'm up") + evening
+            // ("I'm winding down") anchors are independent and
+            // both render on the home screen above the do
+            // list. The evening button mirrors the morning
+            // button's surface (FilledButton.icon, 56dp tap
+            // target, snackbar on tap).
             const _AddAnchorButton(),
+            const _AddEveningAnchorButton(),
             Expanded(
               child: FutureBuilder<List<Do>>(
                 future: _habitsFuture,
@@ -314,6 +321,44 @@ class _AddAnchorButton extends StatelessWidget {
                   t == null
                       ? 'Already up — see you in a few hours.'
                       : 'Marked as up.',
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// WF-026 (Phase 11e). The evening anchor ("I'm winding
+/// down") is a parallel manual anchor with its own debounce
+/// counter. Renders below the morning anchor button; the
+/// icon is `Icons.bedtime_outlined` to distinguish the two
+/// at a glance.
+class _AddEveningAnchorButton extends StatelessWidget {
+  const _AddEveningAnchorButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Spacing.md, 0, Spacing.md, Spacing.md),
+      child: SizedBox(
+        width: double.infinity,
+        height: Sizing.tapHome,
+        child: FilledButton.tonalIcon(
+          key: const ValueKey('home.im_down'),
+          icon: const Icon(Icons.bedtime_outlined),
+          label: const Text("I'm winding down"),
+          onPressed: () {
+            final t = ReminderService.instance.anchor.markEveningNow();
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  t == null
+                      ? 'Already winding down — see you tomorrow.'
+                      : 'Marked as winding down.',
                 ),
               ),
             );

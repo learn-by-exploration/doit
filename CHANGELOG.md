@@ -1087,6 +1087,85 @@ model + 1 repository round-trip + 1 widget picker + 1
 widget home-tile mark-done = 12 new tests for WF-021 /
 Phase 11d; 3-gate green with zero analyzer findings.)
 
+### v1.2o — WF-026 evening anchor (Phase 11e)
+
+Phase 11e of the v1.2 code-TODO closure (`30-phase
+roadmap`). Closes the B7 item: a parallel evening anchor
+("I'm winding down") that lives next to the morning "I'm
+up" button on the home screen. Mirror of WF-008 — the
+morning anchor is `markNow`/`lastAnchor`, the evening is
+`markEveningNow`/`lastEveningAnchor`, and the debounce
+counters are independent (a morning `markNow` within
+debounce returning `null` does NOT block
+`markEveningNow`).
+
+**What's new**
+
+- **`AnchorDetector.markEveningNow()` and `lastEveningAnchor`**
+  (`lib/reminders/anchor_detector.dart`). Two new surface
+  members on the abstract class; the `FakeAnchorDetector`
+  implementation tracks debounce independently from the
+  morning anchor. `reset()` clears both. The events stream
+  is shared — both anchors emit `AnchorEvent` instances,
+  which is enough for downstream listeners that just need
+  "an anchor event happened".
+- **Home screen evening button** (`lib/screens/home.dart`,
+  new `_AddEveningAnchorButton` widget). Renders below the
+  morning button using `FilledButton.tonalIcon` (vs the
+  morning's `FilledButton.icon`), `Icon(Icons.bedtime_outlined)`
+  (vs `Icons.wb_sunny_outlined`), and copy `"I'm winding
+  down"`. The tap target height is `Sizing.tapHome` per the
+  home-tile rule. Snackbar copy is `"Marked as winding
+  down."` on success and `"Already winding down — see you
+  tomorrow."` on a debounced tap.
+- **Manual-only by design.** Android does not expose a
+  stable "winding down" event the way it exposes
+  `Intent.ACTION_USER_PRESENT` for first-unlock, so the
+  evening anchor stays user-initiated. The
+  `AnchorMode.firstUnlock` listener continues to fire the
+  morning anchor only; `AnchorMode.either` honors whichever
+  fires first.
+- **No Drift migration, no schema change.** The evening
+  anchor is held in `FakeAnchorDetector`'s in-memory
+  `_lastEveningAnchor` field. The persistence layer (the
+  Drift `Habits` table) is untouched. The morning anchor
+  is also in-memory today; if v1.3+ adds a
+  `last_anchor_millis` column for `DoAnchor` reminders, the
+  evening anchor can be tracked in a sibling
+  `last_evening_anchor_millis` column without breaking
+  callers.
+
+**Files**
+
+- `lib/reminders/anchor_detector.dart` — added
+  `lastEveningAnchor` getter and `markEveningNow()` method
+  to the abstract class + the `FakeAnchorDetector`
+  implementation. `reset()` now clears both anchors.
+- `lib/screens/home.dart` — added `_AddEveningAnchorButton`
+  widget rendered below `_AddAnchorButton` in the home
+  body.
+- `test/reminders/anchor_detector_test.dart` — 6 new
+  evening-anchor tests (first-fire, debounce, independent
+  counters in both directions, reset clears both).
+- `test/screens/home_test.dart` — 2 new widget tests
+  (button renders, tap records anchor + surfaces snackbar).
+- `docs/v_model/requirements.md` — new `SYS-112` row.
+
+**3-gate verification**
+
+```
+$ dart format --output=none --set-exit-if-changed .
+Formatted 215 files (0 changed) in 0.92 seconds.
+$ flutter analyze --fatal-infos
+No issues found! (ran in 2.8s)
+$ flutter test
+00:19 +1021: All tests passed!
+```
+
+(Test count: 1013 → 1021 — 6 unit + 2 widget = 8 new
+tests for WF-026 / Phase 11e; 3-gate green with zero
+analyzer findings.)
+
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 
 do it is no longer about streaks. Phase A renames the
