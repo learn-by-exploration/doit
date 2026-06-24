@@ -339,4 +339,73 @@ void main() {
       },
     );
   });
+
+  // WF-020 (Phase 11h). Quota habit: a daily-target habit
+  // (e.g., "8 glasses of water") with an optional non-
+  // midnight reset. Soft-mode only in v1.2r. Streak is
+  // window-agnostic — ConsecutiveCounter sees one
+  // completion entry per day the quota was hit.
+  group('DoQuota', () {
+    test('validates with targetCount >= 1 and default resetAt', () {
+      final h = DoQuota(
+        id: 'h_q1',
+        name: '8 glasses of water',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026),
+        restDaysPerMonth: 2,
+        targetCount: 8,
+      );
+      h.validate();
+      expect(h.targetCount, 8);
+      expect(h.resetAt, const DoTime(0, 0));
+    });
+
+    test('rejects targetCount < 1 with DoInvalidTargetCount', () {
+      final h = DoQuota(
+        id: 'h_q2',
+        name: 'bad',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026),
+        restDaysPerMonth: 2,
+        targetCount: 0,
+      );
+      expect(h.validate, throwsA(isA<DoInvalidTargetCount>()));
+    });
+
+    test('rejects a negative targetCount', () {
+      final h = DoQuota(
+        id: 'h_q3',
+        name: 'bad',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026),
+        restDaysPerMonth: 2,
+        targetCount: -3,
+      );
+      expect(h.validate, throwsA(isA<DoInvalidTargetCount>()));
+    });
+
+    test('copyWith updates targetCount + resetAt + graceWindowOverride', () {
+      final h = DoQuota(
+        id: 'h_q4',
+        name: 'cups',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026),
+        restDaysPerMonth: 2,
+        targetCount: 4,
+        resetAt: const DoTime(4, 0),
+      );
+      final h2 = h.copyWith(
+        targetCount: 6,
+        resetAt: const DoTime(0, 0),
+        graceWindowOverride: const Duration(hours: 6),
+      );
+      expect(h2.targetCount, 6);
+      expect(h2.resetAt, const DoTime(0, 0));
+      expect(h2.graceWindowOverride, const Duration(hours: 6));
+      // h is untouched.
+      expect(h.targetCount, 4);
+      expect(h.resetAt, const DoTime(4, 0));
+      expect(h.graceWindowOverride, isNull);
+    });
+  });
 }

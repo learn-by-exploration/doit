@@ -1363,6 +1363,114 @@ $ flutter test
 widget tests = 5 new tests for WF-024 / Phase 11g;
 3-gate green with zero analyzer findings.)
 
+### v1.2r — WF-020 quota habit (Phase 11h)
+
+Phase 11h of the v1.2 code-TODO closure (`30-phase
+roadmap`). Closes the B1 item: a daily-target habit
+("8 glasses of water", "10k steps") that resets at
+local midnight (or a user-picked time-of-day). The
+schedule engine re-arms via `nextOccurrence`; the
+streak counter is window-agnostic — one completion
+per day the quota was hit, computed by
+`ConsecutiveCounter` against the completion log. This
+phase also closes a v1.2n (Phase 11d) gap discovered
+during 11h wiring: the `_scheduleTypeTag` and
+`_fromRow` switches in `DoRepository` were missing
+the `quota` arm, so a saved `DoQuota` row round-trip
+would throw `Unknown do type`. The fix is added in
+the same PR (the natural place — the v5→v6 migration
+is what introduces the `target_count` /
+`quota_reset_hour` / `quota_reset_minute` columns
+the round-trip reads).
+
+**What's new**
+
+- **`DoQuota` (new sealed `Do` leaf in `lib/do/do.dart`)** —
+  `final class DoQuota extends Do` with two schedule-
+  specific fields: `targetCount` (`int`, `>= 1`; the
+  user must log this many completions to satisfy the
+  do for the current window) and `resetAt` (`DoTime`,
+  defaults to `00:00` — the local time-of-day at which
+  the quota window rolls over). Soft-mode only in
+  v1.2r; a future Strong-mode quota is out of scope.
+  `nextOccurrence(from)` returns the next `resetAt`
+  strictly after `from`. Validates that
+  `targetCount >= 1` (`DoInvalidTargetCount`) and that
+  `resetAt` is a valid time-of-day.
+- **`DoInvalidTargetCount` (new exception)** — extends
+  `DoValidationException`. Thrown by
+  `Do.validate()` when `targetCount < 1`.
+- **`DoQuota` row mapping (`lib/services/do_repository.dart`)**:
+  - `_scheduleTypeTag` returns `'quota'` for `DoQuota`.
+  - `_toRow` writes `targetCount`, `quotaResetHour`,
+    `quotaResetMinute` (all nullable, NULL for non-
+    quota rows).
+  - `_fromRow` decodes the new columns back into a
+    `DoQuota` (with `targetCount ?? 1` for the
+    migration-default case where a row predates the
+    column add).
+- **Add-habit UI (`lib/screens/add_habit.dart`)** — a
+  new "Quota" segment in the schedule-type
+  `SegmentedButton`; a `targetCount` stepper; the
+  `_save` switch writes the new `DoQuota` row.
+- **Schema v5→v6 migration (`lib/services/db/migrations/v5_to_v6.dart`)**:
+  `ALTER TABLE habits ADD COLUMN target_count INTEGER`,
+  `quota_reset_hour INTEGER`, `quota_reset_minute
+  INTEGER` (all nullable). Registered in
+  `lib/services/db/schema.dart` and version-pinned
+  via `kCurrentSchemaVersion = 6`.
+- **Drift code-gen refresh** — `lib/services/db/schema.g.dart`
+  regenerated to expose the three new columns on
+  `HabitRow`.
+
+**Files**
+
+- `lib/do/do.dart` — `DoQuota` leaf,
+  `DoInvalidTargetCount` exception, `validate()` arm.
+- `lib/do/do_description.dart` — `DoQuota(:final targetCount) => '$targetCount per day'`.
+- `lib/services/db/tables.dart` — three new nullable
+  columns on `Habits`.
+- `lib/services/db/migrations/v5_to_v6.dart` — **new**.
+- `lib/services/db/schema.dart` — version bump
+  5 → 6 + migration registration + version-history
+  comment.
+- `lib/services/do_repository.dart` — `_scheduleTypeTag`
+  `quota` arm, `_toRow` column writes, `_fromRow`
+  decoder.
+- `lib/screens/add_habit.dart` — schedule-type picker
+  segment, `_loadExisting` arm, `_buildScheduleFields`
+  arm, `_save` arm, `_doToMap` arm.
+- `test/db/migration_test.dart` — version pin update
+  (5 → 6, comment refreshed).
+- `test/db/migration_v2_to_v3_test.dart` — version pin
+  updates (5 → 6, comment refreshed for v1.2r).
+- `test/db/migration_v3_to_v4_test.dart` — version pin
+  updates (5 → 6, comment refreshed for v1.2r).
+- `test/habits/schedule_test.dart` — new
+  `DoQuota.nextOccurrence` group (4 tests:
+  before-midnight / on-midnight / mid-day /
+  non-midnight reset).
+- `test/habits/habit_model_test.dart` — new `DoQuota`
+  group (4 tests: validates default,
+  rejects `targetCount = 0`, rejects `targetCount = -3`,
+  copyWith updates targetCount / resetAt /
+  graceWindowOverride).
+- `test/services/habit_repository_test.dart` — new
+  `DoQuota` round-trip group (2 tests: default reset,
+  non-midnight reset).
+
+**3-gate verification**
+
+```
+$ dart format --output=none --set-exit-if-changed .
+$ flutter analyze --fatal-infos
+$ flutter test
+```
+
+(Test count: 1035 → 1045 — 4 schedule + 4 model + 2
+repo round-trip = 10 new tests for WF-020 / Phase 11h;
+3-gate green with zero analyzer findings.)
+
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 
 do it is no longer about streaks. Phase A renames the

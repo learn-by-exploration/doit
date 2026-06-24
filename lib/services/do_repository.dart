@@ -133,6 +133,12 @@ class DoRepository {
       // global 3-hour default (SYS-019); otherwise the
       // override's millis.
       graceWindowOverrideMillis: d.graceWindowOverride?.inMilliseconds,
+      // WF-020 (Phase 11h). Null on every non-quota row; for
+      // a `DoQuota`, populated with the target count and
+      // the reset time-of-day.
+      targetCount: d is domain.DoQuota ? d.targetCount : null,
+      quotaResetHour: d is domain.DoQuota ? d.resetAt.hour : null,
+      quotaResetMinute: d is domain.DoQuota ? d.resetAt.minute : null,
     );
   }
 
@@ -258,6 +264,29 @@ class DoRepository {
           pausedUntil: base.pausedUntil,
           graceWindowOverride: base.graceWindowOverride,
         );
+      case 'quota':
+        // WF-020 (Phase 11h). The target count and reset
+        // time-of-day come from dedicated columns. A null
+        // `targetCount` is treated as 1 (the model default)
+        // for safety; the migration left it null on every
+        // existing row.
+        return domain.DoQuota(
+          id: base.id,
+          name: base.name,
+          proofMode: base.proofMode,
+          createdAt: base.createdAt,
+          restDaysPerMonth: base.restDaysPerMonth,
+          targetCount: r.targetCount ?? 1,
+          resetAt: domain.DoTime(
+            r.quotaResetHour ?? 0,
+            r.quotaResetMinute ?? 0,
+          ),
+          category: base.category,
+          colorSeed: base.colorSeed,
+          iconName: base.iconName,
+          pausedUntil: base.pausedUntil,
+          graceWindowOverride: base.graceWindowOverride,
+        );
       default:
         throw StateError('Unknown scheduleType: ${r.scheduleType}');
     }
@@ -290,6 +319,7 @@ class DoRepository {
     if (d is domain.DoDayOfX) return 'dayOfX';
     if (d is domain.DoTimeWindow) return 'timeWindow';
     if (d is domain.DoPerDay) return 'perDay';
+    if (d is domain.DoQuota) return 'quota';
     throw ArgumentError('Unknown do type: $d');
   }
 

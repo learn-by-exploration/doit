@@ -294,6 +294,39 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
         type: DriftSqlType.int,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _targetCountMeta = const VerificationMeta(
+    'targetCount',
+  );
+  @override
+  late final GeneratedColumn<int> targetCount = GeneratedColumn<int>(
+    'target_count',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _quotaResetHourMeta = const VerificationMeta(
+    'quotaResetHour',
+  );
+  @override
+  late final GeneratedColumn<int> quotaResetHour = GeneratedColumn<int>(
+    'quota_reset_hour',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _quotaResetMinuteMeta = const VerificationMeta(
+    'quotaResetMinute',
+  );
+  @override
+  late final GeneratedColumn<int> quotaResetMinute = GeneratedColumn<int>(
+    'quota_reset_minute',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -323,6 +356,9 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
     pausedUntilMillis,
     automationsJson,
     graceWindowOverrideMillis,
+    targetCount,
+    quotaResetHour,
+    quotaResetMinute,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -544,6 +580,33 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
         ),
       );
     }
+    if (data.containsKey('target_count')) {
+      context.handle(
+        _targetCountMeta,
+        targetCount.isAcceptableOrUnknown(
+          data['target_count']!,
+          _targetCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('quota_reset_hour')) {
+      context.handle(
+        _quotaResetHourMeta,
+        quotaResetHour.isAcceptableOrUnknown(
+          data['quota_reset_hour']!,
+          _quotaResetHourMeta,
+        ),
+      );
+    }
+    if (data.containsKey('quota_reset_minute')) {
+      context.handle(
+        _quotaResetMinuteMeta,
+        quotaResetMinute.isAcceptableOrUnknown(
+          data['quota_reset_minute']!,
+          _quotaResetMinuteMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -661,6 +724,18 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
         DriftSqlType.int,
         data['${effectivePrefix}grace_window_override_millis'],
       ),
+      targetCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}target_count'],
+      ),
+      quotaResetHour: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}quota_reset_hour'],
+      ),
+      quotaResetMinute: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}quota_reset_minute'],
+      ),
     );
   }
 
@@ -698,6 +773,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
   final int? pausedUntilMillis;
   final String? automationsJson;
   final int? graceWindowOverrideMillis;
+  final int? targetCount;
+  final int? quotaResetHour;
+  final int? quotaResetMinute;
   const HabitRow({
     required this.id,
     required this.name,
@@ -726,6 +804,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     this.pausedUntilMillis,
     this.automationsJson,
     this.graceWindowOverrideMillis,
+    this.targetCount,
+    this.quotaResetHour,
+    this.quotaResetMinute,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -797,6 +878,15 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
         graceWindowOverrideMillis,
       );
     }
+    if (!nullToAbsent || targetCount != null) {
+      map['target_count'] = Variable<int>(targetCount);
+    }
+    if (!nullToAbsent || quotaResetHour != null) {
+      map['quota_reset_hour'] = Variable<int>(quotaResetHour);
+    }
+    if (!nullToAbsent || quotaResetMinute != null) {
+      map['quota_reset_minute'] = Variable<int>(quotaResetMinute);
+    }
     return map;
   }
 
@@ -864,6 +954,15 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
           graceWindowOverrideMillis == null && nullToAbsent
           ? const Value.absent()
           : Value(graceWindowOverrideMillis),
+      targetCount: targetCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetCount),
+      quotaResetHour: quotaResetHour == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quotaResetHour),
+      quotaResetMinute: quotaResetMinute == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quotaResetMinute),
     );
   }
 
@@ -906,6 +1005,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       graceWindowOverrideMillis: serializer.fromJson<int?>(
         json['graceWindowOverrideMillis'],
       ),
+      targetCount: serializer.fromJson<int?>(json['targetCount']),
+      quotaResetHour: serializer.fromJson<int?>(json['quotaResetHour']),
+      quotaResetMinute: serializer.fromJson<int?>(json['quotaResetMinute']),
     );
   }
   @override
@@ -941,6 +1043,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       'graceWindowOverrideMillis': serializer.toJson<int?>(
         graceWindowOverrideMillis,
       ),
+      'targetCount': serializer.toJson<int?>(targetCount),
+      'quotaResetHour': serializer.toJson<int?>(quotaResetHour),
+      'quotaResetMinute': serializer.toJson<int?>(quotaResetMinute),
     };
   }
 
@@ -972,6 +1077,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     Value<int?> pausedUntilMillis = const Value.absent(),
     Value<String?> automationsJson = const Value.absent(),
     Value<int?> graceWindowOverrideMillis = const Value.absent(),
+    Value<int?> targetCount = const Value.absent(),
+    Value<int?> quotaResetHour = const Value.absent(),
+    Value<int?> quotaResetMinute = const Value.absent(),
   }) => HabitRow(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -1016,6 +1124,13 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     graceWindowOverrideMillis: graceWindowOverrideMillis.present
         ? graceWindowOverrideMillis.value
         : this.graceWindowOverrideMillis,
+    targetCount: targetCount.present ? targetCount.value : this.targetCount,
+    quotaResetHour: quotaResetHour.present
+        ? quotaResetHour.value
+        : this.quotaResetHour,
+    quotaResetMinute: quotaResetMinute.present
+        ? quotaResetMinute.value
+        : this.quotaResetMinute,
   );
   HabitRow copyWithCompanion(HabitsCompanion data) {
     return HabitRow(
@@ -1072,6 +1187,15 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       graceWindowOverrideMillis: data.graceWindowOverrideMillis.present
           ? data.graceWindowOverrideMillis.value
           : this.graceWindowOverrideMillis,
+      targetCount: data.targetCount.present
+          ? data.targetCount.value
+          : this.targetCount,
+      quotaResetHour: data.quotaResetHour.present
+          ? data.quotaResetHour.value
+          : this.quotaResetHour,
+      quotaResetMinute: data.quotaResetMinute.present
+          ? data.quotaResetMinute.value
+          : this.quotaResetMinute,
     );
   }
 
@@ -1104,7 +1228,10 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
           ..write('iconName: $iconName, ')
           ..write('pausedUntilMillis: $pausedUntilMillis, ')
           ..write('automationsJson: $automationsJson, ')
-          ..write('graceWindowOverrideMillis: $graceWindowOverrideMillis')
+          ..write('graceWindowOverrideMillis: $graceWindowOverrideMillis, ')
+          ..write('targetCount: $targetCount, ')
+          ..write('quotaResetHour: $quotaResetHour, ')
+          ..write('quotaResetMinute: $quotaResetMinute')
           ..write(')'))
         .toString();
   }
@@ -1138,6 +1265,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     pausedUntilMillis,
     automationsJson,
     graceWindowOverrideMillis,
+    targetCount,
+    quotaResetHour,
+    quotaResetMinute,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -1169,7 +1299,10 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
           other.iconName == this.iconName &&
           other.pausedUntilMillis == this.pausedUntilMillis &&
           other.automationsJson == this.automationsJson &&
-          other.graceWindowOverrideMillis == this.graceWindowOverrideMillis);
+          other.graceWindowOverrideMillis == this.graceWindowOverrideMillis &&
+          other.targetCount == this.targetCount &&
+          other.quotaResetHour == this.quotaResetHour &&
+          other.quotaResetMinute == this.quotaResetMinute);
 }
 
 class HabitsCompanion extends UpdateCompanion<HabitRow> {
@@ -1200,6 +1333,9 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
   final Value<int?> pausedUntilMillis;
   final Value<String?> automationsJson;
   final Value<int?> graceWindowOverrideMillis;
+  final Value<int?> targetCount;
+  final Value<int?> quotaResetHour;
+  final Value<int?> quotaResetMinute;
   final Value<int> rowid;
   const HabitsCompanion({
     this.id = const Value.absent(),
@@ -1229,6 +1365,9 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     this.pausedUntilMillis = const Value.absent(),
     this.automationsJson = const Value.absent(),
     this.graceWindowOverrideMillis = const Value.absent(),
+    this.targetCount = const Value.absent(),
+    this.quotaResetHour = const Value.absent(),
+    this.quotaResetMinute = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   HabitsCompanion.insert({
@@ -1259,6 +1398,9 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     this.pausedUntilMillis = const Value.absent(),
     this.automationsJson = const Value.absent(),
     this.graceWindowOverrideMillis = const Value.absent(),
+    this.targetCount = const Value.absent(),
+    this.quotaResetHour = const Value.absent(),
+    this.quotaResetMinute = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -1293,6 +1435,9 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     Expression<int>? pausedUntilMillis,
     Expression<String>? automationsJson,
     Expression<int>? graceWindowOverrideMillis,
+    Expression<int>? targetCount,
+    Expression<int>? quotaResetHour,
+    Expression<int>? quotaResetMinute,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1326,6 +1471,9 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
       if (automationsJson != null) 'automations_json': automationsJson,
       if (graceWindowOverrideMillis != null)
         'grace_window_override_millis': graceWindowOverrideMillis,
+      if (targetCount != null) 'target_count': targetCount,
+      if (quotaResetHour != null) 'quota_reset_hour': quotaResetHour,
+      if (quotaResetMinute != null) 'quota_reset_minute': quotaResetMinute,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1358,6 +1506,9 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     Value<int?>? pausedUntilMillis,
     Value<String?>? automationsJson,
     Value<int?>? graceWindowOverrideMillis,
+    Value<int?>? targetCount,
+    Value<int?>? quotaResetHour,
+    Value<int?>? quotaResetMinute,
     Value<int>? rowid,
   }) {
     return HabitsCompanion(
@@ -1389,6 +1540,9 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
       automationsJson: automationsJson ?? this.automationsJson,
       graceWindowOverrideMillis:
           graceWindowOverrideMillis ?? this.graceWindowOverrideMillis,
+      targetCount: targetCount ?? this.targetCount,
+      quotaResetHour: quotaResetHour ?? this.quotaResetHour,
+      quotaResetMinute: quotaResetMinute ?? this.quotaResetMinute,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1479,6 +1633,15 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
         graceWindowOverrideMillis.value,
       );
     }
+    if (targetCount.present) {
+      map['target_count'] = Variable<int>(targetCount.value);
+    }
+    if (quotaResetHour.present) {
+      map['quota_reset_hour'] = Variable<int>(quotaResetHour.value);
+    }
+    if (quotaResetMinute.present) {
+      map['quota_reset_minute'] = Variable<int>(quotaResetMinute.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1515,6 +1678,9 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
           ..write('pausedUntilMillis: $pausedUntilMillis, ')
           ..write('automationsJson: $automationsJson, ')
           ..write('graceWindowOverrideMillis: $graceWindowOverrideMillis, ')
+          ..write('targetCount: $targetCount, ')
+          ..write('quotaResetHour: $quotaResetHour, ')
+          ..write('quotaResetMinute: $quotaResetMinute, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5990,6 +6156,9 @@ typedef $$HabitsTableCreateCompanionBuilder =
       Value<int?> pausedUntilMillis,
       Value<String?> automationsJson,
       Value<int?> graceWindowOverrideMillis,
+      Value<int?> targetCount,
+      Value<int?> quotaResetHour,
+      Value<int?> quotaResetMinute,
       Value<int> rowid,
     });
 typedef $$HabitsTableUpdateCompanionBuilder =
@@ -6021,6 +6190,9 @@ typedef $$HabitsTableUpdateCompanionBuilder =
       Value<int?> pausedUntilMillis,
       Value<String?> automationsJson,
       Value<int?> graceWindowOverrideMillis,
+      Value<int?> targetCount,
+      Value<int?> quotaResetHour,
+      Value<int?> quotaResetMinute,
       Value<int> rowid,
     });
 
@@ -6165,6 +6337,21 @@ class $$HabitsTableFilterComposer
 
   ColumnFilters<int> get graceWindowOverrideMillis => $composableBuilder(
     column: $table.graceWindowOverrideMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get targetCount => $composableBuilder(
+    column: $table.targetCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get quotaResetHour => $composableBuilder(
+    column: $table.quotaResetHour,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get quotaResetMinute => $composableBuilder(
+    column: $table.quotaResetMinute,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6312,6 +6499,21 @@ class $$HabitsTableOrderingComposer
     column: $table.graceWindowOverrideMillis,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get targetCount => $composableBuilder(
+    column: $table.targetCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get quotaResetHour => $composableBuilder(
+    column: $table.quotaResetHour,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get quotaResetMinute => $composableBuilder(
+    column: $table.quotaResetMinute,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$HabitsTableAnnotationComposer
@@ -6429,6 +6631,21 @@ class $$HabitsTableAnnotationComposer
     column: $table.graceWindowOverrideMillis,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get targetCount => $composableBuilder(
+    column: $table.targetCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get quotaResetHour => $composableBuilder(
+    column: $table.quotaResetHour,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get quotaResetMinute => $composableBuilder(
+    column: $table.quotaResetMinute,
+    builder: (column) => column,
+  );
 }
 
 class $$HabitsTableTableManager
@@ -6486,6 +6703,9 @@ class $$HabitsTableTableManager
                 Value<int?> pausedUntilMillis = const Value.absent(),
                 Value<String?> automationsJson = const Value.absent(),
                 Value<int?> graceWindowOverrideMillis = const Value.absent(),
+                Value<int?> targetCount = const Value.absent(),
+                Value<int?> quotaResetHour = const Value.absent(),
+                Value<int?> quotaResetMinute = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HabitsCompanion(
                 id: id,
@@ -6515,6 +6735,9 @@ class $$HabitsTableTableManager
                 pausedUntilMillis: pausedUntilMillis,
                 automationsJson: automationsJson,
                 graceWindowOverrideMillis: graceWindowOverrideMillis,
+                targetCount: targetCount,
+                quotaResetHour: quotaResetHour,
+                quotaResetMinute: quotaResetMinute,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6546,6 +6769,9 @@ class $$HabitsTableTableManager
                 Value<int?> pausedUntilMillis = const Value.absent(),
                 Value<String?> automationsJson = const Value.absent(),
                 Value<int?> graceWindowOverrideMillis = const Value.absent(),
+                Value<int?> targetCount = const Value.absent(),
+                Value<int?> quotaResetHour = const Value.absent(),
+                Value<int?> quotaResetMinute = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HabitsCompanion.insert(
                 id: id,
@@ -6575,6 +6801,9 @@ class $$HabitsTableTableManager
                 pausedUntilMillis: pausedUntilMillis,
                 automationsJson: automationsJson,
                 graceWindowOverrideMillis: graceWindowOverrideMillis,
+                targetCount: targetCount,
+                quotaResetHour: quotaResetHour,
+                quotaResetMinute: quotaResetMinute,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -100,6 +100,14 @@ class Habits extends Table {
   // value (millis) is the override; the calculator reads it
   // via `Do.effectiveStreakConfig`.
   IntColumn get graceWindowOverrideMillis => integer().nullable()();
+  // WF-020 (Phase 11h): quota habit. NULL on every non-quota
+  // row. `targetCount` is the integer the user must log
+  // (>= 1); `quotaResetHour` / `quotaResetMinute` form the
+  // local-time-of-day at which the quota window rolls over
+  // (defaults to 00:00 / 00 in the model).
+  IntColumn get targetCount => integer().nullable()();
+  IntColumn get quotaResetHour => integer().nullable()();
+  IntColumn get quotaResetMinute => integer().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

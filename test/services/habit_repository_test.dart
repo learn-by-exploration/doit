@@ -348,5 +348,46 @@ void main() {
           await DoRepository.instance.getById('h_interval_grace') as DoInterval;
       expect(back.graceWindowOverride, const Duration(minutes: 30));
     });
+
+    // WF-020 (Phase 11h). scheduleType='quota' round-trips
+    // the target_count, quota_reset_hour, and
+    // quota_reset_minute columns (migration v5→v6).
+    test('round-trips a DoQuota', () async {
+      final h = DoQuota(
+        id: 'h_quota_roundtrip',
+        name: '8 glasses of water',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026),
+        restDaysPerMonth: 2,
+        targetCount: 8,
+      );
+      await DoRepository.instance.save(h);
+      final back = await DoRepository.instance.getById('h_quota_roundtrip');
+      expect(back, isA<DoQuota>());
+      final q = back! as DoQuota;
+      expect(q.id, 'h_quota_roundtrip');
+      expect(q.name, '8 glasses of water');
+      expect(q.proofMode, isA<SoftProof>());
+      expect(q.restDaysPerMonth, 2);
+      expect(q.targetCount, 8);
+      expect(q.resetAt, const DoTime(0, 0));
+    });
+
+    test('round-trips a DoQuota with a non-midnight reset', () async {
+      final h = DoQuota(
+        id: 'h_quota_4am',
+        name: 'cups before bed',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026),
+        restDaysPerMonth: 2,
+        targetCount: 6,
+        resetAt: const DoTime(4, 0),
+      );
+      await DoRepository.instance.save(h);
+      final back =
+          await DoRepository.instance.getById('h_quota_4am') as DoQuota;
+      expect(back.targetCount, 6);
+      expect(back.resetAt, const DoTime(4, 0));
+    });
   });
 }

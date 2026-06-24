@@ -159,14 +159,15 @@ void main() {
       expect(after, isEmpty);
     });
 
-    test('schemaVersion is 5 for Phase 11f (WF-023)', () {
+    test('schemaVersion is 6 for Phase 11h (WF-020)', () {
       // The version pin is a contract — Phase 3+ bump it.
       // Drift exposes it via the database instance. Phase
-      // 11f / WF-023 bumped from 4 to 5 to add the
-      // grace-window column.
+      // 11h / WF-020 bumped from 5 to 6 to add the quota
+      // columns (target_count, quota_reset_hour,
+      // quota_reset_minute).
       final db = AppDatabaseService.instance.db;
       expect(db.schemaVersion, kCurrentSchemaVersion);
-      expect(kCurrentSchemaVersion, 5);
+      expect(kCurrentSchemaVersion, 6);
     });
 
     test('fresh install creates the v3 templates table', () async {

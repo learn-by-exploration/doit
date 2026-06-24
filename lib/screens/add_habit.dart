@@ -1257,6 +1257,16 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
         weekdays.addAll(List<int>.generate(7, (i) => i + 1));
         hour = 9;
         minute = 0;
+      // WF-020 (Phase 11h). Quota habits encode the
+      // target count and the reset time. The unified
+      // envelope has no slot for [targetCount] today;
+      // round-trip is still useful for the scheduleType
+      // tag and the weekday set.
+      case DoQuota():
+        scheduleType = 'quota';
+        weekdays.addAll(List<int>.generate(7, (i) => i + 1));
+        hour = d.resetAt.hour;
+        minute = d.resetAt.minute;
     }
     return <String, dynamic>{
       'scheduleType': scheduleType,

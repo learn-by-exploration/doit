@@ -25,12 +25,13 @@ void main() {
       await AppDatabaseService.instance.closeForTesting();
     });
 
-    test('schemaVersion is 5 (Phase 11f / WF-023 pin)', () {
-      // WF-023 (Phase 11f) bumped the schema to 5 to add
-      // habits.grace_window_override_millis. The v3→v4
-      // pin test now asserts the post-migration state.
-      expect(db.schemaVersion, 5);
-      expect(kCurrentSchemaVersion, 5);
+    test('schemaVersion is 6 (Phase 11h / WF-020 pin)', () {
+      // WF-020 (Phase 11h) bumped the schema to 6 to add
+      // habits.target_count, quota_reset_hour,
+      // quota_reset_minute. The v3→v4 pin test now
+      // asserts the post-migration state.
+      expect(db.schemaVersion, 6);
+      expect(kCurrentSchemaVersion, 6);
     });
 
     test('habits / people / events have automations_json column', () async {

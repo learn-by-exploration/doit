@@ -1,4 +1,4 @@
-// Do model — sealed hierarchy of 5 schedule types.
+// Do model — sealed hierarchy of 7 schedule types.
 //
 // A do is the source of truth for "what does the user want to
 // do, and when". The model is immutable; mutations go through
@@ -9,7 +9,8 @@
 // schema migration). Sealed subclasses were `DoFixed`,
 // `DoInterval`, `DoAnchor`, `DoDayOfX`,
 // `DoTimeWindow` — now `DoFixed`, `DoInterval`, `DoAnchor`,
-// `DoDayOfX`, `DoTimeWindow`.
+// `DoDayOfX`, `DoTimeWindow`, `DoPerDay` (v1.2n / Phase 11d),
+// `DoQuota` (v1.2r / Phase 11h).
 //
 // Layer rules (per .claude/rules/lib-do.md): no Flutter
 // imports. TimeOfDay is `(hour, minute)` for purity.
@@ -149,6 +150,16 @@ final class DoInvalidIconName extends DoValidationException {
 final class DoInvalidTargetHours extends DoValidationException {
   const DoInvalidTargetHours(this.value)
     : super('targetHours must be in 1..23.');
+  final int value;
+}
+
+// WF-020 (Phase 11h). Quota habits track N completions per
+// period (e.g., "5 cups water, any time today"). The target
+// count must be at least 1; 0 would mean the do is
+// trivially "done" before any completion is logged.
+final class DoInvalidTargetCount extends DoValidationException {
+  const DoInvalidTargetCount(this.value)
+    : super('Quota target count must be >= 1.');
   final int value;
 }
 
@@ -344,6 +355,13 @@ sealed class Do {
       // Empty arm is intentional; do not delete it.
       case DoPerDay():
         break;
+      // WF-020 (Phase 11h). Quota habits have a target count
+      // and a reset time (midnight by default). The target
+      // must be >= 1; the reset time is validated by
+      // _validateTime below.
+      case DoQuota(:final targetCount, :final resetAt):
+        if (targetCount < 1) throw DoInvalidTargetCount(targetCount);
+        _validateTime(resetAt);
     }
     validateProofMode(proofMode);
   }
@@ -980,5 +998,116 @@ final class DoPerDay extends Do {
     // `lib/services/reminder_service.dart:275-281`).
     if (today.isAfter(fromLocal)) return today;
     return DateTime(fromLocal.year, fromLocal.month, fromLocal.day + 1);
+  }
+}
+
+/// WF-020 (Phase 11h). Quota schedule: hit [targetCount]
+/// completions within a rolling window that resets at
+/// [resetAt] local time each day. Examples: "5 cups water,
+/// any time today" (target=5, resetAt=00:00), "3 workouts
+/// by end of week" (target=3, resetAt=Mon 00:00 — though
+/// weekly windows are out of v1.2r scope and the reset
+/// stays daily for now).
+///
+/// The do is "done" once [targetCount] completion entries
+/// are logged for the current window. Streak: the do
+/// increments its consecutive-run on each day the user
+/// hits the target. (The streak calculation lives in
+/// `ConsecutiveCounter` and is window-agnostic — it sees
+/// one completion entry per day the quota was hit.)
+///
+/// Soft-mode only in v1.2r: any-time completion counts,
+/// there is no per-completion mission. A future Strong-mode
+/// quota (e.g., photo-proof each cup) is out of scope.
+@immutable
+final class DoQuota extends Do {
+  const DoQuota({
+    required super.id,
+    required super.name,
+    required super.proofMode,
+    required super.createdAt,
+    required super.restDaysPerMonth,
+    required this.targetCount,
+    this.resetAt = const DoTime(0, 0),
+    super.category,
+    super.colorSeed,
+    super.iconName,
+    super.pausedUntil,
+    super.automations,
+    // WF-023 (Phase 11f). Optional override.
+    super.graceWindowOverride,
+  });
+
+  /// Number of completions required to satisfy the do for
+  /// the current window. Must be >= 1 (see
+  /// `DoInvalidTargetCount`).
+  final int targetCount;
+
+  /// Local time-of-day at which the quota window resets.
+  /// Defaults to local midnight (00:00). A user can pick a
+  /// different reset (e.g., 04:00 for "before bed" cycles)
+  /// in a future PR — the field is on the model now so the
+  /// schema does not have to change later.
+  final DoTime resetAt;
+
+  @override
+  DoQuota copyWith({
+    String? name,
+    DoProofMode? proofMode,
+    int? restDaysPerMonth,
+    int? targetCount,
+    DoTime? resetAt,
+    DoCategory? category,
+    int? colorSeed,
+    String? iconName,
+    DateTime? pausedUntil,
+    bool clearPausedUntil = false,
+    List<Automation>? automations,
+    // WF-023 (Phase 11f). Optional grace-window override.
+    Duration? graceWindowOverride,
+    bool clearGraceWindowOverride = false,
+  }) {
+    return DoQuota(
+      id: id,
+      name: name ?? this.name,
+      proofMode: proofMode ?? this.proofMode,
+      createdAt: createdAt,
+      restDaysPerMonth: restDaysPerMonth ?? this.restDaysPerMonth,
+      targetCount: targetCount ?? this.targetCount,
+      resetAt: resetAt ?? this.resetAt,
+      category: category ?? this.category,
+      colorSeed: colorSeed ?? this.colorSeed,
+      iconName: iconName ?? this.iconName,
+      pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
+      automations: automations ?? this.automations,
+      graceWindowOverride: clearGraceWindowOverride
+          ? null
+          : (graceWindowOverride ?? this.graceWindowOverride),
+    );
+  }
+
+  @override
+  DateTime? nextOccurrence(DateTime from) {
+    // The next reminder is the next reset time strictly
+    // after [from]. The reset happens once per local
+    // calendar day at [resetAt]. Quotas do not have
+    // multi-day windows in v1.2r — daily reset is the
+    // only shape.
+    final fromLocal = from.toLocal();
+    final today = DateTime(
+      fromLocal.year,
+      fromLocal.month,
+      fromLocal.day,
+      resetAt.hour,
+      resetAt.minute,
+    );
+    if (today.isAfter(fromLocal)) return today;
+    return DateTime(
+      fromLocal.year,
+      fromLocal.month,
+      fromLocal.day + 1,
+      resetAt.hour,
+      resetAt.minute,
+    );
   }
 }

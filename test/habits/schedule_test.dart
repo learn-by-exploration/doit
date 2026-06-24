@@ -279,4 +279,61 @@ void main() {
       expect(next, DateTime(2027));
     });
   });
+
+  // WF-020 (Phase 11h). Quota habit: the next occurrence is
+  // the next [resetAt] time strictly after [from]. Daily
+  // reset is the only window shape in v1.2r — multi-day
+  // windows are out of scope.
+  group('DoQuota.nextOccurrence', () {
+    final h = DoQuota(
+      id: 'h_quota',
+      name: '8 glasses of water',
+      proofMode: const SoftProof(),
+      createdAt: DateTime(2026),
+      restDaysPerMonth: 2,
+      targetCount: 8,
+    );
+
+    test('returns today at 00:00 when [from] is before midnight', () {
+      // From 2026-06-23 12:00, with resetAt=00:00: today's
+      // 00:00 has already passed, so the strictly-after rule
+      // makes the answer tomorrow's 00:00. (00:00 resetAt
+      // means "the start of each local day".)
+      final from = DateTime(2026, 6, 23, 12);
+      final next = h.nextOccurrence(from);
+      expect(next, DateTime(2026, 6, 24));
+    });
+
+    test('returns tomorrow at 00:00 when [from] is exactly today at 00:00', () {
+      final from = DateTime(2026, 6, 23);
+      final next = h.nextOccurrence(from);
+      expect(next, DateTime(2026, 6, 24));
+    });
+
+    test('returns tomorrow at 00:00 when [from] is mid-day', () {
+      final from = DateTime(2026, 6, 23, 9, 30);
+      final next = h.nextOccurrence(from);
+      expect(next, DateTime(2026, 6, 24));
+    });
+
+    test('honors a non-midnight resetAt (e.g., 04:00)', () {
+      final h4 = DoQuota(
+        id: 'h_quota_4',
+        name: 'cups before bed',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026),
+        restDaysPerMonth: 2,
+        targetCount: 6,
+        resetAt: const DoTime(4, 0),
+      );
+      // From 2026-06-23 02:00 — next reset is today at 04:00.
+      final from = DateTime(2026, 6, 23, 2);
+      final next = h4.nextOccurrence(from);
+      expect(next, DateTime(2026, 6, 23, 4));
+      // From 2026-06-23 05:00 — next reset is tomorrow at 04:00.
+      final from2 = DateTime(2026, 6, 23, 5);
+      final next2 = h4.nextOccurrence(from2);
+      expect(next2, DateTime(2026, 6, 24, 4));
+    });
+  });
 }

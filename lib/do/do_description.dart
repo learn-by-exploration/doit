@@ -31,6 +31,13 @@ String describeDo(Do h) {
     // the per-day-pill on the home tile carries the
     // visual cue so the subtitle stays short.
     DoPerDay() => 'Every day',
+    // WF-020 (Phase 11h). Quota habits render as "N per
+    // day" — the count is the headline so the user
+    // remembers the target without opening the detail.
+    // The reset time is intentionally omitted from the
+    // subtitle (defaults to midnight; showing "5 per day ·
+    // 00:00" would be noise for the common case).
+    DoQuota(:final targetCount) => '$targetCount per day',
   };
 }
 

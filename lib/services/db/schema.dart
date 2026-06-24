@@ -42,6 +42,17 @@
 //       3-hour global default from SYS-019". Per-do overrides
 //       are honored by `ConsecutiveCounter` via
 //       `Do.effectiveStreakConfig`.
+//   6 — v1.2r (Phase 11h / WF-020):
+//       + habits.target_count (INTEGER nullable)
+//       + habits.quota_reset_hour (INTEGER nullable)
+//       + habits.quota_reset_minute (INTEGER nullable)
+//       The migration is in `migrations/v5_to_v6.dart`. NULL
+//       post-migration means "this is not a quota habit" —
+//       the correct state for every existing row. The
+//       decoder in `lib/services/do_repository.dart`
+//       (`_scheduleTypeTag` and `_fromRow`) writes the
+//       columns NULL for non-quota rows and reads them back
+//       for `DoQuota` rows.
 
 import 'package:drift/drift.dart';
 
@@ -49,6 +60,7 @@ import 'package:doit/services/db/migrations/v1_to_v2.dart';
 import 'package:doit/services/db/migrations/v2_to_v3.dart';
 import 'package:doit/services/db/migrations/v3_to_v4.dart';
 import 'package:doit/services/db/migrations/v4_to_v5.dart';
+import 'package:doit/services/db/migrations/v5_to_v6.dart';
 import 'package:doit/services/db/tables.dart';
 
 part 'schema.g.dart';
@@ -57,7 +69,7 @@ part 'schema.g.dart';
 /// change. The matching migration file MUST land in
 /// `lib/services/db/migrations/vN_to_vM.dart` and be referenced from
 /// [migrations] below.
-const int kCurrentSchemaVersion = 5;
+const int kCurrentSchemaVersion = 6;
 
 @DriftDatabase(
   tables: [
@@ -102,6 +114,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 5) {
         await migrateV4ToV5(m, this);
+      }
+      if (from < 6) {
+        await migrateV5ToV6(m, this);
       }
     },
     beforeOpen: (details) async {

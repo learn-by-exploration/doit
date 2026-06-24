@@ -192,9 +192,9 @@ void main() {
     final db = AppDatabase(NativeDatabase(dbFile));
     addTearDown(db.close);
 
-    // (1) Schema version is now 5 (current — bumped by
-    //     Phase 11f / WF-023 to add the grace-window column).
-    expect(db.schemaVersion, 5);
+    // (1) Schema version is now 6 (current — bumped by
+    //     Phase 11h / WF-020 to add the quota columns).
+    expect(db.schemaVersion, 6);
 
     // (2) The v2 rows survive.
     final habits = await db.select(db.habits).get();
@@ -215,16 +215,17 @@ void main() {
     final templates = await db.select(db.templates).get();
     expect(templates, isEmpty);
 
-    // (4) PRAGMA user_version is now 5 (the bump is what
+    // (4) PRAGMA user_version is now 6 (the bump is what
     //     prevents the migration from re-running on next open).
     //     Phase C PR 1 stacked migrateV3ToV4 on top of v2→v3;
     //     Phase 11f / WF-023 stacked migrateV4ToV5 on top of
-    //     that, so the live schema is v5 even for an entity
-    //     whose first non-trivial migration was v2→v3.
+    //     that; Phase 11h / WF-020 stacked migrateV5ToV6 on
+    //     top of that, so the live schema is v6 even for an
+    //     entity whose first non-trivial migration was v2→v3.
     final afterVersion = await db
         .customSelect('PRAGMA user_version')
         .getSingle();
-    expect(afterVersion.data.values.first, 5);
+    expect(afterVersion.data.values.first, 6);
   });
 
   test('re-opening after migration does not re-run onUpgrade', () async {
@@ -235,7 +236,7 @@ void main() {
     // Second open on the same file: must be a no-op.
     final db2 = AppDatabase(NativeDatabase(dbFile));
     addTearDown(db2.close);
-    expect(db2.schemaVersion, 5);
+    expect(db2.schemaVersion, 6);
     final templates = await db2.select(db2.templates).get();
     expect(templates, isEmpty);
   });
