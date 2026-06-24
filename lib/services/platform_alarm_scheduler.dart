@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 // Platform alarm scheduler — production wiring.
 //
 // The Dart side is the source of truth for "which alarms are
@@ -21,11 +23,14 @@
 //     caller (ReminderService) walks the
 //     scheduled set and issues one call
 //     per id.
-//   - `reliability`                      → bridge.probeReliability,
-//     cached for 30 s to avoid
-//     `MethodChannel` round-trips on
-//     every read of the home-screen
-//     banner.
+//   - `reliability`                      →
+//     `ReliabilityService.instance.value` (v1.3b /
+//     Phase 13 / SYS-112 / ADR-042). The
+//     scheduler used to own the bridge
+//     probe + the 30 s cache; the new
+//     service owns both so the home
+//     banner and the settings page
+//     cannot drift.
 //
 // Pre-v0.6 the `schedule/cancel/...` methods were stubs
 // that returned stable ids without touching the bridge; the
@@ -39,20 +44,17 @@
 // `lib/reminders/alarm_scheduler.dart`; this class is for
 // production only.
 
-import 'dart:async';
-
 import 'package:doit/events/event.dart';
 import 'package:doit/do/do.dart';
 import 'package:doit/do/proof_mode.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
-
-/// How long a probed [Reliability] value is reused before
-/// re-probing the platform. 30 s keeps the home-screen
-/// banner responsive (the banner polls on resume) without
-/// saturating the [MethodChannel] while the user scrolls
-/// the list.
-const Duration kReliabilityCacheTtl = Duration(seconds: 30);
+// v1.3b / Phase 13: the `reliability` getter delegates to
+// `ReliabilityService.instance.value`. The
+// `kReliabilityCacheTtl` constant moved with it (re-exported
+// from `reliability_service.dart` for any test that still
+// imports the name from this file).
+import 'package:doit/services/reliability_service.dart';
 
 class PlatformAlarmScheduler implements AlarmScheduler {
   PlatformAlarmScheduler(this._bridge);
@@ -77,15 +79,6 @@ class PlatformAlarmScheduler implements AlarmScheduler {
   /// both.
   final Map<AlarmId, ScheduledAlarm> _firingEntries =
       <AlarmId, ScheduledAlarm>{};
-
-  /// Cache for the [reliability] getter. Cleared on every
-  /// explicit re-probe (the `request` re-probe path in
-  /// [ReminderService]) and on a TTL of
-  /// [kReliabilityCacheTtl]. The cache is mutable in-place
-  /// (no `late final`) so the [clearReliabilityCache] test
-  /// hook can reset it between cases.
-  Reliability? _cachedReliability;
-  DateTime? _cachedReliabilityAt;
 
   @override
   Future<AlarmId> schedule(Do habit, DateTime at) async {
@@ -178,10 +171,23 @@ class PlatformAlarmScheduler implements AlarmScheduler {
     // `now + delay` heuristic.
     _scheduled.clear();
     _firingEntries.clear();
-    // Re-probe reliability eagerly so the next
-    // `reliability` read is fresh (the Kotlin side re-reads
-    // the WHITELIST state on each probe).
-    clearReliabilityCache();
+    // v1.3b / Phase 13: re-probe reliability eagerly so the
+    // next `reliability` read is fresh (the Kotlin side
+    // re-reads the WHITELIST state on each probe). The
+    // scheduler used to clear its own cache here; the new
+    // ReliabilityService owns the cache, so we delegate.
+    try {
+      // Fire-and-forget — the re-probe is async but the
+      // platform reschedule is the slow path we actually
+      // wait on. The fresh probe result will land in the
+      // notifier and the home banner will rebuild on the
+      // next frame.
+      unawaited(ReliabilityService.instance.refresh());
+    } on StateError {
+      // ReliabilityService was not init'd (a unit test that
+      // constructs the scheduler standalone). Best-effort
+      // re-probe — the scheduler used to skip silently.
+    }
     await _bridge.rescheduleAll();
   }
 
@@ -230,41 +236,22 @@ class PlatformAlarmScheduler implements AlarmScheduler {
 
   @override
   Reliability get reliability {
-    final Reliability? cached = _cachedReliability;
-    final DateTime? cachedAt = _cachedReliabilityAt;
-    final DateTime now = DateTime.now();
-    if (cached != null &&
-        cachedAt != null &&
-        now.difference(cachedAt) < kReliabilityCacheTtl) {
-      return cached;
-    }
-    // Fire-and-forget: a stale read is preferable to a
-    // `Future<Reliability>` getter (the home-screen
-    // banner is a synchronous `Consumer`). The next read
-    // after the probe completes picks up the fresh value.
-    unawaited(_refreshReliability());
-    return cached ?? Reliability.unknown;
-  }
-
-  Future<void> _refreshReliability() async {
+    // v1.3b / Phase 13: delegate to the unified
+    // ReliabilityService. The service owns the bridge
+    // probe + the 30 s cache + the statuses-listener
+    // combine. The scheduler used to own all three; the
+    // delegation is a single read so this getter remains
+    // synchronous and the home-screen banner is a single
+    // `ValueListenableBuilder` rebuild away from a fresh
+    // value.
     try {
-      final Reliability probed = await _bridge.probeReliability();
-      _cachedReliability = probed;
-      _cachedReliabilityAt = DateTime.now();
-    } catch (_) {
-      // The probe call may fail if the platform side is
-      // not installed (a unit test, a CI build, etc.).
-      // Leave the cache alone so a subsequent successful
-      // probe still reuses the prior value.
+      return ReliabilityService.instance.value;
+    } on StateError {
+      // ReliabilityService was not init'd (a unit test
+      // that constructs the scheduler standalone). Fall
+      // back to `optimal` — the same default the unified
+      // service uses for the first-read race.
+      return Reliability.optimal;
     }
-  }
-
-  /// Test hook — clear the [reliability] cache so the next
-  /// read re-probes. Used by the platform_alarm_scheduler
-  /// tests to verify the 30 s TTL behavior.
-  // ignore: use_setters_to_change_properties
-  void clearReliabilityCache() {
-    _cachedReliability = null;
-    _cachedReliabilityAt = null;
   }
 }

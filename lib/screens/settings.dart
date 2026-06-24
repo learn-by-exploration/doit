@@ -22,8 +22,8 @@
 // `requestX()` method; the "Settings" button deep-links to
 // the Android system app-settings page.
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:doit/build_info.dart';
 import 'package:doit/l10n/gen/app_localizations.dart';
@@ -34,6 +34,7 @@ import 'package:doit/screens/stats.dart';
 import 'package:doit/services/call_interceptor.dart';
 import 'package:doit/services/permission_result.dart';
 import 'package:doit/services/permission_service.dart';
+import 'package:doit/services/reliability_service.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/settings_service.dart';
 import 'package:doit/theme/app_theme.dart';
@@ -67,7 +68,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(Spacing.md),
           children: [
-            ReliabilityBanner.fromService(
+            ReliabilityBanner.fromStream(
               key: const ValueKey<String>('settings.reliability_banner'),
             ),
             const SizedBox(height: Spacing.md),
@@ -95,9 +96,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const _PermissionsRow(),
             const SizedBox(height: Spacing.md),
             _SectionHeader(l.settingsSectionReliability),
-            _ReliabilityRow(
-              reliability: ReminderService.instance.scheduler.reliability,
-            ),
+            const _ReliabilityRow(),
             ListTile(
               key: const ValueKey('settings.test_reminder'),
               leading: const Icon(Icons.notifications_outlined),
@@ -227,22 +226,51 @@ class _AnchorModeTile extends StatelessWidget {
 }
 
 class _ReliabilityRow extends StatelessWidget {
-  const _ReliabilityRow({required this.reliability});
-  final Reliability reliability;
+  const _ReliabilityRow();
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    // v1.3b / Phase 13 / SYS-112 / ADR-042: the row
+    // subscribes to the unified `ReliabilityService`
+    // notifier instead of reading
+    // `ReminderService.instance.scheduler.reliability` once
+    // at build. The previous read-once pattern left the
+    // subtitle stale across the resume hook — a user
+    // toggling the exact-alarm permission in Settings →
+    // Apps → Special access → Alarms & reminders would
+    // have to relaunch the app to see the row update. The
+    // `ValueListenableBuilder` rebuilds on every change.
+    //
+    // Defensive: if the service has not been initialized
+    // (a widget test that exercises the settings screen
+    // without wiring `ReliabilityService.init`), the row
+    // falls back to the `optimal` label — matching the
+    // first-read race that production treats as the common
+    // case. A `StateError` here would crash unrelated tests.
+    final ValueListenable<Reliability> listenable;
+    try {
+      listenable = ReliabilityService.instance.notifier;
+    } on StateError {
+      return _rowFor(l, Reliability.optimal);
+    }
+    return ValueListenableBuilder<Reliability>(
+      valueListenable: listenable,
+      builder: (_, reliability, _) => _rowFor(l, reliability),
+    );
+  }
+
+  Widget _rowFor(AppLocalizations l, Reliability reliability) {
     final label = switch (reliability) {
       Reliability.optimal => l.settingsReminderReliabilityOptimal,
       Reliability.degraded => l.settingsReminderReliabilityDegraded,
       Reliability.unknown => l.settingsReminderReliabilityUnknown,
     };
     return ListTile(
+      key: const ValueKey('settings.reliability_row'),
       leading: const Icon(Icons.notifications_active_outlined),
       title: Text(l.settingsReminderReliabilityTitle),
       subtitle: Text(label),
-      onTap: HapticFeedback.selectionClick,
     );
   }
 }

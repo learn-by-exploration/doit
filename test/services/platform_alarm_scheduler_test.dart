@@ -9,8 +9,12 @@
 //   - `cancelEvent(id)`                  → bridge.cancelAlarm
 //   - `cancelForHabit(habitId)`          → no-op (the bridge
 //     has no "cancel-by-habit" primitive)
-//   - `reliability`                      → bridge.probeReliability,
-//     cached for 30 s.
+//   - `reliability`                      →
+//     `ReliabilityService.instance.value`
+//     (v1.3b / Phase 13 / SYS-112 /
+//     ADR-042). The bridge probe + the
+//     30 s cache used to live here; the
+//     new service owns both.
 
 import 'package:doit/events/event.dart';
 import 'package:doit/do/do.dart';
@@ -18,7 +22,10 @@ import 'package:doit/do/proof_mode.dart';
 import 'package:doit/missions/chain.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
+import 'package:doit/services/permission_result.dart';
+import 'package:doit/services/permission_service.dart';
 import 'package:doit/services/platform_alarm_scheduler.dart';
+import 'package:doit/services/reliability_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// A minimal [Do] shell for the scheduler tests. The
@@ -179,72 +186,105 @@ void main() {
     });
 
     test(
-      'rescheduleAll forwards to bridge and clears the reliability cache',
+      'rescheduleAll forwards to bridge and refreshes the reliability service',
       () async {
         final bridge = FakeReminderBridge();
         final scheduler = PlatformAlarmScheduler(bridge);
-        // Prime the reliability cache with a known value.
-        scheduler.clearReliabilityCache();
         await bridge.setExactAlarm(alarmId: 1, epochMs: 0);
-        // The cache is populated by a probe — there is no
-        // direct setter; the cache is exercised by the
-        // `reliability` getter test below.
+        // v1.3b / Phase 13: `rescheduleAll` no longer owns
+        // a local reliability cache; it delegates to
+        // `ReliabilityService.instance.refresh()`. The
+        // service may not be init'd in this test, in which
+        // case the call is a no-op (the scheduler swallows
+        // the StateError). The bridge's rescheduleCount is
+        // the load-bearing assertion.
         await scheduler.rescheduleAll();
         expect(bridge.rescheduleCount, 1);
       },
     );
 
-    group('reliability', () {
-      test('returns the bridge probe value (uncached)', () async {
+    group('reliability (v1.3b / Phase 13 delegation)', () {
+      setUp(() async {
+        // Each test in this group drives
+        // `ReliabilityService.value` directly to assert the
+        // scheduler's getter is a thin pass-through. We
+        // init the service against the same bridge the
+        // scheduler uses so the bootstrap probe is wired.
+        ReliabilityService.resetForTesting();
+        PermissionService.instance.resetForTesting();
+        await PermissionService.instance.init();
+        // v1.3b / Phase 13 / SYS-112: PermissionService.init
+        // defaults every runtime permission to `Denied`
+        // because the platform channel is missing in the
+        // test harness. Grant every kind so the bootstrap
+        // derives `optimal`; tests that flip the bridge
+        // override `reliability` explicitly.
+        PermissionService.instance.statuses.value = {
+          for (final k in PermissionKind.values)
+            k: const PermissionResultGranted(),
+        };
+      });
+
+      tearDown(() {
+        ReliabilityService.resetForTesting();
+        PermissionService.instance.resetForTesting();
+      });
+
+      test('delegates to ReliabilityService.instance.value', () async {
         final bridge = FakeReminderBridge();
-        bridge.reliability = Reliability.degraded;
         final scheduler = PlatformAlarmScheduler(bridge);
-        // The first read is fire-and-forget; the cached
-        // value is still unknown. We give the unawaited
-        // probe a tick to complete before reading again.
-        expect(scheduler.reliability, Reliability.unknown);
-        await Future<void>.delayed(Duration.zero);
+        await ReliabilityService.init(
+          bridge: bridge,
+          permissionService: PermissionService.instance,
+        );
+        // The service is primed at `optimal`; the getter
+        // returns the same value.
+        expect(scheduler.reliability, Reliability.optimal);
+
+        // Flip the service value; the getter picks it up
+        // on the next read.
+        bridge.reliability = Reliability.degraded;
+        await ReliabilityService.instance.refresh();
         expect(scheduler.reliability, Reliability.degraded);
       });
 
-      test('caches the value within kReliabilityCacheTtl', () async {
+      test('returns optimal when ReliabilityService is not init', () {
+        // Construct the scheduler standalone (no service).
+        // The getter must NOT throw — it falls back to
+        // `optimal` (the same default the unified service
+        // uses for the first-read race).
         final bridge = FakeReminderBridge();
-        bridge.reliability = Reliability.optimal;
         final scheduler = PlatformAlarmScheduler(bridge);
-        // Prime the cache.
-        expect(scheduler.reliability, Reliability.unknown);
-        await Future<void>.delayed(Duration.zero);
-        expect(scheduler.reliability, Reliability.optimal);
-        // Flip the bridge's value to degraded. Within the
-        // TTL the cached value must still be returned
-        // (the getter does NOT re-probe).
-        bridge.reliability = Reliability.degraded;
         expect(scheduler.reliability, Reliability.optimal);
       });
 
-      test('clearReliabilityCache forces a re-probe', () async {
-        final bridge = FakeReminderBridge();
-        bridge.reliability = Reliability.optimal;
-        final scheduler = PlatformAlarmScheduler(bridge);
-        expect(scheduler.reliability, Reliability.unknown);
-        await Future<void>.delayed(Duration.zero);
-        expect(scheduler.reliability, Reliability.optimal);
-        bridge.reliability = Reliability.degraded;
-        scheduler.clearReliabilityCache();
-        // The first read after the clear is still unknown
-        // (the fire-and-forget probe is in flight).
-        expect(scheduler.reliability, Reliability.unknown);
-        await Future<void>.delayed(Duration.zero);
-        expect(scheduler.reliability, Reliability.degraded);
-      });
+      test(
+        'reflects a permissions change to a gated kind (location → degraded)',
+        () async {
+          final bridge = FakeReminderBridge();
+          final scheduler = PlatformAlarmScheduler(bridge);
+          await ReliabilityService.init(
+            bridge: bridge,
+            permissionService: PermissionService.instance,
+          );
+          // Drain the bootstrap.
+          await Future<void>.delayed(Duration.zero);
+          expect(scheduler.reliability, Reliability.optimal);
 
-      test('falls back to unknown on the first read with no cache', () {
-        final bridge = FakeReminderBridge();
-        final scheduler = PlatformAlarmScheduler(bridge);
-        // No probe has run; the getter returns `unknown` and
-        // kicks off an unawaited probe for next time.
-        expect(scheduler.reliability, Reliability.unknown);
-      });
+          // Flip `location` to denied. The service
+          // re-derives; the scheduler's getter picks it up.
+          final next = <PermissionKind, PermissionResult?>{
+            for (final entry
+                in PermissionService.instance.statuses.value.entries)
+              entry.key: entry.value,
+            PermissionKind.location: const PermissionResultDenied(
+              canOpenSettings: true,
+            ),
+          };
+          PermissionService.instance.statuses.value = next;
+          expect(scheduler.reliability, Reliability.degraded);
+        },
+      );
     });
 
     // v1.2e / Phase 5: the inbound `fireAlarm` lookup
