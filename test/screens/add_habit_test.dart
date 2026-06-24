@@ -61,6 +61,24 @@ void main() {
     expect(habits?.first.name, 'Stretch');
   });
 
+  // WF-021 (Phase 11d). The schedule-type SegmentedButton
+  // gains a sixth "Per day" segment. This widget test pins
+  // the segment's presence in the picker — the persistence
+  // round-trip is covered by the unit test in
+  // `test/services/habit_repository_test.dart`.
+  testWidgets('Picker renders the "Per day" schedule-type segment '
+      '(WF-021 / Phase 11d)', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: AddHabitScreen()));
+    await tester.pump();
+    // All six segment labels are present, including "Per day".
+    expect(find.text('Fixed'), findsOneWidget);
+    expect(find.text('Every N'), findsOneWidget);
+    expect(find.text('After'), findsOneWidget);
+    expect(find.text('Day-of-X'), findsOneWidget);
+    expect(find.text('Window'), findsOneWidget);
+    expect(find.text('Per day'), findsOneWidget);
+  });
+
   // Phase C PR 2 / SYS-072: the form has a "Routines" section
   // for non-default automation rules. Verify the section
   // renders the empty-state copy + "Add a location routine"

@@ -965,6 +965,128 @@ completion is the cause of a streak break.
   day."` (honest; not punitive). The cancel button is
   the default action visually; the destructive button
   reuses the theme's error color.
+
+### v1.2n — WF-021 per-day todo (Phase 11d)
+
+Phase 11d of the v1.2 code-TODO closure (`30-phase
+roadmap`). Closes the B2 item: a per-day todo is a `Do`
+with no time of day and no weekday set — the user picks
+"Per day" in the schedule-type picker, the home list
+shows a `DoPerDay` tile, and a daily check-off is one
+tap on the per-tile Mark-done button (the existing stub
+that only fired a snackbar). The schedule engine fires
+the alarm at the next local midnight, re-arms via the
+same `nextOccurrence` call.
+
+**What's new**
+
+- **`DoPerDay`** (`lib/do/do.dart`, new sealed leaf of
+  `Do`). No schedule-specific fields — same shape as the
+  model base. `validate()` switch arm is empty (no
+  per-type invariants). `nextOccurrence(DateTime from)`
+  returns the next local midnight strictly after `from`,
+  matching `DoAnchor` semantics. Pure Dart, no `DateTime.now()`
+  inside, no side effects.
+- **`DoRepository` round-trip.** Schedule discriminator
+  tag `'perDay'` is added to `_scheduleTypeTag` and the
+  exhaustive switch in `_fromRow`. All per-type schema
+  columns (`weekdays`, `hour`, `minute`, `nDays`,
+  `referenceDateMillis`, `targetHabitId`, `lastAnchorMillis`,
+  `dayOfMonth`, `nth`, `weekday`, `referenceDayOfMonth`,
+  `endHour`, `endMinute`, `targetHours`) are NULL on the
+  row — **no Drift migration required**. The
+  `_fromRow('perDay')` arm constructs the leaf with the
+  shared base fields.
+- **`describeDo(DoPerDay) == 'Every day'`** — the tile
+  subtitle shows the discriminator string; no time, no
+  weekday set.
+- **Home tile Mark-done becomes a real check-off**
+  (`lib/screens/home.dart:_HomeScreenState._completeOne`).
+  The IconButton that was a stub now writes a
+  `CompletionLogEntry` via
+  `CompletionLogService.instance.append(habitId, day: now,
+  source: CompletionSource.manual, proofModeAtTime: 'soft')`,
+  surfaces a snackbar with copy `"Marked \"<name>\" done."`
+  and a `SnackBarAction(label: 'Undo', onPressed: ...)`
+  that calls `deleteById` on the appended row, and
+  triggers a `_refresh()` to re-render. The IconButton
+  gets a `Semantics(button: true, label: 'Mark <name>
+  done for today')` wrapper so TalkBack announces the
+  action. Errors are caught with `on Object` and surface
+  as `"Could not mark done. Try again."` — the screen
+  stays mounted so the user can retry.
+- **Add-habit schedule-type picker** (`SegmentedButton<String>`
+  in `lib/screens/add_habit.dart`) gains a sixth segment
+  `ButtonSegment(value: 'perDay', label: Text('Per day'))`.
+  Picking it renders a `Padding` explainer row with
+  `Icon(Icons.calendar_today_outlined)` and the copy
+  `"Fires every day. No time of day. Mark it done on the
+  home screen."` Saving constructs a `DoPerDay` with
+  `restDaysPerMonth: 2`, the entered name, and the per-do
+  category / colorSeed / iconName / pausedUntil. The
+  `_loadExisting` arm sets `_scheduleType = 'perDay'` when
+  the persisted leaf is a `DoPerDay`. The `_doToMap` arm
+  for `DoPerDay` writes the `'perDay'` discriminator and
+  the placeholder weekdays/hour/minute so the legacy
+  template-code path stays exhaustive.
+- **UI/UX improvements woven in.** Per-tile Mark-done
+  icon is now reachable in one tap on a per-day tile
+  (Nielsen #1 visibility, Norman #2 feedback). The Undo
+  snackbar affordance restores Norman #3 user control.
+  The Picker screen gains a "Per day" segment for
+  consistency with the existing four schedule kinds
+  (Nielsen #4). All new widgets have `Semantics` labels
+  for accessibility (DESIGN-A11Y-001). Reuses the
+  existing `Spacing.xs` / `Spacing.sm` design tokens
+  (DESIGN-SYS-007) — no new tokens.
+
+**Files**
+
+- `lib/do/do.dart` — new `DoPerDay` sealed leaf (no new
+  per-type fields; empty `validate()` arm).
+- `lib/do/do_description.dart` — new `DoPerDay() =>
+  'Every day'` switch arm.
+- `lib/services/do_repository.dart` — new `'perDay'`
+  tag in `_scheduleTypeTag` and new `case 'perDay':` arm
+  in `_fromRow`.
+- `lib/screens/home.dart` — new `_completeOne(Do)` and
+  `_undoCompletion(String, String)` methods on
+  `_HomeScreenState`; the per-tile Mark-done IconButton
+  wraps in `Semantics(button: true, ...)`.
+- `lib/screens/add_habit.dart` — new `ButtonSegment(value:
+  'perDay', ...)` and new `_loadExisting` / `_buildScheduleFields`
+  / `_save` / `_doToMap` arms for `DoPerDay`.
+- `test/habits/schedule_test.dart` — new `group('DoPerDay
+  .nextOccurrence', ...)` with 5 tests (strictly-after
+  semantics, month roll, year roll).
+- `test/do/do_description_test.dart` — 1 new test.
+- `test/habits/habit_model_test.dart` — 3 new tests
+  (validate, empty-name throws, negative rest-days throws).
+- `test/services/habit_repository_test.dart` — 1 new
+  round-trip test (`save(DoPerDay) → getById`).
+- `test/screens/home_test.dart` — 1 new test (per-tile
+  Mark-done writes a completion + snackbar).
+- `test/screens/add_habit_test.dart` — 1 new test (the
+  schedule-type picker renders all six segments including
+  "Per day").
+- `docs/v_model/requirements.md` — new `SYS-111` row.
+
+**3-gate verification**
+
+```
+$ dart format --output=none --set-exit-if-changed .
+Formatted 215 files (0 changed) in 0.92 seconds.
+$ flutter analyze --fatal-infos
+No issues found! (ran in 2.7s)
+$ flutter test
+00:20 +1013: All tests passed!
+```
+
+(Test count: 1001 → 1013 — 5 schedule + 1 describe + 3
+model + 1 repository round-trip + 1 widget picker + 1
+widget home-tile mark-done = 12 new tests for WF-021 /
+Phase 11d; 3-gate green with zero analyzer findings.)
+
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 
 do it is no longer about streaks. Phase A renames the

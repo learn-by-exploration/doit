@@ -210,4 +210,45 @@ void main() {
     }
     expect(found, isTrue);
   });
+
+  // WF-021 (Phase 11d). The per-tile Mark-done button used
+  // to be a stub that only fired a snackbar. Wiring it to a
+  // real `CompletionLogService.append` is what makes the
+  // per-day todo's daily check-off reachable in one tap.
+  testWidgets('per-tile Mark-done writes a completion for a DoPerDay', (
+    tester,
+  ) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoPerDay(
+        id: 'h_perday',
+        name: 'Daily check-in',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 6),
+        restDaysPerMonth: 2,
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    expect(find.text('Daily check-in'), findsOneWidget);
+    expect(find.text('Every day'), findsOneWidget);
+
+    // Tap the per-tile Mark-done IconButton. There is exactly
+    // one because there is exactly one tile.
+    await tester.tap(find.byTooltip('Mark done'));
+    // Let the async append + snackbar settle.
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    // The snackbar confirms the action and offers Undo.
+    expect(find.text('Marked "Daily check-in" done.'), findsOneWidget);
+    expect(find.text('Undo'), findsOneWidget);
+
+    // A row landed in the completion log for today.
+    final log = await CompletionLogService.instance.listForHabit('h_perday');
+    expect(log.length, 1);
+  });
 }

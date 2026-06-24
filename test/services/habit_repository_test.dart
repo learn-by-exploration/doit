@@ -258,5 +258,28 @@ void main() {
       );
       expect(() => DoRepository.instance.save(h), throwsA(isA<DoNameEmpty>()));
     });
+
+    // WF-021 (Phase 11d). scheduleType='perDay' round-trips
+    // with all per-type schema columns NULL. The reconstructed
+    // DoPerDay keeps the base fields and gets the schedule
+    // type from the discriminator only.
+    test('round-trips a DoPerDay', () async {
+      final h = DoPerDay(
+        id: 'h_perday',
+        name: 'Daily check-in',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026),
+        restDaysPerMonth: 2,
+      );
+      await DoRepository.instance.save(h);
+      final back = await DoRepository.instance.getById('h_perday');
+      expect(back, isA<DoPerDay>());
+      final pd = back! as DoPerDay;
+      expect(pd.id, 'h_perday');
+      expect(pd.name, 'Daily check-in');
+      expect(pd.proofMode, isA<SoftProof>());
+      expect(pd.restDaysPerMonth, 2);
+      expect(pd.createdAt, DateTime(2026));
+    });
   });
 }

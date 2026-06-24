@@ -310,6 +310,13 @@ sealed class Do {
         if (targetHours != null && (targetHours < 1 || targetHours > 23)) {
           throw DoInvalidTargetHours(targetHours);
         }
+      // WF-021 (Phase 11d): per-day todos have no
+      // schedule-specific fields — no time, no weekday set,
+      // no N. The base invariants (empty name, rest-day
+      // budget, color seed, icon name) already ran above.
+      // Empty arm is intentional; do not delete it.
+      case DoPerDay():
+        break;
     }
     validateProofMode(proofMode);
   }
@@ -819,5 +826,83 @@ final class DoTimeWindow extends Do {
       if (candidate.isAfter(fromLocal)) return candidate;
     }
     return null;
+  }
+}
+
+/// Per-day todo (WF-021). A do that fires once per local day
+/// with no time-of-day and no weekday set. The next
+/// occurrence is the next local midnight strictly after
+/// [from]; the schedule engine re-arms via
+/// `ReminderService.onFireAlarm` (`lib/services/reminder_service.dart:275-281`).
+///
+/// A per-day todo shares the existing `ConsecutiveCounter` /
+/// completion-log path — the streak is whatever the log says
+/// it is. Marking a per-day todo done writes a single
+/// `CompletionRow` to the local-day bucket; the log dedupes
+/// on `(habitId, day)` so a double-tap is a no-op.
+///
+/// v1.2n (Phase 11d). No schedule-specific fields beyond
+/// the base; the per-type schema columns (`weekdays`,
+/// `hour`, `minute`, `nDays`, `targetHabitId`,
+/// `dayOfMonth`, `nth`, `weekday`, `endHour`,
+/// `endMinute`, `targetHours`) are all NULL for this
+/// subclass — see `DoRepository._scheduleTypeTag` and
+/// `_fromRow` at `lib/services/do_repository.dart:254` and
+/// the `_toRow` switch at line 105.
+@immutable
+final class DoPerDay extends Do {
+  const DoPerDay({
+    required super.id,
+    required super.name,
+    required super.proofMode,
+    required super.createdAt,
+    required super.restDaysPerMonth,
+    super.category,
+    super.colorSeed,
+    super.iconName,
+    super.pausedUntil,
+    super.automations,
+  });
+
+  @override
+  DoPerDay copyWith({
+    String? name,
+    DoProofMode? proofMode,
+    int? restDaysPerMonth,
+    DoCategory? category,
+    int? colorSeed,
+    String? iconName,
+    DateTime? pausedUntil,
+    bool clearPausedUntil = false,
+    List<Automation>? automations,
+  }) {
+    return DoPerDay(
+      id: id,
+      name: name ?? this.name,
+      proofMode: proofMode ?? this.proofMode,
+      createdAt: createdAt,
+      restDaysPerMonth: restDaysPerMonth ?? this.restDaysPerMonth,
+      category: category ?? this.category,
+      colorSeed: colorSeed ?? this.colorSeed,
+      iconName: iconName ?? this.iconName,
+      pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
+      automations: automations ?? this.automations,
+    );
+  }
+
+  @override
+  DateTime? nextOccurrence(DateTime from) {
+    final fromLocal = from.toLocal();
+    final today = DateTime(fromLocal.year, fromLocal.month, fromLocal.day);
+    // Strictly-after [from]: if [from] is exactly at
+    // today's local midnight, return tomorrow's midnight.
+    // Otherwise return today's midnight (which is in the
+    // past relative to [from] if [from] is past 00:00; in
+    // that case the schedule engine's
+    // `ReminderService.onFireAlarm` will re-fire on the
+    // next post-midnight reschedule — see
+    // `lib/services/reminder_service.dart:275-281`).
+    if (today.isAfter(fromLocal)) return today;
+    return DateTime(fromLocal.year, fromLocal.month, fromLocal.day + 1);
   }
 }

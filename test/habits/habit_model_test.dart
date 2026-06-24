@@ -54,6 +54,18 @@ DoDayOfX _dayOfMonth({required int day}) {
   );
 }
 
+// WF-021 (Phase 11d). Per-day todo has no schedule-specific
+// fields — same shape as the model base.
+DoPerDay _perDay() {
+  return DoPerDay(
+    id: 'h1',
+    name: 'Daily check-in',
+    proofMode: const SoftProof(),
+    createdAt: _createdAt(),
+    restDaysPerMonth: 2,
+  );
+}
+
 StrongProof _strong() {
   return StrongProof(
     MissionChain.from(const [
@@ -83,6 +95,12 @@ void main() {
 
     test('a fresh DayOfX habit validates', () {
       expect(_dayOfMonth(day: 15).validate, returnsNormally);
+    });
+
+    // WF-021 (Phase 11d). DoPerDay has no schedule-specific
+    // invariants beyond the base — empty validate arm.
+    test('a fresh PerDay habit validates', () {
+      expect(_perDay().validate, returnsNormally);
     });
 
     test('empty name throws DoNameEmpty', () {
@@ -157,6 +175,19 @@ void main() {
     test('Auto proof is rejected in v0.1', () {
       final h = _fixed().copyWith(proofMode: const AutoProof());
       expect(h.validate, throwsA(isA<AutoProofNotSupported>()));
+    });
+
+    // WF-021 (Phase 11d). Base invariants apply to DoPerDay:
+    // empty name and negative rest-days still throw, even
+    // though the schedule subtype has no schedule fields.
+    test('PerDay habit with empty name throws DoNameEmpty', () {
+      final h = _perDay().copyWith(name: '');
+      expect(h.validate, throwsA(isA<DoNameEmpty>()));
+    });
+
+    test('PerDay habit with negative rest days throws DoInvalidRestDays', () {
+      final h = _perDay().copyWith(restDaysPerMonth: -1);
+      expect(h.validate, throwsA(isA<DoInvalidRestDays>()));
     });
   });
 

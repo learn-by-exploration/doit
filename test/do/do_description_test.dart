@@ -109,5 +109,18 @@ void main() {
       );
       expect(describeDo(h), 'Window — 08:00–20:00');
     });
+
+    // WF-021 (Phase 11d). No time, no weekday set; the
+    // schedule subtype is identified by name only.
+    test('DoPerDay renders "Every day"', () {
+      final h = DoPerDay(
+        id: 'h1',
+        name: 'Daily check-in',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 6),
+        restDaysPerMonth: 2,
+      );
+      expect(describeDo(h), 'Every day');
+    });
   });
 }

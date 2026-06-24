@@ -137,6 +137,64 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// WF-021 (Phase 11d). Per-tile mark-done: writes a
+  /// completion for [habit] (id + name) for today's local
+  /// day bucket, then offers an Undo affordance.
+  ///
+  /// The per-tile "Mark done" button at `_HabitTile` used
+  /// to be a stub that only fired a snackbar. Wiring it
+  /// to a real check-off is the natural place for the
+  /// per-day todo's daily completion (Nielsen #1: visibility
+  /// of system status; Norman #2: feedback; Norman #3:
+  /// user control via the Undo affordance).
+  ///
+  /// Errors are surfaced via a snackbar and the screen
+  /// is left mounted so the user can retry.
+  Future<void> _completeOne(Do habit) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final now = DateTime.now();
+    final String appendedId;
+    try {
+      appendedId = await CompletionLogService.instance.append(
+        habitId: habit.id,
+        day: now,
+        source: CompletionSource.manual,
+        proofModeAtTime: 'soft',
+      );
+    } on Object catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not mark done. Try again.')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Marked "${habit.name}" done.'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => _undoCompletion(habit.id, appendedId),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+    _refresh();
+  }
+
+  /// Undo the most-recent manual completion for [habitId]
+  /// when [appendedId] matches. Best-effort: if the row
+  /// was already deleted by a sync, the undo is a no-op.
+  Future<void> _undoCompletion(String habitId, String appendedId) async {
+    try {
+      await CompletionLogService.instance.deleteById(appendedId);
+    } on Object catch (_) {
+      // Silent: the user can re-mark if they want to.
+      return;
+    }
+    _refresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -217,6 +275,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       onTap: _selectMode
                           ? () => _toggleSelect(habits[i].id)
                           : () => _onTileTap(habits[i].id),
+                      onMarkDone: _selectMode
+                          ? null
+                          : () => _completeOne(habits[i]),
                     ),
                   );
                 },
@@ -270,12 +331,20 @@ class _HabitTile extends StatelessWidget {
     this.selectMode = false,
     this.onLongPress,
     this.onTap,
+    this.onMarkDone,
   });
   final Do habit;
   final bool selected;
   final bool selectMode;
   final VoidCallback? onLongPress;
   final VoidCallback? onTap;
+
+  /// WF-021 (Phase 11d). The per-tile "Mark done" button
+  /// calls this. The home screen wires it to a real
+  /// completion via `_completeOne` (which offers an Undo
+  /// affordance in a snackbar). The tile was a stub prior
+  /// to v1.2n.
+  final VoidCallback? onMarkDone;
 
   @override
   Widget build(BuildContext context) {
@@ -357,19 +426,15 @@ class _HabitTile extends StatelessWidget {
                   ),
                 ),
                 if (!selectMode)
-                  IconButton(
-                    tooltip: 'Mark done',
-                    icon: const Icon(Icons.check_circle_outline),
-                    iconSize: Sizing.tapHome / 2,
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            AppLocalizations.of(context).homeSnackbarMarkedDone,
-                          ),
-                        ),
-                      );
-                    },
+                  Semantics(
+                    button: true,
+                    label: 'Mark ${habit.name} done for today',
+                    child: IconButton(
+                      tooltip: 'Mark done',
+                      icon: const Icon(Icons.check_circle_outline),
+                      iconSize: Sizing.tapHome / 2,
+                      onPressed: onMarkDone,
+                    ),
                   ),
               ],
             ),

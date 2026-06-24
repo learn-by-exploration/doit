@@ -223,4 +223,60 @@ void main() {
       expect(next, DateTime(2026, 7, 31));
     });
   });
+
+  // WF-021 (Phase 11d). Per-day todo: the next occurrence
+  // is the next local midnight strictly after [from].
+  // The schedule engine re-arms via the same call when the
+  // midnight alarm fires.
+  group('DoPerDay.nextOccurrence', () {
+    final h = DoPerDay(
+      id: 'h_perday',
+      name: 'Daily check-in',
+      proofMode: const SoftProof(),
+      createdAt: DateTime(2026),
+      restDaysPerMonth: 2,
+    );
+
+    test('returns the day after [from] when [from] is past 00:00', () {
+      // 2026-06-23 09:30 local — today is already past midnight,
+      // so the next occurrence is tomorrow's midnight.
+      final from = DateTime(2026, 6, 23, 9, 30);
+      final next = h.nextOccurrence(from);
+      expect(next, DateTime(2026, 6, 24));
+    });
+
+    test('returns tomorrow when [from] is exactly today at 00:00', () {
+      // Strictly-after semantics: if [from] is today's
+      // local midnight, the next occurrence is tomorrow's
+      // midnight. The schedule engine will fire today's
+      // alarm independently.
+      final from = DateTime(2026, 6, 23);
+      final next = h.nextOccurrence(from);
+      expect(next, DateTime(2026, 6, 24));
+    });
+
+    test('returns today\'s midnight when [from] is before today', () {
+      // A `from` in the past relative to today (a
+      // reschedule from the prior day) returns today's
+      // midnight — the engine fires the alarm at 00:00
+      // today.
+      final from = DateTime(2026, 6, 22, 23, 59);
+      final next = h.nextOccurrence(from);
+      expect(next, DateTime(2026, 6, 23));
+    });
+
+    test('rolls across the month boundary', () {
+      // From May 31, 2026 12:00 → next is June 1, 2026.
+      final from = DateTime(2026, 5, 31, 12);
+      final next = h.nextOccurrence(from);
+      expect(next, DateTime(2026, 6));
+    });
+
+    test('rolls across the year boundary', () {
+      // From Dec 31, 2026 18:00 → next is Jan 1, 2027.
+      final from = DateTime(2026, 12, 31, 18);
+      final next = h.nextOccurrence(from);
+      expect(next, DateTime(2027));
+    });
+  });
 }

@@ -27,6 +27,10 @@ String describeDo(Do h) {
     DoAnchor() => 'Anchor',
     DoDayOfX() => 'Day-of-X',
     DoTimeWindow() => 'Window — ${h.start}–${h.end}',
+    // WF-021 (Phase 11d). No time, no weekday set;
+    // the per-day-pill on the home tile carries the
+    // visual cue so the subtitle stays short.
+    DoPerDay() => 'Every day',
   };
 }
 

@@ -184,6 +184,10 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
       _twStart = TimeOfDay(hour: self.start.hour, minute: self.start.minute);
       _twEnd = TimeOfDay(hour: self.end.hour, minute: self.end.minute);
       _twTargetHours = self.targetHours;
+    } else if (self is DoPerDay) {
+      // WF-021 (Phase 11d). No per-type fields; just
+      // flip the picker.
+      _scheduleType = 'perDay';
     }
     // Edit mode: also load the other-habits list for the
     // anchor picker.
@@ -358,6 +362,8 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
                 ButtonSegment(value: 'anchor', label: Text('After')),
                 ButtonSegment(value: 'dayOfX', label: Text('Day-of-X')),
                 ButtonSegment(value: 'timeWindow', label: Text('Window')),
+                // WF-021 (Phase 11d). Per-day todo.
+                ButtonSegment(value: 'perDay', label: Text('Per day')),
               ],
               selected: <String>{_scheduleType},
               onSelectionChanged: (s) =>
@@ -583,6 +589,28 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
               ],
             ),
           ],
+        );
+      // WF-021 (Phase 11d). No per-type fields — a per-day
+      // todo fires every day with no time-of-day. Surface
+      // a single explainer row so the picker is not an
+      // empty region (Nielsen #1: visibility of system
+      // status).
+      case 'perDay':
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+          child: Row(
+            children: [
+              const Icon(Icons.calendar_today_outlined),
+              const SizedBox(width: Spacing.sm),
+              Expanded(
+                child: Text(
+                  'Fires every day. No time of day. '
+                  'Mark it done on the home screen.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            ],
+          ),
         );
       default:
         return const SizedBox.shrink();
@@ -989,6 +1017,21 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             pausedUntil: _pausedUntil,
             automations: _automations,
           );
+        // WF-021 (Phase 11d). Per-day todo. No
+        // per-type fields; just construct the leaf.
+        case 'perDay':
+          habit = DoPerDay(
+            id: id,
+            name: name,
+            proofMode: proofMode,
+            createdAt: createdAt,
+            restDaysPerMonth: 2,
+            category: _category,
+            colorSeed: _colorSeed,
+            iconName: _iconName,
+            pausedUntil: _pausedUntil,
+            automations: _automations,
+          );
         default:
           _showSnack('Pick a schedule type.');
           return;
@@ -1169,6 +1212,15 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
         minute = d.start.minute;
         endHour = d.end.hour;
         endMinute = d.end.minute;
+      // WF-021 (Phase 11d). No per-type fields; fill
+      // the unified envelope with stable defaults
+      // (every weekday, 09:00) so the payload round-trips
+      // even if a future code path reads them.
+      case DoPerDay():
+        scheduleType = 'perDay';
+        weekdays.addAll(List<int>.generate(7, (i) => i + 1));
+        hour = 9;
+        minute = 0;
     }
     return <String, dynamic>{
       'scheduleType': scheduleType,

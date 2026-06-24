@@ -226,6 +226,23 @@ class DoRepository {
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
         );
+      case 'perDay':
+        // WF-021 (Phase 11d). No schedule-specific fields —
+        // the per-type schema columns (weekdays, hour,
+        // minute, nDays, targetHabitId, dayOfMonth, nth,
+        // weekday, endHour, endMinute, targetHours) are
+        // all NULL for DoPerDay.
+        return domain.DoPerDay(
+          id: base.id,
+          name: base.name,
+          proofMode: base.proofMode,
+          createdAt: base.createdAt,
+          restDaysPerMonth: base.restDaysPerMonth,
+          category: base.category,
+          colorSeed: base.colorSeed,
+          iconName: base.iconName,
+          pausedUntil: base.pausedUntil,
+        );
       default:
         throw StateError('Unknown scheduleType: ${r.scheduleType}');
     }
@@ -257,6 +274,7 @@ class DoRepository {
     if (d is domain.DoAnchor) return 'anchor';
     if (d is domain.DoDayOfX) return 'dayOfX';
     if (d is domain.DoTimeWindow) return 'timeWindow';
+    if (d is domain.DoPerDay) return 'perDay';
     throw ArgumentError('Unknown do type: $d');
   }
 
