@@ -111,4 +111,128 @@ void main() {
       findsOneWidget,
     );
   });
+
+  // WF-024 (Phase 11g). The add-habit screen exposes a
+  // per-do rest-day budget stepper. These tests pin:
+  //  (1) the stepper is visible in add mode with the
+  //      global default value (kDefaultRestDaysPerMonth),
+  //  (2) the inc button increments,
+  //  (3) the dec button decrements,
+  //  (4) the bounds-disable behavior at 0 (dec disabled)
+  //      and 31 (inc disabled).
+  group('WF-024 rest-day stepper (Phase 11g)', () {
+    testWidgets('renders with the kDefaultRestDaysPerMonth value', (
+      tester,
+    ) async {
+      await tester.pumpWidget(const MaterialApp(home: AddHabitScreen()));
+      await tester.pump();
+      // The Row that hosts the stepper is keyed.
+      expect(
+        find.byKey(const ValueKey('add_habit.rest_days_stepper')),
+        findsOneWidget,
+      );
+      // The numeric value text reads as the default (2).
+      final valueFinder = find.byKey(
+        const ValueKey('add_habit.rest_days_value'),
+      );
+      expect(valueFinder, findsOneWidget);
+      expect(tester.widget<Text>(valueFinder).data, '2');
+      // The explanatory copy is present so the user knows
+      // what the number means.
+      expect(find.text('Rest days per month'), findsOneWidget);
+    });
+
+    testWidgets('inc increments the displayed value', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: AddHabitScreen()));
+      await tester.pump();
+      // The stepper sits below the schedule-type picker; the
+      // default 800×600 test surface scrolls it off-screen.
+      // Use `ensureVisible` so the button is actually inside
+      // the viewport before the tap.
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('add_habit.rest_days_inc')),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('add_habit.rest_days_inc')));
+      await tester.pump();
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const ValueKey('add_habit.rest_days_value')),
+            )
+            .data,
+        '3',
+      );
+    });
+
+    testWidgets('dec decrements the displayed value', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: AddHabitScreen()));
+      await tester.pump();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('add_habit.rest_days_dec')),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('add_habit.rest_days_dec')));
+      await tester.pump();
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const ValueKey('add_habit.rest_days_value')),
+            )
+            .data,
+        '1',
+      );
+    });
+
+    testWidgets('at the 0-day lower bound, dec is disabled; at 31-day '
+        'upper bound, inc is disabled', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: AddHabitScreen()));
+      await tester.pump();
+
+      // Walk down to 0 (dec four times: 2 -> 1 -> 0).
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('add_habit.rest_days_dec')),
+      );
+      await tester.pump();
+      for (var i = 0; i < 4; i++) {
+        await tester.tap(find.byKey(const ValueKey('add_habit.rest_days_dec')));
+        await tester.pump();
+      }
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const ValueKey('add_habit.rest_days_value')),
+            )
+            .data,
+        '0',
+      );
+      final decBtn = tester.widget<IconButton>(
+        find.byKey(const ValueKey('add_habit.rest_days_dec')),
+      );
+      expect(decBtn.onPressed, isNull);
+
+      // Walk up to 31 (inc 31 times: 0 -> 31). Re-ensure
+      // visibility once after the form re-lays out.
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('add_habit.rest_days_inc')),
+      );
+      await tester.pump();
+      for (var i = 0; i < 32; i++) {
+        await tester.tap(find.byKey(const ValueKey('add_habit.rest_days_inc')));
+        await tester.pump();
+      }
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const ValueKey('add_habit.rest_days_value')),
+            )
+            .data,
+        '31',
+      );
+      final incBtn = tester.widget<IconButton>(
+        find.byKey(const ValueKey('add_habit.rest_days_inc')),
+      );
+      expect(incBtn.onPressed, isNull);
+    });
+  });
 }

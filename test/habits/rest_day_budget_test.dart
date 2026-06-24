@@ -4,6 +4,15 @@ import 'package:doit/do/skip_budget.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // WF-024 (Phase 11g). The global default skip-day budget
+  // per calendar month is named once so the add-habit screen
+  // and any future defaults land on the same constant.
+  group('kDefaultRestDaysPerMonth', () {
+    test('is 2 (matches the historical default)', () {
+      expect(kDefaultRestDaysPerMonth, 2);
+    });
+  });
+
   group('SkipBudget', () {
     test('starts empty', () {
       final b = SkipBudget(doId: 'h1', monthlyLimit: 2);

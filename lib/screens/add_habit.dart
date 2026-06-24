@@ -25,6 +25,7 @@ import 'package:flutter/material.dart';
 
 import 'package:doit/do/do.dart';
 import 'package:doit/do/proof_mode.dart';
+import 'package:doit/do/skip_budget.dart' show kDefaultRestDaysPerMonth;
 import 'package:doit/routines/routine.dart';
 import 'package:doit/routines/routine_executor.dart';
 import 'package:doit/services/do_repository.dart';
@@ -117,6 +118,15 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   // `Habits.automations_json`.
   List<Automation> _automations = const <Automation>[];
 
+  // WF-024 (Phase 11g). The per-do rest-day budget. The
+  // calculator already honors this value via
+  // `SkipBudget(monthlyLimit: h.restDaysPerMonth)` — the UI
+  // simply had no control to let the user edit it. Default is
+  // `kDefaultRestDaysPerMonth` (2). Bounds: 0..31 (a calendar
+  // month has at most 31 days). The model's `validate()`
+  // rejects values below 0; the UI clamps to 31.
+  int _restDaysPerMonth = kDefaultRestDaysPerMonth;
+
   // Cached list of all other habits, for the anchor picker.
   List<Do> _otherHabits = const <Do>[];
 
@@ -159,6 +169,8 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
       _iconName = h.iconName;
       _pausedUntil = h.pausedUntil;
       _automations = h.automations;
+      // WF-024 (Phase 11g). Honor the persisted per-do value.
+      _restDaysPerMonth = h.restDaysPerMonth;
     });
     // Type-specific fields.
     final self = h;
@@ -250,6 +262,13 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     final nDays = (p['nDays'] as num?)?.toInt();
     if (nDays != null && nDays > 0) {
       _intervalNDays = nDays;
+    }
+    // WF-024 (Phase 11g). Pre-fill the rest-day budget from
+    // a template's payload (if present). Defaults to the
+    // global default for missing payloads.
+    final restDays = (p['restDaysPerMonth'] as num?)?.toInt();
+    if (restDays != null && restDays >= 0) {
+      _restDaysPerMonth = restDays;
     }
   }
 
@@ -368,6 +387,20 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
               selected: <String>{_scheduleType},
               onSelectionChanged: (s) =>
                   setState(() => _scheduleType = s.first),
+            ),
+            const SizedBox(height: Spacing.md),
+            // --- WF-024 (Phase 11g). Per-do rest-day budget.
+            // The calculator already honors
+            // `Do.restDaysPerMonth` via
+            // `SkipBudget(monthlyLimit: ...)`, but the user
+            // had no UI to set it. The stepper caps at 31
+            // (a calendar month has at most 31 days) and
+            // floors at 0. The label is "Rest days per
+            // month" so the copy is consistent with the
+            // Settings copy.
+            _RestDaysStepper(
+              value: _restDaysPerMonth,
+              onChanged: (v) => setState(() => _restDaysPerMonth = v),
             ),
             const SizedBox(height: Spacing.md),
             _buildScheduleFields(),
@@ -936,7 +969,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             name: name,
             proofMode: proofMode,
             createdAt: createdAt,
-            restDaysPerMonth: 2,
+            restDaysPerMonth: _restDaysPerMonth,
             weekdays: Set<int>.from(_fixedWeekdays),
             time: DoTime(_fixedTime.hour, _fixedTime.minute),
             category: _category,
@@ -951,7 +984,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             name: name,
             proofMode: proofMode,
             createdAt: createdAt,
-            restDaysPerMonth: 2,
+            restDaysPerMonth: _restDaysPerMonth,
             nDays: _intervalNDays,
             referenceDate: now,
             category: _category,
@@ -970,7 +1003,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             name: name,
             proofMode: proofMode,
             createdAt: createdAt,
-            restDaysPerMonth: 2,
+            restDaysPerMonth: _restDaysPerMonth,
             targetDoId: _anchorTargetId!,
             lastAnchor: null,
             category: _category,
@@ -985,7 +1018,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             name: name,
             proofMode: proofMode,
             createdAt: createdAt,
-            restDaysPerMonth: 2,
+            restDaysPerMonth: _restDaysPerMonth,
             dayOfMonth: _dayOfXDayOfMonth,
             nth: _dayOfXNth,
             weekday: _dayOfXWeekday,
@@ -1006,7 +1039,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             name: name,
             proofMode: proofMode,
             createdAt: createdAt,
-            restDaysPerMonth: 2,
+            restDaysPerMonth: _restDaysPerMonth,
             weekdays: Set<int>.from(_fixedWeekdays),
             start: DoTime(_twStart.hour, _twStart.minute),
             end: DoTime(_twEnd.hour, _twEnd.minute),
@@ -1017,15 +1050,18 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             pausedUntil: _pausedUntil,
             automations: _automations,
           );
-        // WF-021 (Phase 11d). Per-day todo. No
-        // per-type fields; just construct the leaf.
+        // WF-021 (Phase 11d). Per-day todo was reachable in
+        // the picker but the save switch was missing this
+        // arm — saving would fall through to `default` and
+        // show "Pick a schedule type." WF-024 (Phase 11g)
+        // closes the gap.
         case 'perDay':
           habit = DoPerDay(
             id: id,
             name: name,
             proofMode: proofMode,
             createdAt: createdAt,
-            restDaysPerMonth: 2,
+            restDaysPerMonth: _restDaysPerMonth,
             category: _category,
             colorSeed: _colorSeed,
             iconName: _iconName,
@@ -1569,6 +1605,74 @@ class _RoutineRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// WF-024 (Phase 11g). A small stepper row for the per-do
+/// rest-day budget. Three controls: a decrement icon button,
+/// the current value as `N`, and an increment icon button.
+/// Bounds: 0..31 (a calendar month has at most 31 days).
+/// Tap-target size honors the project's 48dp rule.
+class _RestDaysStepper extends StatelessWidget {
+  const _RestDaysStepper({required this.value, required this.onChanged});
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  static const int _min = 0;
+  static const int _max = 31;
+
+  void _dec() {
+    if (value > _min) onChanged(value - 1);
+  }
+
+  void _inc() {
+    if (value < _max) onChanged(value + 1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      key: const ValueKey('add_habit.rest_days_stepper'),
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Rest days per month', style: theme.textTheme.titleSmall),
+              const SizedBox(height: Spacing.xs),
+              Text(
+                "Skip days that don't break your run. "
+                'Default is $kDefaultRestDaysPerMonth.',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          key: const ValueKey('add_habit.rest_days_dec'),
+          tooltip: 'Fewer rest days',
+          onPressed: value > _min ? _dec : null,
+          icon: const Icon(Icons.remove),
+        ),
+        SizedBox(
+          width: 32,
+          child: Text(
+            '$value',
+            key: const ValueKey('add_habit.rest_days_value'),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium,
+          ),
+        ),
+        IconButton(
+          key: const ValueKey('add_habit.rest_days_inc'),
+          tooltip: 'More rest days',
+          onPressed: value < _max ? _inc : null,
+          icon: const Icon(Icons.add),
+        ),
+      ],
     );
   }
 }

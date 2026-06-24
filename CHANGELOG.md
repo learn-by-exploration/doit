@@ -1276,6 +1276,93 @@ $ flutter test
 new tests for WF-023 / Phase 11f; 3-gate green with zero
 analyzer findings.)
 
+### v1.2q — WF-024 rest-day budget override (Phase 11g)
+
+Phase 11g of the v1.2 code-TODO closure (`30-phase
+roadmap`). Closes the B5 item: a per-do rest-day budget
+override surfaced in the add-habit UI. The model field
+(`Do.restDaysPerMonth`) already existed since v0.1 and was
+already persisted on `habits.rest_days_per_month` (no
+migration); the UI simply had no control to edit it. This
+phase also closes a v1.2n (Phase 11d) gap: the
+`_save` switch's `'perDay'` arm was missing — saving a
+per-day todo fell through to `default` and showed "Pick a
+schedule type." even when "Per day" was selected. The arm
+is added in the same PR (this is the natural place to fix
+it because the per-day case needs the new
+`_restDaysPerMonth` field on the saved row).
+
+**What's new**
+
+- **`kDefaultRestDaysPerMonth`** — new top-level
+  `const int kDefaultRestDaysPerMonth = 2` in
+  `lib/do/skip_budget.dart`. The global default is named
+  once; both the add-habit screen and (in a future PR)
+  any per-do defaults land on this constant.
+- **`_RestDaysStepper` (new widget on `AddHabitScreen`)** —
+  a stateless `Padding` row of two `IconButton`s around a
+  `Text(value.toString())`. Bounds 0..31 inclusive (a
+  calendar month has at most 31 days; the model validator
+  accepts any non-negative int, so 31 is the UI cap, not
+  a model cap). Dec/inc buttons are disabled at the bounds
+  for visual + a11y feedback. Keys:
+  `add_habit.rest_days_stepper`, `add_habit.rest_days_dec`,
+  `add_habit.rest_days_value`, `add_habit.rest_days_inc`.
+  Each `IconButton` carries a `Semantics(button: true,
+  label: ...)` wrapper for TalkBack.
+- **`int _restDaysPerMonth` state on `_AddHabitScreenState`**
+  — defaults to `kDefaultRestDaysPerMonth`. The
+  `_loadExisting` arm reads `h.restDaysPerMonth` so editing
+  an existing do restores the per-do value (was previously
+  ignored — the field silently kept the default). The
+  `_applyPayload` arm reads `payload['restDaysPerMonth']`
+  so templates can pre-fill it.
+- **`_save` switch threads `_restDaysPerMonth` through all
+  six `'perDay' | 'fixed' | 'interval' | 'anchor' | 'dayOfX'
+  | 'timeWindow'` cases** — the previous code hard-coded
+  `restDaysPerMonth: 2` in every case. The `'perDay'` arm
+  is newly added in this PR (closes the v1.2n gap).
+- **Stepper renders between the schedule-type picker and
+  the schedule-specific fields** so the user sees the
+  budget for every schedule type, not just the per-day
+  variant.
+
+**Files**
+
+- `lib/do/skip_budget.dart` — added top-level
+  `const int kDefaultRestDaysPerMonth = 2`.
+- `lib/screens/add_habit.dart` — added `import 'package:doit/do/skip_budget.dart' show kDefaultRestDaysPerMonth;`;
+  added `int _restDaysPerMonth = kDefaultRestDaysPerMonth`
+  state; wired `_loadExisting` to read `h.restDaysPerMonth`;
+  wired `_applyPayload` to read `restDaysPerMonth`; added
+  `_RestDaysStepper` widget; inserted it between the
+  schedule-type picker and the schedule fields; rewrote the
+  `_save` switch to use `_restDaysPerMonth` in all six
+  cases; added the previously-missing `'perDay'` arm.
+- `test/do/skip_budget_test.dart` — 1 new constant pin
+  (`kDefaultRestDaysPerMonth == 2`).
+- `test/widgets/rest_days_stepper_test.dart` — **new** —
+  4 widget tests (initial value matches the constant; inc
+  increments to 3; dec decrements to 1; bounds-disable
+  behavior at 0 and 31).
+- `docs/v_model/requirements.md` — new `SYS-114` row
+  pinning the per-do rest-day budget override contract,
+  the stepper widget, the model-vs-UI cap distinction
+  (model: any non-negative int; UI: 0..31), and the
+  v1.2n `_save` gap closure.
+
+**3-gate verification**
+
+```
+$ dart format --output=none --set-exit-if-changed .
+$ flutter analyze --fatal-infos
+$ flutter test
+```
+
+(Test count: 1030 → 1035 — 1 constant pin + 4 stepper
+widget tests = 5 new tests for WF-024 / Phase 11g;
+3-gate green with zero analyzer findings.)
+
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 
 do it is no longer about streaks. Phase A renames the

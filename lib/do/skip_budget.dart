@@ -19,6 +19,14 @@
 
 import 'package:meta/meta.dart';
 
+/// WF-024 (Phase 11g). The global default skip-day budget per
+/// calendar month. Per-do overrides live on
+/// `Do.restDaysPerMonth` (already a field on the model since
+/// v0.1); the UI in `lib/screens/add_habit.dart` defaults new
+/// dos to this value. Matches the historical default of 2
+/// rest days per month.
+const int kDefaultRestDaysPerMonth = 2;
+
 /// Thrown by [SkipBudget.consume] when the budget is exhausted
 /// for the current month.
 @immutable
