@@ -31,6 +31,20 @@
 import 'package:doit/do/skip_budget.dart';
 import 'package:meta/meta.dart';
 
+/// v1.3a (SYS-116): the app-wide default grace window for the
+/// consecutive-run calculator. The user has this much time
+/// past the end of a missed day to retroactively complete it
+/// before the run is considered broken.
+///
+/// Lives at top-level (not on [StreakConfig]) so it is the
+/// single source of truth that both [StreakConfig] consumers
+/// (the stats screen) and the per-do override factory
+/// ([Do.effectiveStreakConfig]) reference. Keep it
+/// `Duration.zero`-aware: a do that sets its
+/// `graceWindowOverride` to `Duration.zero` is honoring
+/// *no* grace window, not falling back to this default.
+const Duration kDefaultGraceWindow = Duration(hours: 3);
+
 /// A single completion of a do.
 ///
 /// [date] is the local-calendar date the user marked the do

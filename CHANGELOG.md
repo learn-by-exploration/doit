@@ -965,6 +965,132 @@ completion is the cause of a streak break.
   day."` (honest; not punitive). The cancel button is
   the default action visually; the destructive button
   reuses the theme's error color.
+
+### v1.3a — Monthly stats + per-do grace factory (Phase 12)
+
+Phase 12 of the v1.3 reliability + lifecycle hardening
+milestone (`30-phase roadmap`). Closes the B9/B13
+follow-ups: the stats screen now shows a 30-day completion
+rate, a month-over-month delta, and a 7-day bar chart, and
+the per-do `graceWindowOverride` field ships end-to-end
+through a new `Do.effectiveStreakConfig(...)` factory
+method. The Settings → Stats entry tile makes the screen
+discoverable from the Settings page. Also closes a Phase
+11f documentation/implementation gap: the `graceWindowOverride`
+field was documented but the factory that wires it into
+the streak calculator was never landed in v1.2p — v1.3a
+is where the factory meets its first real consumer.
+
+**What's new**
+
+- **`Do.effectiveStreakConfig(...)` factory method**
+  (`lib/do/do.dart`, sealed base class) — returns
+  `StreakConfig(graceWindow: graceWindowOverride ?? kDefaultGraceWindow, skipBudget: skipBudget)`.
+  The factory is the canonical way for a consumer (the
+  stats screen today; any future streak-aware surface) to
+  build a `StreakConfig` for a `Do` instance — it honors
+  the per-do override when set, falls back to the app-wide
+  default otherwise, and forwards the rest-day budget
+  verbatim. The `graceWindowOverride` field itself was
+  already on the base class + all 5 subclasses (Phase 11f
+  data-side work); the factory is the missing piece that
+  makes the override actually take effect.
+- **`kDefaultGraceWindow` constant**
+  (`lib/do/consecutive_counter.dart`, top-level) — the
+  single source of truth for "how much time past the end
+  of a missed day does the user have to retroactively
+  complete it before the consecutive-run is broken".
+  Replaces three hard-coded `Duration(hours: 3)` literals
+  that were scattered across the model + the stats
+  screen. The `Duration(hours: 3)` value is unchanged —
+  the constant just guarantees every consumer agrees.
+- **Stats screen extensions** (`lib/screens/stats.dart`) —
+  per-habit card now renders three new lines: `"Last 30
+  days: N (Δ% vs prior 30 days)"` (a signed integer
+  percent or the literal `"new"` when the prior 30 days
+  had zero completions), `"On time: N%"` (completion
+  rate), and a `_Last7DaysChart` widget (7 thin vertical
+  bars, one per local-calendar day, day 0 = today). The
+  `asOf` reference time is captured once at the top of
+  `_load()` so the streak's "is the run still alive?"
+  check, the 30-day window end, and the 7-day bucket
+  labels all stay consistent across the per-habit loop.
+  The streak number on each card is now produced by
+  `h.effectiveStreakConfig(skipBudget: SkipBudget(...))`
+  instead of the prior hard-coded `Duration(hours: 3)`.
+- **Settings → Stats tile** (`lib/screens/settings.dart`) —
+  a new `_StatsTile` between the Reliability section and
+  the Backup section. Tap pushes the existing
+  `StatsScreen` via `MaterialPageRoute`. The home AppBar
+  `Icons.bar_chart` button stays (it's the quick path;
+  Settings is the discoverable path). Three new l10n
+  keys (`settingsSectionStats`, `settingsStatsTitle`,
+  `settingsStatsSubtitle`) added to `app_en.arb` and
+  `app_es.arb`.
+- **`RoutineBanner` auto-clear test pin**
+  (`test/widgets/routine_banner_clear_test.dart`, new) —
+  three widget tests that pin the user-observable
+  behavior of the existing drain-on-next-frame path: an
+  empty queue renders `SizedBox.shrink()`, a non-empty
+  queue renders `"Opening …"` for exactly one frame then
+  drains via the `addPostFrameCallback`, and an out-of-
+  band `clearPendingOpenApp()` collapses the banner back
+  to zero size on the next build. No production code
+  change to `routine_banner.dart` is expected — this is
+  the regression pin for a Phase-11c behavior.
+
+**Why now:** the streak calculator's only production
+`StreakConfig` consumer was the stats screen, and the
+stats screen's `Duration(hours: 3)` literal was the
+single hardest reason per-do grace overrides could not
+ship end-to-end. Phase 12 lands the factory method, the
+constant, and the new stats surface in a single PR so
+the wiring is observable from the day the PR lands
+(per-do override → factory → `StreakConfig` → streak
+snapshot → card).
+
+**3-gate verification**
+
+```
+$ dart format --output=none --set-exit-if-changed .
+Formatted 217 files (0 changed) in 0.74 seconds.
+
+$ flutter analyze --fatal-infos
+Analyzing doit...
+No issues found! (ran in 1.0s)
+
+$ flutter test test/habits/habit_model_test.dart \
+              test/screens/stats_test.dart \
+              test/widgets/routine_banner_clear_test.dart
+00:00 +41: All tests passed!
+```
+
+(Full-suite 3-gate output is in the PR description.)
+
+**V-Model traceability** (this PR)
+
+- `WF-011` (v0.1 stats surface) — extended.
+- `WF-031` (v0.2 monthly stats) — extended.
+- `WF-038` (routine banner drain) — pinned by new test.
+- New `SYS-111`: "Monthly stats + per-do grace factory" —
+  the 30-day completion rate definition, the MoM-delta
+  definition with the `prev30 == 0` boundary, the 7-bar
+  chart semantics, the `Do.effectiveStreakConfig(...)`
+  factory contract, the new Settings → Stats tile, and
+  the `kDefaultGraceWindow` constant.
+
+**Deferred** (out of Phase 12 scope)
+
+- The Android home-screen AppWidget (mirror of the in-app
+  stats). Phase 28 of the 30-phase roadmap.
+- A per-category aggregate line (today's screen groups
+  by category but does not roll the totals up). A v1.4
+  polish candidate.
+- A `kStatsCacheDuration` 5-second memoization in
+  `lib/services/stats_service.dart` (no measurable
+  latency yet — the per-habit `listInRange` is O(30)).
+  Defer until profiling shows up.
+
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 
 do it is no longer about streaks. Phase A renames the

@@ -194,6 +194,24 @@ abstract class AppLocalizations {
   /// **'Device state'**
   String get settingsSectionDeviceState;
 
+  /// No description provided for @settingsSectionStats.
+  ///
+  /// In en, this message translates to:
+  /// **'Stats'**
+  String get settingsSectionStats;
+
+  /// No description provided for @settingsStatsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stats'**
+  String get settingsStatsTitle;
+
+  /// No description provided for @settingsStatsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Streaks, completion rate, 7-day chart.'**
+  String get settingsStatsSubtitle;
+
   /// No description provided for @settingsSectionBackup.
   ///
   /// In en, this message translates to:
