@@ -23,7 +23,9 @@
 //     which is the foundation for WF-019 (v0.2d).
 
 import 'package:doit/do/category.dart';
+import 'package:doit/do/consecutive_counter.dart';
 import 'package:doit/do/proof_mode.dart';
+import 'package:doit/do/skip_budget.dart';
 import 'package:doit/missions/chain.dart';
 import 'package:doit/routines/routine.dart';
 import 'package:meta/meta.dart';
@@ -168,6 +170,7 @@ sealed class Do {
     this.iconName,
     this.pausedUntil,
     this.automations = const <Automation>[],
+    this.graceWindowOverride,
   });
 
   final DoId id;
@@ -202,6 +205,13 @@ sealed class Do {
   /// `Habits.automations_json`.
   final List<Automation> automations;
 
+  /// v1.2p (SYS-113) / v1.3a (SYS-116): per-do override for the
+  /// consecutive-run grace window. `null` means "use the app
+  /// default" ([kDefaultGraceWindow]). `Duration.zero` means
+  /// "no grace window at all — any missed day breaks the run".
+  /// Honored by [Do.effectiveStreakConfig].
+  final Duration? graceWindowOverride;
+
   /// Mission chain — non-empty for Strong, empty for Soft /
   /// Auto. Always reflectable: derived from [proofMode].
   MissionChain get missionChain {
@@ -233,6 +243,8 @@ sealed class Do {
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
     List<Automation>? automations,
+    Duration? graceWindowOverride,
+    bool clearGraceWindowOverride = false,
   });
 
   /// Pure: same input → same output. Returns the next
@@ -240,6 +252,28 @@ sealed class Do {
   /// exists, returns `null` — the caller schedules
   /// `nextOccurrence(from.add(Duration(days: 1)))` instead.
   DateTime? nextOccurrence(DateTime from);
+
+  /// v1.3a (SYS-116): resolves the per-do [StreakConfig] that
+  /// callers should hand to [ConsecutiveCounter.compute].
+  ///
+  /// The grace window is the per-do [graceWindowOverride]
+  /// when set, falling back to the app default
+  /// ([kDefaultGraceWindow]). The skip-budget is forwarded
+  /// verbatim from the caller (the budget lives in
+  /// `lib/services/skip_budget.dart` and is shared by all
+  /// dos in the same calendar month).
+  ///
+  /// Round-tripping through this factory is the only way to
+  /// make per-do grace overrides (the v1.2p SYS-113 contract)
+  /// take effect end-to-end; stats and any future streak
+  /// consumer must use this method instead of constructing
+  /// `StreakConfig` directly.
+  StreakConfig effectiveStreakConfig({required SkipBudget skipBudget}) {
+    return StreakConfig(
+      graceWindow: graceWindowOverride ?? kDefaultGraceWindow,
+      skipBudget: skipBudget,
+    );
+  }
 
   /// Validates the do's invariants. Throws
   /// [DoValidationException] on the first defect.
@@ -348,6 +382,7 @@ final class DoFixed extends Do {
     super.iconName,
     super.pausedUntil,
     super.automations,
+    super.graceWindowOverride,
   });
 
   /// Set of 1..7 (1 = Monday .. 7 = Sunday). Must be non-empty.
@@ -367,6 +402,8 @@ final class DoFixed extends Do {
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
     List<Automation>? automations,
+    Duration? graceWindowOverride,
+    bool clearGraceWindowOverride = false,
   }) {
     return DoFixed(
       id: id,
@@ -381,6 +418,9 @@ final class DoFixed extends Do {
       iconName: iconName ?? this.iconName,
       pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
       automations: automations ?? this.automations,
+      graceWindowOverride: clearGraceWindowOverride
+          ? null
+          : (graceWindowOverride ?? this.graceWindowOverride),
     );
   }
 
@@ -432,6 +472,7 @@ final class DoInterval extends Do {
     super.iconName,
     super.pausedUntil,
     super.automations,
+    super.graceWindowOverride,
   });
 
   final int nDays;
@@ -450,6 +491,8 @@ final class DoInterval extends Do {
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
     List<Automation>? automations,
+    Duration? graceWindowOverride,
+    bool clearGraceWindowOverride = false,
   }) {
     return DoInterval(
       id: id,
@@ -464,6 +507,9 @@ final class DoInterval extends Do {
       iconName: iconName ?? this.iconName,
       pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
       automations: automations ?? this.automations,
+      graceWindowOverride: clearGraceWindowOverride
+          ? null
+          : (graceWindowOverride ?? this.graceWindowOverride),
     );
   }
 
@@ -514,6 +560,7 @@ final class DoAnchor extends Do {
     super.iconName,
     super.pausedUntil,
     super.automations,
+    super.graceWindowOverride,
   });
 
   final DoId targetDoId;
@@ -533,6 +580,8 @@ final class DoAnchor extends Do {
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
     List<Automation>? automations,
+    Duration? graceWindowOverride,
+    bool clearGraceWindowOverride = false,
   }) {
     return DoAnchor(
       id: id,
@@ -547,6 +596,9 @@ final class DoAnchor extends Do {
       iconName: iconName ?? this.iconName,
       pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
       automations: automations ?? this.automations,
+      graceWindowOverride: clearGraceWindowOverride
+          ? null
+          : (graceWindowOverride ?? this.graceWindowOverride),
     );
   }
 
@@ -599,6 +651,7 @@ final class DoDayOfX extends Do {
     super.iconName,
     super.pausedUntil,
     super.automations,
+    super.graceWindowOverride,
   }) : assert(
          dayOfMonth != null || nth != null,
          'Specify either dayOfMonth or (nth, weekday).',
@@ -624,6 +677,8 @@ final class DoDayOfX extends Do {
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
     List<Automation>? automations,
+    Duration? graceWindowOverride,
+    bool clearGraceWindowOverride = false,
   }) {
     return DoDayOfX(
       id: id,
@@ -640,6 +695,9 @@ final class DoDayOfX extends Do {
       iconName: iconName ?? this.iconName,
       pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
       automations: automations ?? this.automations,
+      graceWindowOverride: clearGraceWindowOverride
+          ? null
+          : (graceWindowOverride ?? this.graceWindowOverride),
     );
   }
 
@@ -733,6 +791,7 @@ final class DoTimeWindow extends Do {
     super.iconName,
     super.pausedUntil,
     super.automations,
+    super.graceWindowOverride,
   });
 
   /// Set of 1..7 (1 = Monday .. 7 = Sunday). Must be non-empty.
@@ -760,6 +819,8 @@ final class DoTimeWindow extends Do {
     DateTime? pausedUntil,
     bool clearPausedUntil = false,
     List<Automation>? automations,
+    Duration? graceWindowOverride,
+    bool clearGraceWindowOverride = false,
   }) {
     return DoTimeWindow(
       id: id,
@@ -776,6 +837,9 @@ final class DoTimeWindow extends Do {
       iconName: iconName ?? this.iconName,
       pausedUntil: clearPausedUntil ? null : (pausedUntil ?? this.pausedUntil),
       automations: automations ?? this.automations,
+      graceWindowOverride: clearGraceWindowOverride
+          ? null
+          : (graceWindowOverride ?? this.graceWindowOverride),
     );
   }
 

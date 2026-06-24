@@ -1,7 +1,9 @@
 // Tests for the Do model: validation, immutability, copyWith.
 
+import 'package:doit/do/consecutive_counter.dart';
 import 'package:doit/do/do.dart';
 import 'package:doit/do/proof_mode.dart';
+import 'package:doit/do/skip_budget.dart';
 import 'package:doit/missions/chain.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -208,6 +210,98 @@ void main() {
         theme: 'animals',
       );
       expect(m.rows * m.cols, 8);
+    });
+  });
+
+  group('Do.graceWindowOverride', () {
+    test('default is null on a freshly constructed do', () {
+      expect(_fixed().graceWindowOverride, isNull);
+    });
+
+    test('copyWith(graceWindowOverride: ...) sets the override', () {
+      final h = _fixed().copyWith(
+        graceWindowOverride: const Duration(hours: 6),
+      );
+      expect(h.graceWindowOverride, const Duration(hours: 6));
+    });
+
+    test('copyWith(clearGraceWindowOverride: true) clears the override', () {
+      final withOverride = _fixed().copyWith(
+        graceWindowOverride: const Duration(hours: 6),
+      );
+      final cleared = withOverride.copyWith(clearGraceWindowOverride: true);
+      expect(cleared.graceWindowOverride, isNull);
+    });
+
+    test('copyWith without override keeps the existing value', () {
+      final withOverride = _fixed().copyWith(
+        graceWindowOverride: const Duration(minutes: 30),
+      );
+      final renamed = withOverride.copyWith(name: 'Renamed');
+      expect(renamed.graceWindowOverride, const Duration(minutes: 30));
+      expect(renamed.name, 'Renamed');
+    });
+
+    test('Duration.zero is honored verbatim (no grace window)', () {
+      final h = _fixed().copyWith(graceWindowOverride: Duration.zero);
+      expect(h.graceWindowOverride, Duration.zero);
+    });
+  });
+
+  group('Do.effectiveStreakConfig', () {
+    SkipBudget budget() =>
+        SkipBudget(doId: 'h1', monthlyLimit: 2, consumedDays: const {});
+
+    test('without override returns kDefaultGraceWindow', () {
+      final cfg = _fixed().effectiveStreakConfig(skipBudget: budget());
+      expect(cfg.graceWindow, kDefaultGraceWindow);
+      expect(cfg.skipBudget.doId, 'h1');
+    });
+
+    test('with override returns the override (not the default)', () {
+      final h = _fixed().copyWith(
+        graceWindowOverride: const Duration(hours: 12),
+      );
+      final cfg = h.effectiveStreakConfig(skipBudget: budget());
+      expect(cfg.graceWindow, const Duration(hours: 12));
+    });
+
+    test('Duration.zero override is honored (no grace window)', () {
+      final h = _fixed().copyWith(graceWindowOverride: Duration.zero);
+      final cfg = h.effectiveStreakConfig(skipBudget: budget());
+      expect(cfg.graceWindow, Duration.zero);
+    });
+
+    test('forwards the skipBudget verbatim', () {
+      final consumed = {DateTime(2026, 6, 5), DateTime(2026, 6, 12)};
+      final budget = SkipBudget(
+        doId: 'h1',
+        monthlyLimit: 2,
+        consumedDays: consumed,
+      );
+      final cfg = _fixed().effectiveStreakConfig(skipBudget: budget);
+      expect(cfg.skipBudget.consumedDays, consumed);
+      expect(cfg.skipBudget.monthlyLimit, 2);
+    });
+
+    test('works on every Do subclass (factory is on the base)', () {
+      final b = budget();
+      expect(
+        _fixed().effectiveStreakConfig(skipBudget: b).graceWindow,
+        kDefaultGraceWindow,
+      );
+      expect(
+        _interval().effectiveStreakConfig(skipBudget: b).graceWindow,
+        kDefaultGraceWindow,
+      );
+      expect(
+        _anchor().effectiveStreakConfig(skipBudget: b).graceWindow,
+        kDefaultGraceWindow,
+      );
+      expect(
+        _dayOfMonth(day: 15).effectiveStreakConfig(skipBudget: b).graceWindow,
+        kDefaultGraceWindow,
+      );
     });
   });
 }

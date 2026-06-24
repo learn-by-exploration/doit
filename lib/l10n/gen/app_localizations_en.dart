@@ -78,6 +78,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSectionDeviceState => 'Device state';
 
   @override
+  String get settingsSectionStats => 'Stats';
+
+  @override
+  String get settingsStatsTitle => 'Stats';
+
+  @override
+  String get settingsStatsSubtitle => 'Streaks, completion rate, 7-day chart.';
+
+  @override
   String get settingsSectionBackup => 'Backup';
 
   @override

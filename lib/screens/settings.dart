@@ -30,6 +30,7 @@ import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/screens/settings_restore.dart';
+import 'package:doit/screens/stats.dart';
 import 'package:doit/services/call_interceptor.dart';
 import 'package:doit/services/permission_result.dart';
 import 'package:doit/services/permission_service.dart';
@@ -114,6 +115,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: Spacing.md),
             _SectionHeader(l.settingsSectionDeviceState),
             const DeviceStateRow(),
+            const SizedBox(height: Spacing.md),
+            _SectionHeader(l.settingsSectionStats),
+            const _StatsTile(),
             const SizedBox(height: Spacing.md),
             _SectionHeader(l.settingsSectionBackup),
             ListTile(
@@ -604,6 +608,31 @@ class _CallScreeningTileState extends State<_CallScreeningTile>
               ),
             ),
       onTap: _busy ? null : _request,
+    );
+  }
+}
+
+/// v1.3a (Phase 12 / SYS-116): a discoverable entry into the
+/// Stats screen. The home AppBar `Icons.bar_chart` button
+/// remains as the quick path; this tile is the discoverable
+/// one. Tapping pushes the existing [StatsScreen] via a
+/// `MaterialPageRoute` (matches the Backup tile).
+class _StatsTile extends StatelessWidget {
+  const _StatsTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return ListTile(
+      key: const ValueKey('settings.stats'),
+      leading: const Icon(Icons.bar_chart_outlined),
+      title: Text(l.settingsStatsTitle),
+      subtitle: Text(l.settingsStatsSubtitle),
+      onTap: () {
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute<void>(builder: (_) => const StatsScreen()));
+      },
     );
   }
 }

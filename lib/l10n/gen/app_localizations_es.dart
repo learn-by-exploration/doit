@@ -78,6 +78,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsSectionDeviceState => 'Estado del dispositivo';
 
   @override
+  String get settingsSectionStats => 'Estadísticas';
+
+  @override
+  String get settingsStatsTitle => 'Estadísticas';
+
+  @override
+  String get settingsStatsSubtitle =>
+      'Rachas, tasa de cumplimiento, gráfico de 7 días.';
+
+  @override
   String get settingsSectionBackup => 'Copia de seguridad';
 
   @override
