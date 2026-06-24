@@ -95,6 +95,11 @@ class Habits extends Table {
   // "no non-default automations" (the default `ActionNotify`
   // is synthesized at dispatch time, not stored).
   TextColumn get automationsJson => text().nullable()();
+  // WF-023 (Phase 11f): per-do grace-window override. NULL =
+  // "use the global default (3 hours per SYS-019)". A non-null
+  // value (millis) is the override; the calculator reads it
+  // via `Do.effectiveStreakConfig`.
+  IntColumn get graceWindowOverrideMillis => integer().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

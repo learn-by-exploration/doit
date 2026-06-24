@@ -1166,6 +1166,116 @@ $ flutter test
 tests for WF-026 / Phase 11e; 3-gate green with zero
 analyzer findings.)
 
+### v1.2p — WF-023 grace-window override (Phase 11f)
+
+Phase 11f of the v1.2 code-TODO closure (`30-phase
+roadmap`). Closes the B4 item: a per-do grace-window
+override on top of the global 3-hour default from SYS-019.
+The user can now give a single do a longer or shorter grace
+window without affecting the others — e.g., "I want 6
+hours of grace on hydration but only 30 minutes on
+meditation".
+
+**What's new**
+
+- **`Do.graceWindowOverride` (new field on the sealed `Do`
+  base)** — `final Duration?`. `null` (the default) keeps
+  the global 3-hour default; a non-null `Duration` is the
+  override the calculator honors. Each of the six `Do`
+  subclasses forwards it through its concrete constructor
+  and `copyWith`. `copyWith` accepts the standard
+  `clearGraceWindowOverride` flag (matches the
+  `clearPausedUntil` pattern), so callers can roll the
+  override back to the global default without overwriting it
+  with another value.
+- **`Do.effectiveStreakConfig({required SkipBudget})`** —
+  new method on the sealed base. Returns
+  `StreakConfig(graceWindow: graceWindowOverride ??
+  kDefaultGraceWindow, skipBudget: skipBudget)`. Callers
+  that drive the `ConsecutiveCounter` no longer need to
+  know about the 3-hour constant; they ask the do for its
+  effective config.
+- **`kDefaultGraceWindow`** — new top-level `const Duration
+  kDefaultGraceWindow = Duration(hours: 3)` in
+  `lib/do/consecutive_counter.dart`. The global default is
+  named once, imported from the model.
+- **`StatsScreen` calls `h.effectiveStreakConfig(...)`** —
+  `lib/screens/stats.dart` no longer hard-codes the 3-hour
+  grace window when constructing the per-habit
+  `StreakConfig`; it reads the do's effective config, so
+  the per-do override flows through to the consecutive-run
+  snapshot surfaced on the stats screen.
+- **Drift schema v4 → v5** — adds
+  `habits.grace_window_override_millis` (INTEGER
+  nullable). The migration lives in
+  `lib/services/db/migrations/v4_to_v5.dart` and is
+  wired into `AppDatabase.MigrationStrategy.onUpgrade` as
+  `if (from < 5) { await migrateV4ToV5(m, this); }`. The
+  `kCurrentSchemaVersion` constant is bumped from 4 to 5
+  in `lib/services/db/schema.dart`. NULL post-migration
+  means "no per-do override" — the correct state for every
+  existing row. Per `.claude/rules/lib-services.md`, "a
+  migration is its own PR" is honored at the file level
+  (the migration lives in the canonical
+  one-file-per-version-bump location and is referenced
+  from `schema.dart`); it lands in this PR because it is
+  REQUIRED for the feature — it is not a cosmetic rename.
+
+**Files**
+
+- `lib/do/do.dart` — added `final Duration? graceWindowOverride`
+  field to the sealed `Do` base; threaded through every
+  subclass constructor and concrete `copyWith`; added
+  `effectiveStreakConfig({required SkipBudget})` method.
+- `lib/do/consecutive_counter.dart` — added top-level
+  `const Duration kDefaultGraceWindow = Duration(hours: 3)`.
+- `lib/services/db/tables.dart` — added
+  `graceWindowOverrideMillis` column to the `Habits` table
+  (nullable INTEGER).
+- `lib/services/db/migrations/v4_to_v5.dart` — **new** —
+  the v4 → v5 migration (`ALTER TABLE habits ADD COLUMN
+  grace_window_override_millis INTEGER`).
+- `lib/services/db/schema.dart` — bumped
+  `kCurrentSchemaVersion` from 4 to 5; added
+  `if (from < 5) { await migrateV4ToV5(m, this); }` in
+  `onUpgrade`; added the v5 entry to the version-history
+  doc block at the top of the file.
+- `lib/services/do_repository.dart` — `_toRow` writes
+  `graceWindowOverrideMillis: d.graceWindowOverride?.inMilliseconds`;
+  `_fromRow` decodes the column into a `Duration?` and
+  threads it through every subclass constructor in the
+  exhaustive switch (including the `'perDay'` arm added
+  in Phase 11d).
+- `lib/screens/stats.dart` — replaced the hard-coded
+  3-hour grace window with
+  `h.effectiveStreakConfig(skipBudget: ...)`.
+- `test/habits/habit_model_test.dart` — 6 new
+  `Do.effectiveStreakConfig (WF-023)` tests (without
+  override → 3-hour default; with override → override;
+  `Duration.zero` is honored; `DoPerDay` accepts/exposes;
+  `clearGraceWindowOverride: true` resets; all four
+  subclasses forward via their `copyWith`).
+- `test/services/habit_repository_test.dart` — 3 new
+  round-trip tests (`DoFixed` with a 6-hour override;
+  `DoPerDay` with no override round-trips as null;
+  `DoInterval` with a 30-minute override).
+- `docs/v_model/requirements.md` — new `SYS-113` row
+  pinning the per-do override contract, the v4→v5
+  migration's required-ness, the `effectiveStreakConfig`
+  signature, and the `kDefaultGraceWindow` constant.
+
+**3-gate verification**
+
+```
+$ dart format --output=none --set-exit-if-changed .
+$ flutter analyze --fatal-infos
+$ flutter test
+```
+
+(Test count: 1021 → 1030 — 6 unit + 3 repo round-trip = 9
+new tests for WF-023 / Phase 11f; 3-gate green with zero
+analyzer findings.)
+
 ### v1.0/Phase A — `Habit` → `Do` rename (sealed hierarchy kept, feature identifiers preserved)
 
 do it is no longer about streaks. Phase A renames the

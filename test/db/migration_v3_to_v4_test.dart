@@ -25,9 +25,12 @@ void main() {
       await AppDatabaseService.instance.closeForTesting();
     });
 
-    test('schemaVersion is 4 (Phase C PR 1 pin)', () {
-      expect(db.schemaVersion, 4);
-      expect(kCurrentSchemaVersion, 4);
+    test('schemaVersion is 5 (Phase 11f / WF-023 pin)', () {
+      // WF-023 (Phase 11f) bumped the schema to 5 to add
+      // habits.grace_window_override_millis. The v3→v4
+      // pin test now asserts the post-migration state.
+      expect(db.schemaVersion, 5);
+      expect(kCurrentSchemaVersion, 5);
     });
 
     test('habits / people / events have automations_json column', () async {

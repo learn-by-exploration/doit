@@ -72,8 +72,10 @@ class _StatsScreenState extends State<StatsScreen> {
           .toList(growable: false);
       final snap = ConsecutiveCounter.compute(
         log: log,
-        config: StreakConfig(
-          graceWindow: const Duration(hours: 3),
+        // WF-023 (Phase 11f). Honor the per-do override
+        // when set; otherwise fall back to the global
+        // 3-hour default from SYS-019.
+        config: h.effectiveStreakConfig(
           skipBudget: SkipBudget(doId: h.id, monthlyLimit: h.restDaysPerMonth),
         ),
         asOf: DateTime.now(),

@@ -159,12 +159,14 @@ void main() {
       expect(after, isEmpty);
     });
 
-    test('schemaVersion is 4 for v1.0 reframe (Phase C PR 1)', () {
+    test('schemaVersion is 5 for Phase 11f (WF-023)', () {
       // The version pin is a contract — Phase 3+ bump it.
-      // Drift exposes it via the database instance.
+      // Drift exposes it via the database instance. Phase
+      // 11f / WF-023 bumped from 4 to 5 to add the
+      // grace-window column.
       final db = AppDatabaseService.instance.db;
       expect(db.schemaVersion, kCurrentSchemaVersion);
-      expect(kCurrentSchemaVersion, 4);
+      expect(kCurrentSchemaVersion, 5);
     });
 
     test('fresh install creates the v3 templates table', () async {

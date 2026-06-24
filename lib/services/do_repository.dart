@@ -129,6 +129,10 @@ class DoRepository {
       colorSeed: d.colorSeed,
       iconName: d.iconName,
       pausedUntilMillis: d.pausedUntil?.millisecondsSinceEpoch,
+      // WF-023 (Phase 11f). Null when the do honors the
+      // global 3-hour default (SYS-019); otherwise the
+      // override's millis.
+      graceWindowOverrideMillis: d.graceWindowOverride?.inMilliseconds,
     );
   }
 
@@ -146,6 +150,11 @@ class DoRepository {
       pausedUntil: r.pausedUntilMillis == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(r.pausedUntilMillis!),
+      // WF-023 (Phase 11f). Decode the per-do override;
+      // null means "use the global 3-hour default".
+      graceWindowOverride: r.graceWindowOverrideMillis == null
+          ? null
+          : Duration(milliseconds: r.graceWindowOverrideMillis!),
     );
     switch (r.scheduleType) {
       case 'fixed':
@@ -161,6 +170,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          graceWindowOverride: base.graceWindowOverride,
         );
       case 'interval':
         return domain.DoInterval(
@@ -177,6 +187,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          graceWindowOverride: base.graceWindowOverride,
         );
       case 'anchor':
         return domain.DoAnchor(
@@ -193,6 +204,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          graceWindowOverride: base.graceWindowOverride,
         );
       case 'dayOfX':
         return domain.DoDayOfX(
@@ -209,6 +221,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          graceWindowOverride: base.graceWindowOverride,
         );
       case 'timeWindow':
         return domain.DoTimeWindow(
@@ -225,6 +238,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          graceWindowOverride: base.graceWindowOverride,
         );
       case 'perDay':
         // WF-021 (Phase 11d). No schedule-specific fields —
@@ -242,6 +256,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          graceWindowOverride: base.graceWindowOverride,
         );
       default:
         throw StateError('Unknown scheduleType: ${r.scheduleType}');

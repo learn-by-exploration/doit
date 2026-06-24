@@ -3,6 +3,7 @@
 
 import 'package:doit/do/do.dart';
 import 'package:doit/do/proof_mode.dart';
+import 'package:doit/do/skip_budget.dart';
 import 'package:doit/missions/chain.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/db/schema.dart';
@@ -280,6 +281,72 @@ void main() {
       expect(pd.proofMode, isA<SoftProof>());
       expect(pd.restDaysPerMonth, 2);
       expect(pd.createdAt, DateTime(2026));
+    });
+
+    // WF-023 (Phase 11f). graceWindowOverride is a base-class
+    // field; verify it round-trips through the new
+    // grace_window_override_millis column (migration v4→v5).
+    test('round-trips a DoFixed with a grace-window override', () async {
+      final h = DoFixed(
+        id: 'h_grace_override',
+        name: 'Hydrate',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5},
+        time: const DoTime(9, 0),
+        graceWindowOverride: const Duration(hours: 6),
+      );
+      await DoRepository.instance.save(h);
+      final back =
+          await DoRepository.instance.getById('h_grace_override') as DoFixed;
+      expect(back.graceWindowOverride, const Duration(hours: 6));
+    });
+
+    test(
+      'round-trips a DoPerDay with no grace-window override (null)',
+      () async {
+        // A do without an override should land as null in the
+        // new column. The decoded `graceWindowOverride` is
+        // null; `effectiveStreakConfig` then falls back to the
+        // global 3-hour default.
+        final h = DoPerDay(
+          id: 'h_perday_default_grace',
+          name: 'Daily check-in',
+          proofMode: const SoftProof(),
+          createdAt: DateTime(2026),
+          restDaysPerMonth: 2,
+        );
+        await DoRepository.instance.save(h);
+        final back =
+            await DoRepository.instance.getById('h_perday_default_grace')
+                as DoPerDay;
+        expect(back.graceWindowOverride, isNull);
+        final cfg = back.effectiveStreakConfig(
+          skipBudget: SkipBudget(doId: back.id, monthlyLimit: 2),
+        );
+        expect(cfg.graceWindow, const Duration(hours: 3));
+      },
+    );
+
+    test('round-trips a DoInterval with a 30-minute grace override', () async {
+      // The override is honored across schedule types; this
+      // pins the interval subtype's forward map + reverse
+      // map against the new column.
+      final h = DoInterval(
+        id: 'h_interval_grace',
+        name: 'Read',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026),
+        restDaysPerMonth: 2,
+        nDays: 3,
+        referenceDate: DateTime(2026, 6),
+        graceWindowOverride: const Duration(minutes: 30),
+      );
+      await DoRepository.instance.save(h);
+      final back =
+          await DoRepository.instance.getById('h_interval_grace') as DoInterval;
+      expect(back.graceWindowOverride, const Duration(minutes: 30));
     });
   });
 }

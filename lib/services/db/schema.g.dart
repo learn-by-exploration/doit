@@ -283,6 +283,17 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _graceWindowOverrideMillisMeta =
+      const VerificationMeta('graceWindowOverrideMillis');
+  @override
+  late final GeneratedColumn<int> graceWindowOverrideMillis =
+      GeneratedColumn<int>(
+        'grace_window_override_millis',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -311,6 +322,7 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
     iconName,
     pausedUntilMillis,
     automationsJson,
+    graceWindowOverrideMillis,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -523,6 +535,15 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
         ),
       );
     }
+    if (data.containsKey('grace_window_override_millis')) {
+      context.handle(
+        _graceWindowOverrideMillisMeta,
+        graceWindowOverrideMillis.isAcceptableOrUnknown(
+          data['grace_window_override_millis']!,
+          _graceWindowOverrideMillisMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -636,6 +657,10 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
         DriftSqlType.string,
         data['${effectivePrefix}automations_json'],
       ),
+      graceWindowOverrideMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}grace_window_override_millis'],
+      ),
     );
   }
 
@@ -672,6 +697,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
   final String? iconName;
   final int? pausedUntilMillis;
   final String? automationsJson;
+  final int? graceWindowOverrideMillis;
   const HabitRow({
     required this.id,
     required this.name,
@@ -699,6 +725,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     this.iconName,
     this.pausedUntilMillis,
     this.automationsJson,
+    this.graceWindowOverrideMillis,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -765,6 +792,11 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     if (!nullToAbsent || automationsJson != null) {
       map['automations_json'] = Variable<String>(automationsJson);
     }
+    if (!nullToAbsent || graceWindowOverrideMillis != null) {
+      map['grace_window_override_millis'] = Variable<int>(
+        graceWindowOverrideMillis,
+      );
+    }
     return map;
   }
 
@@ -828,6 +860,10 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       automationsJson: automationsJson == null && nullToAbsent
           ? const Value.absent()
           : Value(automationsJson),
+      graceWindowOverrideMillis:
+          graceWindowOverrideMillis == null && nullToAbsent
+          ? const Value.absent()
+          : Value(graceWindowOverrideMillis),
     );
   }
 
@@ -867,6 +903,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       iconName: serializer.fromJson<String?>(json['iconName']),
       pausedUntilMillis: serializer.fromJson<int?>(json['pausedUntilMillis']),
       automationsJson: serializer.fromJson<String?>(json['automationsJson']),
+      graceWindowOverrideMillis: serializer.fromJson<int?>(
+        json['graceWindowOverrideMillis'],
+      ),
     );
   }
   @override
@@ -899,6 +938,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       'iconName': serializer.toJson<String?>(iconName),
       'pausedUntilMillis': serializer.toJson<int?>(pausedUntilMillis),
       'automationsJson': serializer.toJson<String?>(automationsJson),
+      'graceWindowOverrideMillis': serializer.toJson<int?>(
+        graceWindowOverrideMillis,
+      ),
     };
   }
 
@@ -929,6 +971,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     Value<String?> iconName = const Value.absent(),
     Value<int?> pausedUntilMillis = const Value.absent(),
     Value<String?> automationsJson = const Value.absent(),
+    Value<int?> graceWindowOverrideMillis = const Value.absent(),
   }) => HabitRow(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -970,6 +1013,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     automationsJson: automationsJson.present
         ? automationsJson.value
         : this.automationsJson,
+    graceWindowOverrideMillis: graceWindowOverrideMillis.present
+        ? graceWindowOverrideMillis.value
+        : this.graceWindowOverrideMillis,
   );
   HabitRow copyWithCompanion(HabitsCompanion data) {
     return HabitRow(
@@ -1023,6 +1069,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       automationsJson: data.automationsJson.present
           ? data.automationsJson.value
           : this.automationsJson,
+      graceWindowOverrideMillis: data.graceWindowOverrideMillis.present
+          ? data.graceWindowOverrideMillis.value
+          : this.graceWindowOverrideMillis,
     );
   }
 
@@ -1054,7 +1103,8 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
           ..write('colorSeed: $colorSeed, ')
           ..write('iconName: $iconName, ')
           ..write('pausedUntilMillis: $pausedUntilMillis, ')
-          ..write('automationsJson: $automationsJson')
+          ..write('automationsJson: $automationsJson, ')
+          ..write('graceWindowOverrideMillis: $graceWindowOverrideMillis')
           ..write(')'))
         .toString();
   }
@@ -1087,6 +1137,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     iconName,
     pausedUntilMillis,
     automationsJson,
+    graceWindowOverrideMillis,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -1117,7 +1168,8 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
           other.colorSeed == this.colorSeed &&
           other.iconName == this.iconName &&
           other.pausedUntilMillis == this.pausedUntilMillis &&
-          other.automationsJson == this.automationsJson);
+          other.automationsJson == this.automationsJson &&
+          other.graceWindowOverrideMillis == this.graceWindowOverrideMillis);
 }
 
 class HabitsCompanion extends UpdateCompanion<HabitRow> {
@@ -1147,6 +1199,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
   final Value<String?> iconName;
   final Value<int?> pausedUntilMillis;
   final Value<String?> automationsJson;
+  final Value<int?> graceWindowOverrideMillis;
   final Value<int> rowid;
   const HabitsCompanion({
     this.id = const Value.absent(),
@@ -1175,6 +1228,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     this.iconName = const Value.absent(),
     this.pausedUntilMillis = const Value.absent(),
     this.automationsJson = const Value.absent(),
+    this.graceWindowOverrideMillis = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   HabitsCompanion.insert({
@@ -1204,6 +1258,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     this.iconName = const Value.absent(),
     this.pausedUntilMillis = const Value.absent(),
     this.automationsJson = const Value.absent(),
+    this.graceWindowOverrideMillis = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -1237,6 +1292,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     Expression<String>? iconName,
     Expression<int>? pausedUntilMillis,
     Expression<String>? automationsJson,
+    Expression<int>? graceWindowOverrideMillis,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1268,6 +1324,8 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
       if (iconName != null) 'icon_name': iconName,
       if (pausedUntilMillis != null) 'paused_until_millis': pausedUntilMillis,
       if (automationsJson != null) 'automations_json': automationsJson,
+      if (graceWindowOverrideMillis != null)
+        'grace_window_override_millis': graceWindowOverrideMillis,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1299,6 +1357,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     Value<String?>? iconName,
     Value<int?>? pausedUntilMillis,
     Value<String?>? automationsJson,
+    Value<int?>? graceWindowOverrideMillis,
     Value<int>? rowid,
   }) {
     return HabitsCompanion(
@@ -1328,6 +1387,8 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
       iconName: iconName ?? this.iconName,
       pausedUntilMillis: pausedUntilMillis ?? this.pausedUntilMillis,
       automationsJson: automationsJson ?? this.automationsJson,
+      graceWindowOverrideMillis:
+          graceWindowOverrideMillis ?? this.graceWindowOverrideMillis,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1413,6 +1474,11 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     if (automationsJson.present) {
       map['automations_json'] = Variable<String>(automationsJson.value);
     }
+    if (graceWindowOverrideMillis.present) {
+      map['grace_window_override_millis'] = Variable<int>(
+        graceWindowOverrideMillis.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1448,6 +1514,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
           ..write('iconName: $iconName, ')
           ..write('pausedUntilMillis: $pausedUntilMillis, ')
           ..write('automationsJson: $automationsJson, ')
+          ..write('graceWindowOverrideMillis: $graceWindowOverrideMillis, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5922,6 +5989,7 @@ typedef $$HabitsTableCreateCompanionBuilder =
       Value<String?> iconName,
       Value<int?> pausedUntilMillis,
       Value<String?> automationsJson,
+      Value<int?> graceWindowOverrideMillis,
       Value<int> rowid,
     });
 typedef $$HabitsTableUpdateCompanionBuilder =
@@ -5952,6 +6020,7 @@ typedef $$HabitsTableUpdateCompanionBuilder =
       Value<String?> iconName,
       Value<int?> pausedUntilMillis,
       Value<String?> automationsJson,
+      Value<int?> graceWindowOverrideMillis,
       Value<int> rowid,
     });
 
@@ -6091,6 +6160,11 @@ class $$HabitsTableFilterComposer
 
   ColumnFilters<String> get automationsJson => $composableBuilder(
     column: $table.automationsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get graceWindowOverrideMillis => $composableBuilder(
+    column: $table.graceWindowOverrideMillis,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6233,6 +6307,11 @@ class $$HabitsTableOrderingComposer
     column: $table.automationsJson,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get graceWindowOverrideMillis => $composableBuilder(
+    column: $table.graceWindowOverrideMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$HabitsTableAnnotationComposer
@@ -6345,6 +6424,11 @@ class $$HabitsTableAnnotationComposer
     column: $table.automationsJson,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get graceWindowOverrideMillis => $composableBuilder(
+    column: $table.graceWindowOverrideMillis,
+    builder: (column) => column,
+  );
 }
 
 class $$HabitsTableTableManager
@@ -6401,6 +6485,7 @@ class $$HabitsTableTableManager
                 Value<String?> iconName = const Value.absent(),
                 Value<int?> pausedUntilMillis = const Value.absent(),
                 Value<String?> automationsJson = const Value.absent(),
+                Value<int?> graceWindowOverrideMillis = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HabitsCompanion(
                 id: id,
@@ -6429,6 +6514,7 @@ class $$HabitsTableTableManager
                 iconName: iconName,
                 pausedUntilMillis: pausedUntilMillis,
                 automationsJson: automationsJson,
+                graceWindowOverrideMillis: graceWindowOverrideMillis,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6459,6 +6545,7 @@ class $$HabitsTableTableManager
                 Value<String?> iconName = const Value.absent(),
                 Value<int?> pausedUntilMillis = const Value.absent(),
                 Value<String?> automationsJson = const Value.absent(),
+                Value<int?> graceWindowOverrideMillis = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HabitsCompanion.insert(
                 id: id,
@@ -6487,6 +6574,7 @@ class $$HabitsTableTableManager
                 iconName: iconName,
                 pausedUntilMillis: pausedUntilMillis,
                 automationsJson: automationsJson,
+                graceWindowOverrideMillis: graceWindowOverrideMillis,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

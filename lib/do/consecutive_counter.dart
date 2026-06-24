@@ -31,6 +31,12 @@
 import 'package:doit/do/skip_budget.dart';
 import 'package:meta/meta.dart';
 
+/// WF-023 (Phase 11f). The global default grace window for
+/// every do that does NOT set its own override. Per SYS-019,
+/// this is 3 hours — the user has until 3 AM of the next day
+/// to mark yesterday done before the consecutive-run breaks.
+const Duration kDefaultGraceWindow = Duration(hours: 3);
+
 /// A single completion of a do.
 ///
 /// [date] is the local-calendar date the user marked the do

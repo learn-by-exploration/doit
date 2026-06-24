@@ -35,12 +35,20 @@
 //       migration means "no non-default automations" (the
 //       default `ActionNotify` is synthesized at dispatch
 //       time, not stored).
+//   5 — v1.2p (Phase 11f / WF-023):
+//       + habits.grace_window_override_millis (INTEGER nullable)
+//       The migration is in `migrations/v4_to_v5.dart`. NULL
+//       post-migration means "no per-do override; use the
+//       3-hour global default from SYS-019". Per-do overrides
+//       are honored by `ConsecutiveCounter` via
+//       `Do.effectiveStreakConfig`.
 
 import 'package:drift/drift.dart';
 
 import 'package:doit/services/db/migrations/v1_to_v2.dart';
 import 'package:doit/services/db/migrations/v2_to_v3.dart';
 import 'package:doit/services/db/migrations/v3_to_v4.dart';
+import 'package:doit/services/db/migrations/v4_to_v5.dart';
 import 'package:doit/services/db/tables.dart';
 
 part 'schema.g.dart';
@@ -49,7 +57,7 @@ part 'schema.g.dart';
 /// change. The matching migration file MUST land in
 /// `lib/services/db/migrations/vN_to_vM.dart` and be referenced from
 /// [migrations] below.
-const int kCurrentSchemaVersion = 4;
+const int kCurrentSchemaVersion = 5;
 
 @DriftDatabase(
   tables: [
@@ -91,6 +99,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 4) {
         await migrateV3ToV4(m, this);
+      }
+      if (from < 5) {
+        await migrateV4ToV5(m, this);
       }
     },
     beforeOpen: (details) async {

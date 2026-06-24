@@ -1,7 +1,9 @@
 // Tests for the Do model: validation, immutability, copyWith.
 
+import 'package:doit/do/consecutive_counter.dart';
 import 'package:doit/do/do.dart';
 import 'package:doit/do/proof_mode.dart';
+import 'package:doit/do/skip_budget.dart';
 import 'package:doit/missions/chain.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -240,5 +242,101 @@ void main() {
       );
       expect(m.rows * m.cols, 8);
     });
+  });
+
+  // WF-023 (Phase 11f). The per-do grace-window override is a
+  // sealed-class field on the `Do` base; each subclass forwards
+  // it through its own copyWith. The calculator reads it via
+  // `effectiveStreakConfig`, falling back to the 3-hour global
+  // default from SYS-019 when the override is null.
+  group('Do.effectiveStreakConfig (WF-023)', () {
+    test('without an override, returns the global 3-hour default', () {
+      final cfg = _fixed().effectiveStreakConfig(
+        skipBudget: SkipBudget(doId: 'h1', monthlyLimit: 2),
+      );
+      expect(cfg.graceWindow, const Duration(hours: 3));
+      // Pin against the named constant so a future change to
+      // SYS-019's window length shows up here.
+      expect(cfg.graceWindow, kDefaultGraceWindow);
+      expect(cfg.skipBudget.monthlyLimit, 2);
+    });
+
+    test('with an override, returns the override (not the default)', () {
+      final h = _fixed().copyWith(
+        graceWindowOverride: const Duration(hours: 6),
+      );
+      final cfg = h.effectiveStreakConfig(
+        skipBudget: SkipBudget(doId: 'h1', monthlyLimit: 2),
+      );
+      expect(cfg.graceWindow, const Duration(hours: 6));
+    });
+
+    test('a zero override is honored (0-minute window)', () {
+      // Edge: user can opt into a stricter "no grace at all"
+      // window. We honor it verbatim rather than falling back
+      // to the global default.
+      final h = _fixed().copyWith(graceWindowOverride: Duration.zero);
+      final cfg = h.effectiveStreakConfig(
+        skipBudget: SkipBudget(doId: 'h1', monthlyLimit: 2),
+      );
+      expect(cfg.graceWindow, Duration.zero);
+    });
+
+    test('DoPerDay accepts and exposes the override', () {
+      final h = _perDay().copyWith(
+        graceWindowOverride: const Duration(minutes: 30),
+      );
+      expect(h.graceWindowOverride, const Duration(minutes: 30));
+      final cfg = h.effectiveStreakConfig(
+        skipBudget: SkipBudget(doId: 'h1', monthlyLimit: 2),
+      );
+      expect(cfg.graceWindow, const Duration(minutes: 30));
+    });
+
+    test('copyWith(clearGraceWindowOverride: true) resets to null', () {
+      final h1 = _fixed().copyWith(
+        graceWindowOverride: const Duration(hours: 6),
+      );
+      expect(h1.graceWindowOverride, const Duration(hours: 6));
+      final h2 = h1.copyWith(clearGraceWindowOverride: true);
+      expect(h2.graceWindowOverride, isNull);
+      final cfg = h2.effectiveStreakConfig(
+        skipBudget: SkipBudget(doId: 'h1', monthlyLimit: 2),
+      );
+      expect(cfg.graceWindow, const Duration(hours: 3));
+    });
+
+    test(
+      'DoInterval, DoAnchor, DoDayOfX, DoTimeWindow all forward the override',
+      () {
+        // Each subclass has its own concrete copyWith; verify
+        // they all preserve the override field.
+        final iv = _interval().copyWith(
+          graceWindowOverride: const Duration(minutes: 90),
+        );
+        expect(iv.graceWindowOverride, const Duration(minutes: 90));
+        final an = _anchor().copyWith(
+          graceWindowOverride: const Duration(minutes: 90),
+        );
+        expect(an.graceWindowOverride, const Duration(minutes: 90));
+        final dx = _dayOfMonth(
+          day: 15,
+        ).copyWith(graceWindowOverride: const Duration(minutes: 90));
+        expect(dx.graceWindowOverride, const Duration(minutes: 90));
+        final tw = DoTimeWindow(
+          id: 'tw',
+          name: 'Fasting',
+          proofMode: const SoftProof(),
+          createdAt: DateTime(2026),
+          restDaysPerMonth: 2,
+          weekdays: const {1, 2, 3, 4, 5},
+          start: const DoTime(20, 0),
+          end: const DoTime(12, 0),
+          targetHours: 16,
+          graceWindowOverride: const Duration(minutes: 90),
+        );
+        expect(tw.graceWindowOverride, const Duration(minutes: 90));
+      },
+    );
   });
 }
