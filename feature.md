@@ -113,14 +113,24 @@ system can suppress full-screen intents from background-launching
 apps without this permission. SYS- ID not yet assigned; ADR
 needed.
 
-**Still deferred (the launch path itself):** the
+**Still deferred (the launch path itself):** ~~the
 `PlatformFullScreenIntent.showHabitMission` and
 `showRoutineOverlay` calls continue to raise
 `MissingPluginException`, swallowed by the Dart `_safe` wrapper.
 The new `FullScreenIntentChannel.kt` is shaped so Phase 6a can
 extend it with the launch handlers (or replace it entirely)
 without re-doing the probe wiring. Tracked under the v1.3c
-release row of the same section.
+release row of the same section.~~ **DONE in v1.3d / Phase 15 / SYS-114 / ADR-044**
+(commit `5eca37b` / PR #21). The activity launch path is wired
+end-to-end: `FullScreenActivity` Kotlin class with
+lockscreen-bypass window flags, `showHabitMission` /
+`showRoutineOverlay` handlers on `doit/full_screen`,
+`setFullScreenIntent(openPi, true)` on strong-mode
+notifications, `MissionLauncherScreen` chain-level
+orchestrator widget. The `_safe` wrapper is preserved as
+defense-in-depth per ADR-013. See
+[`CHANGELOG.md`](CHANGELOG.md) `### v1.3d` block +
+`docs/v_model/v1_3_release_baseline.md` §3 (SYS-114 entry).
 
 ### 2.2 Action-side permission disambiguation (v1.2h)
 
