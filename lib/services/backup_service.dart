@@ -110,15 +110,48 @@ class BackupService {
   /// bound OWASP recommends for Argon2id.
   static const int kBackupSaltBytes = 16;
 
+  /// Current inner payload schema version. The outer
+  /// envelope version (v1 / v2 / v3) is decoupled from the
+  /// inner schema; the inner schema tracks the on-disk
+  /// table-shape itself.
+  ///
+  /// - 1: v0.4c.1 (SYS-061) — the original payload shape.
+  ///   Habits + people + completions + restDayBudgets +
+  ///   settings + eventLogs with the v0.4 fields.
+  /// - 2 (v1.4a / SYS-115 / ADR-045): adds the v0.2 visual
+  ///   identity (category, colorSeed, iconName), the v0.2
+  ///   time-window end + fasting target (endHour, endMinute,
+  ///   targetHours), the v0.2 pause state (pausedUntilMillis
+  ///   on habits + people), the v1.0 non-default automation
+  ///   rules (automationsJson on habits + people), and a
+  ///   top-level `reliability` snapshot carrying the last
+  ///   `Reliability` enum value at export time. Old v1
+  ///   payloads stay importable: every new field is optional
+  ///   on read.
+  static const int kBackupPayloadSchemaVersion = 2;
+
+  /// The v0.4c.1 inner payload schema version. Read-only on
+  /// v1.4a+; the import path still accepts it.
+  static const int kBackupPayloadSchemaVersionV1 = 1;
+
   /// Write a JSON snapshot of every table to [file]. Overwrites
   /// any existing file. Returns the number of bytes written.
   ///
   /// If [passphrase] is `null`, writes a v1 plain-JSON
   /// envelope (back-compat). If [passphrase] is non-null,
   /// writes a v3 encrypted envelope (Argon2id + AES-256-GCM).
-  Future<int> exportTo(File file, {String? passphrase}) async {
+  ///
+  /// [reliability] is the optional `Reliability` enum name
+  /// (`optimal` / `degraded` / `unknown`) to snapshot into the
+  /// payload's top-level `reliability` field. The caller is
+  /// `main.dart` which reads `ReliabilityService.instance.value`.
+  Future<int> exportTo(
+    File file, {
+    String? passphrase,
+    String? reliability,
+  }) async {
     await ready;
-    final payload = await _readAllTables();
+    final payload = await _readAllTables(reliability: reliability);
     if (passphrase == null) {
       final bytes = utf8.encode(jsonEncode(payload));
       await file.writeAsBytes(bytes, flush: true);
@@ -224,7 +257,7 @@ class BackupService {
     return total;
   }
 
-  Future<Map<String, Object?>> _readAllTables() async {
+  Future<Map<String, Object?>> _readAllTables({String? reliability}) async {
     final habits = await _db.select(_db.habits).get();
     final people = await _db.select(_db.people).get();
     final completions = await _db.select(_db.completions).get();
@@ -232,13 +265,19 @@ class BackupService {
     final settings = await _db.select(_db.settings).get();
     final events = await _db.select(_db.eventLogs).get();
     return {
-      // The inner payload version is always 1 — the v2 / v3
-      // envelope wraps the same payload in an outer `{version:
-      // N, kdf: ...}` shell. Keeping the inner version at 1
-      // means the v1 import path is the single source of truth
-      // on read, and v1 fixtures stay back-compat.
+      // The inner payload `version` field stays at 1 — the v2
+      // / v3 envelope wraps the same payload in an outer
+      // `{version: N, kdf: ...}` shell. The new
+      // `schemaVersion` field tracks the on-disk table-shape
+      // itself; v1.4a bumps it 1 → 2 to add the v0.2 / v1.0
+      // fields that the v0.4c.1 schema omitted.
       'version': kBackupFormatVersionV1,
+      'schemaVersion': kBackupPayloadSchemaVersion,
       'exportedAtMillis': DateTime.now().toUtc().millisecondsSinceEpoch,
+      // The reliability snapshot is the last-known
+      // `Reliability` enum value at export time. Optional on
+      // read: v1 payloads and un-set callers omit it.
+      'reliability': ?reliability,
       'tables': {
         'habits': habits.map(_habitToJson).toList(growable: false),
         'people': people.map(_personToJson).toList(growable: false),
@@ -311,7 +350,23 @@ class BackupService {
     'nth': r.nth,
     'weekday': r.weekday,
     'referenceDayOfMonth': r.referenceDayOfMonth,
+    // v0.2: timeWindow end + fasting target. Optional; null
+    // for non-window / non-fasting habits.
+    'endHour': r.endHour,
+    'endMinute': r.endMinute,
+    'targetHours': r.targetHours,
     'missionChainJson': r.missionChainJson,
+    // v0.2: visual identity (category / colorSeed / iconName).
+    // The defaults match the schema defaults; existing v1
+    // payloads restore with the v0.4 defaults on read.
+    'category': r.category,
+    'colorSeed': r.colorSeed,
+    'iconName': r.iconName,
+    // v0.2: pause state. When set and in the future, the
+    // scheduler does not fire reminders.
+    'pausedUntilMillis': r.pausedUntilMillis,
+    // v1.0: non-default automation rules (RoutineConfig).
+    'automationsJson': r.automationsJson,
   };
 
   HabitsCompanion _habitFromJson(Map<String, Object?> j) => HabitsCompanion(
@@ -332,7 +387,15 @@ class BackupService {
     nth: Value((j['nth'] as num?)?.toInt()),
     weekday: Value((j['weekday'] as num?)?.toInt()),
     referenceDayOfMonth: Value((j['referenceDayOfMonth'] as num?)?.toInt()),
+    endHour: Value((j['endHour'] as num?)?.toInt()),
+    endMinute: Value((j['endMinute'] as num?)?.toInt()),
+    targetHours: Value((j['targetHours'] as num?)?.toInt()),
     missionChainJson: Value(j['missionChainJson'] as String?),
+    category: Value((j['category'] as String?) ?? 'other'),
+    colorSeed: Value((j['colorSeed'] as num?)?.toInt() ?? 0),
+    iconName: Value(j['iconName'] as String?),
+    pausedUntilMillis: Value((j['pausedUntilMillis'] as num?)?.toInt()),
+    automationsJson: Value(j['automationsJson'] as String?),
   );
 
   // --- PersonRow <-> JSON ----------------------------------------
@@ -351,6 +414,10 @@ class BackupService {
     'monthOfYear': r.monthOfYear,
     'anchoredToWakeup': r.anchoredToWakeup,
     'missionChainJson': r.missionChainJson,
+    // v0.2: pause state. Same semantics as habits.
+    'pausedUntilMillis': r.pausedUntilMillis,
+    // v1.0: non-default automation rules (RoutineConfig).
+    'automationsJson': r.automationsJson,
   };
 
   PeopleCompanion _personFromJson(Map<String, Object?> j) => PeopleCompanion(
@@ -367,6 +434,8 @@ class BackupService {
     monthOfYear: Value((j['monthOfYear'] as num?)?.toInt()),
     anchoredToWakeup: Value((j['anchoredToWakeup'] as bool?) ?? false),
     missionChainJson: Value(j['missionChainJson'] as String?),
+    pausedUntilMillis: Value((j['pausedUntilMillis'] as num?)?.toInt()),
+    automationsJson: Value(j['automationsJson'] as String?),
   );
 
   // --- CompletionRow <-> JSON ------------------------------------
