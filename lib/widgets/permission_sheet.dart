@@ -189,6 +189,21 @@ class _PermissionSheetBodyState extends State<_PermissionSheetBody> {
             ? const PermissionResultDenied(canOpenSettings: true)
             : const PermissionResultPermanentlyDenied();
         break;
+      case PermissionKind.notificationPolicy:
+        // v1.5b / Phase 25: `ACCESS_NOTIFICATION_POLICY` is
+        // a special-access permission — Android does not
+        // show a runtime prompt. The "Allow" CTA drops the
+        // user into the app's notification-policy page
+        // (a follow-up to PR #27 will add a dedicated
+        // `NotificationPolicyService`; for now we fall back
+        // to the generic app-settings page and let the
+        // user navigate from there). Mirrors the
+        // `fullScreenIntent` pattern.
+        final opened = await PermissionService.instance.openAppSettings();
+        result = opened
+            ? const PermissionResultDenied(canOpenSettings: true)
+            : const PermissionResultPermanentlyDenied();
+        break;
       case PermissionKind.backupFolder:
         // The SAF picker is handled by `requestBackupFolder`;
         // the sheet is never shown for this kind because
@@ -287,6 +302,19 @@ class _PermissionSheetBodyState extends State<_PermissionSheetBody> {
         await svc.refreshFullScreenIntent();
         result =
             svc.statuses.value[PermissionKind.fullScreenIntent] ??
+            const PermissionResultDenied(canOpenSettings: true);
+        break;
+      case PermissionKind.notificationPolicy:
+        // v1.5b / Phase 25: `ACCESS_NOTIFICATION_POLICY` is
+        // opt-in via the deep-link (a follow-up to PR #27
+        // adds `requestNotificationPolicy` + the Kotlin
+        // handler — for now we re-probe the cached state
+        // after the generic app-settings deep-link). Mirrors
+        // the `fullScreenIntent` pattern.
+        await svc.openAppSettings();
+        await svc.refreshNotificationPolicy();
+        result =
+            svc.statuses.value[PermissionKind.notificationPolicy] ??
             const PermissionResultDenied(canOpenSettings: true);
         break;
       case PermissionKind.backupFolder:

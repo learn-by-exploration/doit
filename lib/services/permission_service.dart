@@ -163,6 +163,24 @@ enum PermissionKind {
   /// "may be late" on a denial (matches the v1.1g /
   /// `PACKAGE_USAGE_STATS` opt-in precedent).
   fullScreenIntent,
+
+  /// `ACCESS_NOTIFICATION_POLICY` (v1.5b / Phase 25).
+  /// Required on Android M+ for any app that toggles DND.
+  /// Used by `ActionOverrideSilent` (the v1.0/Phase F PR 2
+  /// action that silences / un-silences the ringer when a
+  /// routine fires). The kind is opt-in (ADR-030
+  /// precedent); Android never shows a runtime prompt for
+  /// it — the user must toggle do it on in Settings →
+  /// Special access → Do Not Disturb access. The
+  /// `canOpenSettings` payload is `true` because the
+  /// deep-link target is `Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS`.
+  /// The kind is NOT in
+  /// `ReliabilityService._kReliabilityGatedKinds` — the
+  /// `ActionOverrideSilent` action only matters to the
+  /// owning automation, not to the app-wide reliability
+  /// signal (a denied policy doesn't delay alarms; it just
+  /// turns the "silence the ringer" action into a no-op).
+  notificationPolicy,
 }
 
 /// Singleton holder for the permission / SAF seam. The
@@ -228,6 +246,15 @@ class PermissionService {
         PermissionKind.fullScreenIntent: const PermissionResultDenied(
           canOpenSettings: true,
         ),
+        // v1.5b / Phase 25: opt-in special-access
+        // permission (Android never shows a runtime prompt
+        // for it). Declared with `tools:ignore="ProtectedPermissions"`
+        // in the manifest — the user is never blocked from
+        // using do it for declining. `ActionOverrideSilent`
+        // degrades to a no-op on denial.
+        PermissionKind.notificationPolicy: const PermissionResultDenied(
+          canOpenSettings: true,
+        ),
       });
 
   /// Idempotent. Probes the runtime permissions and stores
@@ -266,6 +293,14 @@ class PermissionService {
         canOpenSettings: true,
       ),
       PermissionKind.fullScreenIntent: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
+      // v1.5b / Phase 25: `ACCESS_NOTIFICATION_POLICY`.
+      // No `permission_handler` mapping — the probe is
+      // fire-and-forget through `NotificationPolicyService`.
+      // Until the probe resolves, the default `denied`
+      // surfaces in the action-side `_KindSection`.
+      PermissionKind.notificationPolicy: const PermissionResultDenied(
         canOpenSettings: true,
       ),
     };
@@ -323,6 +358,14 @@ class PermissionService {
       // on API 32+). Same fire-and-forget rationale as
       // the two special-access kinds above.
       unawaited(_refreshFullScreenIntentAfterInit());
+      // v1.5b / Phase 25: `ACCESS_NOTIFICATION_POLICY` is
+      // the fourth special-access permission. Until the
+      // `NotificationPolicyService` Kotlin handler lands
+      // (v1.5c follow-up), this is a cached-default probe —
+      // a denial is the honest state (the user has to
+      // opt-in via Settings → Special access → Do Not
+      // Disturb access). Same fire-and-forget rationale.
+      unawaited(_refreshNotificationPolicyAfterInit());
     } catch (_) {
       // v0.4b-release-fix / ADR-013 follow-up: a thrown
       // platform-channel error must not crash `main()`. The
@@ -576,6 +619,33 @@ class PermissionService {
     statuses.value = next;
   }
 
+  /// v1.5b / Phase 25. Re-probes
+  /// `ACCESS_NOTIFICATION_POLICY`. The dedicated Kotlin
+  /// handler (a follow-up to PR #27 — `NotificationPolicyService`
+  /// + `DeviceStateChannel.isNotificationPolicyGranted` /
+  /// `openNotificationPolicyAccessSettings`) lands in v1.5c.
+  /// For now we read the cached status — a denial flips the
+  /// `AutomationReliabilityBadge` for routines using
+  /// `ActionOverrideSilent` to `degraded` because
+  /// `notificationPolicy` is in the
+  /// `ReliabilityService._kReliabilityGatedKinds` set.
+  Future<void> refreshNotificationPolicy() async {
+    await ready;
+    // Best-effort probe — until the Kotlin side lands, the
+    // status defaults to the previously-cached value (a denial
+    // is honest: the user has to opt-in via Settings → Special
+    // access → Do Not Disturb access). On a future platform
+    // channel, this becomes a `NotificationManager
+    // .isNotificationPolicyAccessGranted()` round-trip.
+    final current = statuses.value[PermissionKind.notificationPolicy];
+    final next = <PermissionKind, PermissionResult?>{
+      ...statuses.value,
+      PermissionKind.notificationPolicy:
+          current ?? const PermissionResultDenied(canOpenSettings: true),
+    };
+    statuses.value = next;
+  }
+
   /// v1.2i / Phase 9: re-probes every permission the
   /// service knows about. Called from the
   /// `WidgetsBindingObserver` `resumed` hook in `main.dart`
@@ -661,6 +731,16 @@ class PermissionService {
     } catch (_) {
       /* ADR-013 */
     }
+    // v1.5b / Phase 25: the fourth special-access kind —
+    // `ACCESS_NOTIFICATION_POLICY` — joins the sequential
+    // bucket. Same swallow pattern. Until the Kotlin
+    // handler lands (v1.5c follow-up), this reads from the
+    // cached default and is a no-op for status changes.
+    try {
+      await refreshNotificationPolicy();
+    } catch (_) {
+      /* ADR-013 */
+    }
   }
 
   /// Probe helper for [init]. Called after `_ready` is
@@ -705,6 +785,23 @@ class PermissionService {
     await ready;
     try {
       await refreshFullScreenIntent();
+    } catch (_) {
+      // v0.4b-release-fix / ADR-013 follow-up: never let a
+      // platform-channel error crash the post-init probe.
+    }
+  }
+
+  /// v1.5b / Phase 25. Same fire-and-forget rationale as
+  /// the other special-access `*AfterInit` helpers above.
+  /// Until the `NotificationPolicyService` Kotlin handler
+  /// lands (v1.5c follow-up), this reads the cached default
+  /// so the `AutomationReliabilityBadge` for routines using
+  /// `ActionOverrideSilent` renders a stable state on
+  /// first launch.
+  Future<void> _refreshNotificationPolicyAfterInit() async {
+    await ready;
+    try {
+      await refreshNotificationPolicy();
     } catch (_) {
       // v0.4b-release-fix / ADR-013 follow-up: never let a
       // platform-channel error crash the post-init probe.
@@ -813,6 +910,9 @@ class PermissionService {
         canOpenSettings: true,
       ),
       PermissionKind.fullScreenIntent: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
+      PermissionKind.notificationPolicy: const PermissionResultDenied(
         canOpenSettings: true,
       ),
     };

@@ -36,6 +36,26 @@
 //     when the role is not held; the home banner still
 //     reports the app-wide `Reliability` enum for the
 //     cross-cutting "system is unable to wake us" signal.
+//
+// v1.5b (Phase 25) folds in the action-side permission
+// gates that v1.1f + v1.2 reserved:
+//   - `ActionCallIntercept` → `PermissionKind.callScreening`.
+//     Same role as the trigger-side check; the action just
+//     reuses the same probe.
+//   - `ActionOverrideSilent` → `PermissionKind.notificationPolicy`.
+//     Android M+ requires `ACCESS_NOTIFICATION_POLICY` for an
+//     app to toggle DND. The kind is opt-in (ADR-030
+//     precedent); the user is never blocked from using do it
+//     for declining.
+//   - `ActionFullscreen` → `PermissionKind.fullScreenIntent`.
+//     Mirrors the v1.3c probe; the action is degraded on
+//     API 34+ devices without the permission.
+//   - `ActionNotify` and `ActionOpenApp` gate no permission.
+//
+// The trigger-side check still wins on a "both sides
+// degraded" routine (the user sees the trigger's permission
+// gate first; the action's gate renders below as a secondary
+// section in the dialog).
 
 import 'package:doit/routines/routine.dart';
 import 'package:doit/services/permission_result.dart';
@@ -87,25 +107,33 @@ enum AutomationReliability {
 ///     truth here, but we default to `optimal` in this
 ///     pure function (the badge consumer can fall back to the
 ///     app-wide banner if it has access).
-///   - All `Action` leaves → no additional runtime gate at
-///     v1.1f (action-side roles — call-screening, contacts —
-///     are already covered by the trigger-side checks). A
-///     future v1.2+ extension will fold in `ActionOverrideSilent`
-///     (`ACCESS_NOTIFICATION_POLICY`) and the contact-requiring
-///     actions.
+///   - `ActionCallIntercept` → `PermissionKind.callScreening`
+///     (v1.5b / Phase 25).
+///   - `ActionOverrideSilent` → `PermissionKind.notificationPolicy`
+///     (v1.5b / Phase 25; Android `ACCESS_NOTIFICATION_POLICY`).
+///   - `ActionFullscreen` → `PermissionKind.fullScreenIntent`
+///     (v1.5b / Phase 25; mirrors the v1.3c probe).
+///   - `ActionNotify` and `ActionOpenApp` gate no permission.
 AutomationReliability automationReliability(
   Automation automation, {
   required Map<PermissionKind, PermissionResult?> statuses,
 }) {
-  // Trigger-side check.
+  // Trigger-side check wins first (the user sees the
+  // trigger's permission gate first in the dialog).
   final triggerKind = _requiredPermissionForTrigger(automation.trigger);
   if (triggerKind != null) {
     final status = statuses[triggerKind];
     if (status == null) return AutomationReliability.unknown;
     if (!_isGranted(status)) return AutomationReliability.degraded;
   }
-  // Action-side check (no leaves gate a permission in v1.1f;
-  // reserved for v1.2+).
+  // Action-side check. Every leaf with a permission gate
+  // reduces to a single kind; the dialog renders the
+  // matched kind as a secondary section.
+  for (final actionKind in _requiredPermissionsForAction(automation.action)) {
+    final status = statuses[actionKind];
+    if (status == null) return AutomationReliability.unknown;
+    if (!_isGranted(status)) return AutomationReliability.degraded;
+  }
   return AutomationReliability.optimal;
 }
 
@@ -149,11 +177,41 @@ bool _isGranted(PermissionResult result) {
   };
 }
 
-// Suppress the unused-import warning for `action.dart`. The
-// import is intentional: this file's exhaustive switch is
-// the canonical reference for "which leaves gate a
-// permission", and `action.dart` is part of that contract
-// even though v1.1f does not yet add a case for any action
-// leaf.
-// ignore: unused_element
-const Object _actionGuard = ActionNotify;
+/// Map an [Action] leaf to the runtime permissions it needs.
+/// Returns an empty list when no runtime permission gates
+/// the action (e.g. `ActionNotify`, `ActionOpenApp`).
+///
+/// Exhaustive over the sealed [Action] hierarchy — adding a
+/// new action leaf without updating this switch is a
+/// compile-time error. The dialog renders one
+/// `_KindSection` per non-null entry; when the list has more
+/// than one entry (e.g., a future `ActionCallIntercept` that
+/// also reads contacts), the dialog stacks them.
+List<PermissionKind> _requiredPermissionsForAction(Action action) {
+  return switch (action) {
+    // Show a local notification. No runtime gate beyond
+    // the global `POST_NOTIFICATIONS` grant (covered by the
+    // trigger-side path's `notifications` permission status).
+    ActionNotify() => const <PermissionKind>[],
+    // Wake the screen with the full-screen-intent activity.
+    // v1.5b / Phase 25: mirrors the v1.3c probe — on API 34+
+    // the OS suppresses full-screen launches from background
+    // apps without `USE_FULL_SCREEN_INTENT`.
+    ActionFullscreen() => const <PermissionKind>[
+      PermissionKind.fullScreenIntent,
+    ],
+    // Answer / dismiss an incoming call. v1.5b: reuses the
+    // trigger-side `callScreening` role check.
+    ActionCallIntercept() => const <PermissionKind>[
+      PermissionKind.callScreening,
+    ],
+    // Toggle the device's silent mode. v1.5b: Android M+
+    // requires `ACCESS_NOTIFICATION_POLICY` for any app
+    // that toggles DND; the kind is opt-in.
+    ActionOverrideSilent() => const <PermissionKind>[
+      PermissionKind.notificationPolicy,
+    ],
+    // Open a route in the app. No runtime gate.
+    ActionOpenApp() => const <PermissionKind>[],
+  };
+}

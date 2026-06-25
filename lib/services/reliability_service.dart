@@ -99,6 +99,11 @@ const Duration kReliabilityCacheTtl = Duration(seconds: 30);
 ///   `USE_FULL_SCREEN_INTENT` granted; the user sees a
 ///   notification instead of the full-screen activity,
 ///   defeating the strong-mode interruption contract.
+/// - `notificationPolicy` — `ActionOverrideSilent` routines
+///   (v1.5b / Phase 25). Without
+///   `ACCESS_NOTIFICATION_POLICY` the OS rejects the
+///   toggle-ringer / DND call silently, so a routine with
+///   "silence the ringer at 10pm" silently no-ops.
 ///
 /// The notifications / contacts / exact-alarm / battery-
 /// optimization kinds are intentionally NOT in this set —
@@ -113,6 +118,7 @@ const Set<PermissionKind> _kReliabilityGatedKinds = {
   PermissionKind.callScreening,
   PermissionKind.usageStats,
   PermissionKind.fullScreenIntent,
+  PermissionKind.notificationPolicy,
 };
 
 /// Singleton service. Mutable-static pattern matching

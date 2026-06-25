@@ -22,7 +22,9 @@
 //      immediately without rebinding the listener).
 //   9. A probe failure keeps the prior value (per
 //      ADR-013).
-//  10. The 4 gated kinds are the only ones that flip the
+//  10. The 6 gated kinds (v1.5b: location, calendar,
+//      callScreening, usageStats, fullScreenIntent,
+//      notificationPolicy) are the only ones that flip the
 //      service to `degraded` from a permissions change.
 
 import 'dart:async' show Completer, Timer;
@@ -373,7 +375,7 @@ void main() {
     expect(ReliabilityService.instance.value, Reliability.degraded);
   });
 
-  test('the 5 gated kinds are the only ones that flip to degraded', () async {
+  test('the 6 gated kinds are the only ones that flip to degraded', () async {
     final bridge = _ScriptedBridge();
     await ReliabilityService.init(
       bridge: bridge,
@@ -408,16 +410,19 @@ void main() {
       };
       // v1.3c / Phase 14 / SYS-113: `fullScreenIntent` joins
       // the 4 v1.3b gated kinds (location, calendar,
-      // callScreening, usageStats). Mirror the
-      // `_kReliabilityGatedKinds` constant in
+      // callScreening, usageStats). v1.5b / Phase 25:
+      // `notificationPolicy` joins as the 6th gated kind
+      // (mirrors the v1.5b `_kReliabilityGatedKinds`
+      // constant in
       // `lib/services/reliability_service.dart` — the two
-      // must stay in sync.
+      // must stay in sync).
       const gated = {
         PermissionKind.location,
         PermissionKind.calendar,
         PermissionKind.callScreening,
         PermissionKind.usageStats,
         PermissionKind.fullScreenIntent,
+        PermissionKind.notificationPolicy,
       };
       final expected = gated.contains(kind)
           ? Reliability.degraded
