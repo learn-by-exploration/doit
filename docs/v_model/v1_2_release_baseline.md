@@ -137,7 +137,11 @@ v1.x candidates (still v1 track, not v2.0 jump):
   `ActionCallIntercept` mapping).
 - Spanish translation by a native speaker (the v1.1h
   smoke-test locale is the only translation). See
-  `feature.md` §2.4.
+  `feature.md` §2.4. **PR #29 ships the review-process
+  scaffolding** (`docs/v_model/spanish_translation_review.md`
+  with a per-key reviewer checklist + 1 low-risk
+  conjugation fix in `app_es.arb`). The native-speaker
+  pass itself remains a follow-up.
 - `google_maps_flutter` for `LocationMapPreview` (would
   add `INTERNET`). See `feature.md` §2.5.
 - Legacy `mipmap-*/ic_launcher.png` regeneration from the
