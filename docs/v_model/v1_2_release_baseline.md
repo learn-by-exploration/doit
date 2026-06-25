@@ -138,6 +138,11 @@ v1.x candidates (still v1 track, not v2.0 jump):
 - Legacy `mipmap-*/ic_launcher.png` regeneration from the
   master vector. See `feature.md` §2.6.
 - Light-theme icon variant. See `feature.md` §2.7.
+  **Shipped in PR #30** (v1.3d — `Settings._PermissionsRow`
+  branches the FSI tile icon on `Theme.of(context).brightness`
+  so light mode renders `Icons.open_in_full_outlined` and
+  dark mode keeps the filled `Icons.open_in_full`; 2 widget
+  tests pin both branches).
 - B9 — Android home-widget re-arm indicator (the project
   does not yet ship a home widget). See `feature.md` §2.8.
 - Phases 12-30 of the 30-phase roadmap (home widget, iOS

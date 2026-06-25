@@ -445,6 +445,23 @@ notification-icon resource reference.
 
 ## [Unreleased]
 
+### v1.3d — Light-theme icon variant for the FSI tile (feature.md §2.7)
+
+Closes the §2.7 follow-up: the Settings → Permissions
+full-screen-access tile now branches its leading icon on
+the active `Theme.of(context).brightness`. On the light
+theme the tile uses `Icons.open_in_full_outlined` (the
+same outlined style every other permission tile uses),
+and on the dark theme it keeps `Icons.open_in_full`
+(filled — better contrast on the dark surface). The
+icon shown in `PermissionSheet` and in the per-automation
+`AutomationReliabilityDialog` (which read from
+`permissionKindMeta[PermissionKind.fullScreenIntent].icon`)
+is unchanged; the brightness-aware variant is local to
+the settings tile. 2 new widget tests pin both branches.
+Test count: 1047 → 1049. `dart format` clean,
+`flutter analyze --fatal-infos` clean.
+
 ### v1.2e — `NotificationService.dismiss` + `PlatformNotificationService.show` real implementations
 
 Phase 5 of the v1.2 code-TODO closure (`30-phase roadmap`).

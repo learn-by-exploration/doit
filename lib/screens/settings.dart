@@ -303,12 +303,24 @@ class _ReliabilityRow extends StatelessWidget {
 // not hold `USE_FULL_SCREEN_INTENT`; the user needs a
 // discoverable toggle on this screen so the strong-mode
 // interruption contract is restored.
+//
+// v1.3d (feature.md §2.7): the FSI tile icon branches on
+// `Theme.of(context).brightness` so the light theme gets
+// `Icons.open_in_full_outlined` (matches the rest of the
+// permission section, which uses outlined glyphs) while
+// the dark theme keeps the filled `Icons.open_in_full`
+// variant (better contrast on the dark surface).
 class _PermissionsRow extends StatelessWidget {
   const _PermissionsRow();
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    // v1.3d / feature.md §2.7: brightness-aware FSI tile
+    // icon. Outlined on light, filled on dark.
+    final fsiIcon = Theme.of(context).brightness == Brightness.light
+        ? Icons.open_in_full_outlined
+        : Icons.open_in_full;
     return ValueListenableBuilder<Map<PermissionKind, PermissionResult?>>(
       valueListenable: PermissionService.instance.statuses,
       builder: (context, statuses, _) {
@@ -345,7 +357,7 @@ class _PermissionsRow extends StatelessWidget {
             _PermissionTile(
               key: const ValueKey('settings.permission.fullScreenIntent'),
               kind: PermissionKind.fullScreenIntent,
-              icon: Icons.open_in_full,
+              icon: fsiIcon,
               title: l.permissionFullScreenIntentTitle,
               result: statuses[PermissionKind.fullScreenIntent],
             ),
