@@ -181,6 +181,82 @@ void main() {
     }
   });
 
+  // v1.3d (feature.md §2.6): the legacy density buckets are
+  // regenerated from the v1.1i master vector (see
+  // `tool/regen_launcher_icons.py`) so the API 21..25
+  // fallback matches the adaptive-icon foreground instead of
+  // showing the default Flutter blue 'F'. The new test pins
+  // (a) the PNG signature is well-formed and (b) the PNG
+  // IHDR width/height match the standard Android launcher
+  // icon density bucket sizes.
+  test('legacy density buckets ship the v1.1i brand glyph '
+      '(feature.md §2.6)', () {
+    const expected = <(String, int, int)>[
+      // (path, width, height) — matches the standard Android
+      // launcher icon density bucket sizes (mdpi 48, hdpi 72,
+      // xhdpi 96, xxhdpi 144, xxxhdpi 192).
+      ('android/app/src/main/res/mipmap-mdpi/ic_launcher.png', 48, 48),
+      ('android/app/src/main/res/mipmap-hdpi/ic_launcher.png', 72, 72),
+      ('android/app/src/main/res/mipmap-xhdpi/ic_launcher.png', 96, 96),
+      (
+        'android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png',
+        144,
+        144
+      ),
+      (
+        'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png',
+        192,
+        192
+      ),
+    ];
+    for (final (path, expectedWidth, expectedHeight) in expected) {
+      final file = File(path);
+      expect(file.existsSync(), isTrue, reason: '$path missing');
+      final bytes = file.readAsBytesSync();
+      // PNG signature: 8 bytes 0x89 'P' 'N' 'G' 0x0D 0x0A 0x1A 0x0A.
+      const pngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+      expect(
+        bytes.sublist(0, 8),
+        pngSignature,
+        reason: '$path is not a valid PNG',
+      );
+      // IHDR chunk: signature(8) + length(4) + type(4) + width(4)
+      // + height(4) + bit-depth(1) + color-type(1) + ...
+      // The PNG spec lays the chunk out as
+      //   bytes  0..7   = PNG signature (8 bytes)
+      //   bytes  8..11  = IHDR chunk length (always 13 for IHDR)
+      //   bytes 12..15  = 'IHDR'
+      //   bytes 16..19  = width (big-endian u32)
+      //   bytes 20..23  = height (big-endian u32)
+      final width =
+          (bytes[16] << 24) |
+          (bytes[17] << 16) |
+          (bytes[18] << 8) |
+          bytes[19];
+      final height =
+          (bytes[20] << 24) |
+          (bytes[21] << 16) |
+          (bytes[22] << 8) |
+          bytes[23];
+      expect(
+        width,
+        expectedWidth,
+        reason:
+            '$path has width=$width, expected $expectedWidth '
+            '(feature.md §2.6 — legacy density bucket must match '
+            'the standard Android launcher icon size)',
+      );
+      expect(
+        height,
+        expectedHeight,
+        reason:
+            '$path has height=$height, expected $expectedHeight '
+            '(feature.md §2.6 — legacy density bucket must match '
+            'the standard Android launcher icon size)',
+      );
+    }
+  });
+
   test('both splash drawables reference the launch_background color + '
       'centered foreground', () {
     const splashPaths = <String>[
