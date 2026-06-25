@@ -14,6 +14,14 @@
 //     `permissionKindMeta`. "Open settings" deep-links to
 //     the app's Settings page (or, for `usageStats`, the
 //     special-access page).
+//   - Action-side permission denied / unknown (v1.5b /
+//     Phase 25): `ActionCallIntercept` (callScreening role),
+//     `ActionOverrideSilent` (notificationPolicy /
+//     ACCESS_NOTIFICATION_POLICY), `ActionFullscreen`
+//     (fullScreenIntent). Renders as a secondary section
+//     below the trigger-side section. The "Open settings"
+//     CTA on the action section deep-links to the
+//     matching special-access page.
 //   - No permission gate: the badge rendered as
 //     `degraded` for a non-permission reason. Today the only
 //     such reason is `TriggerTimeOfDay` falling back to
@@ -21,10 +29,6 @@
 //     is `degraded` (the badge consumer is expected to fall
 //     back to the home `ReliabilityBanner`). The dialog
 //     surfaces this and points the user at the home banner.
-//   - The action side never gates a permission in v1.2h; a
-//     future v1.2+ extension will fold in
-//     `ActionOverrideSilent` (`ACCESS_NOTIFICATION_POLICY`)
-//     and the contact-requiring actions.
 //
 // The dialog is a pure widget (no `setState`, no
 // `Future`-side-effects on the rendering path). The "Open
@@ -32,7 +36,7 @@
 // `PermissionService.requestX` / `openAppSettings` method
 // and closes the dialog.
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Action;
 
 import 'package:doit/routines/automation_reliability.dart';
 import 'package:doit/routines/routine.dart';
@@ -40,6 +44,7 @@ import 'package:doit/services/permission_kind_meta.dart';
 import 'package:doit/services/permission_result.dart';
 import 'package:doit/services/permission_service.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/triggers/action.dart';
 import 'package:doit/triggers/trigger.dart';
 
 /// Builds and shows the per-automation reliability
@@ -87,6 +92,21 @@ class _AutomationReliabilityDialog extends StatelessWidget {
     final trigger = automation.trigger;
     final kind = _requiredKindForTrigger(trigger);
     final status = kind == null ? null : statuses[kind];
+    // v1.5b / Phase 25: render an action-side section below
+    // the trigger-side section. The action kind list mirrors
+    // `_requiredPermissionsForAction` from
+    // `automation_reliability.dart` — the dialog uses its
+    // own private mirror so the helper stays module-private.
+    final actionKinds = _requiredKindsForAction(automation.action);
+    // The "Open settings" CTA targets the FIRST degraded /
+    // unknown permission — trigger side wins, then action
+    // side. If both sides are healthy the CTA is omitted
+    // (reliability == optimal).
+    final ctaKind =
+        kind ??
+        (reliability != AutomationReliability.optimal
+            ? actionKinds.firstOrNull
+            : null);
 
     return AlertDialog(
       key: ValueKey('automation.reliability_dialog.${automation.id}'),
@@ -98,13 +118,30 @@ class _AutomationReliabilityDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (kind != null) ...[
+              const Text(
+                'Trigger',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: Spacing.xs),
               _KindSection(kind: kind, status: status),
             ] else ...[
               Text(_noPermissionGateCopy(trigger)),
             ],
+            if (actionKinds.isNotEmpty) ...[
+              const SizedBox(height: Spacing.md),
+              const Text(
+                'Action',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: Spacing.xs),
+              for (final ak in actionKinds) ...[
+                _KindSection(kind: ak, status: statuses[ak]),
+                const SizedBox(height: Spacing.xs),
+              ],
+            ],
             const SizedBox(height: Spacing.md),
             Text(
-              _remediationCopy(reliability, kind),
+              _remediationCopy(reliability, ctaKind),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
@@ -118,7 +155,7 @@ class _AutomationReliabilityDialog extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Close'),
         ),
-        if (kind != null)
+        if (ctaKind != null)
           Semantics(
             label: 'Open settings',
             button: true,
@@ -127,7 +164,7 @@ class _AutomationReliabilityDialog extends StatelessWidget {
               key: ValueKey(
                 'automation.reliability_dialog.open_settings.${automation.id}',
               ),
-              onPressed: () => _openSettings(context, kind),
+              onPressed: () => _openSettings(context, ctaKind),
               child: const Text('Open settings'),
             ),
           ),
@@ -176,13 +213,40 @@ class _AutomationReliabilityDialog extends StatelessWidget {
 
   Future<void> _openSettings(BuildContext context, PermissionKind kind) async {
     Navigator.of(context).pop();
-    if (kind == PermissionKind.usageStats) {
-      // The usage-stats permission does NOT have a generic
-      // app-settings page; it has its own special-access
-      // deep-link via `PermissionService.requestUsageStats()`.
-      await PermissionService.instance.requestUsageStats();
-    } else {
-      await PermissionService.instance.openAppSettings();
+    // v1.5b / Phase 25: each special-access permission has
+    // its own `PermissionService.requestX` deep-link rather
+    // than the generic app-settings page. Falling back to
+    // `openAppSettings` for the kinds that don't yet have a
+    // dedicated helper (notificationPolicy deep-link is a
+    // follow-up to PR #27; it lives at
+    // `Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS`
+    // once `NotificationPolicyService` lands in v1.5c).
+    switch (kind) {
+      case PermissionKind.usageStats:
+        // `PACKAGE_USAGE_STATS` does not show a generic
+        // app-settings page; the special-access activity is
+        // opened via `PermissionService.requestUsageStats()`.
+        await PermissionService.instance.requestUsageStats();
+      case PermissionKind.fullScreenIntent:
+        // `USE_FULL_SCREEN_INTENT` opens via
+        // `Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`.
+        await PermissionService.instance.requestFullScreenIntent();
+      case PermissionKind.callScreening:
+      case PermissionKind.notificationPolicy:
+        // The dedicated `requestX` helpers for these two
+        // kinds are v1.5c+ follow-ups (they need a new
+        // `NotificationPolicyService` + Kotlin handler under
+        // `DeviceStateChannel` for the
+        // `ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS`
+        // deep-link, plus a role chooser activity for
+        // callScreening). For now we drop the user into the
+        // generic app-settings page; they can navigate from
+        // there. The Settings → Permissions tile already
+        // shows the rationale copy from `permissionKindMeta`
+        // so the user knows what to look for.
+        await PermissionService.instance.openAppSettings();
+      case _:
+        await PermissionService.instance.openAppSettings();
     }
   }
 }
@@ -250,5 +314,27 @@ PermissionKind? _requiredKindForTrigger(Trigger trigger) {
     TriggerForegroundApp() => PermissionKind.usageStats,
     TriggerDeviceState() => null,
     TriggerTimeOfDay() => null,
+  };
+}
+
+/// Mirror of `_requiredPermissionsForAction` from
+/// `automation_reliability.dart` (v1.5b / Phase 25). Same
+/// duplication-rationale as `_requiredKindForTrigger`:
+/// the helper is module-private to the routines layer and
+/// the widget cannot reach it. Stays in sync via the
+/// matching unit tests on both sides.
+List<PermissionKind> _requiredKindsForAction(Action action) {
+  return switch (action) {
+    ActionNotify() => const <PermissionKind>[],
+    ActionFullscreen() => const <PermissionKind>[
+      PermissionKind.fullScreenIntent,
+    ],
+    ActionCallIntercept() => const <PermissionKind>[
+      PermissionKind.callScreening,
+    ],
+    ActionOverrideSilent() => const <PermissionKind>[
+      PermissionKind.notificationPolicy,
+    ],
+    ActionOpenApp() => const <PermissionKind>[],
   };
 }

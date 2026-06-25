@@ -480,6 +480,16 @@ class _PermissionTile extends StatelessWidget {
         // tile updates when the user toggles it on in
         // the background.
         await service.refreshFullScreenIntent();
+      case PermissionKind.notificationPolicy:
+        // v1.5b / Phase 25: `ACCESS_NOTIFICATION_POLICY` is
+        // a special-access permission required for
+        // `ActionOverrideSilent`. There is no runtime
+        // prompt; the user MUST navigate to Settings →
+        // Notifications → Do Not Disturb access. The
+        // re-probe re-reads the
+        // `NotificationManager.isNotificationPolicyAccessGranted()`
+        // state and refreshes the cached status.
+        await service.refreshNotificationPolicy();
       case PermissionKind.backupFolder:
         // The backup folder is not a runtime permission;
         // it's a SAF picker. The re-pick is handled in

@@ -68,6 +68,8 @@ Map<PermissionKind, PermissionResult?> _statuses({
   PermissionResult? batteryOptimization = _granted,
   PermissionResult? usageStats = _granted,
   PermissionResult? callScreening = _granted,
+  PermissionResult? fullScreenIntent = _granted,
+  PermissionResult? notificationPolicy = _granted,
 }) => {
   PermissionKind.notifications: notifications,
   PermissionKind.contacts: contacts,
@@ -78,6 +80,8 @@ Map<PermissionKind, PermissionResult?> _statuses({
   PermissionKind.calendar: calendar,
   PermissionKind.usageStats: usageStats,
   PermissionKind.callScreening: callScreening,
+  PermissionKind.fullScreenIntent: fullScreenIntent,
+  PermissionKind.notificationPolicy: notificationPolicy,
 };
 
 Automation _automation(Trigger trigger) => Automation(
@@ -349,6 +353,206 @@ void main() {
       expect(
         automationReliability(a, statuses: _statuses()),
         AutomationReliability.optimal,
+      );
+    });
+  });
+
+  // v1.5b / Phase 25: action-side permission disambiguation.
+  // Each action leaf with a runtime gate now contributes to
+  // the reliability state. The exhaustive switch in
+  // `_requiredPermissionsForAction` is the canonical
+  // reference — adding a new action leaf without updating
+  // that switch is a compile-time error.
+  group('ActionFullscreen (v1.5b — gated by fullScreenIntent)', () {
+    test('granted fullScreenIntent → optimal', () {
+      final a = Automation(
+        trigger: _timeOfDayTrigger,
+        action: const ActionFullscreen(),
+      );
+      expect(
+        automationReliability(a, statuses: _statuses()),
+        AutomationReliability.optimal,
+      );
+    });
+
+    test('denied fullScreenIntent → degraded', () {
+      final a = Automation(
+        trigger: _timeOfDayTrigger,
+        action: const ActionFullscreen(),
+      );
+      expect(
+        automationReliability(
+          a,
+          statuses: _statuses(fullScreenIntent: _denied),
+        ),
+        AutomationReliability.degraded,
+      );
+    });
+
+    test('null fullScreenIntent (unprobed) → unknown', () {
+      final a = Automation(
+        trigger: _timeOfDayTrigger,
+        action: const ActionFullscreen(),
+      );
+      expect(
+        automationReliability(a, statuses: _statuses(fullScreenIntent: null)),
+        AutomationReliability.unknown,
+      );
+    });
+  });
+
+  group('ActionCallIntercept (v1.5b — gated by callScreening role)', () {
+    test('granted callScreening → optimal', () {
+      final a = Automation(
+        trigger: _timeOfDayTrigger,
+        action: const ActionCallIntercept(decision: CallInterceptDecision.mute),
+      );
+      expect(
+        automationReliability(a, statuses: _statuses()),
+        AutomationReliability.optimal,
+      );
+    });
+
+    test('denied callScreening → degraded', () {
+      final a = Automation(
+        trigger: _timeOfDayTrigger,
+        action: const ActionCallIntercept(decision: CallInterceptDecision.mute),
+      );
+      expect(
+        automationReliability(a, statuses: _statuses(callScreening: _denied)),
+        AutomationReliability.degraded,
+      );
+    });
+
+    test('null callScreening (unprobed) → unknown', () {
+      final a = Automation(
+        trigger: _timeOfDayTrigger,
+        action: const ActionCallIntercept(decision: CallInterceptDecision.mute),
+      );
+      expect(
+        automationReliability(a, statuses: _statuses(callScreening: null)),
+        AutomationReliability.unknown,
+      );
+    });
+  });
+
+  group('ActionOverrideSilent (v1.5b — gated by notificationPolicy)', () {
+    test('granted notificationPolicy → optimal', () {
+      final a = Automation(
+        trigger: _timeOfDayTrigger,
+        action: const ActionOverrideSilent(targetMode: SilentMode.silent),
+      );
+      expect(
+        automationReliability(a, statuses: _statuses()),
+        AutomationReliability.optimal,
+      );
+    });
+
+    test('denied notificationPolicy → degraded', () {
+      final a = Automation(
+        trigger: _timeOfDayTrigger,
+        action: const ActionOverrideSilent(targetMode: SilentMode.silent),
+      );
+      expect(
+        automationReliability(
+          a,
+          statuses: _statuses(notificationPolicy: _denied),
+        ),
+        AutomationReliability.degraded,
+      );
+    });
+
+    test('null notificationPolicy (unprobed) → unknown', () {
+      final a = Automation(
+        trigger: _timeOfDayTrigger,
+        action: const ActionOverrideSilent(targetMode: SilentMode.silent),
+      );
+      expect(
+        automationReliability(a, statuses: _statuses(notificationPolicy: null)),
+        AutomationReliability.unknown,
+      );
+    });
+
+    test('permanentlyDenied notificationPolicy → degraded', () {
+      final a = Automation(
+        trigger: _timeOfDayTrigger,
+        action: const ActionOverrideSilent(targetMode: SilentMode.silent),
+      );
+      expect(
+        automationReliability(
+          a,
+          statuses: _statuses(notificationPolicy: _permanentlyDenied),
+        ),
+        AutomationReliability.degraded,
+      );
+    });
+  });
+
+  group('ActionNotify / ActionOpenApp (no runtime gate)', () {
+    test('ActionNotify with denied fullScreenIntent → optimal '
+        '(action gates no permission)', () {
+      final a = Automation(
+        trigger: _timeOfDayTrigger,
+        action: const ActionNotify(title: 't', body: 'b'),
+      );
+      expect(
+        automationReliability(
+          a,
+          statuses: _statuses(fullScreenIntent: _denied),
+        ),
+        AutomationReliability.optimal,
+      );
+    });
+
+    test('ActionOpenApp with denied notificationPolicy → optimal '
+        '(action gates no permission)', () {
+      final a = Automation(
+        trigger: _timeOfDayTrigger,
+        action: const ActionOpenApp(route: '/home'),
+      );
+      expect(
+        automationReliability(
+          a,
+          statuses: _statuses(notificationPolicy: _denied),
+        ),
+        AutomationReliability.optimal,
+      );
+    });
+  });
+
+  // v1.5b / Phase 25: trigger-side check wins when both
+  // sides are degraded. The dialog renders the trigger
+  // section first; the user fixes the trigger's permission
+  // gate before the action's. (See the in-source comment
+  // for `automationReliability`.)
+  group('Both sides degraded (v1.5b — trigger wins)', () {
+    test('denied location + denied fullScreenIntent → degraded '
+        '(trigger side dominates the enum, dialog renders both sections)', () {
+      final a = Automation(
+        trigger: _locationTrigger,
+        action: const ActionFullscreen(),
+      );
+      expect(
+        automationReliability(
+          a,
+          statuses: _statuses(location: _denied, fullScreenIntent: _denied),
+        ),
+        AutomationReliability.degraded,
+      );
+    });
+
+    test('granted location + denied notificationPolicy → degraded '
+        '(action side degrades the routine)', () {
+      final a = Automation(
+        trigger: _timeOfDayTrigger,
+        action: const ActionOverrideSilent(targetMode: SilentMode.silent),
+      );
+      expect(
+        automationReliability(
+          a,
+          statuses: _statuses(notificationPolicy: _denied),
+        ),
+        AutomationReliability.degraded,
       );
     });
   });

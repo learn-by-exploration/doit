@@ -129,4 +129,18 @@ const Map<PermissionKind, PermissionKindMeta> permissionKindMeta =
             'full-screen mission screen when a strong-mode habit fires. '
             'Without it, you\'ll see a notification instead.',
       ),
+      // v1.5b / Phase 25: `ACCESS_NOTIFICATION_POLICY`.
+      // Required to toggle DND on routines that use
+      // `ActionOverrideSilent`. Opt-in (ADR-030
+      // precedent); the user is never blocked from using
+      // do it for declining — a denied policy degrades
+      // the action to a no-op.
+      PermissionKind.notificationPolicy: PermissionKindMeta(
+        title: 'Do Not Disturb access',
+        icon: Icons.do_not_disturb_on_outlined,
+        rationale:
+            'Lets do it toggle your ringer / DND when a routine fires. '
+            'Without it, the "silence the ringer" action becomes a no-op. '
+            'You\'ll need to toggle do it on in Settings → Special access.',
+      ),
     };
