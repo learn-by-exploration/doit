@@ -50,6 +50,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
 
 import 'package:doit/services/call_interceptor.dart';
+import 'package:doit/services/full_screen_intent_service.dart';
 import 'package:doit/services/permission_result.dart';
 import 'package:doit/services/usage_stats_service.dart';
 
@@ -136,6 +137,32 @@ enum PermissionKind {
   /// `RoleManager.createRequestRoleIntent` (the OS shows
   /// its own dialog; no app-side Settings path is needed).
   callScreening,
+
+  /// `USE_FULL_SCREEN_INTENT` (v1.3c / Phase 14 / SYS-113
+  /// / ADR-043). On Android 14+ (API 34) the OS suppresses
+  /// full-screen intents from background-launched apps
+  /// that do not hold this permission — the strong-mode
+  /// full-screen mission UI fails open to a notification
+  /// instead. The probe goes through
+  /// `FullScreenIntentService.isGranted` → Kotlin
+  /// `doit/full_screen.canUseFullScreenIntent` (an
+  /// `NotificationManager.canUseFullScreenIntent()` call
+  /// on API 32+; implicit-`true` on API < 32 because the
+  /// permission did not exist). The deep-link target is
+  /// `Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`
+  /// on API 34+ and falls back to
+  /// `Settings.ACTION_APPLICATION_SETTINGS` on API 32/33
+  /// (where the FSI-specific activity does not exist).
+  /// Android never shows a runtime prompt for this; the
+  /// user MUST navigate to Settings → Special access.
+  /// `canOpenSettings` is hard-coded `true` because the
+  /// deep-link target is well-defined on every supported
+  /// API. The kind is in the
+  /// `ReliabilityService._kReliabilityGatedKinds` set so
+  /// the home-screen reliability banner flips to
+  /// "may be late" on a denial (matches the v1.1g /
+  /// `PACKAGE_USAGE_STATS` opt-in precedent).
+  fullScreenIntent,
 }
 
 /// Singleton holder for the permission / SAF seam. The
@@ -193,6 +220,14 @@ class PermissionService {
         PermissionKind.callScreening: const PermissionResultDenied(
           canOpenSettings: true,
         ),
+        // v1.3c / Phase 14 / SYS-113: opt-in special-access
+        // permission (Android never shows a runtime prompt
+        // for it). Declared with `tools:ignore="ProtectedPermissions"`
+        // in the manifest — the user is never blocked from
+        // using do it for declining.
+        PermissionKind.fullScreenIntent: const PermissionResultDenied(
+          canOpenSettings: true,
+        ),
       });
 
   /// Idempotent. Probes the runtime permissions and stores
@@ -228,6 +263,9 @@ class PermissionService {
         canOpenSettings: true,
       ),
       PermissionKind.callScreening: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
+      PermissionKind.fullScreenIntent: const PermissionResultDenied(
         canOpenSettings: true,
       ),
     };
@@ -275,6 +313,16 @@ class PermissionService {
       // Same fire-and-forget rationale as
       // `usageStats` above.
       unawaited(_refreshCallScreeningAfterInit());
+      // v1.3c / Phase 14 / SYS-113 / ADR-043:
+      // `USE_FULL_SCREEN_INTENT` is a special-access
+      // permission; the `permission_handler` plugin does
+      // not expose it. The probe goes through
+      // `FullScreenIntentService.isGranted` → Kotlin
+      // `doit/full_screen.canUseFullScreenIntent` (a
+      // `NotificationManager.canUseFullScreenIntent()` call
+      // on API 32+). Same fire-and-forget rationale as
+      // the two special-access kinds above.
+      unawaited(_refreshFullScreenIntentAfterInit());
     } catch (_) {
       // v0.4b-release-fix / ADR-013 follow-up: a thrown
       // platform-channel error must not crash `main()`. The
@@ -490,6 +538,44 @@ class PermissionService {
     statuses.value = next;
   }
 
+  /// v1.3c / Phase 14 / SYS-113 / ADR-043. Deep-links the
+  /// user to the system Settings surface for
+  /// `USE_FULL_SCREEN_INTENT` (Settings →
+  /// `ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT` on API 34+,
+  /// `ACTION_APPLICATION_SETTINGS` fallback on API 32/33).
+  /// Unlike the other `requestX` methods, this does NOT
+  /// re-probe immediately: the user has to navigate the
+  /// system Settings page, toggle do it on, and come back.
+  /// The widget that called this method should re-probe via
+  /// [PermissionService.instance.init] or [refresh] when the
+  /// app resumes (e.g., the `PermissionLifecycleReProbe`
+  /// `WidgetsBindingObserver.didChangeAppLifecycleState` →
+  /// `resumed` hook).
+  Future<bool> requestFullScreenIntent() async {
+    await ready;
+    return FullScreenIntentService.instance.openSettings();
+  }
+
+  /// v1.3c / Phase 14 / SYS-113 / ADR-043. Re-probes
+  /// `USE_FULL_SCREEN_INTENT`. Used by the app-resume
+  /// handler so the Settings → Permissions tile and the
+  /// `ReliabilityBanner` reflect the user's most recent
+  /// toggle without a full restart. A denial flips the
+  /// banner to `Reliability.degraded` because
+  /// `fullScreenIntent` is in the
+  /// `ReliabilityService._kReliabilityGatedKinds` set.
+  Future<void> refreshFullScreenIntent() async {
+    await ready;
+    final granted = await FullScreenIntentService.instance.isGranted();
+    final next = <PermissionKind, PermissionResult?>{
+      ...statuses.value,
+      PermissionKind.fullScreenIntent: granted
+          ? const PermissionResultGranted()
+          : const PermissionResultDenied(canOpenSettings: true),
+    };
+    statuses.value = next;
+  }
+
   /// v1.2i / Phase 9: re-probes every permission the
   /// service knows about. Called from the
   /// `WidgetsBindingObserver` `resumed` hook in `main.dart`
@@ -567,6 +653,14 @@ class PermissionService {
     } catch (_) {
       /* ADR-013 */
     }
+    // v1.3c / Phase 14 / SYS-113 / ADR-043: the third
+    // special-access kind — `USE_FULL_SCREEN_INTENT` —
+    // joins the sequential bucket. Same swallow pattern.
+    try {
+      await refreshFullScreenIntent();
+    } catch (_) {
+      /* ADR-013 */
+    }
   }
 
   /// Probe helper for [init]. Called after `_ready` is
@@ -596,6 +690,21 @@ class PermissionService {
     await ready;
     try {
       await refreshCallScreening();
+    } catch (_) {
+      // v0.4b-release-fix / ADR-013 follow-up: never let a
+      // platform-channel error crash the post-init probe.
+    }
+  }
+
+  /// v1.3c / Phase 14 / SYS-113 / ADR-043. Same
+  /// fire-and-forget rationale as the other
+  /// special-access `*AfterInit` helpers above. Runs the
+  /// `FullScreenIntentService.isGranted` probe against
+  /// the Kotlin `doit/full_screen` channel.
+  Future<void> _refreshFullScreenIntentAfterInit() async {
+    await ready;
+    try {
+      await refreshFullScreenIntent();
     } catch (_) {
       // v0.4b-release-fix / ADR-013 follow-up: never let a
       // platform-channel error crash the post-init probe.
@@ -701,6 +810,9 @@ class PermissionService {
         canOpenSettings: true,
       ),
       PermissionKind.callScreening: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
+      PermissionKind.fullScreenIntent: const PermissionResultDenied(
         canOpenSettings: true,
       ),
     };

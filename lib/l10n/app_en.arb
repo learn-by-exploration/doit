@@ -81,6 +81,7 @@
   "permissionLocationTitle": "Location",
   "permissionCalendarTitle": "Calendar",
   "permissionUsageStatsTitle": "Usage access",
+  "permissionFullScreenIntentTitle": "Full-screen access",
   "permissionStatusGranted": "Granted",
   "permissionStatusDenied": "Not granted — tap to ask again",
   "permissionStatusBlocked": "Blocked. Tap 'Settings' to grant.",

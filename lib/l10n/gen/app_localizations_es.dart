@@ -176,6 +176,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get permissionUsageStatsTitle => 'Acceso de uso';
 
   @override
+  String get permissionFullScreenIntentTitle => 'Acceso a pantalla completa';
+
+  @override
   String get permissionStatusGranted => 'Concedido';
 
   @override

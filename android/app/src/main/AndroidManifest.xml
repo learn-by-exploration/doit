@@ -60,6 +60,30 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 
+    <!-- v1.3c / Phase 14 / SYS-113 / ADR-043:
+         USE_FULL_SCREEN_INTENT is a special-access
+         permission for strong-mode habit full-screen
+         mission launches. On Android 14+ the OS
+         suppresses full-screen intents from background-
+         launched apps that do not hold this permission,
+         so the user sees a notification instead of the
+         full-screen mission screen — defeating the
+         strong-mode interruption contract (SYS-113). The
+         Kotlin probe (`NotificationManager
+         .canUseFullScreenIntent()`) + the deep-link
+         (`Settings
+         .ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`,
+         API 34+; falls back to `ACTION_APPLICATION_SETTINGS`
+         on API 32/33) live in
+         `FullScreenIntentChannel.kt`. The `tools:ignore`
+         marker mirrors the v1.1g PACKAGE_USAGE_STATS
+         precedent: the permission is opt-in only (declining
+         does NOT block any feature — the notification still
+         fires; the user just has to tap it). -->
+    <uses-permission
+        android:name="android.permission.USE_FULL_SCREEN_INTENT"
+        tools:ignore="ProtectedPermissions" />
+
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"

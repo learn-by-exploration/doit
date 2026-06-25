@@ -153,6 +153,29 @@ with a sealed exception.
     android:name="android.permission.PACKAGE_USAGE_STATS"
     tools:ignore="ProtectedPermissions" />
 
+<!-- v1.3c / Phase 14 / SYS-113 / ADR-043:
+     USE_FULL_SCREEN_INTENT is the special-access
+     permission for strong-mode full-screen mission
+     launches. On Android 14+ (UPSIDE_DOWN_CAKE) the OS
+     suppresses full-screen intents from background-
+     launched apps that don't hold this permission, so
+     the user sees a notification instead of the full-
+     screen mission screen. The Kotlin probe
+     (`NotificationManager.canUseFullScreenIntent()`,
+     API 32+) + the deep-link
+     (`Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`,
+     API 34+; falls back to ACTION_APPLICATION_SETTINGS
+     on API 32/33) live in
+     android/app/src/main/kotlin/com/doit/FullScreenIntentChannel.kt.
+     Declared with tools:ignore="ProtectedPermissions"
+     because the permission is opt-in only — the user
+     keeps getting the notification fallback if they
+     decline. The strong-mode interruption contract is
+     the only behavior that depends on it. -->
+<uses-permission
+    android:name="android.permission.USE_FULL_SCREEN_INTENT"
+    tools:ignore="ProtectedPermissions" />
+
 <!-- Camera permission only requested at the moment a photo-based mission
      is enabled in v0.2. Not in v0.1. -->
 ```

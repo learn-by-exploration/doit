@@ -49,6 +49,7 @@
   "permissionLocationTitle": "Ubicación",
   "permissionCalendarTitle": "Calendario",
   "permissionUsageStatsTitle": "Acceso de uso",
+  "permissionFullScreenIntentTitle": "Acceso a pantalla completa",
   "permissionStatusGranted": "Concedido",
   "permissionStatusDenied": "No concedido — toca para pedir de nuevo",
   "permissionStatusBlocked": "Bloqueado. Toca \"Ajustes\" para conceder.",

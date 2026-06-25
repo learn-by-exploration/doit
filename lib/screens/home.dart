@@ -184,7 +184,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       body: SafeArea(
         child: Column(
           children: [
-            ReliabilityBanner.fromStream(),
+            ReliabilityBanner.fromStream(
+              // v1.3c / Phase 14 / SYS-113 / ADR-043: when
+              // the unified reliability stream flips to
+              // `degraded` (because the user revoked a
+              // permission — or any of the 5 gated kinds
+              // from the v1.3b service), the banner shows a
+              // chevron and is tappable. One tap lands the
+              // user on the Settings → Permissions screen
+              // where each gated kind has its own tile. The
+              // deep-link is the single discoverable
+              // affordance; without it the user has no way
+              // to recover from a degraded state.
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+              ),
+            ),
             const RoutineBanner(),
             const _AddAnchorButton(),
             Expanded(

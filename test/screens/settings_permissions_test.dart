@@ -96,6 +96,14 @@ void main() {
     'flutter.baseflow.com/permissions/methods',
   );
 
+  // v1.3c / Phase 14 / SYS-113 / ADR-043: the full-screen
+  // intent probe channel (mirror of `doit/device_state` +
+  // `doit/call_interceptor`). Scripts the platform-side
+  // `canUseFullScreenIntent` / `openFullScreenIntentSettings`
+  // responses so the `fullScreenIntent` tile behaves like
+  // the other runtime tiles in tests.
+  const fullScreenChannel = MethodChannel('doit/full_screen');
+
   /// Scripted response for `requestPermissions` calls,
   /// keyed by `Permission.value` (int). Tests set entries
   /// before tapping a row.
@@ -116,6 +124,23 @@ void main() {
   /// `requestX` / `openAppSettings` calls.
   final permissionsCalls = <MethodCall>[];
 
+  /// v1.3c / Phase 14 / SYS-113: scripted
+  /// `canUseFullScreenIntent` response for the FSI probe
+  /// in `PermissionService.init()` /
+  /// `refreshFullScreenIntent`. Tests flip the value
+  /// before pumping the screen so the `fullScreenIntent`
+  /// tile starts in the right state. Default is `false`
+  /// (matches the real device on Android 14+ with the
+  /// permission revoked).
+  bool scriptedFullScreenGranted = false;
+
+  /// All method calls received on the `doit/full_screen`
+  /// channel since the last setUp. Tests assert on this
+  /// list to verify the service issued the right
+  /// `canUseFullScreenIntent` /
+  /// `openFullScreenIntentSettings` calls.
+  final fullScreenCalls = <MethodCall>[];
+
   /// If non-null, the next call to the permissions channel
   /// throws this exception.
   Object? throwOnNext;
@@ -126,6 +151,8 @@ void main() {
     requestScriptedStatuses.clear();
     probeScriptedStatuses.clear();
     permissionsCalls.clear();
+    fullScreenCalls.clear();
+    scriptedFullScreenGranted = false;
     throwOnNext = null;
     SettingsService.instance.resetForTesting();
     ReminderService.resetForTesting();
@@ -177,6 +204,26 @@ void main() {
       messenger.setMockMethodCallHandler(permissionsChannel, null);
     });
 
+    // v1.3c / Phase 14 / SYS-113 / ADR-043: mock the FSI
+    // channel so the `fullScreenIntent` tile behaves like
+    // the other runtime tiles. `canUseFullScreenIntent`
+    // returns the scripted value; `openFullScreenIntentSettings`
+    // returns `true` so the deep-link resolves in tests.
+    messenger.setMockMethodCallHandler(fullScreenChannel, (call) async {
+      fullScreenCalls.add(call);
+      switch (call.method) {
+        case 'canUseFullScreenIntent':
+          return scriptedFullScreenGranted;
+        case 'openFullScreenIntentSettings':
+          return true;
+        default:
+          return null;
+      }
+    });
+    addTearDown(() {
+      messenger.setMockMethodCallHandler(fullScreenChannel, null);
+    });
+
     fakeFilePicker = _FakeFilePicker();
     FilePicker.platform = fakeFilePicker;
 
@@ -193,9 +240,9 @@ void main() {
 
   // ── Behavior contract ─────────────────────────────────────
 
-  testWidgets('renders all four permission tiles with the initial status '
-      'text (SYS-063..066)', (tester) async {
-    // All four start in the `PermissionResultDenied` (the
+  testWidgets('renders all five permission tiles with the initial status '
+      'text (SYS-063..066 + SYS-113)', (tester) async {
+    // All five start in the `PermissionResultDenied` (the
     // service's `init()`-time default after a clean probe
     // with `denied` from the channel mock).
     await setPhoneSize(tester);
@@ -222,14 +269,22 @@ void main() {
       findsOneWidget,
     );
     expect(
+      find.byKey(const ValueKey('settings.permission.fullScreenIntent')),
+      findsOneWidget,
+      reason:
+          'v1.3c / Phase 14 / SYS-113 / ADR-043: the FSI tile '
+          'must be rendered between location and call-screening '
+          'so the user can discover the FSI toggle from Settings.',
+    );
+    expect(
       find.byKey(const ValueKey('settings.permission.backupFolder')),
       findsOneWidget,
     );
     // The status text on the row is "Not granted — tap
     // to ask again" for the runtime permissions. v1.0
-    // Phase C PR 2 (SYS-076) added the coarse-location
-    // tile, so the count is 4 not 3.
-    expect(find.text('Not granted — tap to ask again'), findsNWidgets(4));
+    // Phase C PR 2 (SYS-076) bumped the count from 3 to 4;
+    // v1.3c (SYS-113) bumped it to 5.
+    expect(find.text('Not granted — tap to ask again'), findsNWidgets(5));
     // The backup folder shows "Not picked — tap to pick"
     // because the service's `init()` does not set a
     // `BackupFolderResult`; the `SettingsService` is the
@@ -372,6 +427,84 @@ void main() {
           'The re-probe must target the same permission as the row '
           'the user tapped; otherwise the status display would '
           'reflect the wrong state.',
+    );
+  });
+
+  // v1.3c / Phase 14 / SYS-113 / ADR-043: the FSI tile
+  // taps go through the `_reProbe()` arm added in
+  // `lib/screens/settings.dart` for
+  // `PermissionKind.fullScreenIntent`. The arm calls
+  // `PermissionService.refreshFullScreenIntent()` which
+  // round-trips the `doit/full_screen` channel. The test
+  // pins the wire shape so the Kotlin handler is called
+  // with the expected method name on tap.
+  testWidgets('tapping the fullScreenIntent tile re-probes via '
+      'doit/full_screen (SYS-113 / ADR-043)', (tester) async {
+    // The probe in `init()` returns `false` for FSI
+    // (the default `scriptedFullScreenGranted`); the row's
+    // `onTap` should call `refreshFullScreenIntent` which
+    // round-trips the channel.
+    scriptedFullScreenGranted = false;
+    PermissionService.instance.resetForTesting();
+    await PermissionService.instance.init();
+    await setPhoneSize(tester);
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pump();
+
+    // Capture the call count so we assert on the delta
+    // (the init probe may have made a `canUseFullScreenIntent`
+    // call; the tap should add exactly one more).
+    final before = fullScreenCalls.length;
+    await tester.tap(
+      find.byKey(const ValueKey('settings.permission.fullScreenIntent')),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pump();
+    final newCalls = fullScreenCalls.sublist(before);
+    final probeCalls = newCalls
+        .where((c) => c.method == 'canUseFullScreenIntent')
+        .toList();
+    expect(
+      probeCalls.length,
+      1,
+      reason:
+          'Tapping the fullScreenIntent tile must issue exactly one '
+          '`canUseFullScreenIntent` call (the re-probe through '
+          '`PermissionService.refreshFullScreenIntent`).',
+    );
+  });
+
+  testWidgets('fullScreenIntent tile renders the localized title '
+      '(SYS-113)', (tester) async {
+    await setPhoneSize(tester);
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pump();
+    // The English ARB copy is `Full-screen access` (see
+    // `permissionFullScreenIntentTitle` in `app_en.arb`).
+    // The test asserts the title rendered through the
+    // `_PermissionTile` builder, not the rationale copy
+    // (which lives in `permission_kind_meta.dart`).
+    final tileFinder = find.byKey(
+      const ValueKey('settings.permission.fullScreenIntent'),
+    );
+    expect(tileFinder, findsOneWidget);
+    expect(
+      find.descendant(
+        of: tileFinder,
+        matching: find.text('Full-screen access'),
+      ),
+      findsOneWidget,
     );
   });
 }

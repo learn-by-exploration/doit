@@ -373,7 +373,7 @@ void main() {
     expect(ReliabilityService.instance.value, Reliability.degraded);
   });
 
-  test('the 4 gated kinds are the only ones that flip to degraded', () async {
+  test('the 5 gated kinds are the only ones that flip to degraded', () async {
     final bridge = _ScriptedBridge();
     await ReliabilityService.init(
       bridge: bridge,
@@ -383,7 +383,7 @@ void main() {
     expect(ReliabilityService.instance.value, Reliability.optimal);
 
     // Iterate over every `PermissionKind` and verify only
-    // the 4 gated kinds flip the value to `degraded`.
+    // the 5 gated kinds flip the value to `degraded`.
     for (final kind in PermissionKind.values) {
       // Reset to optimal between iterations by writing a
       // fresh all-granted map. (A mutation of the previous
@@ -406,11 +406,18 @@ void main() {
         ...PermissionService.instance.statuses.value,
         kind: const PermissionResultDenied(canOpenSettings: true),
       };
+      // v1.3c / Phase 14 / SYS-113: `fullScreenIntent` joins
+      // the 4 v1.3b gated kinds (location, calendar,
+      // callScreening, usageStats). Mirror the
+      // `_kReliabilityGatedKinds` constant in
+      // `lib/services/reliability_service.dart` — the two
+      // must stay in sync.
       const gated = {
         PermissionKind.location,
         PermissionKind.calendar,
         PermissionKind.callScreening,
         PermissionKind.usageStats,
+        PermissionKind.fullScreenIntent,
       };
       final expected = gated.contains(kind)
           ? Reliability.degraded
@@ -423,6 +430,40 @@ void main() {
             '(gated set: $gated).',
       );
     }
+  });
+
+  test('flipping fullScreenIntent to denied re-derives to '
+      'degraded (v1.3c / Phase 14 / SYS-113 / ADR-043)', () async {
+    final bridge = _ScriptedBridge()..reliability = Reliability.optimal;
+    await PermissionService.instance.init();
+    await ReliabilityService.init(
+      bridge: bridge,
+      permissionService: PermissionService.instance,
+    );
+    await _drain();
+    // All kinds granted → optimal.
+    PermissionService.instance.statuses.value = {
+      for (final k in PermissionKind.values) k: const PermissionResultGranted(),
+    };
+    expect(ReliabilityService.instance.value, Reliability.optimal);
+
+    // Flip `fullScreenIntent` to denied. The derive rule
+    // must re-emit `degraded` because `fullScreenIntent` is
+    // in the gated set (added in v1.3c).
+    PermissionService.instance.statuses.value = {
+      ...PermissionService.instance.statuses.value,
+      PermissionKind.fullScreenIntent: const PermissionResultDenied(
+        canOpenSettings: true,
+      ),
+    };
+    expect(
+      ReliabilityService.instance.value,
+      Reliability.degraded,
+      reason:
+          'A denial on the new fullScreenIntent kind must '
+          'flip the unified reliability stream to degraded '
+          '(SYS-113 / ADR-043).',
+    );
   });
 }
 

@@ -4377,3 +4377,160 @@ only.
 - ADR-036 (resume hook) — `PermissionLifecycleReProbe`
   is extended (not replaced); the new service is
   re-probed on every non-cold-start resume.
+
+## ADR-043 — Full-screen intent probe + reliability wiring (v1.3c / SYS-113)
+
+**Status:** accepted (v1.3c / 2026-06-25).
+
+**Context.** The v1.2e-minimal `FullScreenActivity`
+(shipped in v1.2e / Phase 5) successfully launches a
+full-screen mission screen on user tap, but on
+Android 14+ (API 34+, `UPSIDE_DOWN_CAKE`) the OS
+**suppresses** full-screen intents from background-
+launched apps that do not hold the
+`USE_FULL_SCREEN_INTENT` permission. The user sees a
+notification instead of the full-screen mission screen
+— defeating the strong-mode interruption contract (the
+whole reason the user opted into a strong habit). The
+home-screen `ReliabilityBanner` does not flip to "may
+be late"; the Settings → Permissions tile does not
+surface a toggle; there is no discoverable recovery
+affordance. `feature.md` §2.1 has carried this gap
+since v1.2e as a deferred Phase 6a item.
+
+Three platform facts shape the solution:
+
+1. Android never shows a runtime prompt for
+   `USE_FULL_SCREEN_INTENT`; the user must navigate to
+   Settings → Apps → do it → "Appear on top" / "Full
+   screen" and toggle it on manually.
+2. The probe API (`NotificationManager.canUseFullScreenIntent()`)
+   only exists on API 32+. On API < 32 the permission
+   is implicit-granted (every app may launch full-screen
+   intents).
+3. The dedicated Settings activity
+   (`Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`)
+   only exists on API 34+. On API 32/33 the user must
+   use the generic app-info page; OEMs that surface a
+   per-app FSI toggle on those API levels route the user
+   to it from there.
+
+**Decision.** v1.3c (`SYS-113`) ships the probe + the
+deep-link + the reliability wiring in three layers:
+
+1. **Dart side** — a new `FullScreenIntentService`
+   singleton (`lib/services/full_screen_intent_service.dart`)
+   mirrors the `UsageStatsService` shape (the v1.1g
+   precedent for special-access permissions). It exposes
+   `isGranted() → Future<bool>` and `openSettings() →
+   Future<bool>` over the `doit/full_screen`
+   `MethodChannel`. A `ScriptedFullScreenIntentSource`
+   test seam (mirrors `ScriptedUsageStatsSource`) keeps
+   the service unit-testable.
+2. **PermissionService** — a new `PermissionKind.fullScreenIntent`
+   enum entry, with `requestFullScreenIntent()` (deep-link)
+   and `refreshFullScreenIntent()` (re-probe) methods that
+   mirror `requestUsageStats` / `refreshUsageStats`. The
+   probe runs as a sequential special-access probe in
+   `PermissionService.refresh()` (after the parallel
+   `Future.wait` batch) and as a fire-and-forget call
+   from `PermissionService.init()`.
+3. **Kotlin side** — a new
+   `android/app/src/main/kotlin/com/doit/FullScreenIntentChannel.kt`
+   owns the `doit/full_screen` `MethodChannel` and
+   resolves the API 32 / 33 / 34 asymmetry on the
+   platform side. The Dart side stays platform-agnostic.
+   The channel is attached in `MainActivity.configureFlutterEngine`
+   and detached in `onDestroy`.
+
+The manifest gains `<uses-permission android:name=
+"android.permission.USE_FULL_SCREEN_INTENT"
+tools:ignore="ProtectedPermissions" />` — the
+`tools:ignore` marker mirrors the v1.1g
+`PACKAGE_USAGE_STATS` precedent because the permission
+is opt-in (declining does NOT block any feature — the
+notification still fires; the user just has to tap it).
+
+`PermissionKind.fullScreenIntent` joins the
+`_kReliabilityGatedKinds` set in `ReliabilityService`
+(now 5 elements: `location`, `calendar`, `callScreening`,
+`usageStats`, `fullScreenIntent`). A denial on the new
+kind flips the unified reliability stream to
+`Reliability.degraded`; the home-screen banner shows
+the "may be late" copy and (new in v1.3c) is tappable —
+one tap lands the user on the Settings → Permissions
+screen, which now has a 5th `_PermissionTile` for the
+FSI kind.
+
+The **activity launch path** itself remains stubbed for
+Phase 6a proper. `PlatformFullScreenIntent.showHabitMission`
+and `showRoutineOverlay` continue to raise
+`MissingPluginException`, swallowed by the Dart `_safe`
+wrapper. The new `FullScreenIntentChannel.kt` is shaped
+so Phase 6a can extend it with the launch handlers
+without re-doing the probe wiring.
+
+**Consequences.**
+
+- The probe is sequential after the parallel batch
+  (same bucket as `usageStats` and `callScreening`); it
+  cannot join the `Future.wait` because it goes through
+  a custom channel, not `permission_handler`. This is a
+  cost the v1.3c PR accepts; the special-access probe
+  is at most a few hundred milliseconds.
+- The Settings tile count grows from 6 to 7 (4
+  `_PermissionTile` + 2 special tiles + 1 new
+  `_PermissionTile`). The `_PermissionsRow` lives
+  inside a `ListView` (verified by reading the settings
+  screen structure), so scrolling handles the overflow.
+- `ReliabilityBanner.fromStream({VoidCallback? onTap})`
+  already accepted the callback (line 51 of
+  `lib/widgets/reliability_banner.dart`); v1.3c just
+  wires the callback in `lib/screens/home.dart` so the
+  home screen is one tap from Settings.
+- The activity launch path (Phase 6a proper) is its own
+  PR. Bundling it with v1.3c would have inflated the
+  diff and required a separate adb test (the launch
+  path needs a real device to verify the strong-mode
+  interruption contract).
+
+**Alternatives considered.**
+
+- **Use `permission_handler` for the FSI permission.**
+  Rejected: `permission_handler` does not expose the
+  full-screen intent API; the probe must go through
+  `NotificationManager.canUseFullScreenIntent()` and
+  the deep-link must use the FSI-specific Settings
+  action. Wrapping `permission_handler` for a single
+  permission would have added an unused abstraction.
+- **Bundle the activity launch path (Phase 6a proper).**
+  Rejected: the launch path needs a separate adb test
+  (real device + manual tap) that the CI cannot
+  automate. Splitting the two keeps v1.3c testable in
+  the existing harness.
+- **Make the FSI tile auto-open the Settings page on
+  tap (instead of just re-probing).** Rejected: the
+  `usageStats` and `callScreening` tiles re-probe on tap
+  and only deep-link when the status is
+  `permanentlyDenied` (the `_PermissionSheet`'s "Open
+  Settings" path). The FSI tile follows the same pattern
+  for consistency.
+
+**References.**
+
+- ADR-030 (v1.1g `PACKAGE_USAGE_STATS`) — the special-
+  access permission precedent; the `tools:ignore=
+  "ProtectedPermissions"` marker, the opt-in UX
+  pattern, and the `requestX` / `refreshX` shape.
+- ADR-042 (v1.3b `ReliabilityService`) — the unified
+  reliability stream that the new gated kind joins;
+  `_kReliabilityGatedKinds` is extended from 4 to 5.
+- `feature.md` §2.1 — the deferred Phase 6a item
+  v1.3c closes.
+- `docs/v_model/notification_reliability.md` "Full-
+  screen access (v1.3c / Phase 14 / SYS-113)" — the
+  long-form explanation of the API 32 / 33 / 34
+  asymmetry.
+- `docs/v_model/architecture_options.md` "Permission
+  Baseline" — the v1.3c `USE_FULL_SCREEN_INTENT`
+  block.
