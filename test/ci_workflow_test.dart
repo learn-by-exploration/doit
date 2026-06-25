@@ -143,4 +143,57 @@ void main() {
       reason: '`flutter pub get` must run before `flutter test`',
     );
   });
+
+  // SYS-026 / PR #32: the CI workflow must contain a grep step
+  // that rejects `import 'package:http'`, `Uri.http(s)(`,
+  // and `HttpClient()` in production code (`lib/` +
+  // `android/app/src/main/`). The step's stdout comment
+  // names the SYS- ID so a grep through CI history surfaces
+  // the contract. Without this step a future PR that adds
+  // an HTTP client would slip through the 3-gate.
+  test('CI workflow rejects network calls in production code (SYS-026)', () {
+    final workflow = _read('.github/workflows/ci.yml');
+
+    expect(
+      workflow,
+      contains("import 'package:http"),
+      reason:
+          'CI workflow grep must look for `import \'package:http\'` to '
+          'satisfy SYS-026 (no network calls with user data)',
+    );
+    expect(
+      workflow,
+      contains('Uri\\.https?\\('),
+      reason:
+          'CI workflow grep must look for `Uri.http(s)(...)` to satisfy '
+          'SYS-026 (catches `dart:io` HTTP usage even when the package '
+          'is not imported)',
+    );
+    expect(
+      workflow,
+      contains('SYS-026'),
+      reason:
+          'CI workflow grep step must reference the SYS- ID so a '
+          'history grep surfaces the contract',
+    );
+    // The grep step must NOT scan `test/` (the dev-only
+    // test harness that SYS-026 explicitly whitelists) or
+    // `tool/` (design-time scripts). Both are mentioned in
+    // the inline comment in the workflow file.
+    expect(
+      workflow,
+      contains('--exclude-dir=test'),
+      reason:
+          'CI grep must exclude `test/` so the dev-only test harness '
+          '(which may import `package:http` for `MockClient`) is not '
+          'falsely flagged',
+    );
+    expect(
+      workflow,
+      contains('--exclude-dir=tool'),
+      reason:
+          'CI grep must exclude `tool/` so design-time scripts '
+          '(e.g. `tool/regen_launcher_icons.py`) are not scanned',
+    );
+  });
 }

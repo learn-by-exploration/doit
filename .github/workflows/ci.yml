@@ -51,6 +51,63 @@ jobs:
       - name: Run tests with coverage
         run: flutter test --coverage
 
+      # SYS-026: the app shall not perform any network call
+      # with user data. The CI grep enforces this contract at
+      # the source level — any `import 'package:http'` or
+      # `Uri.http(s)` in production code is a defect (see
+      # `.claude/rules/lib-services.md` "No network calls").
+      #
+      # The grep covers `lib/` and `android/app/src/main/`
+      # (Kotlin). The `tool/` directory is excluded — it holds
+      # design-time scripts (e.g.,
+      # `tool/regen_launcher_icons.py`) which may use any
+      # network-free tooling. `test/` is excluded — the
+      # `flutter_test` framework and `package:http`'s
+      # `MockClient` are explicitly whitelisted for test
+      # scaffolding (the dev-only test harness that SYS-026
+      # calls out). `dart_tool/` and `build/` are excluded —
+      # generated code from third-party packages may include
+      # `package:http` transitively and that is fine.
+      #
+      # The grep is "must produce zero hits". A non-empty hit
+      # count fails the CI job.
+      - name: Reject network calls in production code (SYS-026)
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          hits=$(grep -RInE \
+            --exclude-dir=build \
+            --exclude-dir=dart_tool \
+            --exclude-dir=.dart_tool \
+            --exclude-dir=tool \
+            --exclude-dir=test \
+            --exclude-dir=.git \
+            -e "import 'package:http" \
+            -e "Uri\.https?\(" \
+            -e "HttpClient\(\)" \
+            -e "dart:io" \
+            lib/ android/app/src/main/ 2>&1 || true)
+          # `dart:io` import alone is not a defect (we use it
+          # for `dart:io.File`, `dart:io.Platform`,
+          # `dart:io.Process`, etc.) — exclude matches that
+          # are NOT `dart:io.HttpClient` / `dart:io.HttpServer`.
+          # Filter out the `dart:io` line unless it's followed
+          # by `Http*` on the same import statement. Since
+          # grep returns the matching line, a line containing
+          # only `import 'dart:io'` (no `Http`) is OK; the
+          # line `import 'dart:io' as io;` and use of `io.Http*`
+          # would NOT be caught here and is caught by the
+          # `HttpClient()` regex above.
+          net_hits=$(echo "$hits" | grep -v "^$" | grep -vE \
+            "^[^:]+:[^:]*:[[:space:]]*import 'dart:io'" || true)
+          if [ -n "$net_hits" ]; then
+            echo "::error title=SYS-026 violation::"
+            echo "Found forbidden network usage in production code:"
+            echo "$net_hits"
+            exit 1
+          fi
+          echo "SYS-026 grep clean — no http/Uri.https in production code."
+
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
