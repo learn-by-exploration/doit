@@ -275,7 +275,7 @@ class _ReliabilityRow extends StatelessWidget {
   }
 }
 
-/// v0.5d (ADR-016): the four `PermissionService`-backed
+/// v0.5d (ADR-016): the five `PermissionService`-backed
 /// permission rows. Reads from
 /// [PermissionService.instance.statuses] (a
 /// `ValueNotifier<Map<PermissionKind, PermissionResult?>>`
@@ -296,6 +296,13 @@ class _ReliabilityRow extends StatelessWidget {
 // [PermissionService.requestLocation] which surfaces the
 // system dialog (and re-probes the platform stream so
 // [GeofenceService] picks up the grant).
+//
+// v1.3c / Phase 14 / SYS-113 / ADR-043: adds the
+// fullScreenIntent tile. Android 14+ suppresses full-
+// screen mission launches from background apps that do
+// not hold `USE_FULL_SCREEN_INTENT`; the user needs a
+// discoverable toggle on this screen so the strong-mode
+// interruption contract is restored.
 class _PermissionsRow extends StatelessWidget {
   const _PermissionsRow();
 
@@ -334,6 +341,13 @@ class _PermissionsRow extends StatelessWidget {
               icon: Icons.location_on_outlined,
               title: l.permissionLocationTitle,
               result: statuses[PermissionKind.location],
+            ),
+            _PermissionTile(
+              key: const ValueKey('settings.permission.fullScreenIntent'),
+              kind: PermissionKind.fullScreenIntent,
+              icon: Icons.open_in_full,
+              title: l.permissionFullScreenIntentTitle,
+              result: statuses[PermissionKind.fullScreenIntent],
             ),
             const _CallScreeningTile(),
             const _BackupFolderTile(),
@@ -454,6 +468,18 @@ class _PermissionTile extends StatelessWidget {
         // toggles the role in Settings → Default apps →
         // Caller ID & spam app.
         await service.refreshCallScreening();
+      case PermissionKind.fullScreenIntent:
+        // v1.3c / Phase 14 / SYS-113 / ADR-043:
+        // `USE_FULL_SCREEN_INTENT` is a special-access
+        // permission. There is no runtime prompt; the user
+        // MUST navigate to Settings → Apps → do it →
+        // "Appear on top" / "Full screen" toggle. The
+        // re-probe re-reads the
+        // `NotificationManager.canUseFullScreenIntent()`
+        // state and refreshes the cached status so the
+        // tile updates when the user toggles it on in
+        // the background.
+        await service.refreshFullScreenIntent();
       case PermissionKind.backupFolder:
         // The backup folder is not a runtime permission;
         // it's a SAF picker. The re-pick is handled in

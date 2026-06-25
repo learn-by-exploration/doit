@@ -368,6 +368,12 @@ abstract class AppLocalizations {
   /// **'Usage access'**
   String get permissionUsageStatsTitle;
 
+  /// No description provided for @permissionFullScreenIntentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Full-screen access'**
+  String get permissionFullScreenIntentTitle;
+
   /// No description provided for @permissionStatusGranted.
   ///
   /// In en, this message translates to:

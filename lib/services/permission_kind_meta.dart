@@ -8,7 +8,10 @@
 // it lets a non-widget caller (the dialog builder) render
 // the same rationale copy the sheet does.
 //
-// The rationale text is the user-facing explanation of why
+// v1.3c / Phase 14 / SYS-113 / ADR-043: adds the
+// `fullScreenIntent` entry (the Android 14+ full-screen
+// intent suppression permission). The rationale text is
+// the user-facing explanation of why
 // do it needs the permission. Keep it in sync with the
 // onboarding step bodies in `lib/screens/onboarding.dart` —
 // both should answer "what is this permission for?" in
@@ -110,5 +113,20 @@ const Map<PermissionKind, PermissionKindMeta> permissionKindMeta =
             'Lets do it intercept incoming calls so it can silence the '
             'ringer on contacts you choose. Android will ask you to '
             'confirm do it as the call-screening app.',
+      ),
+      // v1.3c / Phase 14 / SYS-113 / ADR-043: Android 14+
+      // suppresses full-screen launches from background
+      // apps unless this permission is on. Without it, do
+      // it shows a notification instead of the full-screen
+      // mission screen. Mirrors the `PACKAGE_USAGE_STATS`
+      // opt-in pattern (the user is never blocked from
+      // using do it for declining).
+      PermissionKind.fullScreenIntent: PermissionKindMeta(
+        title: 'Full-screen access',
+        icon: Icons.open_in_full,
+        rationale:
+            'On Android 14+, do it needs this permission to launch the '
+            'full-screen mission screen when a strong-mode habit fires. '
+            'Without it, you\'ll see a notification instead.',
       ),
     };

@@ -100,6 +100,11 @@ single-source-of-truth.
 
 ### 2.1 Strong-mode full-screen launch hardening (v1.2e)
 
+**DONE in v1.3c / Phase 14 / SYS-113 / ADR-043.** See
+[CHANGELOG.md](CHANGELOG.md) `### v1.3c` block. The probe +
+deep-link + reliability wiring all landed; the activity launch
+path itself (Phase 6a proper) is still deferred — see below.
+
 `MainActivity.kt`'s `FullScreenActivity` is described as
 "v1.2e-minimal" and needs hardening in a follow-up that adds
 `USE_FULL_SCREEN_INTENT` on API 34+ (Phase 6 in the 30-phase
@@ -107,6 +112,15 @@ roadmap). The current behavior is best-effort; on Android 14+ the
 system can suppress full-screen intents from background-launching
 apps without this permission. SYS- ID not yet assigned; ADR
 needed.
+
+**Still deferred (the launch path itself):** the
+`PlatformFullScreenIntent.showHabitMission` and
+`showRoutineOverlay` calls continue to raise
+`MissingPluginException`, swallowed by the Dart `_safe` wrapper.
+The new `FullScreenIntentChannel.kt` is shaped so Phase 6a can
+extend it with the launch handlers (or replace it entirely)
+without re-doing the probe wiring. Tracked under the v1.3c
+release row of the same section.
 
 ### 2.2 Action-side permission disambiguation (v1.2h)
 

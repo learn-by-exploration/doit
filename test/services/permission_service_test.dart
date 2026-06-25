@@ -208,6 +208,13 @@ void main() {
       const MethodChannel('doit/call_interceptor'),
       null,
     );
+    // v1.3c / Phase 14 / SYS-113: clear the
+    // `doit/full_screen` mock too (the new
+    // `FullScreenIntentService` channel).
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('doit/full_screen'),
+      null,
+    );
   });
 
   // ── requestX → sealed PermissionResult mapping ───────────────
@@ -451,8 +458,8 @@ void main() {
 
   // ── v1.2: usageStats + callScreening (special-access probes) ──
 
-  test('init() seeds usageStats and callScreening in [statuses] '
-      'as denied(canOpenSettings: true)', () async {
+  test('init() seeds usageStats, callScreening, and fullScreenIntent '
+      'in [statuses] as denied(canOpenSettings: true)', () async {
     await PermissionService.instance.init();
     expect(
       PermissionService.instance.statuses.value[PermissionKind.usageStats],
@@ -467,6 +474,16 @@ void main() {
       reason:
           '`callScreening` defaults to denied(canOpenSettings: true) '
           'because the role is not auto-granted at install time.',
+    );
+    expect(
+      PermissionService.instance.statuses.value[PermissionKind
+          .fullScreenIntent],
+      isA<PermissionResultDenied>(),
+      reason:
+          '`fullScreenIntent` defaults to denied(canOpenSettings: true) '
+          'because the OS does not show a runtime prompt for it '
+          '(the user MUST navigate to Settings → Special access). '
+          'v1.3c / Phase 14 / SYS-113 / ADR-043.',
     );
   });
 
@@ -746,8 +763,9 @@ void main() {
     );
   });
 
-  test('refresh() also re-probes usageStats and callScreening', () async {
-    // Mock both special-access channels to grant.
+  test('refresh() also re-probes usageStats, callScreening, '
+      'and fullScreenIntent', () async {
+    // Mock all three special-access channels to grant.
     messenger.setMockMethodCallHandler(
       const MethodChannel('doit/device_state'),
       (call) async {
@@ -762,6 +780,16 @@ void main() {
         return false;
       },
     );
+    // v1.3c / Phase 14 / SYS-113: the third special-access
+    // channel — `FullScreenIntentService` over
+    // `doit/full_screen`.
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('doit/full_screen'),
+      (call) async {
+        if (call.method == 'canUseFullScreenIntent') return true;
+        return null;
+      },
+    );
     await CallInterceptorService.instance.init();
     await PermissionService.instance.init();
     await PermissionService.instance.refresh();
@@ -772,6 +800,85 @@ void main() {
     expect(
       PermissionService.instance.statuses.value[PermissionKind.callScreening],
       isA<PermissionResultGranted>(),
+    );
+    expect(
+      PermissionService.instance.statuses.value[PermissionKind
+          .fullScreenIntent],
+      isA<PermissionResultGranted>(),
+    );
+  });
+
+  // ── v1.3c: fullScreenIntent (special-access probe) ────────
+
+  test('requestFullScreenIntent deep-links to the full-screen Settings '
+      'page via FullScreenIntentService (SYS-113 / ADR-043)', () async {
+    // Mock MUST be in place before init() so the fire-and-
+    // forget probe inside init() doesn't hang waiting on a
+    // missing method-channel handler.
+    const fullScreenChannel = MethodChannel('doit/full_screen');
+    var openedCount = 0;
+    messenger.setMockMethodCallHandler(fullScreenChannel, (call) async {
+      switch (call.method) {
+        case 'openFullScreenIntentSettings':
+          openedCount++;
+          return true;
+        case 'canUseFullScreenIntent':
+          return false;
+        default:
+          return null;
+      }
+    });
+    await PermissionService.instance.init();
+    final ok = await PermissionService.instance.requestFullScreenIntent();
+    expect(ok, isTrue);
+    expect(
+      openedCount,
+      1,
+      reason: 'requestFullScreenIntent must invoke exactly once.',
+    );
+  });
+
+  test('refreshFullScreenIntent merges an "isGranted=true" probe into '
+      '[statuses] (SYS-113 / ADR-043)', () async {
+    const fullScreenChannel = MethodChannel('doit/full_screen');
+    messenger.setMockMethodCallHandler(fullScreenChannel, (call) async {
+      switch (call.method) {
+        case 'canUseFullScreenIntent':
+          return true;
+        case 'openFullScreenIntentSettings':
+          return true;
+        default:
+          return null;
+      }
+    });
+    await PermissionService.instance.init();
+    await PermissionService.instance.refreshFullScreenIntent();
+    expect(
+      PermissionService.instance.statuses.value[PermissionKind
+          .fullScreenIntent],
+      isA<PermissionResultGranted>(),
+    );
+  });
+
+  test('refreshFullScreenIntent merges an "isGranted=false" probe into '
+      '[statuses] (SYS-113 / ADR-043)', () async {
+    const fullScreenChannel = MethodChannel('doit/full_screen');
+    messenger.setMockMethodCallHandler(fullScreenChannel, (call) async {
+      switch (call.method) {
+        case 'canUseFullScreenIntent':
+          return false;
+        case 'openFullScreenIntentSettings':
+          return true;
+        default:
+          return null;
+      }
+    });
+    await PermissionService.instance.init();
+    await PermissionService.instance.refreshFullScreenIntent();
+    expect(
+      PermissionService.instance.statuses.value[PermissionKind
+          .fullScreenIntent],
+      isA<PermissionResultDenied>(),
     );
   });
 }

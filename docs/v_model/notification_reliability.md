@@ -298,6 +298,80 @@ isolate is warm.
   depend on the Dart isolate. The Japan routine config is
   read from `SharedPreferences` on every call.
 
+### Full-screen access (v1.3c / Phase 14 / SYS-113)
+
+The strong-mode interruption contract relies on the
+app launching the full-screen mission screen the
+moment a habit's alarm fires. On Android 14+ the OS
+**suppresses** full-screen intents from background-
+launched apps that do not hold `USE_FULL_SCREEN_INTENT`
+— the user sees a notification instead of the full-
+screen activity, defeating the contract. v1.3c ships
+the probe + the deep-link + the reliability wiring so
+this state is discoverable + recoverable.
+
+**API asymmetry** (resolved on the Kotlin side; Dart is
+platform-agnostic):
+
+- **API < 32 (`S_V2`):** the permission is implicit-
+  granted. Every app may launch full-screen intents.
+  The probe returns `true`; no Settings activity exists
+  to deep-link to (the user did not need to opt in).
+- **API 32 / 33 (`TIRAMISU`):** the probe reads
+  `NotificationManager.canUseFullScreenIntent()`. The
+  deep-link falls back to `Settings.ACTION_APPLICATION_SETTINGS`
+  (the app-info page); OEMs that surface a per-app FSI
+  toggle on these API levels route the user to it from
+  there.
+- **API 34+ (`UPSIDE_DOWN_CAKE`):** the probe reads
+  `NotificationManager.canUseFullScreenIntent()`; the
+  deep-link uses
+  `Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`
+  which lands the user directly on the FSI toggle.
+
+**Implementation:**
+
+- Kotlin: `android/app/src/main/kotlin/com/doit/FullScreenIntentChannel.kt`
+  — owns the `doit/full_screen` MethodChannel, exposes
+  `canUseFullScreenIntent()` + `openFullScreenIntentSettings()`.
+  Attached in `MainActivity.configureFlutterEngine`,
+  detached in `onDestroy`.
+- Dart: `lib/services/full_screen_intent_service.dart` —
+  the `FullScreenIntentService` singleton mirrors
+  `UsageStatsService`. `PermissionService.requestFullScreenIntent()`
+  deep-links via `openSettings()`; `refreshFullScreenIntent()`
+  re-probes the channel and merges the result into
+  `statuses`. The probe runs as a sequential special-
+  access probe in `PermissionService.refresh()` (after
+  the parallel `Future.wait` batch).
+- Reliability: `PermissionKind.fullScreenIntent` joins
+  the `_kReliabilityGatedKinds` set in
+  `ReliabilityService` (now 5 elements). A denial flips
+  the unified stream to `Reliability.degraded`; the
+  home banner shows "may be late" and (new in v1.3c)
+  is tappable — one tap lands the user on Settings →
+  Permissions where the 5th `_PermissionTile` for
+  `fullScreenIntent` is rendered.
+
+**Permission baseline:**
+
+`<uses-permission android:name=
+"android.permission.USE_FULL_SCREEN_INTENT"
+tools:ignore="ProtectedPermissions" />` — the
+`tools:ignore` marker mirrors the v1.1g
+`PACKAGE_USAGE_STATS` precedent: the permission is
+opt-in only. Declining does NOT block any feature —
+the notification still fires; the user just has to tap
+it. The strong-mode interruption contract is the only
+behavior that depends on the permission.
+
+**Out of scope (deferred to Phase 6a proper):** the
+activity launch path itself
+(`PlatformFullScreenIntent.showHabitMission` /
+`showRoutineOverlay`). The new channel is shaped so
+Phase 6a can extend it with the launch handlers
+without re-doing the probe wiring.
+
 ## Timezone and DST
 
 `flutter_local_notifications` and `android_alarm_manager_plus`

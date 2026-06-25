@@ -1095,6 +1095,130 @@ All three gates green at the head of `feat/v1.3b-phase13-reliability-stream`.
   context but does not rewrite history; ADR-042 is the
   new follow-up).
 
+### v1.3c — `USE_FULL_SCREEN_INTENT` probe + reliability wiring (Phase 14)
+
+Closes `feature.md` §2.1 — the Android 14+ full-screen
+launch suppression gap. On API 34+, the OS suppresses
+full-screen intents from background-launched apps that
+do not hold `USE_FULL_SCREEN_INTENT`; without this PR,
+the user sees a notification instead of the full-screen
+mission screen on a strong-mode habit, and the home
+banner / Settings tile do not surface a recovery
+affordance.
+
+**What's new**
+
+- `PermissionKind.fullScreenIntent` joins the enum
+  (after `callScreening`, before `backupFolder`). The
+  permission is **opt-in** — declining does NOT block
+  any feature (the user keeps getting the notification
+  fallback), mirroring the v1.1g `PACKAGE_USAGE_STATS`
+  precedent (ADR-030).
+- New `FullScreenIntentService` singleton
+  (`lib/services/full_screen_intent_service.dart`) is
+  the Dart-side wrapper around the `doit/full_screen`
+  MethodChannel. Mirrors the `UsageStatsService` shape
+  (singleton with `_ready`, `Scripted*Source` test
+  seam, ADR-013 platform-error swallow).
+- New Kotlin side
+  (`android/app/src/main/kotlin/com/doit/FullScreenIntentChannel.kt`)
+  owns the same `doit/full_screen` MethodChannel and
+  resolves the API 32 / 33 / 34 asymmetry on the
+  platform side:
+  - API < 32: implicit-granted; probe returns `true`.
+  - API 32 / 33: probes
+    `NotificationManager.canUseFullScreenIntent()`;
+    deep-link falls back to `ACTION_APPLICATION_SETTINGS`.
+  - API 34+: same probe; deep-link uses
+    `Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`.
+- `PermissionService.requestFullScreenIntent()` deep-
+  links via `openSettings()`. `refreshFullScreenIntent()`
+  re-probes the channel probe and merges the result into
+  `statuses`. The probe runs as a sequential special-
+  access probe in `PermissionService.refresh()` (after
+  the parallel `Future.wait` batch) and as a fire-and-
+  forget call from `init()`.
+- `PermissionKind.fullScreenIntent` joins
+  `_kReliabilityGatedKinds` (now 5 elements: `location`,
+  `calendar`, `callScreening`, `usageStats`,
+  `fullScreenIntent`). A denial flips the unified
+  reliability stream to `Reliability.degraded`; the home
+  banner shows "may be late" and (new in v1.3c) is
+  tappable — one tap lands the user on Settings →
+  Permissions where the 5th `_PermissionTile` for
+  `fullScreenIntent` is rendered.
+- `lib/services/permission_kind_meta.dart` gains the
+  matching `title` (`'Full-screen access'`) + icon
+  (`Icons.open_in_full`) + rationale copy.
+- `AndroidManifest.xml` gains
+  `<uses-permission android:name=
+  "android.permission.USE_FULL_SCREEN_INTENT"
+  tools:ignore="ProtectedPermissions" />` — the
+  `tools:ignore` marker mirrors the v1.1g
+  `PACKAGE_USAGE_STATS` precedent.
+
+**Test pins**
+
+- `test/services/full_screen_intent_service_test.dart`
+  (8 tests) — `isGranted` / `openSettings` happy paths
+  + `MissingPluginException` / `PlatformException`
+  swallows + `resetForTesting` + `debugInstance`.
+- `test/services/permission_service_test.dart`
+  (+3 tests) — `requestFullScreenIntent` deep-links;
+  `refreshFullScreenIntent` merges both branches.
+- `test/services/reliability_service_test.dart`
+  (+1 test, 1 edit) — flipping `fullScreenIntent` to
+  `Denied` re-derives to `degraded`; the existing
+  "the 4 gated kinds" test is renamed to "the 5
+  gated kinds" and the `gated` const grows from 4 to 5.
+- `test/screens/settings_permissions_test.dart`
+  (+2 tests, 1 edit) — tapping the FSI tile re-probes
+  via `doit/full_screen`; the tile renders the
+  localized title; the existing "renders all four"
+  test is renamed to "renders all five" with the new
+  `ValueKey` asserted.
+- `test/widgets/reliability_banner_test.dart`
+  (+1 test) — `fromStream` wires `onTap` and the
+  callback fires on tap when the service is degraded.
+- The new `permissionFullScreenIntentTitle` ARB key
+  is auto-validated by the existing "every non-
+  template ARB has the same key set as the template"
+  test in `test/l10n/app_localizations_test.dart`.
+
+**Verification (3-gate)**
+
+```
+dart format --output=none --set-exit-if-changed .
+flutter analyze --fatal-infos
+flutter test
+```
+
+Plus the targeted Kotlin compile check:
+
+```
+./android/gradlew :app:compileDebugKotlin
+```
+
+**Deferred**
+
+- The activity launch path itself
+  (`PlatformFullScreenIntent.showHabitMission` /
+  `showRoutineOverlay`) — Phase 6a proper. The new
+  `FullScreenIntentChannel.kt` is shaped so Phase 6a
+  can extend it with the launch handlers without re-
+  doing the probe wiring. The Dart `_safe` wrapper
+  continues to swallow the launch-method
+  `MissingPluginException`.
+- Per-routine reliability budgets (Phase 13 already
+  deferred; still deferred).
+- Light-theme icon variant for the FSI tile (feature.md
+  §2.7).
+- Native Spanish translation (feature.md §2.4) — the
+  `app_es.arb` copy for the new keys follows the
+  existing non-professional smoke-test pattern.
+- The Android home-screen widget (Phase 28). The widget
+  surface does not interact with `USE_FULL_SCREEN_INTENT`.
+
 ### v1.3a — Monthly stats + per-do grace factory (Phase 12)
 
 Phase 12 of the v1.3 reliability + lifecycle hardening

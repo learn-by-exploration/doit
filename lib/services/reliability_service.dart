@@ -92,6 +92,13 @@ const Duration kReliabilityCacheTtl = Duration(seconds: 30);
 ///   SYS-075 + SYS-079 follow-up).
 /// - `usageStats` — foreground-app triggers (v1.1g /
 ///   ADR-030 / SYS-086).
+/// - `fullScreenIntent` — strong-mode full-screen mission
+///   launches (v1.3c / Phase 14 / SYS-113 / ADR-043). On
+///   Android 14+ the OS suppresses full-screen intents
+///   from background-launched apps that don't have
+///   `USE_FULL_SCREEN_INTENT` granted; the user sees a
+///   notification instead of the full-screen activity,
+///   defeating the strong-mode interruption contract.
 ///
 /// The notifications / contacts / exact-alarm / battery-
 /// optimization kinds are intentionally NOT in this set —
@@ -105,6 +112,7 @@ const Set<PermissionKind> _kReliabilityGatedKinds = {
   PermissionKind.calendar,
   PermissionKind.callScreening,
   PermissionKind.usageStats,
+  PermissionKind.fullScreenIntent,
 };
 
 /// Singleton service. Mutable-static pattern matching

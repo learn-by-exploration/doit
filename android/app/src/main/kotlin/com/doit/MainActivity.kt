@@ -50,6 +50,16 @@ class MainActivity : FlutterActivity() {
         CallInterceptor.setActivity(this)
         CallInterceptor.attach(flutterEngine)
 
+        // v1.3c / Phase 14 / SYS-113 / ADR-043: full-screen
+        // intent probe + deep-link channel. The Kotlin side
+        // resolves the API 32/33/34 asymmetry (Dart side is
+        // platform-agnostic); the activity launch path
+        // (Phase 6a proper) will extend the same channel
+        // with `showHabitMission` + `showRoutineOverlay`
+        // handlers without re-doing this wiring.
+        FullScreenIntentChannel.setAppContext(applicationContext)
+        FullScreenIntentChannel.attach(flutterEngine)
+
         // v1.2e / Phase 5: ensure the reminder notification
         // channel is registered before the first alarm fires.
         // The channel id MUST match `kNotificationChannelId`
@@ -68,6 +78,12 @@ class MainActivity : FlutterActivity() {
         // happen in MainActivity only.
         CallInterceptor.setActivity(null)
         CallInterceptor.detach()
+        // v1.3c / Phase 14 / SYS-113 / ADR-043: tear
+        // down the FSI channel in the same lifecycle slot
+        // as the other channels. Order matters only because
+        // all four channels are independent — the reverse
+        // of attach() is fine.
+        FullScreenIntentChannel.detach()
         CalendarChannel.detach()
         DeviceStateChannel.detach()
         ReminderChannelProxy.detach()

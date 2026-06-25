@@ -175,6 +175,20 @@ class _PermissionSheetBodyState extends State<_PermissionSheetBody> {
             ? const PermissionResultDenied(canOpenSettings: true)
             : const PermissionResultPermanentlyDenied();
         break;
+      case PermissionKind.fullScreenIntent:
+        // v1.3c / Phase 14 / SYS-113 / ADR-043.
+        // `USE_FULL_SCREEN_INTENT` is a special-access
+        // permission — Android does not show a runtime
+        // prompt. The "Allow" CTA deep-links to the FSI
+        // Settings page (API 34+) or the app-info page
+        // (API 32/33); the re-probe on resume decides the
+        // final status. Mirrors the `usageStats` pattern.
+        final opened = await PermissionService.instance
+            .requestFullScreenIntent();
+        result = opened
+            ? const PermissionResultDenied(canOpenSettings: true)
+            : const PermissionResultPermanentlyDenied();
+        break;
       case PermissionKind.backupFolder:
         // The SAF picker is handled by `requestBackupFolder`;
         // the sheet is never shown for this kind because
@@ -261,6 +275,18 @@ class _PermissionSheetBodyState extends State<_PermissionSheetBody> {
         await svc.refreshCallScreening();
         result =
             svc.statuses.value[PermissionKind.callScreening] ??
+            const PermissionResultDenied(canOpenSettings: true);
+        break;
+      case PermissionKind.fullScreenIntent:
+        // v1.3c / Phase 14 / SYS-113 / ADR-043.
+        // `USE_FULL_SCREEN_INTENT` is opt-in via the
+        // deep-link. Fire the request, then re-probe the
+        // platform channel. Mirrors the `usageStats`
+        // pattern (request → refresh → read cached status).
+        await svc.requestFullScreenIntent();
+        await svc.refreshFullScreenIntent();
+        result =
+            svc.statuses.value[PermissionKind.fullScreenIntent] ??
             const PermissionResultDenied(canOpenSettings: true);
         break;
       case PermissionKind.backupFolder:

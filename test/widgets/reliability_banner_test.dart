@@ -115,4 +115,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Reminders may be late. Tap to fix.'), findsOneWidget);
   });
+
+  // v1.3c / Phase 14 / SYS-113 / ADR-043: the home screen
+  // passes an `onTap` callback to `fromStream` so the user
+  // is one tap away from the Settings → Permissions screen.
+  // The test pins the wiring so a regression that drops
+  // the callback (or wraps the tap in an InkWell that does
+  // not fire) is caught.
+  testWidgets('fromStream wires onTap when the service is degraded', (
+    tester,
+  ) async {
+    // Start degraded so the banner actually renders the
+    // warning row (the `optimal` branch returns a
+    // SizedBox, which is not tappable).
+    bridge.reliability = Reliability.degraded;
+    await ReliabilityService.instance.refresh();
+    var tapped = 0;
+    await tester.pumpWidget(
+      _wrap(ReliabilityBanner.fromStream(onTap: () => tapped++)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Reminders may be late. Tap to fix.'), findsOneWidget);
+    await tester.tap(find.text('Reminders may be late. Tap to fix.'));
+    expect(tapped, 1, reason: 'fromStream onTap must fire on tap.');
+  });
 }
