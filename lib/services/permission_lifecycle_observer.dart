@@ -13,6 +13,15 @@
 // `PermissionService.statuses` ValueNotifier, so the
 // visible state updates without a relaunch.
 //
+// v1.3b / Phase 13 / SYS-112 / ADR-042: the resume hook
+// also calls `ReliabilityService.instance.refresh()`. The
+// unified reliability service merges the permissions
+// statuses with the alarm-system bridge probe; without the
+// resume hook, a user toggling the exact-alarm permission
+// in Settings → Apps → Special access → Alarms & reminders
+// would have to relaunch the app to see the "may be late"
+// banner go away.
+//
 // Wiring (see `lib/main.dart`):
 //
 // ```dart
@@ -33,10 +42,12 @@
 
 import 'dart:async' show unawaited;
 
-import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
+import 'package:flutter/foundation.dart'
+    show debugPrint, kDebugMode, visibleForTesting;
 import 'package:flutter/widgets.dart';
 
 import 'package:doit/services/permission_service.dart';
+import 'package:doit/services/reliability_service.dart';
 
 /// v1.2i / Phase 9. Registered with [WidgetsBinding] in
 /// `main.dart` after `PermissionService.init()` completes.
@@ -66,7 +77,25 @@ class PermissionLifecycleReProbe with WidgetsBindingObserver {
     unawaited(_safeRefresh());
   }
 
+  /// Test hook: drives [_safeRefresh] directly so a test
+  /// can `await` it to completion. Production callers go
+  /// through `didChangeAppLifecycleState` (fire-and-
+  /// forget); the resume handler's microtask may not run
+  /// to completion before a unit test exits, leaving the
+  /// catch branches uncovered. Marked
+  /// `@visibleForTesting` so it cannot leak into the
+  /// widget tree.
+  @visibleForTesting
+  Future<void> triggerRefreshForTest() => _safeRefresh();
+
   Future<void> _safeRefresh() async {
+    // v1.3b / Phase 13: refresh permissions first (so the
+    // statuses map is fresh when the reliability service
+    // re-derives), then refresh the unified reliability
+    // (which re-probes the alarm-system bridge on top of
+    // the fresh statuses). Both are best-effort: a
+    // platform-channel error on either side keeps the prior
+    // value per ADR-013.
     try {
       await PermissionService.instance.refresh();
     } catch (e, st) {
@@ -77,6 +106,22 @@ class PermissionLifecycleReProbe with WidgetsBindingObserver {
       // refresh or reopen Settings → Permissions to retry.
       if (kDebugMode) {
         debugPrint('PermissionLifecycleReProbe.refresh failed: $e\n$st');
+      }
+    }
+    try {
+      await ReliabilityService.instance.refresh();
+    } on StateError {
+      // ReliabilityService was not init'd (a unit test
+      // that constructs the observer standalone, or a code
+      // path that runs the observer before
+      // `ReliabilityService.init`). Best-effort: the
+      // banner shows the prior value until the service is
+      // wired up.
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint(
+          'PermissionLifecycleReProbe.reliability refresh failed: $e\n$st',
+        );
       }
     }
   }

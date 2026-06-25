@@ -966,6 +966,135 @@ completion is the cause of a streak break.
   the default action visually; the destructive button
   reuses the theme's error color.
 
+### v1.3b — Unified reliability source-of-truth (Phase 13)
+
+Phase 13 of the v1.3 reliability + lifecycle hardening
+milestone (`30-phase roadmap`). Closes the B20 / C10 /
+E7 / H2 follow-ups: the two parallel reliability signals
+that existed in v1.3a — `AlarmScheduler.reliability` (a
+synchronous getter backed by a 30 s fire-and-forget
+`bridge.probeReliability()` cache) and
+`PermissionService.statuses` (a `ValueNotifier<Map<...>>`
+the Settings → Permissions tile and the per-automation
+`AutomationReliability` enum read) — are now consolidated
+behind a single `ReliabilityService` singleton. The
+home-screen banner and the settings page `_ReliabilityRow`
+bind to the new `Stream<Reliability>` /
+`ValueListenable<Reliability>` so they cannot drift.
+
+**What's new**
+
+- **`ReliabilityService` (new).** `lib/services/reliability_service.dart`
+  exposes a singleton with a `Stream<Reliability>` getter,
+  a `ValueListenable<Reliability>` mirror, and a synchronous
+  `value` getter. The service merges the alarm-system
+  bridge probe (re-run on `init`, on `refresh`, and on a
+  30 s fallback `Timer.periodic`) with the
+  `PermissionService.statuses` listener (re-derives the
+  value on every change). Initial value is
+  `Reliability.optimal` — closes the v1.3a first-read
+  race where the very first read of
+  `PlatformAlarmScheduler.reliability` returned
+  `Reliability.unknown` for a fully optimal device.
+- **`PlatformAlarmScheduler.reliability` is a thin
+  pass-through.** The `_cachedReliability` /
+  `_cachedReliabilityAt` fields, the
+  `_refreshReliability` helper, the `clearReliabilityCache`
+  test hook, and the fire-and-forget refresh on read are
+  removed. The getter body is now
+  `ReliabilityService.instance.value` (with a `try /
+  on StateError` fallback to `Reliability.optimal` for
+  standalone-scheduler unit tests). The
+  `kReliabilityCacheTtl` constant moves to
+  `reliability_service.dart` (re-exported from the
+  scheduler for back-compat with the test imports).
+- **`ReliabilityBanner.fromStream` factory.** The new
+  `ReliabilityBanner.fromStream({VoidCallback? onTap})`
+  factory wraps the unified service notifier in a
+  `ValueListenableBuilder<Reliability>`. The home screen
+  and the settings page both switch to this factory.
+  `ReliabilityBanner.fromService` is kept as a
+  `@Deprecated` thin shim for one cycle (returns the
+  service's current value at build time and does NOT
+  rebuild on change) so existing widget tests that
+  constructed a banner via the previous factory still
+  compile.
+- **`_ReliabilityRow` in settings.dart** now wraps its
+  `ListTile` in a `ValueListenableBuilder<Reliability>`
+  bound to the unified service. The 3-arm subtitle
+  switch (`_ReliabilityRow._subtitleFor(Reliability)`)
+  is unchanged; only the data source moves.
+- **`PermissionLifecycleReProbe` extended.** The resume
+  hook (`AppLifecycleState.resumed` after the cold
+  start) now calls
+  `ReliabilityService.instance.refresh()` in addition to
+  `PermissionService.refresh()`. Same fire-and-forget
+  pattern; both errors are swallowed (ADR-013). A
+  `StateError` from an uninit'd `ReliabilityService` is
+  also swallowed so a unit test that constructs the
+  observer standalone does not throw.
+- **`main.dart` wires the service.** After
+  `WidgetsBinding.instance.addObserver(PermissionLifecycleReProbe())`,
+  `main.dart` awaits `ReliabilityService.init(bridge:
+  bridge, permissionService: PermissionService.instance)`.
+  The order matters: the service needs the bridge for
+  `probeReliability()` and the `PermissionService` for
+  the `statuses` listener, so it must be wired after
+  both are constructed.
+
+**Test pins (new + updated)**
+
+- `test/services/reliability_service_test.dart` (new,
+  ~10 tests) pins: initial value is `optimal`; `refresh()`
+  re-probes the bridge; subscribing to `statuses`
+  re-derives when `location` / `calendar` /
+  `callScreening` / `usageStats` flips to denied; an
+  unrelated kind does NOT re-derive; the 30 s fallback
+  timer calls `refresh()` (via an injectable periodic
+  factory); the stream emits `distinct()` values;
+  `resetForTesting()` clears the singleton + closes the
+  stream controller; `init()` is idempotent; a probe
+  failure keeps the prior value (ADR-013); the 4 gated
+  kinds are the only ones that flip the service to
+  `degraded`.
+- `test/services/platform_alarm_scheduler_test.dart`
+  reliability group rewritten. The previous 4 tests
+  exercised the local 30 s cache; v1.3b has no local
+  cache. The new 3 tests pin the delegation: the getter
+  reads `ReliabilityService.instance.value`; the getter
+  returns `optimal` when the service is not init'd; the
+  getter reflects a permissions change to a gated kind.
+- `test/widgets/reliability_banner_test.dart` adds 2
+  tests: `fromStream` renders nothing when the service
+  is optimal; `fromStream` rebuilds when the service
+  value flips to degraded.
+- `test/screens/home_test.dart` and
+  `test/screens/settings_test.dart` `setUp` blocks now
+  init the unified service against the same
+  `FakeReminderBridge` the reminder service uses, so
+  the home banner and the settings row read the right
+  value.
+
+**Verification (3-gate)**
+
+```
+dart format --output=none --set-exit-if-changed .
+flutter analyze --fatal-infos
+flutter test
+```
+
+All three gates green at the head of `feat/v1.3b-phase13-reliability-stream`.
+
+**Deferred**
+
+- Per-routine reliability budgets (a v1.3+ polish idea).
+- Dropping `PermissionService.statuses` (still the
+  source for `AutomationReliability` and the per-
+  permission tile).
+- Retroactive amendment of ADR-030 (this PR cites it as
+  context but does not rewrite history; ADR-042 is the
+  new follow-up).
+
 ### v1.3a — Monthly stats + per-do grace factory (Phase 12)
 
 Phase 12 of the v1.3 reliability + lifecycle hardening

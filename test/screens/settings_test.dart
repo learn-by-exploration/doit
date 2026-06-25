@@ -1,5 +1,7 @@
 // Tests for the SettingsScreen.
 
+import 'dart:async' show Timer;
+
 import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/anchor_detector.dart';
@@ -7,7 +9,9 @@ import 'package:doit/reminders/full_screen_intent.dart';
 import 'package:doit/reminders/notification_service.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
 import 'package:doit/screens/settings.dart';
+import 'package:doit/services/permission_result.dart';
 import 'package:doit/services/permission_service.dart';
+import 'package:doit/services/reliability_service.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/settings_service.dart';
 import 'package:doit/theme/app_theme.dart';
@@ -38,6 +42,27 @@ Widget _wrap() {
   );
 }
 
+/// No-op `Timer` so [ReliabilityService.init] in the test
+/// never creates a real `Timer.periodic`. A real timer
+/// started in a `testWidgets` body's `FakeAsync` zone is
+/// tracked as a `FakeTimer` and surfaces as a "Pending
+/// timers" assertion failure before `tearDown`'s
+/// `resetForTesting` cancels it. (v1.3b / Phase 13 /
+/// SYS-112.)
+class _NoopTimer implements Timer {
+  @override
+  void cancel() {}
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// No-op `Timer.periodic` factory for [ReliabilityService].
+/// Returns a [Timer] whose `cancel()` is a no-op so the
+/// fallback timer is not in any zone's pending list. Tests
+/// that need to drive the 30 s tick manually should use a
+/// recording factory instead.
+Timer _noopPeriodicFactory(Duration d, void Function(Timer) cb) => _NoopTimer();
+
 /// Phone-sized viewport so the long ListView lays out
 /// without scrolling.
 void _setPhoneSize(WidgetTester tester) {
@@ -57,14 +82,45 @@ void main() {
   setUp(() async {
     SettingsService.instance.resetForTesting();
     ReminderService.resetForTesting();
+    final bridge = FakeReminderBridge();
     await ReminderService.init(
       ReminderService(
         scheduler: FakeAlarmScheduler(),
         notifications: FakeNotificationService(),
         fullScreen: FakeFullScreenIntent(),
         anchor: FakeAnchorDetector(),
-        bridge: FakeReminderBridge(),
+        bridge: bridge,
       ),
+    );
+
+    // v1.3b / Phase 13 / SYS-112: the settings screen's
+    // `_ReliabilityRow` reads from the unified
+    // `ReliabilityService` (not from
+    // `ReminderService.instance.scheduler.reliability`
+    // directly). Init the service against the same bridge
+    // the reminder service uses so the bootstrap probe
+    // returns the right value.
+    ReliabilityService.resetForTesting();
+    PermissionService.instance.resetForTesting();
+    await PermissionService.instance.init();
+    // v1.3b / Phase 13 / SYS-112: `PermissionService.init()`
+    // defaults every runtime permission to `Denied` because
+    // the platform channel is missing in the test harness.
+    // The unified `ReliabilityService` would then derive
+    // `degraded` from the start. Grant every kind so the
+    // common-case test sees the "Optimal" copy; tests that
+    // exercise the degraded path override the bridge.
+    PermissionService.instance.statuses.value = {
+      for (final k in PermissionKind.values) k: const PermissionResultGranted(),
+    };
+    await ReliabilityService.init(
+      bridge: bridge,
+      permissionService: PermissionService.instance,
+      // v1.3b / Phase 13 / SYS-112: the testWidgets
+      // FakeAsync zone would track the 30 s fallback timer
+      // as a `FakeTimer`, leaking past `tearDown`. Pass a
+      // no-op factory so the timer never enters the zone.
+      periodicFactory: _noopPeriodicFactory,
     );
 
     // Mock the permissions channel so the surrounding
@@ -88,8 +144,11 @@ void main() {
     addTearDown(() {
       messenger.setMockMethodCallHandler(permissionsChannel, null);
     });
+  });
+
+  tearDown(() {
+    ReliabilityService.resetForTesting();
     PermissionService.instance.resetForTesting();
-    await PermissionService.instance.init();
   });
 
   testWidgets('renders all section headers', (tester) async {
@@ -231,47 +290,49 @@ void main() {
     },
   );
 
-  testWidgets(
-    'the reliability row renders the "Optimal" copy when the scheduler '
-    'reports Reliability.optimal',
-    (tester) async {
-      _setPhoneSize(tester);
-      final scheduler = FakeAlarmScheduler();
-      ReminderService.resetForTesting();
-      await ReminderService.init(
-        ReminderService(
-          scheduler: scheduler,
-          notifications: FakeNotificationService(),
-          fullScreen: FakeFullScreenIntent(),
-          anchor: FakeAnchorDetector(),
-          bridge: FakeReminderBridge(),
-        ),
-      );
-      await tester.pumpWidget(_wrap());
-      await tester.pumpAndSettle();
-      // `FakeAlarmScheduler._reliability` defaults to
-      // `optimal`, so no setter call is needed.
-      expect(find.text('Optimal — exact alarm granted.'), findsOneWidget);
-    },
-  );
+  testWidgets('the reliability row renders the "Optimal" copy when the unified '
+      'reliability service reports Reliability.optimal', (tester) async {
+    _setPhoneSize(tester);
+    // v1.3b / Phase 13 / SYS-112: the row reads from
+    // `ReliabilityService.instance.notifier`. The
+    // `setUp` initializes the service with a bridge
+    // whose `reliability` defaults to `optimal`, so the
+    // row shows the optimal copy without further
+    // scripting.
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    expect(find.text('Optimal — exact alarm granted.'), findsOneWidget);
+  });
 
   testWidgets(
-    'the reliability row renders the "Degraded" copy when the scheduler '
-    'reports Reliability.degraded',
+    'the reliability row renders the "Degraded" copy when the unified '
+    'reliability service reports Reliability.degraded',
     (tester) async {
       _setPhoneSize(tester);
-      final scheduler = FakeAlarmScheduler()
-        ..setReliability(Reliability.degraded);
+      // Flip the bridge's `reliability` to degraded and
+      // refresh the service so the row rebuilds.
+      final bridge = FakeReminderBridge()..reliability = Reliability.degraded;
       ReminderService.resetForTesting();
       await ReminderService.init(
         ReminderService(
-          scheduler: scheduler,
+          scheduler: FakeAlarmScheduler(),
           notifications: FakeNotificationService(),
           fullScreen: FakeFullScreenIntent(),
           anchor: FakeAnchorDetector(),
-          bridge: FakeReminderBridge(),
+          bridge: bridge,
         ),
       );
+      ReliabilityService.resetForTesting();
+      await ReliabilityService.init(
+        bridge: bridge,
+        permissionService: PermissionService.instance,
+        // v1.3b / Phase 13 / SYS-112: a no-op periodic
+        // factory so the testWidgets FakeAsync zone does
+        // not see a pending timer on `tearDown`.
+        periodicFactory: _noopPeriodicFactory,
+      );
+      await ReliabilityService.instance.refresh();
+
       await tester.pumpWidget(_wrap());
       await tester.pumpAndSettle();
       expect(

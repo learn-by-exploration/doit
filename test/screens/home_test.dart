@@ -14,6 +14,9 @@ import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/db/schema.dart';
 import 'package:doit/services/do_repository.dart';
+import 'package:doit/services/permission_result.dart';
+import 'package:doit/services/permission_service.dart';
+import 'package:doit/services/reliability_service.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/settings_service.dart';
 import 'package:doit/theme/app_theme.dart';
@@ -50,16 +53,36 @@ void main() {
   setUp(() async {
     DoRepository.instance;
     ReminderService.resetForTesting();
+    final bridge = FakeReminderBridge();
     await ReminderService.init(
       ReminderService(
         scheduler: FakeAlarmScheduler(),
         notifications: FakeNotificationService(),
         fullScreen: FakeFullScreenIntent(),
         anchor: FakeAnchorDetector(),
-        bridge: FakeReminderBridge(),
+        bridge: bridge,
       ),
     );
     SettingsService.instance.resetForTesting();
+    // v1.3b / Phase 13 / SYS-112: the home screen's
+    // `ReliabilityBanner.fromStream` factory reads from
+    // the unified `ReliabilityService`. Init the service
+    // against the same bridge the reminder service uses
+    // so the bootstrap probe returns the right value.
+    ReliabilityService.resetForTesting();
+    PermissionService.instance.resetForTesting();
+    await PermissionService.instance.init();
+    // v1.3b / Phase 13 / SYS-112: grant every kind so the
+    // bootstrap derive lands on `optimal` — otherwise the
+    // banner would render "Reminders may be late" on every
+    // home-screen test.
+    PermissionService.instance.statuses.value = {
+      for (final k in PermissionKind.values) k: const PermissionResultGranted(),
+    };
+    await ReliabilityService.init(
+      bridge: bridge,
+      permissionService: PermissionService.instance,
+    );
   });
 
   testWidgets('empty state shows the placeholder', (tester) async {

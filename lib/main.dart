@@ -25,6 +25,7 @@ import 'package:doit/services/permission_lifecycle_observer.dart';
 import 'package:doit/services/platform_alarm_scheduler.dart';
 import 'package:doit/services/platform_full_screen_intent.dart';
 import 'package:doit/services/platform_notification_service.dart';
+import 'package:doit/services/reliability_service.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/settings_service.dart';
 import 'package:doit/services/template_repository.dart';
@@ -97,6 +98,25 @@ Future<void> main() async {
   //    there is no dispose path. See
   //    `lib/services/permission_lifecycle_observer.dart`.
   WidgetsBinding.instance.addObserver(PermissionLifecycleReProbe());
+
+  // 4a-ter. v1.3b / Phase 13 / SYS-112 / ADR-042: init
+  //    the unified `ReliabilityService`. The service
+  //    merges `PermissionService.statuses` with the
+  //    alarm-system bridge probe and exposes a single
+  //    `Stream<Reliability>` (mirror: `ValueListenable`)
+  //    for the home-screen banner and the settings page.
+  //    Must be wired AFTER `PermissionService.instance.init`
+  //    so the first derive step sees a populated statuses
+  //    map, and AFTER the bridge is constructed (so
+  //    `probeReliability` is available). The
+  //    `PermissionLifecycleReProbe` above calls
+  //    `ReliabilityService.refresh()` on every non-cold-
+  //    start resume, so the banner does not need a
+  //    separate observer.
+  await ReliabilityService.init(
+    bridge: bridge,
+    permissionService: PermissionService.instance,
+  );
 
   // 4a. v1.0 Phase C PR 2 (SYS-072 / ADR-021): init the
   //     geofence service. The service starts the platform

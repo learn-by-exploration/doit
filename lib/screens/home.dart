@@ -184,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       body: SafeArea(
         child: Column(
           children: [
-            ReliabilityBanner.fromService(),
+            ReliabilityBanner.fromStream(),
             const RoutineBanner(),
             const _AddAnchorButton(),
             Expanded(

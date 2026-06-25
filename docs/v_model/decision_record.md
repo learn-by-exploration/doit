@@ -4198,3 +4198,182 @@ post-restore side effects).
   designed for that (the side effects of `ActionNotify` /
   `ActionOverrideSilent` / `ActionSendMessage` are not
   reversible in general).
+
+## ADR-042 — `ReliabilityService`: unified `Stream<Reliability>` source-of-truth (v1.3b / SYS-112)
+
+**Status:** accepted (v1.3b / 2026-06-24).
+
+**Context.** Two parallel signals were driving the
+home-screen `ReliabilityBanner` and the settings page
+`_ReliabilityRow` in v1.3a:
+
+1. `PlatformAlarmScheduler.reliability` — a synchronous
+   getter backed by a 30 s fire-and-forget
+   `bridge.probeReliability()` cache. The first read
+   returned `Reliability.unknown` for a fully optimal
+   device (the cache was null until the in-flight probe
+   completed) — the home banner would briefly show
+   "Reminders may be late" on cold start even when the
+   device was fully optimal.
+2. `PermissionService.statuses` — a
+   `ValueNotifier<Map<PermissionKind, PermissionResult?>>`
+   mutated by `PermissionService.refresh()`. The Settings
+   → Permissions tile and the per-automation
+   `AutomationReliability` enum consumed it, but the
+   app-wide reliability banner did not — it read from the
+   scheduler's getter only.
+
+Both consumers (`ReliabilityBanner.fromService` and
+`_ReliabilityRow`) read once at `build()` and never
+re-subscribed. When the user toggled the exact-alarm
+permission in Settings → Apps → Special access → Alarms &
+reminders, the banner would not update until something
+else caused a parent rebuild. The `PermissionLifecycleReProbe`
+(ADR-036) re-probed `PermissionService` on resume but
+NOT the alarm-system reliability.
+
+**Decision.** v1.3b (`SYS-112`) introduces a new
+`ReliabilityService` singleton
+(`lib/services/reliability_service.dart`) that is the
+unified source-of-truth for the app-wide `Reliability`
+enum. The service exposes:
+
+- `Stream<Reliability> get reliability` — broadcast,
+  `distinct()`, so a late subscriber does not see a
+  replayed value and the same value is never emitted
+  twice in a row.
+- `ValueListenable<Reliability> get notifier` — the
+  mirror; widgets use `ValueListenableBuilder<Reliability>`
+  for declarative rebuilds.
+- `Reliability get value` — synchronous read for the
+  `AlarmScheduler.reliability` pass-through.
+- `Future<void> refresh()` — re-probes the bridge AND
+  re-derives the value from the latest statuses map.
+  Idempotent. Called by the resume hook
+  (`PermissionLifecycleReProbe._safeRefresh`) on every
+  non-cold-start `AppLifecycleState.resumed`.
+
+The service owns:
+
+- The `bridge.probeReliability()` round-trip (re-run on
+  `init`, on `refresh`, and on a 30 s `Timer.periodic`
+  fallback).
+- The `PermissionService.statuses` listener (re-derives
+  on every change to a `PermissionKind` in the gated set
+  `{location, calendar, callScreening, usageStats}`).
+- The `kReliabilityCacheTtl = Duration(seconds: 30)`
+  constant (moved from `PlatformAlarmScheduler`).
+
+**Combine rule:**
+
+- If the bridge probe returned `Reliability.degraded`, the
+  value is `degraded` (the alarm system is the primary
+  signal).
+- Else if any gated kind is `Denied` /
+  `PermanentlyDenied`, the value is `degraded`
+  (geofence / calendar / call-screening / usage-stats
+  triggers are gated off).
+- Else the value is `optimal` — the common case and the
+  default-initial value.
+
+**Initial value is `Reliability.optimal` (NOT `unknown`).**
+Closes the first-read race. Matches the
+`FakeAlarmScheduler._reliability` default and the
+banner-hidden behavior for the common case.
+
+`PlatformAlarmScheduler.reliability` becomes a thin
+pass-through to `ReliabilityService.instance.value`
+(with a `try / on StateError` fallback to
+`Reliability.optimal` for standalone-scheduler unit
+tests). The `_cachedReliability` / `_cachedReliabilityAt`
+fields, the `_refreshReliability` helper, the
+`clearReliabilityCache` test hook, and the fire-and-
+forget refresh on read are removed from the scheduler.
+
+`ReliabilityBanner.fromStream({VoidCallback? onTap})` is
+the new recommended factory; the previous
+`ReliabilityBanner.fromService` is kept as a
+`@Deprecated` thin shim for one cycle.
+
+`AutomationReliability` (per-automation reliability for
+triggers) stays separate (per ADR-029). The badge +
+dialog continue to consume `PermissionService.statuses`
+directly. The new service is for app-wide reliability
+only.
+
+**Consequences.**
+
+- The home banner and the settings row cannot drift —
+  both bind to the same notifier.
+- A user toggling a permission in Settings → Special
+  access sees the banner update on the next frame (via
+  the resume hook's `ReliabilityService.refresh()` call).
+- The scheduler's surface shrinks (no more
+  `_cachedReliability`, no more `clearReliabilityCache`,
+  no more fire-and-forget in the getter). The test
+  surface shrinks accordingly (the previous 4
+  `reliability`-group tests are replaced by 3
+  delegation tests).
+- The `kReliabilityCacheTtl` constant moves from
+  `PlatformAlarmScheduler` to `ReliabilityService`. It
+  is re-exported from the scheduler file for back-
+  compatibility with the test imports.
+- `ReliabilityService.init` MUST be wired AFTER
+  `PermissionService.init` (so the first derive step
+  sees a populated statuses map) and AFTER the
+  `ReminderBridge` is constructed (so
+  `bridge.probeReliability()` is available). The
+  `PermissionLifecycleReProbe` MUST be added BEFORE
+  `ReliabilityService.init` (so the observer can
+  call `refresh()` on the next resume).
+
+**Alternatives considered.**
+
+- **Per-automation reliability only (drop the app-wide
+  banner).** Rejected: the home-screen banner is the
+  cheapest signal that a routine may not fire on time.
+  Dropping it would force the user to drill into the
+  per-automation dialog for every routine they care
+  about, which is a worse UX than a single banner.
+- **Widget-poll pattern (a `Timer.periodic` in the
+  banner that re-reads every 30 s).** Rejected: a
+  `Stream<Reliability>` is the canonical Flutter
+  pattern, the `ValueListenableBuilder` is a one-liner
+  rebuild, and the polling would still race the
+  resume hook (a user toggling a permission would see
+  a 30 s worst-case lag).
+- **In-place mutation of `PermissionService.statuses` to
+  include a `reliability` field.** Rejected: mixing the
+  per-permission map with the app-wide derived value
+  conflates two answers. The badge wants the map; the
+  banner wants the derived value. The new service
+  reads from the map but does not mutate it.
+- **Drop `AlarmScheduler.reliability` and migrate every
+  consumer to the new service in one PR.** Deferred: the
+  v1.3b PR keeps the scheduler's getter as a thin
+  pass-through (the `try / on StateError` fallback
+  preserves the existing widget tests that pass a
+  `Reliability` directly to the banner). A follow-up
+  PR could deprecate the scheduler's getter entirely.
+
+**References.**
+
+- ADR-013 (no crash on missing plugin) — the service
+  swallows platform-channel errors in `_safeProbe`.
+- ADR-016 (singleton shape) — mutable-static pattern
+  matching `ReminderService`.
+- ADR-029 (per-automation reliability) — the
+  `AutomationReliability` enum stays separate; the new
+  service is for app-wide reliability only.
+- ADR-030 (fire-and-forget probe) — the resume hook
+  pattern is the same; this PR effectively revisits
+  the rejected "the probe belongs in a service other
+  than `PermissionService`" alternative in ADR-030
+  (we do not retroactively amend ADR-030; ADR-042
+  cites it as context).
+- ADR-035 (`AutomationReliabilityDialog` on tap) — the
+  per-automation dialog is orthogonal; it still reads
+  from `PermissionService.statuses` directly.
+- ADR-036 (resume hook) — `PermissionLifecycleReProbe`
+  is extended (not replaced); the new service is
+  re-probed on every non-cold-start resume.
