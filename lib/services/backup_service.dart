@@ -9,11 +9,12 @@
 // v0.4c.1 (SYS-061) adds the v2 envelope: AES-256-GCM over
 // the same JSON payload, key derived from a user-supplied
 // passphrase via PBKDF2-HMAC-SHA256 (≥ 100,000 iterations,
-// 16-byte random salt). The v1 plain-JSON path stays
-// supported on read for back-compat; writes default to v2
-// when a passphrase is supplied. v0.4 does NOT auto-write
-// v2 backups — the user opts in from the backup screen with
-// a passphrase prompt.
+// 16-byte random salt). v1.4a (SYS-115 / ADR-045) bumps the
+// envelope to v3: Argon2id (OWASP 2024 params: memory=19 MiB,
+// iterations=2, parallelism=1) replaces PBKDF2. v2 stays
+// supported on read for back-compat; writes default to v3
+// when a passphrase is supplied. The v1 plain-JSON path is
+// also still readable.
 //
 // Layer rules (per .claude/rules/lib-services.md): singleton
 // with `Completer<void> _ready`; all public methods async.
@@ -69,11 +70,15 @@ class BackupService {
   ///   payload is encrypted with AES-256-GCM using a key
   ///   derived from a user-supplied passphrase via
   ///   PBKDF2-HMAC-SHA256 (100,000 iterations, 16-byte salt).
-  ///   The envelope is:
-  ///   `{"version": 2, "kdf": {"name": "pbkdf2-hmac-sha256",
-  ///   "iterations": 100000, "saltB64": "..."}, "ciphertextB64":
-  ///   "...", "nonceB64": "..."}`.
-  static const int kBackupFormatVersion = 2;
+  ///   Read-only on v1.4a+; the import path still accepts v2.
+  /// - v3 (v1.4a / SYS-115 / ADR-045): encrypted envelope with
+  ///   Argon2id (OWASP 2024 params: memory=19 MiB, iterations=2,
+  ///   parallelism=1) replacing PBKDF2. The envelope is:
+  ///   `{"version": 3, "kdf": {"name": "argon2id", "memoryKiB":
+  ///   19456, "iterations": 2, "parallelism": 1, "saltB64":
+  ///   "..."}, "ciphertextB64": "...", "macB64": "...",
+  ///   "nonceB64": "..."}`.
+  static const int kBackupFormatVersion = 3;
 
   /// Number of PBKDF2 iterations for the v2 envelope. 100,000
   /// is OWASP's 2023+ recommendation; lower values are not
@@ -84,12 +89,33 @@ class BackupService {
   /// the import path still accepts it for back-compat.
   static const int kBackupFormatVersionV1 = 1;
 
+  /// The PBKDF2-based v2 envelope version. Read-only on v1.4a+;
+  /// the import path still accepts v2 for back-compat.
+  static const int kBackupFormatVersionV2 = 2;
+
+  /// Argon2id memory cost in KiB. 19456 KiB = 19 MiB, the
+  /// OWASP 2024 recommendation for Argon2id v1.3.
+  static const int kBackupArgon2MemoryKiB = 19456;
+
+  /// Argon2id iteration count. 2 is the OWASP 2024
+  /// recommendation when memory = 19 MiB.
+  static const int kBackupArgon2Iterations = 2;
+
+  /// Argon2id parallelism (lanes). 1 is the OWASP 2024
+  /// recommendation for single-user mobile derive.
+  static const int kBackupArgon2Parallelism = 1;
+
+  /// Salt length for both PBKDF2 (v2) and Argon2id (v3).
+  /// 16 bytes matches the v2 wire shape and is the lower
+  /// bound OWASP recommends for Argon2id.
+  static const int kBackupSaltBytes = 16;
+
   /// Write a JSON snapshot of every table to [file]. Overwrites
   /// any existing file. Returns the number of bytes written.
   ///
   /// If [passphrase] is `null`, writes a v1 plain-JSON
   /// envelope (back-compat). If [passphrase] is non-null,
-  /// writes a v2 encrypted envelope.
+  /// writes a v3 encrypted envelope (Argon2id + AES-256-GCM).
   Future<int> exportTo(File file, {String? passphrase}) async {
     await ready;
     final payload = await _readAllTables();
@@ -98,7 +124,7 @@ class BackupService {
       await file.writeAsBytes(bytes, flush: true);
       return bytes.length;
     }
-    final envelope = await _encryptV2(payload, passphrase);
+    final envelope = await _encryptV3(payload, passphrase);
     final bytes = utf8.encode(jsonEncode(envelope));
     await file.writeAsBytes(bytes, flush: true);
     return bytes.length;
@@ -109,10 +135,11 @@ class BackupService {
   /// transaction; if the file is malformed the transaction
   /// rolls back and the DB is left untouched.
   ///
-  /// Accepts both v1 (plain JSON) and v2 (encrypted) envelopes.
-  /// For v2 the caller must supply [passphrase]; a wrong
-  /// passphrase throws [BackupFormatException] ("decryption
-  /// failed"). For v1 the [passphrase] is ignored.
+  /// Accepts v1 (plain JSON), v2 (PBKDF2 + AES-256-GCM), and
+  /// v3 (Argon2id + AES-256-GCM) envelopes. For v2 / v3 the
+  /// caller must supply [passphrase]; a wrong passphrase
+  /// throws [BackupFormatException] ("decryption failed").
+  /// For v1 the [passphrase] is ignored.
   Future<int> importFrom(File file, {String? passphrase}) async {
     await ready;
     if (!await file.exists()) {
@@ -136,13 +163,13 @@ class BackupService {
     if (version == kBackupFormatVersionV1) {
       payload = envelope;
     } else {
-      // v2: decrypt with the user-supplied passphrase.
+      // v2 / v3: decrypt with the user-supplied passphrase.
       if (passphrase == null || passphrase.isEmpty) {
         throw BackupFormatException(
-          'Backup is encrypted (v2); a passphrase is required.',
+          'Backup is encrypted (v$version); a passphrase is required.',
         );
       }
-      payload = await _decryptV2(envelope, passphrase);
+      payload = await _decrypt(envelope, passphrase, version);
     }
     final tables = payload['tables'] as Map<String, Object?>?;
     if (tables == null) {
@@ -205,11 +232,11 @@ class BackupService {
     final settings = await _db.select(_db.settings).get();
     final events = await _db.select(_db.eventLogs).get();
     return {
-      // The inner payload version is always 1 — the v2 envelope
-      // wraps the same payload in an outer `{version: 2, kdf: ...}`
-      // shell. Keeping the inner version at 1 means the v1
-      // import path is the single source of truth on read, and
-      // v1 fixtures stay back-compat.
+      // The inner payload version is always 1 — the v2 / v3
+      // envelope wraps the same payload in an outer `{version:
+      // N, kdf: ...}` shell. Keeping the inner version at 1
+      // means the v1 import path is the single source of truth
+      // on read, and v1 fixtures stay back-compat.
       'version': kBackupFormatVersionV1,
       'exportedAtMillis': DateTime.now().toUtc().millisecondsSinceEpoch,
       'tables': {
@@ -416,7 +443,7 @@ class BackupService {
         detailJson: Value(j['detailJson'] as String?),
       );
 
-  // --- v2 encryption envelope (SYS-061) ---------------------------
+  // --- v3 encryption envelope (SYS-115 / ADR-045) -----------------
   //
   // The plaintext is the same JSON payload that v1 writes
   // (`{"version": 1, "tables": {...}, ...}` — note the inner
@@ -424,33 +451,48 @@ class BackupService {
   // truth on read). The envelope is:
   //
   //   {
-  //     "version": 2,
-  //     "kdf": { "name": "pbkdf2-hmac-sha256",
-  //              "iterations": 100000,
+  //     "version": 3,
+  //     "kdf": { "name": "argon2id",
+  //              "memoryKiB": 19456,
+  //              "iterations": 2,
+  //              "parallelism": 1,
   //              "saltB64": "<16 random bytes, base64>" },
   //     "ciphertextB64": "<AES-256-GCM ciphertext, base64>",
+  //     "macB64": "<AES-GCM MAC tag, base64>",
   //     "nonceB64": "<12 random bytes, base64>"
   //   }
   //
-  // The MAC tag is appended to the ciphertext by the
-  // `cryptography` package's AES-GCM; the v2 envelope does
-  // not store it separately. A wrong passphrase surfaces
-  // as a decryption failure (the MAC check rejects it).
+  // OWASP 2024 recommends Argon2id with memory=19 MiB,
+  // iterations=2, parallelism=1 (RFC 9106 "Argon2id v1.3").
+  // The AES-GCM MAC tag is stored in `macB64` (matching the v2
+  // wire shape) so a single ciphertext decoder serves both
+  // envelopes. A wrong passphrase surfaces as a decryption
+  // failure (the MAC check rejects it).
+  //
+  // v2 envelopes (PBKDF2-HMAC-SHA256) are still readable for
+  // back-compat via the dispatcher in [_decrypt]. Reads-from-v2
+  // are tested in `backup_encryption_test.dart`.
 
   static final Random _rng = Random.secure();
   static final Pbkdf2 _pbkdf2 = Pbkdf2.hmacSha256(
     iterations: kBackupKdfIterations,
     bits: 256,
   );
+  static final Argon2id _argon2id = Argon2id(
+    parallelism: kBackupArgon2Parallelism,
+    memory: kBackupArgon2MemoryKiB,
+    iterations: kBackupArgon2Iterations,
+    hashLength: 32,
+  );
   static final AesGcm _aesGcm = AesGcm.with256bits();
 
-  Future<Map<String, Object?>> _encryptV2(
+  Future<Map<String, Object?>> _encryptV3(
     Map<String, Object?> payload,
     String passphrase,
   ) async {
-    final salt = _randomBytes(16);
+    final salt = _randomBytes(kBackupSaltBytes);
     final nonce = _randomBytes(12);
-    final secretKey = await _pbkdf2.deriveKey(
+    final secretKey = await _argon2id.deriveKey(
       secretKey: SecretKey(utf8.encode(passphrase)),
       nonce: salt,
     );
@@ -462,8 +504,10 @@ class BackupService {
     return {
       'version': kBackupFormatVersion,
       'kdf': {
-        'name': 'pbkdf2-hmac-sha256',
-        'iterations': kBackupKdfIterations,
+        'name': 'argon2id',
+        'memoryKiB': kBackupArgon2MemoryKiB,
+        'iterations': kBackupArgon2Iterations,
+        'parallelism': kBackupArgon2Parallelism,
         'saltB64': base64Encode(salt),
       },
       'ciphertextB64': base64Encode(box.cipherText),
@@ -472,14 +516,92 @@ class BackupService {
     };
   }
 
-  Future<Map<String, Object?>> _decryptV2(
+  /// Dispatch on the envelope's KDF name. v3 (Argon2id) is the
+  /// current write path; v2 (PBKDF2) stays readable for back-compat.
+  Future<Map<String, Object?>> _decrypt(
     Map<String, Object?> envelope,
     String passphrase,
+    int version,
   ) async {
     final kdf = envelope['kdf'];
     if (kdf is! Map) {
       throw BackupFormatException('Missing or malformed "kdf" object.');
     }
+    final name = kdf['name'];
+    if (name == 'argon2id') {
+      return _decryptV3(envelope, passphrase);
+    }
+    if (name == 'pbkdf2-hmac-sha256') {
+      return _decryptV2(envelope, passphrase);
+    }
+    throw BackupFormatException(
+      'Unsupported KDF "$name" in v$version envelope.',
+    );
+  }
+
+  Future<Map<String, Object?>> _decryptV3(
+    Map<String, Object?> envelope,
+    String passphrase,
+  ) async {
+    final kdf = envelope['kdf'] as Map;
+    final memoryKiB = kdf['memoryKiB'];
+    final iterations = kdf['iterations'];
+    final parallelism = kdf['parallelism'];
+    final saltB64 = kdf['saltB64'];
+    final ciphertextB64 = envelope['ciphertextB64'];
+    final macB64 = envelope['macB64'];
+    final nonceB64 = envelope['nonceB64'];
+    if (memoryKiB is! int ||
+        iterations is! int ||
+        parallelism is! int ||
+        saltB64 is! String ||
+        ciphertextB64 is! String ||
+        macB64 is! String ||
+        nonceB64 is! String) {
+      throw BackupFormatException('Malformed v3 envelope.');
+    }
+    if (iterations < kBackupArgon2Iterations) {
+      throw BackupFormatException(
+        'Argon2id iterations below minimum: '
+        '$iterations < $kBackupArgon2Iterations',
+      );
+    }
+    if (memoryKiB < kBackupArgon2MemoryKiB) {
+      throw BackupFormatException(
+        'Argon2id memory below minimum: '
+        '$memoryKiB KiB < $kBackupArgon2MemoryKiB KiB',
+      );
+    }
+    final argon2 = Argon2id(
+      parallelism: parallelism,
+      memory: memoryKiB,
+      iterations: iterations,
+      hashLength: 32,
+    );
+    final salt = base64Decode(saltB64);
+    final ciphertext = base64Decode(ciphertextB64);
+    final macBytes = base64Decode(macB64);
+    final nonce = base64Decode(nonceB64);
+    final secretKey = await argon2.deriveKey(
+      secretKey: SecretKey(utf8.encode(passphrase)),
+      nonce: salt,
+    );
+    try {
+      final clear = await _aesGcm.decrypt(
+        SecretBox(ciphertext, nonce: nonce, mac: Mac(macBytes)),
+        secretKey: secretKey,
+      );
+      return jsonDecode(utf8.decode(clear)) as Map<String, Object?>;
+    } catch (e) {
+      throw BackupFormatException('Decryption failed (wrong passphrase?).');
+    }
+  }
+
+  Future<Map<String, Object?>> _decryptV2(
+    Map<String, Object?> envelope,
+    String passphrase,
+  ) async {
+    final kdf = envelope['kdf'] as Map;
     final name = kdf['name'];
     final iterations = kdf['iterations'];
     final saltB64 = kdf['saltB64'];
