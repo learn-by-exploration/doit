@@ -475,3 +475,110 @@ intentionally incomplete for that slice.
   verification on the Android emulator (or a real
   SM-S918B device), the same shape as v0.5e / v1.0h
   / v1.1k.
+
+## Milestone 10 — v1.3: Reliability + lifecycle hardening (shipped)
+
+- **Date:** 2026-06-25.
+- **Status:** shipped. Four sub-entries (v1.3a..v1.3d)
+  landed across the v1.3 cycle; this milestone is the
+  doc-only sign-off that flips the milestone to `shipped`
+  and finalises the CHANGELOG `[1.3.0]` block. The
+  implementation rows are in `implementation_status.md`
+  (rows v1.3a..v1.3d) and the CHANGELOG entries are in
+  `CHANGELOG.md` under `## [Unreleased]`.
+- **Scope:** the reliability + lifecycle hardening pass
+  over the v1.2 foundation. The three headline themes:
+  - **Stats-side groundwork** (v1.3a / Phase 12) — the
+    30-day completion-rate + 7-day bar chart on the Stats
+    screen + the per-do `graceWindowOverride` factory.
+  - **Reliability unification** (v1.3b / Phase 13) —
+    `ReliabilityService.instance` is the unified
+    `Stream<Reliability>` source-of-truth; the home-screen
+    `ReliabilityBanner` and the settings page
+    `_ReliabilityRow` both bind to
+    `ReliabilityService.instance.notifier`; the
+    `_kReliabilityGatedKinds` set is the policy gate.
+  - **Special-access gating** (v1.3c / Phase 14) —
+    `PermissionKind.fullScreenIntent` joins the gated set
+    (now 5 elements); the Settings → Permissions screen
+    gains a 5th `_PermissionTile`; the home banner's
+    `onTap` deep-links the user to the tile; the manifest
+    declares `<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"
+    tools:ignore="ProtectedPermissions" />`.
+  - **Strong-mode interruption end-to-end** (v1.3d /
+    Phase 15 / Phase 6a proper) — `FullScreenActivity`
+    Kotlin class lands; `showHabitMission` +
+    `showRoutineOverlay` launch handlers on
+    `doit/full_screen`; the strong-mode notification uses
+    `setFullScreenIntent(openPi, true)`; the chain-level
+    orchestrator (`MissionLauncherScreen`) walks the
+    `MissionChain` end-to-end and appends the completion
+    on `ChainPassed`. Closes `feature.md` §2.1 "Still
+    deferred".
+- **V-Model artifacts (this milestone):**
+  - `v1_3_release_baseline.md` (left-side) +
+    `v1_3_release_checklist.md` (right-side gate).
+  - `requirements.md` rows SYS-112..SYS-114 (appended
+    in v1.3b..v1.3d).
+  - `decision_record.md` rows ADR-042..ADR-044
+    (appended in v1.3b..v1.3d; see the baseline for
+    the per-ADR topics).
+  - `implementation_status.md` rows v1.3a..v1.3d.
+  - `CHANGELOG.md` `## [1.3.0]` block + a clean
+    alphabetised merge of the v1.3a..v1.3d sub-entries.
+  - `pubspec.yaml` → `1.3.0+10`; `lib/build_info.dart`
+    mirrors; `test/release_signing_test.dart` mirror-
+    pin assertions updated in lockstep.
+- **Deferred (v1.x candidates, tracked in `feature.md`):**
+  - Action-side permission disambiguation in the
+    `AutomationReliabilityDialog` (today the dialog
+    covers trigger-side only).
+  - `TriggerCallIncoming*` reliability arm once
+    `PermissionService.callScreening` is fully probed.
+  - Native-Spanish-speaker translation of
+    `lib/l10n/app_es.arb` (v1.1h's smoke-test locale is
+    the only translation).
+  - `google_maps_flutter` for `LocationMapPreview`
+    (would add `INTERNET`).
+  - Legacy `mipmap-*/ic_launcher.png` regeneration from
+    the master vector.
+  - Light-theme icon variant.
+  - B9 — widget re-arm indicator (the project does not
+    yet ship a home widget).
+  - Home screen widget, iOS port, Wear OS, Argon2id
+    backup upgrade, backup format v2 → v3 — all v1.x
+    point-release candidates, NOT v2.0.
+  - Kotlin-side unit tests for `FullScreenIntentChannel.showHabitMission`
+    / `showRoutineOverlay` + the new `FullScreenActivity`
+    (the Dart-side tests cover the channel-call contract;
+    the `compileDebugKotlin` gate catches syntax /
+    null-safety / deprecation issues).
+- **One new permission, no `INTERNET`.** The v1.3 cycle
+  added one `AndroidManifest.xml` permission entry:
+  `<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"
+  tools:ignore="ProtectedPermissions" />` (v1.3c). The
+  permission is **opt-in** — declining does NOT block any
+  feature (the user keeps getting the notification
+  fallback). The `tools:ignore` marker mirrors the v1.1g
+  `PACKAGE_USAGE_STATS` precedent (ADR-030). The v1.3
+  cycle did not add `INTERNET`; the `LocationMapPreview`
+  remains a pure `CustomPaint` widget, and no new
+  network call paths were added. The `ci grep rejects
+  any import 'package:http'` rule is unchanged.
+- **No DB migrations.** The `MissionChainExecutor.run`
+  signature is unchanged (pure function); the
+  `ReliabilityService` is a new singleton that sits next
+  to the existing `PlatformAlarmScheduler.reliability`
+  getter (now a thin pass-through); the new
+  `FullScreenActivity` is a separate Android `Activity`
+  (NOT a new `launchMode` on `MainActivity`) and
+  therefore does not affect the existing channel
+  registration in `MainActivity.configureFlutterEngine`.
+- **Right-side gate (this milestone):**
+  [`v1_3_release_checklist.md`](v1_3_release_checklist.md).
+  The sign-off line at the bottom of that doc is the
+  moment the user accepts the build as the v1.3
+  release. v1.3x is the user's hands-on on-device
+  verification on the Android emulator (or a real
+  SM-S918B device), the same shape as v0.5e / v1.0h /
+  v1.1k / v1.2x.

@@ -15,7 +15,13 @@ publish_to: 'none'
 # pin both ends so a future drift fails CI.
 # v1.2: bumped to 1.2.0+9 across 13 v1.2a..m sub-entries (the
 # code-TODO closure pass). The mirror-pin tests pin both ends.
-version: 1.2.0+9
+# v1.3: bumped to 1.3.0+10 across 4 v1.3a..d sub-entries
+# (the reliability + lifecycle hardening milestone — Phase 12
+# monthly stats, Phase 13 unified `ReliabilityService`, Phase 14
+# `USE_FULL_SCREEN_INTENT` probe + reliability wiring, Phase 15
+# full-screen activity launch path). The mirror-pin tests pin
+# both ends.
+version: 1.3.0+10
 
 environment:
   sdk: ^3.12.0
