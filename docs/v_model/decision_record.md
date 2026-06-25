@@ -4534,3 +4534,221 @@ without re-doing the probe wiring.
 - `docs/v_model/architecture_options.md` "Permission
   Baseline" — the v1.3c `USE_FULL_SCREEN_INTENT`
   block.
+
+## ADR-044 — Full-screen activity launch path (v1.3d / SYS-114)
+
+**Status.** Accepted 2026-06-25 (Phase 15). Closes
+[`feature.md`](../../feature.md) §2.1 "Still deferred (the
+launch path itself)".
+
+**Context.**
+
+v1.3c (Phase 14 / SYS-113 / ADR-043) shipped the
+`USE_FULL_SCREEN_INTENT` probe + deep-link + reliability
+wiring but explicitly deferred the activity launch path.
+`PlatformFullScreenIntent.showHabitMission` and
+`showRoutineOverlay` continued to raise
+`MissingPluginException`, swallowed by the Dart `_safe`
+wrapper, and `feature.md` §2.1 tracked the gap as
+"Phase 6a proper" — closeable only when a real
+`FullScreenActivity` Kotlin class exists, when the
+`doit/full_screen` MethodChannel implements the launch
+handlers, and when a chain-level orchestrator widget
+wires `DoRepository.instance.getById` to
+`MissionChainExecutor.run`.
+
+**Decision.**
+
+v1.3d ships the launch path end-to-end:
+
+1. **A separate `FullScreenActivity` Kotlin class**
+   (`android/app/src/main/kotlin/com/doit/FullScreenActivity.kt`).
+   A `FlutterActivity` subclass that sets the
+   lockscreen-bypass window flags in `onCreate`
+   (`FLAG_SHOW_WHEN_LOCKED | FLAG_TURN_SCREEN_ON |
+   FLAG_DISMISS_KEYGUARD | FLAG_KEEP_SCREEN_ON`), encodes
+   the intent extras into the initial route query string
+   via `getInitialRoute()` (`/mission?mode=habit&habitId=...`
+   for strong-mode habit launches, `/mission?mode=overlay
+   &title=...&body=...` for routine-fired overlays), and is
+   declared in `AndroidManifest.xml` with `exported="false"`,
+   `taskAffinity=""`, `excludeFromRecents="true"`,
+   `launchMode="singleTask"`, the lockscreen-bypass
+   `showOnLockScreen="true"` / `turnScreenOn="true"` /
+   `showWhenLocked="true"` attributes, and the
+   `@style/LaunchTheme` shared with `MainActivity`.
+2. **Two new `when` arms on `FullScreenIntentChannel.kt`**
+   — `showHabitMission` builds the habit intent and starts
+   it with `FLAG_ACTIVITY_NEW_TASK`; `showRoutineOverlay`
+   builds the overlay intent with optional `title` /
+   `body` extras. The existing probe handlers are
+   unchanged; the Dart `_safe` wrapper at
+   `PlatformFullScreenIntent` is kept as defense-in-depth
+   per ADR-013.
+3. **Strong-mode notification uses `setFullScreenIntent`.**
+   `MainActivity.buildReminderNotification` splits the
+   strong-mode branch: the strong-mode `openIntent`
+   targets `FullScreenActivity` (with `habitId` extra) and
+   `NotificationCompat.Builder.setFullScreenIntent(openPi,
+   /* highPriority= */ true)` is added so the OS launches
+   the activity directly on a locked device. The
+   strong-mode `Open` action button reuses the same
+   `fsiPi`. Soft-mode notifications keep the existing
+   `MainActivity` openPi (no FSI).
+4. **A chain-level orchestrator widget in
+   `lib/screens/mission_launcher.dart`.** Loads the habit
+   by id via `DoRepository.instance.getById(habitId)`;
+   rejects (and pops with `null`) when the habit is
+   missing, not in `StrongProof` mode, or carries an empty
+   chain. Iterates the `MissionChain`, pushing the
+   matching `MissionXxxScreen` for each `Mission` and
+   `await`ing the pop value. Once all inputs are
+   collected, `MissionChainExecutor.run(chain, inputs)`
+   is invoked; on `ChainPassed`, the completion is
+   appended via `CompletionLogService.instance.append`
+   with `source: CompletionSource.mission` and
+   `missionResultsJson: "missions=<N>"`; on `ChainFailedAt`
+   / `ChainTimedOut`, the widget pops with `null` (the
+   streak stays broken per the v1.1f grace-window
+   contract).
+5. **A routine overlay banner widget in
+   `lib/screens/routine_overlay_screen.dart`.** Renders
+   the `title` / `body` from the launch intent with
+   generic-copy fallbacks; the Dismiss button is ≥ 64 dp
+   and wrapped in `Semantics(button: true, label: "Dismiss
+   routine overlay", ...)` per `.claude/rules/lib-screens.md`
+   (SYS-062).
+6. **`MaterialApp.onGenerateRoute` in `lib/main.dart`** —
+   additive (the existing `home:` switch is unchanged).
+   The route resolver maps `/mission` to
+   `MissionLauncherScreen` (default) or
+   `RoutineOverlayScreen` (when `mode=overlay`) based on
+   the initial-route query string.
+7. **`Future<LaunchIntent?> getLaunchIntent()` on
+   `PlatformFullScreenIntent`.** Reads `getLaunchIntent`
+   over the `doit/full_screen` channel; the
+   `_safeResult<T>` wrapper swallows the production
+   `MissingPluginException` and returns `null`. The
+   canonical read for production code is the
+   initial-route query string; the method-channel read
+   exists for symmetry with the `FullScreenIntent`
+   interface and for test fixtures that drive the channel
+   seam directly.
+
+**Consequences.**
+
+- The strong-mode interruption contract is now honored
+  end-to-end on API 27+: a strong-mode habit reminder
+  launches `FullScreenActivity` directly, surfaces the
+  chain UI, and appends the completion on `ChainPassed`.
+  On API 14+ the OS no longer suppresses the full-screen
+  intent because `USE_FULL_SCREEN_INTENT` is now in the
+  manifest (v1.3c) AND the activity uses
+  `setFullScreenIntent` so the OS handles the launch
+  itself.
+- The launch handlers and the probe handlers share a
+  single `doit/full_screen` MethodChannel (ADR-043); the
+  probe + deep-link surface from v1.3c is unchanged.
+  Adding a new launch kind in the future (e.g., a
+  deferred-acknowledgement path) is a 2-line addition
+  to the `when` dispatch plus a 1-line activity-intent
+  factory.
+- The `FakeFullScreenIntent` test seam grew a
+  `launchIntents` list (additive); existing tests
+  (`test/reminders/reminder_service_test.dart`,
+  `test/routines/action_dispatch_test.dart`) keep
+  passing without edits.
+- No `wakelock_plus` package added — pubspec stays
+  clean. The wake-lock is held at the Android Window
+  level via `FLAG_KEEP_SCREEN_ON` on the activity
+  (released automatically when the activity is
+  destroyed), per the v1.2e precedent
+  (`feature.md` §2.1 lines 8-12).
+- No new `<uses-permission>` — the `USE_FULL_SCREEN_INTENT`
+  baseline from v1.3c (SYS-113) covers the launch path.
+- The completion-log append on `ChainPassed` is a 3-line
+  addition; the daily-dedupe key on
+  `(habitId, day)` prevents a double-insert if the alarm
+  re-arms before the scheduler clears it (the v0.4b
+  precedent).
+- The separately-launched activity's `FlutterEngine` has
+  no channels attached (channels are attached in
+  `MainActivity.configureFlutterEngine`). The activity
+  is a *pure renderer* — it does not need channels
+  because the only Dart-side work is reading
+  `DoRepository.instance.getById(habitId)` (pure DB read,
+  no platform-channel dependency) and rendering widgets.
+  If a future Phase adds a platform-channel call to the
+  launcher, it must attach the relevant channel in
+  `FullScreenActivity.configureFlutterEngine` (mirror
+  `MainActivity`).
+
+**Alternatives considered.**
+
+- **Add a new `launchMode` to `MainActivity` instead of a
+  separate activity.** Rejected: separate activity =
+  distinct task affinity (won't pollute MainActivity's
+  back-stack) + distinct theme / launchMode + the
+  lockscreen-bypass flags per
+  `docs/v_model/notification_reliability.md` § Layer 1.
+- **Add a new MethodChannel for the launch path instead
+  of extending `doit/full_screen`.** Rejected: the probe
+  and launch paths are the same concept; one
+  MethodChannel per concept. Two new `when` arms on the
+  existing handler is the v1.3c precedent.
+- **Use `wakelock_plus` for the per-mission wake-lock.**
+  Rejected for v1.3d: the activity-level
+  `FLAG_KEEP_SCREEN_ON` is sufficient and matches the
+  v1.2e precedent. A v1.4+ follow-up may swap to
+  per-mission wake-lock control if the team wants
+  finer-grained control.
+- **Move the chain-level orchestrator into
+  `lib/missions/`.** Rejected: per
+  `.claude/rules/lib-missions.md` the model layer is
+  pure Dart. The orchestrator is a widget that depends
+  on `DoRepository`, `CompletionLogService`, and
+  `Navigator.push`; it lives in `lib/screens/`.
+- **Bundle the Kotlin-side unit tests
+  (`FullScreenIntentChannelTest.kt`).** Rejected for
+  v1.3d: the Dart-side tests cover the channel-call
+  contract; the actual `Intent` construction, flags, and
+  activity launch are not unit-tested in Kotlin. The
+  lint check + `compileDebugKotlin` gate catch syntax
+  / null-safety / deprecation issues. A v1.4+ follow-up
+  can add Robolectric tests for the activity + channel
+  handlers.
+- **Add a per-mission retry UX (a "Retry mission N"
+  button on the launcher).** Rejected for v1.3d:
+  `ChainFailedAt` pops with `null`; v1.1f grace-window
+  semantics handle the wrong-attempt case for Math /
+  Type (the shared `MissionWrongAttempts` module from
+  v1.2l); Shake / Hold / Memory do not retry. A v1.4+
+  follow-up could add a retry affordance.
+
+**References.**
+
+- ADR-013 (defense-in-depth `_safe` wrapper) — the
+  `MissingPluginException` swallow that the launch
+  handlers' channel calls now go through.
+- ADR-043 (v1.3c `FullScreenIntentChannel` probe +
+  deep-link) — the channel the launch handlers extend;
+  the v1.3c `USE_FULL_SCREEN_INTENT` baseline the
+  launch path depends on.
+- ADR-030 (v1.1g `PACKAGE_USAGE_STATS`) — the special-
+  access permission precedent; the opt-in UX pattern.
+- ADR-042 (v1.3b `ReliabilityService`) — the unified
+  reliability stream that the new gated kind
+  (SYS-113) joins; the home-screen banner's "may be
+  late" copy is the user-visible signal that
+  full-screen launch may be suppressed.
+- `feature.md` §2.1 — the deferred Phase 6a item
+  v1.3d closes.
+- `docs/v_model/notification_reliability.md` "Full-
+  screen launch (v1.3d / Phase 15 / SYS-114)" — the
+  long-form explanation of the launch path (keyguard-
+  bypass flags, `setFullScreenIntent`, the chain
+  orchestrator, the route encoding).
+- `docs/v_model/architecture_options.md` "Module
+  Inventory" — the new `FullScreenActivity`,
+  `MissionLauncherScreen`, and `RoutineOverlayScreen`
+  entries.

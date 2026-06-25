@@ -124,6 +124,19 @@ class MainActivity : FlutterActivity() {
          * v1.1b / SYS-085); null bodies fall back to a
          * default "Time for <habitName>".
          *
+         * v1.3d / Phase 15 / SYS-114 / ADR-044:
+         * `strongMode = true` notifications now target
+         * `FullScreenActivity` (the strong-mode mission
+         * UI) and set `.setFullScreenIntent(openPi, true)`
+         * so the OS launches the activity directly when
+         * the alarm fires and the device is locked —
+         * honoring the strong-mode interruption contract
+         * without requiring the user to tap the
+         * notification first. Soft-mode notifications
+         * keep the existing `MainActivity` openPi (no
+         * FSI); tapping the notification or the "Done"
+         * action opens the home screen.
+         *
          * The notification id matches the alarm id so a
          * follow-up `NotificationManager.cancel(alarmId)`
          * removes exactly this one — never a sibling alarm.
@@ -134,15 +147,9 @@ class MainActivity : FlutterActivity() {
             habitName: String,
             body: String?,
             strongMode: Boolean,
+            habitId: String? = null,
         ): Notification {
             ensureNotificationChannel(ctx)
-            val openIntent = Intent(ctx, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-            val openPi = PendingIntent.getActivity(
-                ctx, alarmId, openIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
             val title = habitName
             val text = body ?: "Time for $habitName"
             val builder = NotificationCompat.Builder(ctx, NOTIFICATION_CHANNEL_ID)
@@ -151,16 +158,50 @@ class MainActivity : FlutterActivity() {
                 .setContentText(text)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
-                .setContentIntent(openPi)
-            // The "Done" / "Open" action set lives here so
-            // future v1.x releases can route the action
-            // through PendingIntent.getBroadcast into the
-            // Dart side; for now both actions open the app
-            // (the home screen / mission screen are picked
-            // by the route from there).
-            if (strongMode) {
-                builder.addAction(0, "Open", openPi)
+            if (strongMode && habitId != null) {
+                // v1.3d / SYS-114: the strong-mode
+                // openIntent targets `FullScreenActivity`
+                // with the `habitId` extra. The activity's
+                // `getInitialRoute()` encodes it into
+                // `/mission?mode=habit&habitId=...`; the
+                // Dart `MissionLauncherScreen` parses the
+                // route and looks up the habit via
+                // `DoRepository.instance.getById(habitId)`.
+                val fsiIntent = FullScreenActivity.habitIntent(ctx, habitId)
+                val fsiPi = PendingIntent.getActivity(
+                    ctx, alarmId, fsiIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or
+                        PendingIntent.FLAG_IMMUTABLE,
+                )
+                builder.setContentIntent(fsiPi)
+                // v1.3d / SYS-114: `setFullScreenIntent`
+                // tells the OS to launch the activity
+                // directly when the alarm fires — even if
+                // the device is locked. This is the
+                // strong-mode interruption contract; on
+                // API 34+ the OS suppresses the FSI
+                // unless `USE_FULL_SCREEN_INTENT` is
+                // granted (handled by the Phase 14 /
+                // v1.3c / SYS-113 probe + deep-link).
+                builder.setFullScreenIntent(fsiPi, true)
+                builder.addAction(0, "Open", fsiPi)
             } else {
+                // Soft-mode (and the legacy "no habitId"
+                // path): open `MainActivity`. The home
+                // screen handles the "Done" tap as a
+                // soft completion.
+                val openIntent = Intent(
+                    ctx,
+                    MainActivity::class.java,
+                ).apply {
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                val openPi = PendingIntent.getActivity(
+                    ctx, alarmId, openIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or
+                        PendingIntent.FLAG_IMMUTABLE,
+                )
+                builder.setContentIntent(openPi)
                 builder.addAction(0, "Done", openPi)
             }
             return builder.build()

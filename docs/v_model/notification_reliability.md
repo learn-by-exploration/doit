@@ -372,6 +372,147 @@ activity launch path itself
 Phase 6a can extend it with the launch handlers
 without re-doing the probe wiring.
 
+### Full-screen launch (v1.3d / Phase 15 / SYS-114)
+
+v1.3d closes the "Phase 6a proper" gap that v1.3c
+explicitly deferred. The launch path is wired end-to-end
+on API 27+:
+
+**The `FullScreenActivity` Kotlin class.** A thin
+`FlutterActivity` subclass
+(`android/app/src/main/kotlin/com/doit/FullScreenActivity.kt`)
+that:
+
+- Sets lockscreen-bypass window flags in `onCreate`:
+  `WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
+  FLAG_TURN_SCREEN_ON | FLAG_DISMISS_KEYGUARD |
+  FLAG_KEEP_SCREEN_ON`. On API 27+ the activity surfaces
+  directly on the lockscreen; on API < 27 the activity
+  still launches but without keyguard dismissal (the
+  `DISMISS_KEYGUARD` and `TURN_SCREEN_ON` flags are
+  silently ignored).
+- Overrides `getInitialRoute()` to encode the intent
+  extras into a query string: `/mission?mode=habit
+  &habitId=<id>` for strong-mode habit launches,
+  `/mission?mode=overlay&title=<t>&body=<b>` for
+  routine-fired overlays. The Dart-side route resolver
+  in `lib/main.dart`'s `MaterialApp.onGenerateRoute`
+  reads the query string and pushes the matching widget.
+- The manifest declares the activity with
+  `exported="false"` (only our own code can launch it),
+  `taskAffinity=""` (won't pollute `MainActivity`'s back
+  stack), `excludeFromRecents="true"` (the user does
+  not see it in Recents), `launchMode="singleTask"`,
+  `showOnLockScreen="true"`, `turnScreenOn="true"`,
+  `showWhenLocked="true"`, and `@style/LaunchTheme`
+  (shared with `MainActivity`).
+
+**The launch handlers on `FullScreenIntentChannel.kt`.**
+Two new `when` arms extend the v1.3c probe channel
+without re-doing the wiring:
+
+- `showHabitMission(ctx, args)` builds
+  `FullScreenActivity.habitIntent(ctx, habitId)` and
+  starts the activity with `FLAG_ACTIVITY_NEW_TASK`
+  (required because the alarm fires from a background
+  context).
+- `showRoutineOverlay(ctx, args)` builds the overlay
+  intent with optional `title` / `body` extras.
+
+The Dart `_safe` wrapper at
+`lib/services/platform_full_screen_intent.dart` swallows
+the `MissingPluginException` end-to-end (defense-in-
+depth per ADR-013). In production the handlers always
+succeed; the wrapper remains a no-op.
+
+**Strong-mode notification uses `setFullScreenIntent`.**
+`MainActivity.buildReminderNotification` splits the
+strong-mode branch: the strong-mode `openIntent`
+targets `FullScreenActivity` (with `habitId` extra), and
+`NotificationCompat.Builder.setFullScreenIntent(openPi,
+/* highPriority= */ true)` is added so the OS launches
+the activity directly when the alarm fires on a locked
+device. The strong-mode `Open` action button reuses the
+same `fsiPi`. Soft-mode notifications keep the existing
+`MainActivity` openPi (no FSI) and the "Done" action
+button — soft habits do not need the full-screen
+interruption contract.
+
+**The chain-level orchestrator widget
+(`lib/screens/mission_launcher.dart`).** The Flutter
+route resolver in `lib/main.dart`'s
+`MaterialApp.onGenerateRoute` maps
+`/mission?mode=habit&habitId=<id>` to
+`MissionLauncherScreen`. The widget:
+
+1. Loads the habit by id via
+   `DoRepository.instance.getById(habitId)`. If the
+   habit is missing, not in `StrongProof` mode, or
+   carries an empty `MissionChain`, the widget pops
+   with `null` (the streak stays untouched).
+2. Iterates the `MissionChain`, pushing the matching
+   `MissionXxxScreen` (`MissionShakeScreen`,
+   `MissionTypeScreen`, `MissionHoldScreen`,
+   `MissionMathScreen`, `MissionMemoryScreen`) for
+   each `Mission` and `await`ing the pop value. A
+   `null` pop (cancel / timeout / dismiss) aborts the
+   chain immediately.
+3. On all inputs collected, runs
+   `MissionChainExecutor.run(chain, inputs)`. On
+   `ChainPassed`, the completion is appended via
+   `CompletionLogService.instance.append` with
+   `source: CompletionSource.mission`,
+   `proofModeAtTime: <strong|soft|auto>`, and
+   `missionResultsJson: "missions=<N>"`; the widget
+   pops with `true`. On `ChainFailedAt` /
+   `ChainTimedOut`, the widget pops with `null` (the
+   streak stays broken per the v1.1f grace-window
+   contract — `MissionWrongAttempts` covers the
+   wrong-attempt case for Math / Type).
+
+**The routine overlay widget
+(`lib/screens/routine_overlay_screen.dart`).** The
+Flutter route resolver maps
+`/mission?mode=overlay&title=<t>&body=<b>` to
+`RoutineOverlayScreen`. The widget is a simple
+dismissable banner — the routine executor has already
+published `AutomationFired` so no further Dart-side
+action is needed. The Dismiss button is ≥ 64 dp
+(matching the mission primary action size) and wrapped
+in `Semantics(button: true, label: "Dismiss routine
+overlay", ...)` per `.claude/rules/lib-screens.md`
+(SYS-062).
+
+**No `wakelock_plus` package added.** The wake-lock is
+held at the Android Window level via
+`FLAG_KEEP_SCREEN_ON` on the activity (released
+automatically when the activity is destroyed). This
+matches the v1.2e precedent (`feature.md` §2.1 lines
+8-12). A v1.4+ follow-up may swap to `wakelock_plus` if
+the team wants per-mission wake-lock control.
+
+**No new `<uses-permission>`.** The v1.3c
+`USE_FULL_SCREEN_INTENT` baseline (SYS-113) covers the
+launch path. On API 14+ the OS no longer suppresses the
+full-screen intent because (a) the app holds
+`USE_FULL_SCREEN_INTENT` (v1.3c manifest) and (b) the
+notification uses `setFullScreenIntent` so the OS
+handles the launch itself.
+
+**The launch-intent read.** The Dart-side
+`PlatformFullScreenIntent` gains
+`Future<LaunchIntent?> getLaunchIntent()` which reads
+`getLaunchIntent` over the `doit/full_screen` channel.
+The `_safeResult<T>` wrapper swallows the production
+`MissingPluginException` and returns `null` (the Kotlin
+side does NOT implement the read; the canonical read
+is the initial-route query string). The method exists
+for symmetry with the `FullScreenIntent` interface and
+for test fixtures that drive the channel seam directly.
+`LaunchIntent` is a new immutable class +
+`LaunchMode` enum (a v1.3d additive in
+`lib/reminders/full_screen_intent.dart`).
+
 ## Timezone and DST
 
 `flutter_local_notifications` and `android_alarm_manager_plus`

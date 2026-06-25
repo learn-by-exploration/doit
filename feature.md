@@ -100,10 +100,28 @@ single-source-of-truth.
 
 ### 2.1 Strong-mode full-screen launch hardening (v1.2e)
 
-**DONE in v1.3c / Phase 14 / SYS-113 / ADR-043.** See
-[CHANGELOG.md](CHANGELOG.md) `### v1.3c` block. The probe +
-deep-link + reliability wiring all landed; the activity launch
-path itself (Phase 6a proper) is still deferred — see below.
+**DONE in v1.3c / Phase 14 / SYS-113 / ADR-043 (probe +
+deep-link + reliability wiring).** See
+[CHANGELOG.md](CHANGELOG.md) `### v1.3c` block.
+
+**DONE in v1.3d / Phase 15 / SYS-114 / ADR-044 (activity
+launch path — Phase 6a proper).** See
+[CHANGELOG.md](CHANGELOG.md) `### v1.3d` block. The
+deferred "launch path itself" gap is closed: a real
+`FullScreenActivity` Kotlin class exists (lockscreen-bypass
+flags, `getInitialRoute()` query-string encoding, manifest
+declaration with `singleTask` / `taskAffinity=""` /
+`excludeFromRecents`), `FullScreenIntentChannel.kt` has
+the two launch handlers (`showHabitMission`,
+`showRoutineOverlay`), `MainActivity.buildReminderNotification`
+splits the strong-mode branch with
+`setFullScreenIntent(openPi, true)`, and a chain-level
+orchestrator widget (`lib/screens/mission_launcher.dart`)
+loads the habit by id from `DoRepository.instance.getById`
+and walks the `MissionChain` end-to-end. The routine-fired
+overlay path is wired to a new
+`lib/screens/routine_overlay_screen.dart` banner widget.
+`_safe` wrapper defense-in-depth preserved (ADR-013).
 
 `MainActivity.kt`'s `FullScreenActivity` is described as
 "v1.2e-minimal" and needs hardening in a follow-up that adds
@@ -112,15 +130,6 @@ roadmap). The current behavior is best-effort; on Android 14+ the
 system can suppress full-screen intents from background-launching
 apps without this permission. SYS- ID not yet assigned; ADR
 needed.
-
-**Still deferred (the launch path itself):** the
-`PlatformFullScreenIntent.showHabitMission` and
-`showRoutineOverlay` calls continue to raise
-`MissingPluginException`, swallowed by the Dart `_safe` wrapper.
-The new `FullScreenIntentChannel.kt` is shaped so Phase 6a can
-extend it with the launch handlers (or replace it entirely)
-without re-doing the probe wiring. Tracked under the v1.3c
-release row of the same section.
 
 ### 2.2 Action-side permission disambiguation (v1.2h)
 
