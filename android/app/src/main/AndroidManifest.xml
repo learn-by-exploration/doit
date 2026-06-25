@@ -111,6 +111,57 @@
             </intent-filter>
         </activity>
 
+        <!-- v1.3d / Phase 15 / SYS-114 / ADR-044: the
+             full-screen mission activity. Strong-mode
+             habit alarms fire this activity via the
+             `doit/full_screen` MethodChannel's
+             `showHabitMission` / `showRoutineOverlay`
+             handlers (FullScreenIntentChannel.kt) and
+             strong-mode notifications call it via
+             `setFullScreenIntent`. The activity is a
+             thin `FlutterActivity` shell that hosts a
+             `/mission` Flutter route; the
+             `MissionLauncherScreen` /
+             `RoutineOverlayScreen` widgets parse the
+             route and render the right surface.
+
+             Why a separate activity (vs a new launchMode
+             on MainActivity): distinct task affinity
+             keeps the strong-mode launch out of the
+             MainActivity back-stack; distinct theme +
+             launchMode + keyguard-bypass flags match
+             the strong-mode interruption contract
+             (SYS-114) without polluting MainActivity's
+             cold-launch config; `excludeFromRecents`
+             hides the launch from the app-switcher so a
+             missed launch is not a phantom entry.
+
+             Keyguard bypass (`showOnLockScreen`,
+             `turnScreenOn`, `showWhenLocked`) +
+             `FLAG_DISMISS_KEYGUARD` (set in
+             `onCreate`) implement the strong-mode
+             contract: the OS surfaces this activity
+             on top of any lockscreen.
+
+             `exported="false"`: only our own code
+             (FullScreenIntentChannel) launches this
+             activity. No external Intent filter. The
+             system can still start it from a
+             PendingIntent built by our own code. -->
+        <activity
+            android:name=".FullScreenActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:theme="@style/LaunchTheme"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:showWhenLocked="true"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Boot survival (SYS-016). Receives BOOT_COMPLETED,
              LOCKED_BOOT_COMPLETED, MY_PACKAGE_REPLACED, and
              TIMEZONE_CHANGED. Re-arms every pending alarm.

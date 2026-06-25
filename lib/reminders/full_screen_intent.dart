@@ -8,15 +8,19 @@
 // `wakelock_plus` lock while the mission is on screen; the
 // lock is released on close.
 //
-// This file is a thin Dart-side wrapper that records the
-// intent-to-show. The actual platform call lives in the Kotlin
-// `MainActivity` (or a dedicated `FullScreenLauncher`). Tests
-// use [FakeFullScreenIntent].
-//
 // v1.2f / Phase 6: added [showRoutineOverlay] so the routine
 // engine's `ActionFullscreen` arm has a typed seam. The
 // habit-side `show(Do, MissionChain)` continues to be used by
 // the reminder service for Strong-mode habit fires.
+//
+// v1.3d / Phase 15 / SYS-114 / ADR-044: added
+// [LaunchIntent] / [LaunchMode] / [getLaunchIntent] so the
+// Dart side can ask the Kotlin `FullScreenActivity` which
+// kind of launch the current activity was opened for (the
+// initial route carries the same info, but a follow-up
+// `getLaunchIntent` read is the right shape for the
+// routine-overlay path where the activity may also be
+// re-entered while the user is on the lockscreen).
 
 import 'dart:async';
 
@@ -57,6 +61,66 @@ class RoutineOverlayLaunch {
   int get hashCode => Object.hash(title, body);
 }
 
+/// v1.3d / Phase 15 / SYS-114 / ADR-044. The launch kind
+/// for the current `FullScreenActivity` instance. The
+/// Kotlin `FullScreenIntentChannel.showHabitMission` /
+/// `showRoutineOverlay` handlers write the matching Intent
+/// extras; the Dart side either parses them out of the
+/// initial route query string (via
+/// `MaterialApp.onGenerateRoute`) or — for re-entries where
+/// the initial route is no longer relevant — reads them via
+/// `FullScreenIntent.getLaunchIntent()`.
+enum LaunchMode {
+  /// Strong-mode habit mission UI. Pairs with a
+  /// non-null [LaunchIntent.habitId] pointing at the
+  /// habit in the local DB.
+  habit,
+
+  /// Routine-fired overlay banner. Pairs with optional
+  /// [LaunchIntent.title] / [LaunchIntent.body] copy.
+  overlay,
+}
+
+/// v1.3d / Phase 15 / SYS-114 / ADR-044. The launch
+/// intent for the current `FullScreenActivity` instance.
+/// Read once at activity entry (via the route query
+/// string parsed by `MaterialApp.onGenerateRoute`) or on
+/// demand via [FullScreenIntent.getLaunchIntent]. The
+/// Dart side uses the kind to dispatch between
+/// `MissionLauncherScreen` (habit mode) and
+/// `RoutineOverlayScreen` (overlay mode).
+@immutable
+class LaunchIntent {
+  const LaunchIntent({required this.mode, this.habitId, this.title, this.body});
+
+  /// The launch kind. See [LaunchMode].
+  final LaunchMode mode;
+
+  /// The habit id, populated iff [mode] is [LaunchMode.habit].
+  final String? habitId;
+
+  /// The overlay title, populated iff [mode] is
+  /// [LaunchMode.overlay] AND the routine overlay caller
+  /// supplied a title.
+  final String? title;
+
+  /// The overlay body, populated iff [mode] is
+  /// [LaunchMode.overlay] AND the routine overlay caller
+  /// supplied a body.
+  final String? body;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LaunchIntent &&
+      other.mode == mode &&
+      other.habitId == habitId &&
+      other.title == title &&
+      other.body == body;
+
+  @override
+  int get hashCode => Object.hash(mode, habitId, title, body);
+}
+
 abstract class FullScreenIntent {
   /// Show the full-screen mission UI for the given habit and
   /// mission chain.
@@ -71,6 +135,19 @@ abstract class FullScreenIntent {
   /// keyguard; on lower APIs the overlay still renders but
   /// the user must unlock first.
   Future<void> showRoutineOverlay({String? title, String? body});
+
+  /// v1.3d / Phase 15 / SYS-114 / ADR-044: read the launch
+  /// intent for the current `FullScreenActivity` instance.
+  /// Returns `null` if the activity was not launched as a
+  /// full-screen intent (e.g., the activity is being shown
+  /// for an unrelated reason in a future version).
+  ///
+  /// The Dart side typically parses the initial route query
+  /// string for this data instead of calling this method
+  /// (the route is set by `FullScreenActivity.getInitialRoute`).
+  /// This method is the canonical read for re-entry scenarios
+  /// and for tests that exercise the platform seam directly.
+  Future<LaunchIntent?> getLaunchIntent();
 }
 
 /// In-memory implementation used by tests.
@@ -81,6 +158,20 @@ class FakeFullScreenIntent implements FullScreenIntent {
   /// (in invocation order).
   final List<RoutineOverlayLaunch> routineOverlays = <RoutineOverlayLaunch>[];
 
+  /// v1.3d / Phase 15 / SYS-114 / ADR-044: every
+  /// `getLaunchIntent` return value, in invocation order.
+  /// Tests that drive the launch path push to this list to
+  /// simulate a Kotlin-side launch; tests that exercise the
+  /// widget code read it to confirm the chain / overlay
+  /// widget received the right launch data.
+  final List<LaunchIntent?> launchIntents = <LaunchIntent?>[];
+
+  /// What `getLaunchIntent()` should return on the next
+  /// (and every subsequent) call. `null` means the activity
+  /// has no launch intent (returns `null`). Tests set this
+  /// in `setUp` to drive the widget test fixture.
+  LaunchIntent? scriptedLaunchIntent;
+
   @override
   Future<void> show(Do habit, MissionChain chain) async {
     launches.add(FullScreenLaunch(habit: habit, chain: chain));
@@ -89,5 +180,12 @@ class FakeFullScreenIntent implements FullScreenIntent {
   @override
   Future<void> showRoutineOverlay({String? title, String? body}) async {
     routineOverlays.add(RoutineOverlayLaunch(title: title, body: body));
+  }
+
+  @override
+  Future<LaunchIntent?> getLaunchIntent() async {
+    final intent = scriptedLaunchIntent;
+    launchIntents.add(intent);
+    return intent;
   }
 }

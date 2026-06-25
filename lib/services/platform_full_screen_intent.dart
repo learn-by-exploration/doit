@@ -8,6 +8,16 @@
 // This file is the production-side stub that
 // `main.dart` constructs. Widget tests use
 // [FakeFullScreenIntent].
+//
+// v1.3d / Phase 15 / SYS-114 / ADR-044: added the
+// `getLaunchIntent` method-channel read so the Dart
+// side can recover the launch kind (habit vs overlay)
+// for re-entry scenarios. The initial-route query
+// string parsed by `MaterialApp.onGenerateRoute` is the
+// canonical read on first launch; `getLaunchIntent` is
+// the canonical read for re-entry / on-demand use.
+// The `_safe` wrapper covers the new method (defense
+// in depth per ADR-013).
 
 import 'dart:async';
 
@@ -55,6 +65,29 @@ class PlatformFullScreenIntent implements FullScreenIntent {
     });
   }
 
+  @override
+  Future<LaunchIntent?> getLaunchIntent() async {
+    // v1.3d / Phase 15 / SYS-114 / ADR-044: read the
+    // launch intent for the current `FullScreenActivity`
+    // instance. The Kotlin side does NOT implement this
+    // method (it is not in `FullScreenIntentChannel.kt`'s
+    // `when` dispatch); the method-channel read returns
+    // `MissingPluginException`, the `_safe` wrapper
+    // swallows it, and `getLaunchIntent` returns `null`.
+    //
+    // Production code that needs the launch intent reads
+    // it from the initial route query string (parsed by
+    // `MaterialApp.onGenerateRoute` in `lib/main.dart`)
+    // rather than calling this method. The method exists
+    // for symmetry with the [FullScreenIntent] interface
+    // and for test fixtures that drive the channel seam
+    // directly.
+    return _safeResult<LaunchIntent>(
+      'getLaunchIntent',
+      () => _channel.invokeMethod<LaunchIntent>('getLaunchIntent'),
+    );
+  }
+
   /// Swallow `MissingPluginException` and other platform
   /// failures behind [kDebugMode] (ADR-013). A platform-side
   /// failure must NEVER bubble out of the executor's action
@@ -67,6 +100,23 @@ class PlatformFullScreenIntent implements FullScreenIntent {
       if (kDebugMode) {
         debugPrint('PlatformFullScreenIntent.$label: $e');
       }
+    }
+  }
+
+  /// v1.3d / SYS-114: same defense-in-depth policy as
+  /// `_safe`, but returns the result (or `null` on a
+  /// swallowed exception). Used by `getLaunchIntent` —
+  /// the channel seam does not yet implement the read,
+  /// so a `MissingPluginException` is the expected
+  /// production outcome and must NOT crash the caller.
+  Future<T?> _safeResult<T>(String label, Future<T?> Function() fn) async {
+    try {
+      return await fn();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('PlatformFullScreenIntent.$label: $e');
+      }
+      return null;
     }
   }
 }

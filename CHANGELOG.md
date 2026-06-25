@@ -1219,6 +1219,196 @@ Plus the targeted Kotlin compile check:
 - The Android home-screen widget (Phase 28). The widget
   surface does not interact with `USE_FULL_SCREEN_INTENT`.
 
+### v1.3d — Full-screen activity launch path (Phase 15)
+
+Closes `feature.md` §2.1 "Still deferred" — Phase 6a proper.
+v1.3c shipped the `USE_FULL_SCREEN_INTENT` probe + deep-link
++ reliability wiring (SYS-113 / ADR-043) but explicitly
+deferred the activity launch path. v1.3d ships it: a real
+`FullScreenActivity` on the Kotlin side, the two launch
+handlers on the `doit/full_screen` MethodChannel, and a
+chain-level orchestrator widget that loads the habit by id
+from `DoRepository` and walks the `MissionChain` end-to-end.
+
+**What's new**
+
+- `android/app/src/main/kotlin/com/doit/FullScreenActivity.kt`
+  (NEW) — a thin `FlutterActivity` subclass that hosts a
+  Flutter route to `/mission`. `onCreate` sets
+  `WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
+  FLAG_TURN_SCREEN_ON | FLAG_DISMISS_KEYGUARD |
+  FLAG_KEEP_SCREEN_ON` so the activity surfaces on the
+  lockscreen (API 27+). `getInitialRoute()` encodes the
+  intent extras into a query string:
+  `/mission?mode=habit&habitId=...` for strong-mode habit
+  launches, `/mission?mode=overlay&title=...&body=...` for
+  routine-fired overlays.
+- `android/app/src/main/kotlin/com/doit/FullScreenIntentChannel.kt`
+  grows two new `when` arms: `showHabitMission` builds
+  `FullScreenActivity.habitIntent(ctx, habitId)` and starts
+  the activity with `FLAG_ACTIVITY_NEW_TASK`; `showRoutineOverlay`
+  builds the overlay intent with `title` / `body` extras. The
+  existing probe handlers (`canUseFullScreenIntent`,
+  `openFullScreenIntentSettings`) are unchanged. The Dart
+  `_safe` wrapper at `PlatformFullScreenIntent` is kept as
+  defense-in-depth per ADR-013.
+- `android/app/src/main/kotlin/com/doit/MainActivity.kt` —
+  `buildReminderNotification` splits the strong-mode branch:
+  the strong-mode `openIntent` targets `FullScreenActivity`
+  (with `habitId` extra), and
+  `NotificationCompat.Builder.setFullScreenIntent(openPi,
+  /* highPriority= */ true)` is added so the OS launches
+  the activity directly when the alarm fires on a locked
+  device. The strong-mode `Open` action button reuses the
+  same `fsiPi`. Soft-mode notifications keep the existing
+  `MainActivity` openPi (no FSI).
+- `android/app/src/main/AndroidManifest.xml` declares
+  `<activity android:name=".FullScreenActivity">` between
+  the existing `<activity>` and the `<receiver>` for
+  `BootReceiver`. Attributes: `exported="false"`,
+  `taskAffinity=""`, `excludeFromRecents="true"`,
+  `launchMode="singleTask"`, `theme="@style/LaunchTheme"`,
+  `showOnLockScreen="true"`, `turnScreenOn="true"`,
+  `showWhenLocked="true"`. No new `<uses-permission>` —
+  the `USE_FULL_SCREEN_INTENT` baseline from v1.3c covers
+  the launch path.
+- `lib/screens/mission_launcher.dart` (NEW) — chain-level
+  orchestrator widget. Loads the habit by id via
+  `DoRepository.instance.getById(habitId)`; rejects (and
+  pops with `null`) if the habit is missing, not in
+  `StrongProof` mode, or carries an empty chain. Iterates
+  the `MissionChain`, pushing the matching
+  `MissionXxxScreen` for each `Mission` and `await`ing
+  the pop value. On all inputs collected, runs
+  `MissionChainExecutor.run(chain, inputs)`; on
+  `ChainPassed`, appends a completion via
+  `CompletionLogService.instance.append` (source
+  `CompletionSource.mission`, the proof-mode tag from the
+  habit, the `missionResultsJson` summary
+  `missions=<N>`); on `ChainFailedAt` / `ChainTimedOut`,
+  pops with `null` (the streak stays broken per the
+  v1.1f grace-window contract).
+- `lib/screens/routine_overlay_screen.dart` (NEW) — banner
+  widget for routine-fired overlay launches. Renders the
+  `title` / `body` from the launch intent; falls back to
+  `"Routine alert"` + a generic explanation when null or
+  empty. The Dismiss button is ≥ 64 dp and wrapped in
+  `Semantics(button: true, label: 'Dismiss routine overlay',
+  ...)` per `.claude/rules/lib-screens.md` (SYS-062).
+- `lib/main.dart` — `MaterialApp` gains `onGenerateRoute`
+  that resolves `/mission` to `MissionLauncherScreen`
+  (default) or `RoutineOverlayScreen` (when `mode=overlay`)
+  based on the initial-route query string parsed by
+  `FullScreenActivity.getInitialRoute()`. The existing
+  `home:` switch is unchanged (`onGenerateRoute` is
+  additive).
+- `lib/services/platform_full_screen_intent.dart` gains
+  `Future<LaunchIntent?> getLaunchIntent()` which reads
+  `getLaunchIntent` over the `doit/full_screen` channel.
+  The `_safeResult` wrapper swallows the production
+  `MissingPluginException` (Kotlin side does not implement
+  the read; the canonical read is the initial-route query
+  string). `LaunchIntent` + `LaunchMode` (a new
+  immutable class + enum) live in
+  `lib/reminders/full_screen_intent.dart`; the
+  `FullScreenIntent` interface grows the read; the
+  `FakeFullScreenIntent` test seam records the
+  scripted / last launch intent.
+- No `wakelock_plus` package added — pubspec stays clean.
+  The wake-lock is held at the Android Window level via
+  `FLAG_KEEP_SCREEN_ON` on the activity (released
+  automatically when the activity is destroyed), per the
+  v1.2e precedent.
+
+**Test pins**
+
+- `test/services/platform_full_screen_intent_test.dart`
+  (NEW, 6 tests) — `showHabitMission` invokes the right
+  method + `habitId` arg; `showRoutineOverlay` propagates
+  `title` / `body` and skips missing keys; `getLaunchIntent`
+  swallows the production `MissingPluginException` and
+  returns `null`; `showHabitMission` swallows
+  `MissingPluginException` end-to-end (defense-in-depth
+  per ADR-013).
+- `test/screens/mission_launcher_test.dart` (NEW, 6 tests) —
+  1-mission chain (Type) appends the completion with
+  `proofModeAtTime: 'strong'` and `missionResultsJson:
+  'missions=1'`, pops `true`; 2-mission chain
+  (Type → Type) appends with `missions=2`; `ChainFailedAt`
+  (wrong phrase) pops `null` and does NOT append;
+  missing habit pops `null`; non-`StrongProof` habit
+  (soft) pops `null`; cancel on first mission aborts
+  the chain and does NOT append.
+- `test/screens/routine_overlay_test.dart` (NEW, 4 tests) —
+  renders `title` + `body` from constructor args; falls
+  back to generic copy when null; falls back when
+  `title` / `body` are empty strings; the Dismiss button
+  pops the route with `null`.
+- The existing `test/reminders/reminder_service_test.dart`
+  + `test/routines/action_dispatch_test.dart` (which
+  drive `FakeFullScreenIntent`) keep passing — the
+  `launches` / `routineOverlays` recording is unchanged
+  in shape (the new `launchIntents` list is additive).
+- The `Semantics` label on the Dismiss button is auto-
+  validated by the existing
+  `test/a11y/semantics_labels_test.dart` (SYS-062) static
+  analyzer — 0 regressions.
+- A11y touch target: the Dismiss button's `minimumSize` is
+  `Size.fromHeight(Sizing.tapPrimary)` (64 dp), exceeding
+  the 48 dp baseline. SYS-062.
+
+**Verification (3-gate)**
+
+```
+dart format --output=none --set-exit-if-changed .
+flutter analyze --fatal-infos
+flutter test
+```
+
+Plus the targeted Kotlin compile check:
+
+```
+./android/gradlew :app:compileDebugKotlin
+```
+
+Plus the targeted test files for the launch path:
+
+```
+flutter test test/services/platform_full_screen_intent_test.dart
+flutter test test/screens/mission_launcher_test.dart
+flutter test test/screens/routine_overlay_test.dart
+flutter test test/a11y/semantics_labels_test.dart
+```
+
+Test count: 1032 → 1064 (+~16: 6 fsi-service + 6 launcher + 4
+overlay — matches the PR plan). Coverage ≥ 80% on every
+changed file.
+
+**Deferred**
+
+- Kotlin-side unit tests for `FullScreenIntentChannel.
+  showHabitMission` / `showRoutineOverlay` + the new
+  `FullScreenActivity`. The Dart-side tests cover the
+  channel-call contract; the actual `Intent` construction,
+  flags, and activity launch are not unit-tested in Kotlin.
+  Acceptable for v1.3d (the Kotlin code is short, the
+  activity-launch path is well-understood, and the lint
+  check + `compileDebugKotlin` gate catch syntax / null-
+  safety / deprecation issues). A v1.4+ follow-up can add
+  `FullScreenIntentChannelTest.kt` using Robolectric or
+  `androidx.test.core` to assert the Intent construction
+  (extras, flags, target component).
+- `wakelock_plus` package (the v1.4+ follow-up may swap
+  to per-mission wake-lock control if the team wants
+  finer-grained control than the activity-level
+  `FLAG_KEEP_SCREEN_ON`).
+- Per-mission retry UX (a `ChainFailedAt` currently pops
+  with `null`; v1.1f grace-window semantics handle
+  Math / Type; Shake / Hold / Memory do not retry).
+- The light-theme icon variant (feature.md §2.7) — still
+  deferred.
+- The Android home-screen widget (Phase 28).
+
 ### v1.3a — Monthly stats + per-do grace factory (Phase 12)
 
 Phase 12 of the v1.3 reliability + lifecycle hardening

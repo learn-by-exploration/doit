@@ -14,7 +14,9 @@ import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
 import 'package:doit/screens/home.dart';
+import 'package:doit/screens/mission_launcher.dart';
 import 'package:doit/screens/onboarding.dart';
+import 'package:doit/screens/routine_overlay_screen.dart';
 import 'package:doit/services/backup_scheduler.dart';
 import 'package:doit/services/backup_service.dart';
 import 'package:doit/services/call_interceptor.dart';
@@ -219,6 +221,31 @@ class DoItApp extends StatelessWidget {
             // of hardcoded `Text('...')`.
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
+            // v1.3d / Phase 15 / SYS-114 / ADR-044:
+            // resolves the `/mission` route set by the
+            // Kotlin `FullScreenActivity.getInitialRoute()`.
+            // The route query string carries the launch
+            // mode (`habit` | `overlay`) and the
+            // matching payload (`habitId` | `title` /
+            // `body`). The router picks the right widget
+            // — `MissionLauncherScreen` for habit
+            // launches (loads the habit from the DB and
+            // iterates the mission chain), or
+            // `RoutineOverlayScreen` for routine-fired
+            // overlay launches (banner-style dismissable
+            // surface). Unknown `/mission` shapes fall
+            // through to `onUnknownRoute` so the app
+            // does not crash on a malformed query.
+            //
+            // The `home:` switch below is unchanged —
+            // this router is additive and is only
+            // consulted when the Kotlin-side
+            // `FullScreenActivity` provides a non-null
+            // initial route (the embedding routes that
+            // through `onGenerateRoute` on the first
+            // frame).
+            onGenerateRoute: _buildMissionRoute,
+            onUnknownRoute: _unknownMissionRoute,
             home: (firstLaunchOverride ?? !firstLaunchDone)
                 ? OnboardingScreen(
                     // v0.4a.3 (SYS-059): persist the flag so the
@@ -235,6 +262,49 @@ class DoItApp extends StatelessWidget {
       ),
     );
   }
+}
+
+/// v1.3d / Phase 15 / SYS-114 / ADR-044. Resolves the
+/// `/mission` route. Returns `null` for non-`/mission`
+/// routes so `MaterialApp` falls back to the `home:`
+/// switch above.
+Route<dynamic>? _buildMissionRoute(RouteSettings settings) {
+  if (settings.name != '/mission') return null;
+  final args =
+      (settings.arguments as Map<String, Object?>?) ??
+      const <String, Object?>{};
+  final mode = (args['mode'] as String?) ?? 'habit';
+  switch (mode) {
+    case 'overlay':
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => RoutineOverlayScreen(
+          title: args['title'] as String?,
+          body: args['body'] as String?,
+        ),
+      );
+    case 'habit':
+    default:
+      final habitId = (args['habitId'] as String?) ?? '';
+      return MaterialPageRoute<bool?>(
+        settings: settings,
+        builder: (_) => MissionLauncherScreen(habitId: habitId),
+      );
+  }
+}
+
+/// v1.3d / Phase 15 / SYS-114 / ADR-044. Catch-all for
+/// malformed `/mission` query strings (e.g., empty
+/// `habitId`, missing `mode`). Returns a blank scaffold
+/// that pops immediately so the activity does not show
+/// a broken UI.
+Route<dynamic> _unknownMissionRoute(RouteSettings settings) {
+  return MaterialPageRoute<void>(
+    settings: settings,
+    builder: (_) {
+      return const Scaffold(body: SizedBox.shrink());
+    },
+  );
 }
 
 /// v1.2e / Phase 5: inbound adapter that wires the

@@ -10,7 +10,8 @@ import io.flutter.plugin.common.MethodChannel
 
 /**
  * Thin Kotlin-side adapter for the `doit/full_screen` method
- * channel (v1.3c / Phase 14 / SYS-113 / ADR-043).
+ * channel (v1.3c / Phase 14 / SYS-113 / ADR-043 + v1.3d /
+ * Phase 15 / SYS-114 / ADR-044).
  *
  * Responsibilities:
  *   - Receive `canUseFullScreenIntent` calls from Dart and
@@ -20,6 +21,14 @@ import io.flutter.plugin.common.MethodChannel
  *     — the user must toggle it manually in Settings).
  *   - Receive `openFullScreenIntentSettings` calls and
  *     launch the corresponding Settings activity. Returns
+ *     `true` if the launch resolved, `false` otherwise.
+ *   - Receive `showHabitMission` calls (v1.3d / SYS-114)
+ *     and launch `FullScreenActivity` for the given
+ *     `habitId`. Returns `true` if the launch resolved,
+ *     `false` otherwise.
+ *   - Receive `showRoutineOverlay` calls (v1.3d / SYS-114)
+ *     and launch `FullScreenActivity` in routine-overlay
+ *     mode with the given `title` / `body`. Returns
  *     `true` if the launch resolved, `false` otherwise.
  *
  * API asymmetry (Android's gradual rollout of the FSI
@@ -46,10 +55,10 @@ import io.flutter.plugin.common.MethodChannel
  *
  * The Dart side (`FullScreenIntentService`) is platform-
  * agnostic — the Kotlin handler resolves the right API
- * branch. The Dart `_safe` wrapper is unchanged for the
- * launch-method calls (`showHabitMission`,
- * `showRoutineOverlay`); Phase 6a proper will fill those
- * in via the same channel.
+ * branch. v1.3d / SYS-114 / ADR-044 fills in the launch
+ * handlers (`showHabitMission`, `showRoutineOverlay`) on
+ * the same channel; the Dart `_safe` wrapper is unchanged
+ * (defense-in-depth per ADR-013).
  */
 object FullScreenIntentChannel {
     private const val CHANNEL = "doit/full_screen"
@@ -82,6 +91,56 @@ object FullScreenIntentChannel {
                         )
                     } else {
                         val launched = openFullScreenIntentSettings(ctx)
+                        result.success(launched)
+                    }
+                }
+                "showHabitMission" -> {
+                    // v1.3d / SYS-114 / ADR-044: launch
+                    // `FullScreenActivity` in habit mode.
+                    // The Dart side passes `{habitId: "..."}`
+                    // as the method arguments.
+                    val ctx = appContext
+                    if (ctx == null) {
+                        result.error(
+                            "NO_CONTEXT",
+                            "FullScreenIntentChannel has no app context",
+                            null,
+                        )
+                    } else {
+                        val args = call.arguments as? Map<*, *>
+                        val habitId =
+                            args?.get("habitId") as? String
+                        if (habitId.isNullOrEmpty()) {
+                            result.error(
+                                "BAD_ARGS",
+                                "showHabitMission requires non-empty habitId",
+                                null,
+                            )
+                        } else {
+                            val launched = showHabitMission(ctx, habitId)
+                            result.success(launched)
+                        }
+                    }
+                }
+                "showRoutineOverlay" -> {
+                    // v1.3d / SYS-114 / ADR-044: launch
+                    // `FullScreenActivity` in routine-
+                    // overlay mode with optional title /
+                    // body. The Dart side passes
+                    // `{title: "...", body: "..."}` (both
+                    // optional) as the method arguments.
+                    val ctx = appContext
+                    if (ctx == null) {
+                        result.error(
+                            "NO_CONTEXT",
+                            "FullScreenIntentChannel has no app context",
+                            null,
+                        )
+                    } else {
+                        val args = call.arguments as? Map<*, *>
+                        val title = args?.get("title") as? String
+                        val body = args?.get("body") as? String
+                        val launched = showRoutineOverlay(ctx, title, body)
                         result.success(launched)
                     }
                 }
@@ -157,6 +216,48 @@ object FullScreenIntentChannel {
             }
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
+        return runCatching {
+            ctx.startActivity(intent)
+            true
+        }.getOrDefault(false)
+    }
+
+    /**
+     * v1.3d / Phase 15 / SYS-114 / ADR-044. Launch the
+     * `FullScreenActivity` in habit mode for the given
+     * `habitId`. The activity's `getInitialRoute()` reads
+     * the `habitId` extra and encodes it into the
+     * `/mission?mode=habit&habitId=...` route that the
+     * Dart `MissionLauncherScreen` parses.
+     *
+     * Returns `true` if the launch resolved; `false` if
+     * the OS refused the launch (e.g., no `USE_FULL_SCREEN_INTENT`
+     * permission on API 34+). The Dart side logs the
+     * failure under `kDebugMode` per ADR-013.
+     */
+    private fun showHabitMission(ctx: Context, habitId: String): Boolean {
+        val intent = FullScreenActivity.habitIntent(ctx, habitId)
+        return runCatching {
+            ctx.startActivity(intent)
+            true
+        }.getOrDefault(false)
+    }
+
+    /**
+     * v1.3d / Phase 15 / SYS-114 / ADR-044. Launch the
+     * `FullScreenActivity` in routine-overlay mode with
+     * the given (optional) `title` / `body`. The
+     * activity's `getInitialRoute()` encodes them into
+     * the `/mission?mode=overlay&title=...&body=...`
+     * route that the Dart `RoutineOverlayScreen`
+     * parses.
+     */
+    private fun showRoutineOverlay(
+        ctx: Context,
+        title: String?,
+        body: String?,
+    ): Boolean {
+        val intent = FullScreenActivity.overlayIntent(ctx, title, body)
         return runCatching {
             ctx.startActivity(intent)
             true
