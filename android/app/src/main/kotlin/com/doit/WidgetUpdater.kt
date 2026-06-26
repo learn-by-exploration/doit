@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
+import io.flutter.embedding.engine.loader.FlutterLoader
 
 /**
  * Repaint trigger for the Android home widget (v1.4a /
@@ -71,7 +72,7 @@ object WidgetUpdater {
 
     private fun ensureFlutterEngine(ctx: Context) {
         if (engine != null) return
-        FlutterMain.startInitialization(ctx)
+        FlutterLoader().startInitialization(ctx)
         val newEngine = FlutterEngine(ctx.applicationContext)
         newEngine.dartExecutor.executeDartEntrypoint(
             DartExecutor.DartEntrypoint.createDefault(),

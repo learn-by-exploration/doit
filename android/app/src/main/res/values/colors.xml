@@ -8,7 +8,32 @@
   inside `drawable-v21/` resources; referencing a
   named color resource works on every API level.
   Mirrors the seed in `lib/theme/app_theme.dart:15`.
+
+  The `widget_*` colors are the RemoteViews-safe
+  counterparts of the Material 3 dark surface tokens
+  (`colorBackground`, `colorOutline`, `textColorPrimary`,
+  `textColorSecondary`). The widget is rendered by the
+  launcher against a `RemoteViews` context, which does
+  NOT have access to the host app's theme — so the
+  drawable + layout cannot reference `?android:attr/...`
+  theme attrs at runtime. Literal hex values that match
+  the app's dark `ColorScheme.fromSeed(seedColor:
+  streakSeed, brightness: Brightness.dark)` round
+  (surface ≈ #1F1B24, outline ≈ #49454F,
+  onSurface ≈ #E6E1E5, onSurfaceVariant ≈ #CAC4D0).
+  A future v1.4d "light widget" pass can split these
+  into `values-night/` variants and a theme picker.
 -->
 <resources>
     <color name="launch_background">#FF6750A4</color>
+
+    <!-- Home widget (v1.4a / SYS-115 / ADR-045). -->
+    <color name="widget_background">#FF1F1B24</color>
+    <color name="widget_outline">#FF49454F</color>
+    <color name="widget_text_primary">#FFE6E1E5</color>
+    <color name="widget_text_secondary">#FFCAC4D0</color>
+    <!-- Brand-purple check fill — matches `streakSeed` so
+         the widget "Done" affordance reads as the same
+         color as the in-app theme primary. -->
+    <color name="widget_accent">#FF6750A4</color>
 </resources>
