@@ -582,3 +582,54 @@ intentionally incomplete for that slice.
   verification on the Android emulator (or a real
   SM-S918B device), the same shape as v0.5e / v1.0h /
   v1.1k / v1.2x.
+
+## Milestone 11 — v1.4: Home-screen widget + remaining parking-lot items
+
+- **Date:** _TBD_ (sign-off pending v1.4a device
+  verification).
+- **Status:** stub (Milestone 11 placeholder; v1.4a
+  lands as the first sub-entry, with v1.4b / v1.4c
+  parking-lot candidates to follow).
+- **Scope:** ship the first v1.x parking-lot items. The
+  headline feature for v1.4a is the Android home-screen
+  widget — the missing primary surface that closes
+  `feature.md` §2.8 B9.
+- **v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042** (the
+  first sub-entry): a native `AppWidgetProvider` +
+  `RemoteViews` over the `doit/widget` MethodChannel
+  renders the user's first-active do, current streak,
+  "Done" button, and unified `Reliability` badge. No
+  `home_widget` pubspec dep (per ADR-018); no new
+  `<uses-permission>`; no `wakelock_plus`. The
+  cold-start fallback uses a `SharedPreferences` cache so
+  the widget is never blank between OS process-kill and
+  first Dart frame. See `CHANGELOG.md` v1.4a block for
+  the long-form summary; `implementation_status.md` row
+  v1.4a for the file-by-file breakdown; `feature.md` §2.8
+  B9 for the deferral that v1.4a closes.
+- **v1.4b candidates** (parking lot, TBD): in-app tile
+  streak number (`_HabitTile` rewrite);
+  in-app tile "Done" button (replace the v0.1 SnackBar
+  stub at `home.dart:374-388` with a real completion
+  append); widget small / large variants (the
+  `resizeMode=horizontal|vertical` attribute is already
+  set; only `widget_medium.xml` ships in v1.4a); widget
+  config activity (user picks which do the widget tracks);
+  widget list (scrolling widget that walks the whole
+  repo); per-automation reliability badge inside the
+  widget; deep-link from widget body to a specific do
+  (needs new `MaterialApp.routes` infra).
+- **v1.4c candidates** (parking lot, TBD): iOS / Wear OS
+  widget surfaces (each needs a separate platform port
+  + a shared widget spec); native Spanish translator
+  (smoke-test translation only today — see `feature.md`
+  §2.4).
+- **Right-side gate:** the user runs `flutter build
+  appbundle --release` + installs on an Android 13+ device
+  + drags the widget from the launcher's widget picker +
+  verifies streak number renders + taps Done + verifies
+  completion appends + revokes a gated permission +
+  verifies badge flips to degraded. Mirrors the v0.5e /
+  v1.0h / v1.1k / v1.2x / v1.3x user-side on-device
+  checks. Kotlin side is untested at the unit level per
+  the established 5-native-channel precedent.

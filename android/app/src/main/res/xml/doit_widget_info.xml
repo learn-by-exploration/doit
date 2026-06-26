@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042.
+
+     AppWidgetProviderInfo for the do it home widget.
+
+     - 4x2 cells (medium size). minWidth/minHeight are the
+       API 30 floor; targetCellWidth/Height (API 31+) hint
+       to the launcher that the widget looks best at 4x2.
+     - updatePeriodMillis = 30 min (Android's floor). The
+       widget is event-driven in practice (the Dart side
+       calls WidgetUpdater.refreshAll on completion-log
+       writes + reliability changes); the 30-min fallback
+       covers the case where the app process is dead.
+     - resizeMode="horizontal|vertical" — the launcher can
+       resize. Only the medium layout exists for v1.4a;
+       v1.4b adds small + large variants.
+     - widgetCategory="home_screen" — only the home
+       launcher (not the lock screen / keyguard).
+     - previewLayout points to the same XML as
+       initialLayout so the widget picker shows the
+       widget in its actual rendered shape. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_medium"
+    android:previewLayout="@layout/widget_medium"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_description" />

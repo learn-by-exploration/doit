@@ -60,6 +60,18 @@ class MainActivity : FlutterActivity() {
         FullScreenIntentChannel.setAppContext(applicationContext)
         FullScreenIntentChannel.attach(flutterEngine)
 
+        // v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042:
+        // home widget channel. Wired here so the inbound
+        // Dart side (WidgetService) can ask the Kotlin
+        // side to repaint every bound widget via
+        // WidgetUpdater.refreshAll. The widget's own
+        // DoitWidgetProvider attaches a separate one-shot
+        // FlutterEngine on demand (see WidgetUpdater) so
+        // the widget host process survives the OS killing
+        // the MainActivity process.
+        WidgetChannel.setAppContext(applicationContext)
+        WidgetChannel.attach(flutterEngine)
+
         // v1.2e / Phase 5: ensure the reminder notification
         // channel is registered before the first alarm fires.
         // The channel id MUST match `kNotificationChannelId`
@@ -84,6 +96,12 @@ class MainActivity : FlutterActivity() {
         // all four channels are independent — the reverse
         // of attach() is fine.
         FullScreenIntentChannel.detach()
+        // v1.4a / Phase 28 / SYS-115: tear down the widget
+        // channel. The widget's own DoitWidgetProvider
+        // attaches a separate one-shot engine on demand
+        // (see WidgetUpdater) — that engine is process-
+        // scoped and not tied to MainActivity.
+        WidgetChannel.detach()
         CalendarChannel.detach()
         DeviceStateChannel.detach()
         ReminderChannelProxy.detach()

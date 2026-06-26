@@ -191,6 +191,30 @@
             </intent-filter>
         </receiver>
 
+        <!-- v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042:
+             the Android home-screen widget. The OS calls
+             `DoitWidgetProvider.onUpdate` on every bound
+             widget id when the APPWIDGET_UPDATE broadcast
+             fires (initial bind, the 30-min periodic floor,
+             and after `WidgetUpdater.refreshAll` posts
+             the `ACTION_REFRESH_WIDGET` custom action).
+             The provider is `exported="false"` (Android 12+
+             requires an explicit declaration; only the
+             launcher binds this provider via the
+             `APPWIDGET_PICK` activity). No new
+             <uses-permission> is required for widget
+             rendering. -->
+        <receiver
+            android:name=".DoitWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/doit_widget_info" />
+        </receiver>
+
         <!-- v1.0 / Phase F PR 1 / ADR-019 / SYS-075: the
              call-screening service for the Japan silent-mode
              routine. The OS invokes onScreenCall(Call.Details)

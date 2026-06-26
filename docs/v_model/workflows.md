@@ -1441,3 +1441,116 @@ Condition), SYS-071 (sealed Action), SYS-077 (cross-
 reference to the BLUETOOTH_CONNECT banner pattern in
 `notification_reliability.md`).
 
+
+## WF-042 — View streak on the Android home widget (v1.4a / Phase 28 / SYS-115)
+
+The user drops the do it widget from their launcher's
+widget picker, long-presses the home screen, and taps
+"Widgets". The widget shows the first-active Do's name,
+streak number (e.g. "7"), "day streak" subtitle, an
+`ic_widget_optimal` / `ic_widget_degraded` /
+`ic_widget_unknown` reliability badge, and a circular
+"Done" button.
+
+**Primary path (happy flow):**
+
+1. User long-presses home screen → Widgets → finds
+   "do it: your streak on the home screen" in the
+   picker.
+2. User drags the medium (4×2) variant to a home-screen
+   cell and releases.
+3. The OS calls `DoitWidgetProvider.onUpdate(ctx, mgr,
+   ids)`. The Kotlin side reads
+   `WidgetStateCache.cachedFromPrefs(ctx)` FIRST; if the
+   cache is empty (first install), it renders the
+   empty-state placeholder ("Add a do in do it").
+4. The Kotlin side then boots a one-shot `FlutterEngine`
+   via `WidgetUpdater.refreshIds(ctx, ids)`, which calls
+   `WidgetChannel.snapshot()` to get the live JSON.
+5. `WidgetService.instance.handleRefreshRequest()`
+   computes the state: `firstActiveDo(...)` reads
+   `DoRepository.listAll()` + sorts ascending by
+   `createdAt` + filters paused, then
+   `buildWidgetState(...)` runs `ConsecutiveCounter.compute`
+   + maps `ReliabilityService.instance.value` to the
+   badge enum.
+6. The state is persisted to
+   `WidgetStateCache.cachedFromPrefs(ctx)` (a
+   `SharedPreferences` key `doit.widget.cached_v1`) AND
+   sent over `doit/widget.cacheSnapshot(state)` to the
+   Kotlin `WidgetStateCache` (separate `SharedPreferences`
+   file used by the Kotlin side directly).
+7. `WidgetRenderer.render(ctx, state)` applies the
+   `RemoteViews` to the widget's `appWidgetIds`. The
+   widget is now visible: habit name, streak number,
+   badge, Done button.
+8. The widget registers a 30-min `updatePeriodMillis`
+   fallback so the OS re-fires `onUpdate` even if the
+   app process is dead.
+
+**Done button (in-widget):**
+
+9. User taps "Done" on the widget. The
+   `ImageButton.done` `PendingIntent.getBroadcast`
+   fires `ACTION_MARK_DONE` with the cached
+   `habitId` extra.
+10. `DoitWidgetProvider.onReceive` dispatches the action
+    to `WidgetChannel.markDone(habitId)`, which calls
+    back into Dart.
+11. Dart-side `WidgetService.instance.markDone(habitId)`
+    appends a completion via `CompletionLogService.append`
+    (with `source: CompletionSource.manual` + the
+    do's current `proofModeAtTime` tag), then re-derives
+    the state via `handleRefreshRequest()`.
+12. The new state is written to both the Dart
+    `WidgetStateCache` and the Kotlin
+    `WidgetStateCache`, and `WidgetRenderer.render(...)`
+    repaints the widget. The Done button now appears
+    grayed-out (`isCompletedToday == true`).
+
+**Body tap (open app):**
+
+13. User taps the widget body (not the Done button).
+    The `widget_root` `FrameLayout` `PendingIntent.getActivity`
+    opens `MainActivity` to the home screen via the
+    existing launch intent (single-top).
+
+**Reliability change path:**
+
+14. User revokes a gated permission (e.g. `location`)
+    in Android Settings. `PermissionService.statuses`
+    emits a `Denied` for the gated kind.
+15. `ReliabilityService` re-derives its value to
+    `Reliability.degraded` (per SYS-112's combine rule)
+    and emits to `ReliabilityService.reliability`.
+16. `WidgetService`'s subscription fires
+    `handleRefreshRequest()`. The new state's
+    `reliability` field is `DoitWidgetReliability.degraded`,
+    and the badge icon swaps from `ic_widget_optimal`
+    to `ic_widget_degraded`.
+
+**Failure paths:**
+
+- **`MissingPluginException` on `doit/widget` calls** —
+  the Dart `PlatformWidgetBridge._safe` wrapper swallows
+  the exception and returns `null` / completes normally
+  (ADR-013). The widget falls back to the cached state
+  or the empty-state placeholder.
+- **No active Do** — the locator returns `null` and the
+  builder produces the empty-state snapshot. The widget
+  shows the `widget_empty_state` copy ("Add a do in
+  do it") and hides the Done button.
+- **OS process kill between updates** — the cold-start
+  fallback in `WidgetStateCache.cachedFromPrefs(ctx)`
+  rehydrates the last-known-good state. The widget is
+  never blank between OS process-kill and the first Dart
+  frame.
+- **Permission denied for the `doit/widget` channel**
+  — the platform impl returns `null`; the widget renders
+  the cached state or empty-state.
+
+**Requirements covered:** SYS-115 (widget),
+SYS-112 (`ReliabilityService` as the source for the
+badge), SYS-111 (`Do.effectiveStreakConfig` as the
+source for the streak), SYS-114 (sibling Phase 15
+feature, shares the native-channel precedent).
