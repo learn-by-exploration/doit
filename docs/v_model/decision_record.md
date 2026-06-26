@@ -4918,7 +4918,7 @@ over a new `doit/widget` MethodChannel. Specifically:
   sibling Phase 15 feature that also ships a native
   MethodChannel.
 - WF-042 — the end-to-end workflow this ADR defines.
-ADR-047 — In-app home tile "Skip today" + rest-day budget indicator (v1.4c / SYS-117)
+## ADR-047 — In-app home tile "Skip today" + rest-day budget indicator (v1.4c / SYS-117)
 
 **Context.** v1.4b (SYS-116) shipped the in-app home tile streak number + per-tile "Done" button, mirroring the Android home-screen widget's UX surface. The tile still lacks the **rest-day affordance**: today, a user who wants to mark a do as a planned rest day has to either (a) miss the day and accept the streak break (defeats the rest-day budget feature in the streak calculator), or (b) edit the do's schedule to skip a weekday. The rest-day budget was designed to *credit* rest-day rows in `ConsecutiveCounter.compute` identically to manual rows, but the user has no UI to write a rest-day row from the in-app tile. The widget-side equivalent is parked for v1.4d; the in-app side is v1.4c.
 
@@ -4935,3 +4935,40 @@ ADR-047 — In-app home tile "Skip today" + rest-day budget indicator (v1.4c / S
 - **Budget exhaustion is a soft signal, not a hard error.** A user who hits `restDaysPerMonth == 0` mid-month sees a SnackBar ("No rest days left this month.") and the tile continues to render the streak + Done button normally. The user's existing streak is NOT broken — `ConsecutiveCounter.compute` only checks the budget at *write* time, not at *compute* time.
 - **`_isSkippedToday` is state-only, not DB-driven.** The flag initializes to `false` on tile mount and flips to `true` after a successful `markDoSkipped` call. A home-screen reload from a cold start would reset the flag, but the local-midnight comparison in the `_BudgetCaption` is computed from the DB on every build, so the caption is always correct even if the user opens the app on a day they previously skipped. This is the same shape as `_isCompletedToday` (which is also state-only after v1.4b).
 - **No new pubspec deps, no new `<uses-permission>`.** Pure-Dart + a stateful tile extension + 6 new ARB keys (3 EN + 3 ES, ARB parity test catches Spanish drift).
+
+## ADR-048 — Per-tile "Undo today's completion" affordance (v1.4d / SYS-118 / Phase 31 / WF-045)
+
+### Context
+
+v1.4b (SYS-116 / ADR-046) added the per-tile "Done" button. v1.4c (SYS-117 / ADR-047) added the per-tile "Skip today" button. Both affordances can be tapped by accident (wrong do, autopilot tap, fat-fingered on a crowded home screen). The existing undo path lives behind the edit screen via `lib/widgets/completion_log_section.dart`'s `CompletionLogSection` (v1.2m / WF-025 / SYS-108) — a list-view "Delete this completion" `IconButton` per row, gated by a confirm dialog, calling `CompletionLogService.deleteById(rowId)`. The user has to open the edit screen, scroll the recent-completions card, and tap delete. The flow is friction-heavy for what is the most common correction (an accidental same-day tap).
+
+The v1.4c parking-lot section explicitly lists "per-tile undo" as the next sub-entry: "Mirrors the v1.3b `CompletionLogSection` pattern (SYS-108)."
+
+### Decision
+
+Add an `_UndoButton` `IconButton` to the home tile (the same `_HabitTile` widget that already owns `_DoneButton` + `_SkipButton` + `_BudgetCaption`). The button is visible **only** when `_isResolvedToday == true` (i.e., `_isCompletedToday || _isSkippedToday` is true). The button uses `Icons.undo` and a localized tooltip (`homeTileUndoToday`). A tap fires a confirm dialog ("Undo today's completion? This will shorten your streak by one day.") with localized title + body + Confirm/Cancel actions; on confirm, the helper `undoToday(...)` calls `CompletionLogService.deleteById(rowId)` for the row whose `dayMillis` matches today's local-midnight. The tile rebuilds — the streak number drops, the Done button reverts to active, the Skip button reverts to active. A `SnackBar` (`homeTileUndoSuccess` — "Completion removed.") confirms the action.
+
+### Architectural choices
+
+- **Re-use the existing `CompletionLogService.deleteById` write path.** The home-tile undo is a UX convenience, NOT a new write path. The completion log is the source of truth for the streak; removing a row is the same operation whether the user does it from the edit screen (existing) or the home tile (new).
+- **Helper is pure-Dart.** `lib/screens/home_tile_undo.dart` exposes `Future<UndoResult> undoToday({required Do activeDo, required DateTime asOf, required CompletionLogService completionLog})`. The helper:
+  1. Fetches `completionLog.listForHabit(activeDo.id)`.
+  2. Filters for the row whose `dayMillis == DateTime(asOf.year, asOf.month, asOf.day).millisecondsSinceEpoch`.
+  3. If no row matches today, returns `UndoResult.nothingToUndo()` (the UI shows `homeTileUndoNotToday` — "Nothing to undo for today.").
+  4. Otherwise calls `completionLog.deleteById(row.id)` and returns `UndoResult.removed(rowId: row.id, source: row.source)`.
+  The result is an immutable value class with `UndoResult.nothingToUndo()` and `UndoResult.removed(...)` constructors + `==` / `hashCode` for testability. No `DateTime.now()` inside; the caller passes the frozen `asOf`.
+- **Local-midnight boundary, not "today's rolling window".** The undo targets the row whose `dayMillis` exactly matches the local-midnight at `asOf`. A row written at 23:59 yesterday is NOT undoable today (the user's day has rolled over; the new tile state correctly reflects the new day). This mirrors the existing `CompletionLogSection.deleteById(row.id)` semantics — single-row deletion, no "move to yesterday" support.
+- **Confirm dialog, not undo-snackbar.** A confirm dialog (`AlertDialog`) is the v1.2m precedent for destructive tile-level actions; the existing `CompletionLogSection._confirmAndDelete` uses the same shape. An "undo" snackbar with a 5-second window (Android Material's undo pattern) is a v2.0 polish item — the user's pattern-recognition is stronger with a confirm dialog.
+- **Long-press select-mode is unaffected.** The existing long-press → select-mode → app-bar Delete flow (v0.1+) still works for batch operations. The per-tile undo is a single-tile quick-path.
+- **No new `<uses-permission>`, no new pubspec deps.** Pure-Dart + a stateful tile extension + 4 new ARB keys (EN + ES, parity test catches Spanish drift). The existing `completionLog.deleteById(rowId)` already exists (added in v1.2m alongside `CompletionLogSection`).
+
+### Consequences
+
+- **The tile's `_isCompletedToday` and `_isSkippedToday` flags reset to `false` on a successful undo.** The `setState(() { _isCompletedToday = false; _isSkippedToday = false; })` mirrors the existing pattern in `_DoneButton.onPressed`. The streak re-computes on the next build via `streakForDo(...)`.
+- **The undo is single-tile.** If the user has the same do's completion in two surfaces (e.g., home tile + edit screen), the edit-screen row disappears immediately on a tile-level undo. Both surfaces share the same DB row.
+- **No race with the streak calculator.** `ConsecutiveCounter.compute` reads the log fresh on every call; an undo followed by an immediate rebuild re-computes the streak from the now-shorter log.
+- **The undo is fully reversible** (the user can re-tap Done to re-add the row) — the append dedupes on `(habitId, day)` so a re-tap inserts a fresh row with a new id.
+- **The SnackBar is non-blocking.** A second tile's tap during the SnackBar lifetime is honored; the dialog blocks the underlying tile until dismissed (standard Material behavior).
+- **Spanish localization is part of the same PR.** The ARB parity test (`test/l10n/app_localizations_test.dart` "every non-template ARB has the same key set as the template") catches missing Spanish entries automatically — a single missing key fails the 3-gate.
+
+(v1.4d / Phase 31 / SYS-118.)

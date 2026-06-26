@@ -1554,7 +1554,7 @@ SYS-112 (`ReliabilityService` as the source for the
 badge), SYS-111 (`Do.effectiveStreakConfig` as the
 source for the streak), SYS-114 (sibling Phase 15
 feature, shares the native-channel precedent).
-WF-044 — Skip a do for today from the home tile (v1.4c / Phase 30 / SYS-117 / ADR-047)
+## WF-044 — Skip a do for today from the home tile (v1.4c / Phase 30 / SYS-117 / ADR-047)
 
 **Actor.** User, inside the app, looking at the home screen.
 
@@ -1585,3 +1585,35 @@ WF-044 — Skip a do for today from the home tile (v1.4c / Phase 30 / SYS-117 / 
 - Rest-day history visualization ("you've used 1 of 2 this month" expansion tile showing the dates). v1.4d candidate.
 - Rest-day budget edit affordance (change `restDaysPerMonth` from the tile's overflow menu instead of the long-press → select-mode → edit flow). v1.4d candidate.
 - Per-tile undo (delete a stray rest-day row from the last 7 days). Mirrors the v1.3b `CompletionLogSection` pattern (SYS-108). v1.4d candidate.
+
+## WF-045 — Undo today's completion from the home tile (v1.4d / Phase 31 / SYS-118 / ADR-048)
+
+**Actor.** User, inside the app, looking at the home screen.
+
+**Goal.** Reverse today's completion (manual, rest-day, or notification-source) without leaving the home screen and without opening the edit screen — a quick-path for the most common corrective action.
+
+**Preconditions.** The user has at least one `_HabitTile` whose `_isResolvedToday == true` (i.e., `_isCompletedToday || _isSkippedToday` is true). The reliability banner is irrelevant.
+
+**Flow.**
+
+1. The home screen renders each `_HabitTile` with the do name (left), a `_DoStreakBadge` (right — streak number + "day streak" subtitle + a `_BudgetCaption` when `restDaysPerMonth > 0`), a `_SkipButton` (Icons.bedtime, only when `restDaysPerMonth > 0`), an `_UndoButton` (Icons.undo, only when `_isResolvedToday == true`), and a `_DoneButton` (Icons.check_circle_outlined, far right).
+2. The user taps the tile's `_UndoButton`.
+3. The app shows an `AlertDialog` titled `homeTileUndoConfirm` ("Undo today's completion?") with body `homeTileUndoConfirmBody` ("This will remove the entry for today and shorten your streak by one day.") and Confirm / Cancel actions.
+4. The user taps Confirm.
+5. `undoToday(activeDo, asOf, CompletionLogService.instance)` fetches `completionLog.listForHabit(activeDo.id)`, filters for the row whose `dayMillis == DateTime(asOf.year, asOf.month, asOf.day).millisecondsSinceEpoch`, and (a) calls `completionLog.deleteById(row.id)` if found, or (b) returns `UndoResult.nothingToUndo()` if no row matches today.
+6. On the happy path, the helper returns `UndoResult.removed(rowId, source)`. The tile flips `_isCompletedToday = false` and `_isSkippedToday = false`; the `_DoneButton` re-renders with `Icons.check_circle_outlined`; the `_UndoButton` hides; the `_SkipButton` (if visible) re-renders with `Icons.bedtime`; the `_DoStreakBadge` re-computes the streak via `streakForDo(...)` (one fewer row → streak decreases by 1 within the grace window, or breaks if past the grace window per v1.1f / WF-023).
+7. The SnackBar `homeTileUndoSuccess` ("Completion removed.") shows.
+
+**Alternate paths.**
+
+- **No completion row for today.** The helper returns `UndoResult.nothingToUndo()`. The tile shows the `homeTileUndoNotToday` SnackBar ("Nothing to undo for today."). The tile state is unchanged.
+- **DB write failure (rare).** The catch-all `try/catch` re-throws as a generic exception (matching the v1.4b `_onMarkDonePressed` shape); the tile stays in the "completed/skipped" state; the user can retry. (Future PR can add a `homeTileUndoFailure` SnackBar + a retry button.)
+- **User cancels the dialog.** No DB write; the tile state is unchanged; no SnackBar.
+
+**Out of scope (v1.5 candidates).**
+
+- SnackBar-with-undo pattern (Material's "5-second undo window") as an alternative to the confirm dialog. Useful for batch operations but the per-tile quick-path is dialog-first. v1.5 candidate.
+- Cross-day undo (rewind a row from yesterday). The existing `_HabitTile` state is local-midnight-bounded; a cross-day undo would need a date picker. v1.5 candidate.
+- "Undo all" (clear every completion row for the do — used for a fresh-start scenario). The existing v1.2m `CompletionLogSection.deleteById` is single-row; the bulk version is a v1.5 candidate.
+
+**Requirements covered:** SYS-118 (per-tile undo), SYS-108 (the parent `CompletionLogSection` pattern from v1.2m that v1.4d mirrors at the tile surface).

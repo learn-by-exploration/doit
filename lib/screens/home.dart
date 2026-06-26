@@ -34,6 +34,7 @@ import 'package:doit/screens/home_tile_budget.dart';
 import 'package:doit/screens/home_tile_completion.dart';
 import 'package:doit/screens/home_tile_skip.dart';
 import 'package:doit/screens/home_tile_streak.dart';
+import 'package:doit/screens/home_tile_undo.dart';
 import 'package:doit/screens/mission_launcher.dart';
 import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/db/schema.dart';
@@ -427,6 +428,83 @@ class _HabitTileState extends State<_HabitTile> {
     }
   }
 
+  /// v1.4d / SYS-118 — the tile-level handler for an
+  /// "Undo today" tap. Reverts today's completion (or
+  /// rest-day) row via `undoToday` and flips the
+  /// `_isCompletedToday` / `_isSkippedToday` flag back to
+  /// `false` based on which source was deleted. Mirrors
+  /// `CompletionLogSection._confirmAndDelete` (v1.2m /
+  /// SYS-108) but at the tile surface with one fewer tap.
+  ///
+  /// Flow: tap → open `AlertDialog` (gated on the user
+  /// tapping "Undo") → confirm → call `undoToday` → on
+  /// `UndoResult.removed` flip the matching flag to
+  /// `false` + show `homeTileUndoSuccess` snackbar → on
+  /// `UndoResult.nothingToUndo` show the defensive
+  /// `homeTileUndoNotToday` snackbar (DB-as-truth; the
+  /// dialog is gated on `_isResolvedToday` but a
+  /// concurrent tile rebuild could leave a dangling
+  /// flag).
+  Future<void> _onUndoTodayPressed() async {
+    if (_busy) return;
+    if (!_isResolvedToday) return; // no-op if not resolved
+    final l = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l.homeTileUndoConfirm),
+        content: Text(l.homeTileUndoConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              MaterialLocalizations.of(dialogContext).cancelButtonLabel,
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l.homeTileUndoToday),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+    // Capture the messenger BEFORE the async gap so
+    // we can surface the snackbar even if the
+    // post-undo setState disposes the widget (e.g.,
+    // the parent rebuild removes the tile).
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    final now = DateTime.now();
+    final result = await undoToday(
+      activeDo: widget.habit,
+      asOf: now,
+      completionLog: CompletionLogService.instance,
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    switch (result) {
+      case UndoResultRemoved(:final source):
+        // Flip the flag that matches the deleted source
+        // back to false. Manual → completed flag; restDay
+        // → skipped flag. Other sources (notification,
+        // mission) are possible but the tile only
+        // resolves via manual (Done) or restDay (Skip);
+        // the flag stays as-is if neither matches.
+        setState(() {
+          if (source == 'rest_day') {
+            _isSkippedToday = false;
+          } else if (source == 'manual') {
+            _isCompletedToday = false;
+          }
+        });
+        messenger.showSnackBar(SnackBar(content: Text(l.homeTileUndoSuccess)));
+      case UndoResultNothingToUndo():
+        messenger.showSnackBar(SnackBar(content: Text(l.homeTileUndoNotToday)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final habit = widget.habit;
@@ -551,6 +629,16 @@ class _HabitTileState extends State<_HabitTile> {
                           busy: _busy,
                           isSkippedToday: _isSkippedToday,
                           onPressed: _onSkipTodayPressed,
+                        ),
+                      // v1.4d / SYS-118: undo button.
+                      // Visible only when the day is
+                      // resolved (Done or Skip recorded).
+                      // Tap opens an `AlertDialog` that
+                      // calls `undoToday` on confirm.
+                      if (_isResolvedToday)
+                        _UndoButton(
+                          busy: _busy,
+                          onPressed: _onUndoTodayPressed,
                         ),
                       _DoneButton(
                         busy: _busy,
@@ -1050,6 +1138,49 @@ class _SkipButton extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           : Icon(icon),
+      iconSize: Sizing.tapHome / 2,
+      onPressed: busy ? null : onPressed,
+    );
+  }
+}
+
+/// v1.4d / SYS-118 — undo today's completion button.
+/// Renders between `_SkipButton` and `_DoneButton` on
+/// the right edge of the tile, only when:
+///   - the day is already resolved (`_isResolvedToday
+///     == true`, i.e., Done or Skip recorded)
+///   - the tile is not in select-mode
+///
+/// Tap opens an `AlertDialog` that calls `undoToday` on
+/// confirm. On the happy path the tile flips
+/// `_isCompletedToday` / `_isSkippedToday` (whichever
+/// was true) back to `false` and shows the
+/// `homeTileUndoSuccess` SnackBar. The button itself
+/// does not carry a "completed" / "skipped" visual
+/// state — once resolved, the undo affordance is always
+/// available; the day-state icons on the other buttons
+/// already convey what kind of completion is on file.
+///
+/// Visual states:
+///   - busy → spinner (in-flight `undoToday` call)
+///   - otherwise → outlined undo icon (`Icons.undo`)
+class _UndoButton extends StatelessWidget {
+  const _UndoButton({required this.busy, required this.onPressed});
+  final bool busy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return IconButton(
+      tooltip: l.homeTileUndoToday,
+      icon: busy
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.undo),
       iconSize: Sizing.tapHome / 2,
       onPressed: busy ? null : onPressed,
     );

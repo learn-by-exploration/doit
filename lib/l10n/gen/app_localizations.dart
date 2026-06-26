@@ -188,6 +188,36 @@ abstract class AppLocalizations {
   /// **'No rest days left'**
   String get homeTileBudgetNoRemaining;
 
+  /// Tooltip / aria-label for the in-app home tile's 'Undo today' IconButton (v1.4d / SYS-118). Visible only when the tile is 'resolved' for today (Done tap or Skip tap recorded). Tap opens a confirm dialog; the confirm reverts the completion via CompletionLogService.deleteById.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo today'**
+  String get homeTileUndoToday;
+
+  /// Title of the AlertDialog that confirms an in-app home tile Undo tap (v1.4d / SYS-118). Mirrors the CompletionLogSection's 'Delete this completion?' title but at the tile surface.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo today\'s completion?'**
+  String get homeTileUndoConfirm;
+
+  /// Body copy of the AlertDialog that confirms an in-app home tile Undo tap (v1.4d / SYS-118). Sets the user's expectation: the row is deleted, the streak decrements by 1 (or the rest-day budget re-increments by 1 for the skip path).
+  ///
+  /// In en, this message translates to:
+  /// **'This will remove today\'s check-in. The streak will update.'**
+  String get homeTileUndoConfirmBody;
+
+  /// Snackbar copy after a successful in-app home tile Undo tap (v1.4d / SYS-118). Mirrors the CompletionLogSection's 'Completion removed.' snackbar but at the tile surface.
+  ///
+  /// In en, this message translates to:
+  /// **'Completion removed.'**
+  String get homeTileUndoSuccess;
+
+  /// Snackbar copy when the in-app home tile Undo tap completes but the DB has no row to delete (v1.4d / SYS-118). Defensive — the dialog is gated on _isResolvedToday == true, but the DB is the source of truth and a concurrent app-tile rebuild could leave a dangling flag.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to undo for today.'**
+  String get homeTileUndoNotToday;
+
   /// No description provided for @homeEmptyTitle.
   ///
   /// In en, this message translates to:
