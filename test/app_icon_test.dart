@@ -198,16 +198,8 @@ void main() {
       ('android/app/src/main/res/mipmap-mdpi/ic_launcher.png', 48, 48),
       ('android/app/src/main/res/mipmap-hdpi/ic_launcher.png', 72, 72),
       ('android/app/src/main/res/mipmap-xhdpi/ic_launcher.png', 96, 96),
-      (
-        'android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png',
-        144,
-        144
-      ),
-      (
-        'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png',
-        192,
-        192
-      ),
+      ('android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png', 144, 144),
+      ('android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png', 192, 192),
     ];
     for (final (path, expectedWidth, expectedHeight) in expected) {
       final file = File(path);
@@ -229,15 +221,9 @@ void main() {
       //   bytes 16..19  = width (big-endian u32)
       //   bytes 20..23  = height (big-endian u32)
       final width =
-          (bytes[16] << 24) |
-          (bytes[17] << 16) |
-          (bytes[18] << 8) |
-          bytes[19];
+          (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
       final height =
-          (bytes[20] << 24) |
-          (bytes[21] << 16) |
-          (bytes[22] << 8) |
-          bytes[23];
+          (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
       expect(
         width,
         expectedWidth,
