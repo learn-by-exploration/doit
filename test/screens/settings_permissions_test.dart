@@ -64,7 +64,7 @@ import 'package:provider/provider.dart';
 
 import '../support/localized_app.dart';
 
-Widget _wrap() {
+Widget _wrap({Brightness brightness = Brightness.dark}) {
   return ChangeNotifierProvider<SettingsService>.value(
     value: SettingsService.instance,
     // v1.1h / ADR-031 / SYS-087: route through
@@ -72,7 +72,16 @@ Widget _wrap() {
     // `AppLocalizations` delegate (the permission tile
     // titles + status labels are now pulled from the ARB
     // catalog).
-    child: localizedApp(theme: AppTheme.dark, home: const SettingsScreen()),
+    //
+    // v1.3d (feature.md §2.7): the FSI tile icon is
+    // brightness-aware (outlined on light, filled on
+    // dark). The default is dark; light-mode tests pass
+    // `brightness: Brightness.light` so they exercise the
+    // outlined variant.
+    child: localizedApp(
+      theme: brightness == Brightness.dark ? AppTheme.dark : AppTheme.light,
+      home: const SettingsScreen(),
+    ),
   );
 }
 
@@ -505,6 +514,101 @@ void main() {
         matching: find.text('Full-screen access'),
       ),
       findsOneWidget,
+    );
+  });
+
+  // v1.3d / feature.md §2.7: the FSI tile icon branches on
+  // the active theme brightness so the light theme gets an
+  // outlined glyph (matching every other permission tile
+  // which uses `_outlined` variants) while the dark theme
+  // keeps the filled variant (better contrast on the dark
+  // surface). The two tests below pin both branches so a
+  // future refactor cannot accidentally drop the variant.
+  testWidgets('fullScreenIntent tile uses the filled icon on dark theme '
+      '(feature.md §2.7)', (tester) async {
+    await setPhoneSize(tester);
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pump();
+    final tileFinder = find.byKey(
+      const ValueKey('settings.permission.fullScreenIntent'),
+    );
+    // The leading `Icon` carries the permission glyph; the
+    // trailing chevron is also an `Icon` widget but with a
+    // different `IconData`. Filter by the `codePoint` family
+    // so we always pick the leading slot (the
+    // `open_in_full*` codepoints are unique within the
+    // tile).
+    final leadingIcon = tester.widget<Icon>(
+      find.descendant(
+        of: tileFinder,
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w is Icon &&
+              (w.icon?.codePoint == Icons.open_in_full.codePoint ||
+                  w.icon?.codePoint == Icons.open_in_full_outlined.codePoint),
+        ),
+      ),
+    );
+    expect(
+      leadingIcon.icon!.codePoint,
+      Icons.open_in_full.codePoint,
+      reason:
+          'On the dark theme the FSI tile must use the filled '
+          '`Icons.open_in_full` glyph for contrast on the dark '
+          'surface (feature.md §2.7).',
+    );
+    expect(
+      leadingIcon.icon!.fontFamily,
+      Icons.open_in_full.fontFamily,
+      reason:
+          'The filled variant must stay in the standard '
+          '`MaterialIcons` family; do not regress to the '
+          'sharp/round/outlined family.',
+    );
+  });
+
+  testWidgets('fullScreenIntent tile uses the outlined icon on light theme '
+      '(feature.md §2.7)', (tester) async {
+    await setPhoneSize(tester);
+    await tester.pumpWidget(_wrap(brightness: Brightness.light));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pump();
+    final tileFinder = find.byKey(
+      const ValueKey('settings.permission.fullScreenIntent'),
+    );
+    final leadingIcon = tester.widget<Icon>(
+      find.descendant(
+        of: tileFinder,
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w is Icon &&
+              (w.icon?.codePoint == Icons.open_in_full.codePoint ||
+                  w.icon?.codePoint == Icons.open_in_full_outlined.codePoint),
+        ),
+      ),
+    );
+    expect(
+      leadingIcon.icon!.codePoint,
+      Icons.open_in_full_outlined.codePoint,
+      reason:
+          'On the light theme the FSI tile must use the outlined '
+          '`Icons.open_in_full_outlined` glyph to match every '
+          'other permission tile in the section '
+          '(feature.md §2.7).',
+    );
+    expect(
+      leadingIcon.icon!.fontFamily,
+      Icons.open_in_full_outlined.fontFamily,
+      reason:
+          'The outlined variant must stay in the standard '
+          '`MaterialIcons` family.',
     );
   });
 }
