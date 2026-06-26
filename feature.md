@@ -72,13 +72,39 @@ Landing in the v1.4 sign-off PR.
 ### 1.4 Commit a `release(v1.4)` debug-signed APK
 
 `v1.1i` shipped as `222f860` (debug-signed APK, 75.1 MB, SHA1
-`c3e0f6c6`). `v1.2` and `v1.3` did NOT ship a debug-signed APK
-build artefact (the project shifted to "code PR + sign-off PR"
-shape in v1.2). v1.4 re-introduces the APK commit so the
-release artefact is on disk and easy to install: `flutter build
-apk --debug` (no signing-config touch), record the SHA1 + size
-in a `release(v1.4)` commit that mirrors the v1.1i sign-off
-shape. This is a build artefact, not a code change.
+`c3e0f6c6`). `v1.2` shipped as `5ed9fcf` (75.3 MB, SHA1
+`85ffabbdd29e6c908c2d786d77618730b18514aa`). `v1.3` did NOT ship
+a debug-signed APK commit (the project shifted to "code PR +
+sign-off PR" shape in v1.3). v1.4 attempts to re-introduce the
+APK commit but **the v1.4 APK exceeds GitHub's 100 MB file size
+limit**: the v1.4a widget (DoitWidgetProvider + WidgetChannel
++ WidgetUpdater + WidgetRenderer + WidgetStateCache + the
+`lib/widget/` Dart code + the new drawables + layouts) pushes
+the debug APK from ~75 MB (v1.2) to ~175 MB. The SHA1 +
+size were recorded locally:
+- SHA1: `dcaf115a5991151d574ceef25a6cab2d7ab81531`
+- Size: 174,842,017 bytes (166.7 MiB / 174.8 MB)
+
+User options to land the release artefact:
+- **Set up Git LFS on the repo** (recommended for future
+  releases). One-time setup; the repo's `.gitattributes` would
+  mark `*.apk` for LFS tracking; subsequent APK commits land
+  in LFS storage (separate from the 100 MB GitHub file size
+  limit). Requires repo-owner authorization.
+- **Build a single-arch APK** with
+  `flutter build apk --debug --target-platform android-arm64`
+  (drops the universal APK's armv7 + x86_64 + x86 fat-binary
+  overhead — the debug APK is normally built for all ABIs).
+- **Build with R8/proguard** via
+  `flutter build apk --release` (the v0.3 release signing
+  shape; user must drop a keystore into
+  `android/key.properties` first per CLAUDE.md). This requires
+  the v0.3 signing setup.
+
+For now, the v1.4 release artefact is the user-runs step on
+the user's machine; the SHA1 + size are recorded in this
+section for traceability. The release(v1.4) commit lands when
+one of the three options above is chosen.
 
 ### 1.5 Optional: v1.4.0 git tag
 

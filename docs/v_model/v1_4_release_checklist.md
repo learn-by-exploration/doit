@@ -43,8 +43,23 @@ These run as CI / commit-time checks, not on the device:
 ## Build + install (the user runs)
 
 - [ ] `flutter build apk --debug` — no signing-config touch.
-      Record the SHA1 + size in the `release(v1.4)` commit
-      (mirrors the v1.1i pattern at `222f860`).
+      **Note (2026-06-27):** the v1.4 debug APK exceeds GitHub's
+      100 MB file size limit at **~175 MB** (the v1.4a widget
+      surface — DoitWidgetProvider + WidgetChannel +
+      WidgetUpdater + WidgetRenderer + WidgetStateCache + the
+      `lib/widget/` Dart code + the new drawables + layouts —
+      pushes the universal debug APK from ~75 MB at v1.2 to
+      ~175 MB at v1.4). The previously-built artefact's SHA1 +
+      size were recorded locally:
+      - SHA1: `dcaf115a5991151d574ceef25a6cab2d7ab81531`
+      - Size: 174,842,017 bytes (166.7 MiB / 174.8 MB)
+      To land the APK in the repo, the user picks one of:
+      (a) set up Git LFS for `*.apk` (recommended; one-time
+      repo config), (b) build a single-arch APK with
+      `flutter build apk --debug --target-platform android-arm64`,
+      or (c) build with R8/proguard via `flutter build apk
+      --release` (requires the v0.3 signing setup). The
+      `release(v1.4)` commit lands when one is chosen.
 - [ ] `adb install -r build/app/outputs/apk/debug/app-debug.apk`
       on the Android emulator (or a real SM-S918B device).
 - [ ] Optional (asks first per CLAUDE.md):
