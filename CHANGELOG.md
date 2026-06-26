@@ -965,6 +965,82 @@ added in v1.4c remain green; the v1.4a + v1.4b + v1.4c
 + v1.4d net delta against the v1.4a `main` baseline of
 1130 is +53).
 
+### v1.4e — In-app home tile 7-day streak history sparkline (Phase 32 / SYS-119 / ADR-049 / WF-046)
+
+Closes the v1.4d → v1.4e parking-lot item: the home tile
+now renders a one-glance view of the last 7 days as a
+row of small dots under the streak badge. Filled dots
+mark days with at least one completion (manual OR
+rest-day, matching the streak calculator's
+`ConsecutiveCounter.compute` credit rule); outlined
+dots mark days with no completion; the rightmost dot
+(today) bumps to a larger filled circle when today is
+already resolved. Mirrors the `CompletionLogSection`
+review-row pattern (v1.2m / SYS-108 / WF-025) but at
+the tile surface — no scroll, no list, no per-row
+delete icon. New code:
+
+- `lib/screens/home_tile_sparkline.dart` (NEW) —
+  pure-Dart `sparklineForDo({required Do activeDo,
+  required DateTime asOf, required CompletionLogService
+  completionLog})` returns `Future<List<SparklineDot>>`.
+  The `SparklineDot` sealed hierarchy has three
+  value-equal subclasses (`SparklineDotFilled(day,
+  source)` carrying the first-matching row's source tag;
+  `SparklineDotEmpty(day)`; `SparklineDotFuture(day)`
+  for the defensive future-day case). The helper builds
+  the 7-day window `[asOf - 6 days .. asOf]` (local-
+  midnight each), then for each day performs a linear
+  first-match scan over `completionLog.listForHabit`
+  rows — emitting `SparklineDot.filled` on `dayMillis`
+  match, `SparklineDot.future` if `day.isAfter(today)`,
+  or `SparklineDot.empty` otherwise. First-match
+  semantic mirrors `home_tile_undo.undoToday` (v1.4d /
+  SYS-118) so the two helpers stay in lockstep on the
+  same-day tiebreak rule. No Flutter import, no
+  `DateTime.now()`, no side effects beyond the
+  `listForHabit` read.
+- `lib/screens/home.dart` — `_DoStreakBadge`'s right-
+  aligned `Column` grows a `_Sparkline` sub-widget
+  under the budget caption. The widget wraps the 7 dots
+  in a single `Semantics(label:
+  l.homeTileSparklineSemantics, readOnly: true)` node
+  so screen readers announce "Last 7 days" / "Últimos 7
+  días" once. While the future is in flight, the widget
+  renders `_SparklineSkeleton` (7 outlined 6 dp dots)
+  to reserve space and prevent layout shift on resolve.
+  On resolve it renders 7 `_SparklineDot` circles — 6 dp
+  outlined by default; the rightmost dot (today) bumps
+  to 8 dp + filled when `_isResolvedToday == true`. The
+  `resolvedToday` hint comes from the parent
+  `_DoStreakBadge`'s `rows.any(r.dayMillis ==
+  todayMillis)` check — re-derived from the same
+  `completions` future the streak badge already holds,
+  so no second `listForHabit` round-trip is added.
+- `lib/l10n/app_en.arb` + `app_es.arb` — 1 new key
+  (`homeTileSparklineSemantics`).
+
+**ADR-049** locks the design: pure-Dart helper behind a
+thin widget, sealed `SparklineDot` value class with
+three factories (matching the `BudgetRemaining` /
+`UndoResult` / `SparklineDot` value-class shape
+introduced across v1.4c..v1.4e), first-match `source`
+tagging mirrors `home_tile_undo.undoToday` (v1.4d) for
+in-lockstep tiebreak semantics, no second
+`listForHabit` round-trip (the `resolvedToday` hint
+rides on the parent's `completions` future), no new
+pubspec dep; no new `<uses-permission>`.
+
+**SYS-119 + ADR-049 + WF-046 appended.** `feature.md`
+§4 sparkline bullet removed; §5 quick-index updated to
+ADR-049 / SYS-119 / WF-046.
+
+Tests: 1208 / 1208 (1197 v1.4 sign-off tip + 11 new — 8
+home_tile_sparkline + 3 home_test widget extensions per
+the 3-gate at this commit; the 53 added in v1.4a..v1.4d
+remain green; the v1.4a..v1.4e net delta against the
+v1.4a `main` baseline of 1130 is +64).
+
 ### v1.3d — Light-theme icon variant for the FSI tile (feature.md §2.7)
 
 Closes the §2.7 follow-up: the Settings → Permissions

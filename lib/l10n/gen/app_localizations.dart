@@ -218,6 +218,12 @@ abstract class AppLocalizations {
   /// **'Nothing to undo for today.'**
   String get homeTileUndoNotToday;
 
+  /// Semantics label for the 7-day streak history sparkline row on the in-app home tile (v1.4e / SYS-119). Wraps the 7 dots in a single Semantics node so screen readers announce 'Last 7 days' once instead of 7 separate dots.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 days'**
+  String get homeTileSparklineSemantics;
+
   /// No description provided for @homeEmptyTitle.
   ///
   /// In en, this message translates to:

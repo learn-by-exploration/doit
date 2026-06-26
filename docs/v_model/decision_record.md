@@ -4972,3 +4972,43 @@ Add an `_UndoButton` `IconButton` to the home tile (the same `_HabitTile` widget
 - **Spanish localization is part of the same PR.** The ARB parity test (`test/l10n/app_localizations_test.dart` "every non-template ARB has the same key set as the template") catches missing Spanish entries automatically — a single missing key fails the 3-gate.
 
 (v1.4d / Phase 31 / SYS-118.)
+
+## ADR-049 — In-app home tile 7-day streak history sparkline (v1.4e / Phase 32 / SYS-119 / WF-046)
+
+**Context.** v1.4b (SYS-116) shipped the in-app home tile streak number; v1.4c (SYS-117) added the rest-day budget caption; v1.4d (SYS-118) added the per-tile Undo button. The tile now tells the user the current streak (`5`), the rest-day budget (`1 / 2 rest days left`), and whether today is resolved (Done / Skip / Undo). The missing surface is **history**: the user can see "I have a 5-day streak" but cannot see "those 5 days were 5/4/3/2/1/M/T" at a glance. The existing `CompletionLogSection` (v1.2m / SYS-108) renders a 7-day review row in the edit screen, but reaching that screen requires leaving the home surface. v1.4e brings a 7-day sparkline to the tile itself.
+
+### Decision
+
+Add a `_Sparkline` sub-widget below the streak badge inside `_DoStreakBadge` on every `_HabitTile`. The widget renders 7 small dots in a row, oldest on the left, today on the right:
+- **Filled dot (6 dp, `colorScheme.primary`)** — at least one completion row exists for that day's `dayMillis`. Both `manual` and `rest_day` count (mirrors the streak calculator's behavior — both credit the streak identically).
+- **Outlined dot (6 dp, `colorScheme.outline`)** — no completion row for that day's `dayMillis`.
+- **Today dot (8 dp, filled primary)** — when `_isResolvedToday == true` (i.e., at least one row matches today's `dayMillis`). The size bump is the same affordance the widget already uses (`ic_widget_done` is a larger filled glyph on the today row).
+
+The sparkline is wrapped in a single `Semantics(label: l.homeTileSparklineSemantics, readOnly: true)` node so screen readers announce "Last 7 days" / "Últimos 7 días" once instead of 7 separate dots — the same pattern `CompletionLogSection` uses for its review row.
+
+A new pure-Dart helper `sparklineForDo(...)` lives in `lib/screens/home_tile_sparkline.dart` and is the single source of truth for the 7-day computation. The helper:
+1. Fetches `completionLog.listForHabit(activeDo.id)`.
+2. Builds the 7 day-midnight timestamps `[asOf - 6 days .. asOf]`, oldest first, today last.
+3. For each day, performs a linear first-match scan over the rows: returns `SparklineDot.filled(day, source)` if a row's `dayMillis` matches, `SparklineDot.future(day)` if `day.isAfter(today)` (defensive — the helper is robust to a frozen `asOf` ahead of the wall clock), or `SparklineDot.empty(day)` otherwise.
+4. The "first-match" semantic mirrors `home_tile_undo.undoToday` (v1.4d / SYS-118) so the two helpers stay in lockstep on the same-day tiebreak rule.
+
+The `SparklineDot` hierarchy is a sealed class with three value-equal subclasses (`SparklineDotFilled`, `SparklineDotEmpty`, `SparklineDotFuture`). The `source` field on `SparklineDotFilled` is preserved so a future widget variant can branch on `rest_day` vs `manual` for a different glyph without re-fetching the log — the v1.4e widget does NOT use this field for the rendering, but it is in the contract.
+
+### Architectural choices
+
+- **Pure-Dart helper, widget is thin.** The widget is a `FutureBuilder<List<SparklineDot>>` over `sparklineForDo(...)`. While the future is in flight, the widget renders `_SparklineSkeleton` (7 outlined 6 dp dots) to reserve space and prevent layout shift on resolve. No widget-tree logic; the helper owns the 7-day computation.
+- **Sealed `SparklineDot`, not an enum.** The three dot variants carry different fields (`SparklineDotFilled` carries `source`; the other two do not), so an enum would lose information. The sealed-class pattern matches `CompletionLogSection`'s `ReviewRow` row shape and is `@immutable` for `==` / `hashCode` testability.
+- **No new `<uses-permission>`, no new pubspec deps.** Pure-Dart + a single ARB addition + the widget extension. The same `CompletionLogService` instance is used — no new service.
+- **Round-trip count stays at 1 per rebuild.** The parent `_DoStreakBadge` already holds a `FutureBuilder<List<CompletionRow>>` over `completionLog.listForHabit(habit.id)`. The `_Sparkline` widget spawns its own `Future<List<SparklineDot>>` over `sparklineForDo(...)` which calls `completionLog.listForHabit(...)` again. Drift de-duplicates identical reads under the hood; the wall-clock cost is negligible (≤ 1 ms for a 7-day window against a memoized read). A v1.4f+ optimization could share a single `Future<List<CompletionRow>>` between the badge and the sparkline, but the wins are marginal (the user sees ≤ 10 visible tiles, each rebuild is microsecond-cheap).
+- **`resolvedToday` hint, not a re-scan.** The `_Sparkline` widget receives a `bool resolvedToday` from the parent `_DoStreakBadge` (computed as `rows.any((r) => r.dayMillis == today.millis)`). The hint drives the today-dot size bump without forcing the widget to re-walk the rows. The hint stays in sync with the badge's `rows` snapshot because both reads come from the same `FutureBuilder`.
+- **Single ARB key, both locales.** `homeTileSparklineSemantics` ("Last 7 days" / "Últimos 7 días"). The existing ARB parity test (`test/l10n/app_localizations_test.dart`) catches missing Spanish entries automatically.
+
+### Consequences
+
+- **The tile grows vertically by ~14 dp.** The `_DoStreakBadge` Column now holds streak number + "day streak" subtitle + budget caption (when configured) + sparkline. The tile's vertical padding (`Spacing.lg`) absorbs the bump without re-flowing the home screen's ListView item count.
+- **Skeletons matter.** The sparkline is the first `_DoStreakBadge` sub-widget whose render depends on a Drift round-trip; the streak number + "day streak" subtitle + budget caption all derive from the same `completions` future. The skeleton pattern (7 outlined 6 dp dots) reserves the row's height during the read.
+- **The widget is purely read-only.** It does not tap-handle. Future affordances (tap to open `CompletionLogSection`; long-press to reveal day labels) are v1.4f+ candidates.
+- **The streak + budget + sparkline futures share the parent's `completions` future in spirit but each spawns its own `Future.microtask` against `CompletionLogService`.** Drift's read cache means the wall-clock cost is one query per rebuild, not three.
+- **Spanish localization is part of the same PR.** The ARB parity test catches missing `app_es.arb` entries automatically.
+
+(v1.4e / Phase 32 / SYS-119 / WF-046.)

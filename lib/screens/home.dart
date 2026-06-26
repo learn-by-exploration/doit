@@ -33,6 +33,7 @@ import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/screens/home_tile_budget.dart';
 import 'package:doit/screens/home_tile_completion.dart';
 import 'package:doit/screens/home_tile_skip.dart';
+import 'package:doit/screens/home_tile_sparkline.dart';
 import 'package:doit/screens/home_tile_streak.dart';
 import 'package:doit/screens/home_tile_undo.dart';
 import 'package:doit/screens/mission_launcher.dart';
@@ -735,6 +736,28 @@ class _DoStreakBadge extends StatelessWidget {
                     );
                   },
                 ),
+                // v1.4e / Phase 32 / SYS-119: 7-day sparkline
+                // row. Renders one dot per day for the last
+                // week; today is highlighted via a larger
+                // filled dot. `completionLog` is the same
+                // singleton the streak + budget futures
+                // already use — re-using it keeps the
+                // round-trip count to one Drift read per
+                // tile rebuild.
+                _Sparkline(
+                  activeDo: activeDo,
+                  asOf: asOf,
+                  completionLog: CompletionLogService.instance,
+                  resolvedToday: rows.any(
+                    (r) =>
+                        r.dayMillis ==
+                        DateTime(
+                          asOf.year,
+                          asOf.month,
+                          asOf.day,
+                        ).millisecondsSinceEpoch,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1219,6 +1242,163 @@ class _BudgetCaption extends StatelessWidget {
     return Text(
       l.homeTileBudgetRemaining(budget.remaining, budget.limit),
       style: Theme.of(context).textTheme.bodySmall,
+    );
+  }
+}
+
+/// v1.4e / Phase 32 / SYS-119 / ADR-049 / WF-046 — the
+/// 7-day streak history sparkline rendered under the
+/// streak badge on the in-app home tile.
+///
+/// Wraps `sparklineForDo` (the pure-Dart helper) in a
+/// `FutureBuilder` and renders a row of 7 dots:
+///   - filled: at least one completion row exists for that
+///     day (manual or rest_day);
+///   - outlined: no completion row for that day;
+///   - the rightmost dot (today) is larger + filled when
+///     the user has resolved today.
+///
+/// `resolvedToday` is a sync hint from the parent
+/// `_DoStreakBadge` so the sparkline does not have to
+/// re-walk the rows; the hint is `true` when at least one
+/// row in `completions` matches today's local-midnight.
+class _Sparkline extends StatelessWidget {
+  const _Sparkline({
+    required this.activeDo,
+    required this.asOf,
+    required this.completionLog,
+    required this.resolvedToday,
+  });
+
+  final Do activeDo;
+  final DateTime asOf;
+  final CompletionLogService completionLog;
+  final bool resolvedToday;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final l = AppLocalizations.of(context);
+    return Semantics(
+      label: l.homeTileSparklineSemantics,
+      readOnly: true,
+      child: FutureBuilder<List<SparklineDot>>(
+        future: sparklineForDo(
+          activeDo: activeDo,
+          asOf: asOf,
+          completionLog: completionLog,
+        ),
+        builder: (context, snap) {
+          final dots = snap.data;
+          if (dots == null) {
+            // Skeleton: 7 outlined tiny dots so the row
+            // reserves its space while the DB read
+            // resolves.
+            return const _SparklineSkeleton();
+          }
+          return Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < dots.length; i++)
+                  _SparklineDot(
+                    dot: dots[i],
+                    isToday: i == dots.length - 1,
+                    isResolvedToday: resolvedToday,
+                    filledColor: colorScheme.primary,
+                    emptyColor: colorScheme.outline,
+                    futureColor: colorScheme.outlineVariant,
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// A single 6dp dot in the 7-day sparkline. Filled when
+/// the underlying day has at least one completion row,
+/// outlined otherwise. The today dot (last in the row)
+/// bumps to 8dp + primary when the user has resolved
+/// today; otherwise it stays outlined like any other
+/// day.
+class _SparklineDot extends StatelessWidget {
+  const _SparklineDot({
+    required this.dot,
+    required this.isToday,
+    required this.isResolvedToday,
+    required this.filledColor,
+    required this.emptyColor,
+    required this.futureColor,
+  });
+
+  final SparklineDot dot;
+  final bool isToday;
+  final bool isResolvedToday;
+  final Color filledColor;
+  final Color emptyColor;
+  final Color futureColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final isFilled = dot is SparklineDotFilled;
+    final isFuture = dot is SparklineDotFuture;
+    final color = isFilled
+        ? filledColor
+        : isFuture
+        ? futureColor
+        : emptyColor;
+    final todayFilled = isToday && isResolvedToday;
+    final size = todayFilled ? 8.0 : 6.0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 1.5),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: todayFilled || isFilled ? color : null,
+          border: todayFilled || isFilled
+              ? null
+              : Border.all(color: color, width: 1.2),
+        ),
+      ),
+    );
+  }
+}
+
+/// Skeleton placeholder for the sparkline row while the
+/// Drift read is in flight. Renders 7 outlined dots so the
+/// row reserves its space and the layout does not jump on
+/// resolve.
+class _SparklineSkeleton extends StatelessWidget {
+  const _SparklineSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final outline = Theme.of(context).colorScheme.outlineVariant;
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < 7; i++)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 1.5),
+              child: Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: outline, width: 1.2),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -93,6 +93,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeTileUndoNotToday => 'Nothing to undo for today.';
 
   @override
+  String get homeTileSparklineSemantics => 'Last 7 days';
+
+  @override
   String get homeEmptyTitle => 'No dos yet.';
 
   @override
