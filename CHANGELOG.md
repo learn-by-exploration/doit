@@ -1488,6 +1488,65 @@ flutter test                                         →   1064 / 1064 passed (n
 (The doc-only annotation is the entire diff; the test
 count is unchanged because no Dart code moved.)
 
+### v1.3e — Native Spanish translation review-process scaffolding (Phase 25c)
+
+Closes the **process** half of `feature.md §2.4` (the
+native-speaker review pass itself remains a follow-up
+owned by the reviewer). This PR ships:
+
+- New `docs/v_model/spanish_translation_review.md` —
+  the per-key reviewer checklist. Every one of the 81
+  keys in `lib/l10n/app_es.arb` is tabulated with an
+  author-side note flagging the keys most likely to read
+  awkwardly (the `tarea`-vs-`do` translator choice on
+  the home tile; the "hacer sonar contactos específicos
+  en modo silencio" call-screening onboarding line;
+  "Comprobación" vs "verificación" in the
+  `Reliability.unknown` copy; etc.). The reviewer is
+  expected to walk the live UI in Spanish and replace
+  any string that does not read as natural Mexican /
+  Rioplatense / peninsular Spanish.
+- One low-risk conjugation fix in
+  `lib/l10n/app_es.arb`:
+  `settingsAnchorManual`: `"... toco ..."` →
+  `"... tocas ..."` (second-person matches every other
+  tile in the app).
+- A reviewer log table at the bottom of the new doc —
+  the native-speaker reviewer adds their row when they
+  ship the follow-up PR.
+- `docs/v_model/v1_2_release_baseline.md` §5 — the §2.4
+  entry now notes "PR #29 ships the review-process
+  scaffolding; the native-speaker pass itself remains a
+  follow-up".
+
+**Why not a self-translation.** The author is not a
+native Spanish speaker; shipping a machine-style
+self-translation would be worse than the v1.1h
+smoke-test catalog. The right move is to lay out the
+process (this PR) and let a native speaker own the
+content pass (a separate PR they open).
+
+**Out of scope (deferred).**
+- A regional split (`app_es_419.arb` vs
+  `app_es_ES.arb`) — requires a target-market decision
+  first.
+- New locales (`app_fr.arb`, `app_de.arb`, etc.).
+- Currency / date / number formatting changes (Spanish
+  uses the `intl` defaults that already handle es-ES
+  style).
+
+**Verification.**
+```
+dart format --output=none --set-exit-if-changed .   →   0 changed
+flutter analyze --fatal-infos                       →   0 issues
+flutter test                                        →   1047 / 1047 passed (no count delta)
+```
+
+The ARB fix is a single character; the codegen
+(`flutter gen-l10n`) re-emits the same `AppLocalizations`
+class because the `toco` → `tocas` change is a string
+replacement, not a structural one.
+
 ### v1.3a — Monthly stats + per-do grace factory (Phase 12)
 
 Phase 12 of the v1.3 reliability + lifecycle hardening
