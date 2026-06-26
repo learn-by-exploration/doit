@@ -319,18 +319,15 @@ These items are deferred beyond v1.4 but are explicitly **v1
 work** (no v2.0 jump). They are tracked here so they don't get
 lost between the v1.4 closeout and the next milestone kickoff.
 
-| ADRs | `docs/v_model/decision_record.md` | up to ADR-050 (9 v1.2 ADRs appended in the closeout PR — ADR-033..ADR-041 covering SYS-098..SYS-110; v1.3 sub-entries appended ADR-042..ADR-044 covering SYS-112..SYS-114; v1.4 sub-entries appended ADR-045..ADR-048 covering SYS-115..SYS-118; v1.4f sub-entry appended ADR-050 covering SYS-120 — widget-side Skip + Undo at the Android home-screen widget surface); v1.2c/d/e/f/h/i/j/l/m earned ADRs; v1.2g/k did not (doc-only closeout / routine UI affordance respectively) |
-| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 sub-entries appended SYS-111..SYS-114 (4 IDs); v1.4 sub-entries appended SYS-115..SYS-118 (4 IDs — home widget, tile streak+Done, tile Skip+budget, tile Undo); v1.4e appended SYS-119 (tile 7-day sparkline); v1.4f appended SYS-120 (widget-side Skip + Undo). v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
-| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 sub-entries added WF-040, WF-041; v1.4 sub-entries added WF-042..WF-046; v1.4f added WF-047 (widget-side Skip + Undo from the home widget). Cross-check the rest are in `traceability_matrix.md` |
+| ADRs | `docs/v_model/decision_record.md` | up to ADR-051 (9 v1.2 ADRs appended in the closeout PR — ADR-033..ADR-041 covering SYS-098..SYS-110; v1.3 sub-entries appended ADR-042..ADR-044 covering SYS-112..SYS-114; v1.4 sub-entries appended ADR-045..ADR-048 covering SYS-115..SYS-118; v1.4f sub-entry appended ADR-050 covering SYS-120 — widget-side Skip + Undo; v1.4g sub-entry appended ADR-051 covering SYS-121 — widget-action round-trip Kotlin → Dart via the inbound `doit/widget` MethodChannel); v1.2c/d/e/f/h/i/j/l/m earned ADRs; v1.2g/k did not (doc-only closeout / routine UI affordance respectively) |
+| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 sub-entries appended SYS-111..SYS-114 (4 IDs); v1.4 sub-entries appended SYS-115..SYS-118 (4 IDs — home widget, tile streak+Done, tile Skip+budget, tile Undo); v1.4e appended SYS-119 (tile 7-day sparkline); v1.4f appended SYS-120 (widget-side Skip + Undo); v1.4g appended SYS-121 (widget-action round-trip — bidirectional `doit/widget` MethodChannel). v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
+| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 sub-entries added WF-040, WF-041; v1.4 sub-entries added WF-042..WF-046; v1.4f added WF-047 (widget-side Skip + Undo from the home widget); v1.4g added WF-048 (widget action button taps round-trip to Dart's `WidgetService`). Cross-check the rest are in `traceability_matrix.md` |
 
-**v1.4g+ follow-up** — Tile + widget surface gaps after
+**v1.4h+ follow-up** — Tile + widget surface gaps after
   the v1.4a widget + v1.4b tile streak + v1.4c tile skip
   + v1.4d tile undo + v1.4e tile sparkline + v1.4f widget-side
-  Skip + Undo ship: widget-side "Done" tap round-trip to Dart
-  (closes the latent v1.4a gap noted in ADR-050 — the existing
-  "Done" tap still only triggers `WidgetUpdater.refreshAll`
-  from the Kotlin `ACTION_MARK_DONE` broadcast, not a Dart
-  round-trip); widget small / large variants, widget config
+  Skip + Undo + v1.4g widget-action round-trip ship: widget
+  small / large variants, widget config
   activity, widget list (scrolling), widget deep-link to a
   specific do; tile edit / delete affordance (currently
   long-press select-mode only); rest-day history visualization;
@@ -374,11 +371,11 @@ the commit message (mirrors the v1.1i pattern at `222f860`).
 Then optionally tag `v1.4.0`, then optionally
 `flutter build appbundle --release` + on-device install.
 
-The v1.4g+ parking lot at `feature.md` §4 has fresh candidates
-ready for the next cycle: widget-side "Done" tap round-trip
-to Dart (closes the latent v1.4a gap noted in ADR-050);
-widget small / large variants, widget config activity, widget list
-(scrolling), widget deep-link to a specific do; rest-day
-history visualization; rest-day budget edit affordance.
+The v1.4h+ parking lot at `feature.md` §4 has fresh candidates
+ready for the next cycle: widget small / large variants, widget
+config activity, widget list (scrolling), widget deep-link to a
+specific do; rest-day history visualization; rest-day budget edit
+affordance. (The v1.4g widget-action round-trip closure closed
+the v1.4g+ "widget-side Done tap round-trip to Dart" item.)
 See `docs/v_model/plan.md` Milestone 12+ for the candidate
 list.

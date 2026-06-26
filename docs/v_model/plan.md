@@ -813,7 +813,18 @@ re-used verbatim; no new Drift methods, no new
   In-app tile 7-day streak history sparkline: shipped
   (PR #39, commit `4049866` on main).
 - **v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047** —
-  Android home widget Skip today + Undo today: _this PR_.
+  Android home widget Skip today + Undo today: shipped
+  (PR #40, commit `fe9630e` on main).
+- **v1.4g / Phase 34 / SYS-121 / ADR-051 / WF-048** —
+  Widget-action round-trip: Kotlin → Dart via inbound
+  `doit/widget` channel: _this PR_. Closes the latent
+  v1.4a + v1.4f gap (widget buttons NEVER wrote to the
+  completion log; only repainted via `WidgetUpdater.refreshAll`).
+  The `doit/widget` MethodChannel becomes bidirectional;
+  `WidgetActionInvoker` is the new inbound dispatcher;
+  `WidgetService.markDone` returns `Future<bool>`; Kotlin
+  `invokeAction` suspending helper with 5 s timeout; new
+  `EXTRA_HABIT_ID` extra on the action `PendingIntent`s.
 
 **Milestone 11 v1.4 — fully shipped on `main`.** Version
 bump + V-Model docs (CHANGELOG `[1.4.0]` block +

@@ -46,6 +46,7 @@ import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/reliability_service.dart';
 import 'package:doit/widget/doit_widget_state.dart';
+import 'package:doit/widget/widget_action_invoker.dart';
 import 'package:doit/widget/widget_bridge.dart';
 import 'package:doit/widget/widget_state_builder.dart';
 import 'package:doit/widget/widget_state_cache.dart';
@@ -106,6 +107,12 @@ class WidgetService {
       cache: cache ?? WidgetStateCache.instance,
     );
     _instance = service;
+    // v1.4g / SYS-121 / ADR-051 / WF-048: attach the inbound
+    // `doit/widget` channel handler so the Kotlin side's
+    // widget taps can invoke Dart's markDone / skip / undo.
+    // attach() is idempotent — a second call (e.g., from a
+    // test that re-runs init) is a no-op.
+    await WidgetActionInvoker.attach();
     // Subscribe to the reliability stream. Production
     // wires this to `ReliabilityService.instance.reliability`;
     // tests inject a fake stream via the test seam (the
@@ -205,19 +212,32 @@ class WidgetService {
   /// widget "Done" tap is conceptually identical to the
   /// home-tile "Done" tap — same audit trail, same
   /// `proofModeAtTime` snapshot.
-  Future<void> markDone(String habitId) async {
-    if (_disposed) return;
+  ///
+  /// v1.4g / SYS-121 / ADR-051 / WF-048: returns `Future<bool>`
+  /// (matching the v1.4f `skip` / `undo` contract) so the
+  /// inbound channel handler can relay a success / failure
+  /// outcome back to the Kotlin-side `WidgetChannel.invokeAction`
+  /// caller. `true` on a successful append; `false` when the
+  /// do does not exist (no append), when the service is
+  /// disposed, or when the underlying write fails.
+  Future<bool> markDone(String habitId) async {
+    if (_disposed) return false;
     final activeDo = await _doRepository.getById(habitId);
-    if (activeDo == null) return;
-    final asOf = DateTime.now();
-    final day = DateTime(asOf.year, asOf.month, asOf.day);
-    await _completionLog.append(
-      habitId: habitId,
-      day: day,
-      source: CompletionSource.manual,
-      proofModeAtTime: proofModeTag(activeDo.proofMode),
-    );
+    if (activeDo == null) return false;
+    try {
+      final asOf = DateTime.now();
+      final day = DateTime(asOf.year, asOf.month, asOf.day);
+      await _completionLog.append(
+        habitId: habitId,
+        day: day,
+        source: CompletionSource.manual,
+        proofModeAtTime: proofModeTag(activeDo.proofMode),
+      );
+    } catch (_) {
+      return false;
+    }
     await handleRefreshRequest();
+    return true;
   }
 
   /// Append a rest-day completion for [habitId] via

@@ -70,7 +70,14 @@ object WidgetUpdater {
 
     private var engine: FlutterEngine? = null
 
-    private fun ensureFlutterEngine(ctx: Context) {
+    /**
+     * Boot the one-shot FlutterEngine. Public so
+     * [WidgetChannel.invokeAction] (v1.4g / SYS-121)
+     * can ensure the engine is alive before sending an
+     * inbound `MethodChannel` call to Dart. Idempotent —
+     * a second call is a no-op.
+     */
+    fun ensureFlutterEngine(ctx: Context) {
         if (engine != null) return
         FlutterLoader().startInitialization(ctx)
         val newEngine = FlutterEngine(ctx.applicationContext)

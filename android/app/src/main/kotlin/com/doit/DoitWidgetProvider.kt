@@ -9,6 +9,10 @@ import android.content.Intent
 import android.widget.RemoteViews
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * The Android home-screen widget provider (v1.4a / Phase 28 /
@@ -22,11 +26,11 @@ import io.flutter.embedding.engine.dart.DartExecutor
  *     (middle row),
  *   - a reliability badge (optimal / degraded / unknown icon),
  *   - a "Skip today" `ImageButton` (v1.4f / SYS-120) that
- *     round-trips to Dart via [WidgetChannel.skip],
+ *     round-trips to Dart via [WidgetChannel.invokeAction],
  *   - an "Undo today" `ImageButton` (v1.4f / SYS-120) that
- *     round-trips to Dart via [WidgetChannel.undo],
+ *     round-trips to Dart via [WidgetChannel.invokeAction],
  *   - a "Done" `ImageButton` that round-trips to Dart via
- *     [WidgetChannel.markDone].
+ *     [WidgetChannel.invokeAction].
  *
  * Cold-start fallback (SYS-115 risk #2): the host process
  * can be killed at any time; [onUpdate] reads the cached
@@ -50,13 +54,36 @@ import io.flutter.embedding.engine.dart.DartExecutor
  *     `ACTION_WIDGET_UNDO` custom actions posted by
  *     [WidgetUpdater] + the widget buttons.
  *
+ * v1.4g / Phase 34 / SYS-121 / ADR-051 / WF-048: the
+ * three widget action arms (`ACTION_MARK_DONE` /
+ * `ACTION_WIDGET_SKIP` / `ACTION_WIDGET_UNDO`) now
+ * route through [WidgetChannel.invokeAction] which
+ * sends an INBOUND `MethodChannel` call to the Dart-side
+ * [com.doit.widget.WidgetActionInvoker] so the actual
+ * completion write / rest-day append / row delete goes
+ * through Dart's [com.doit.services.WidgetService].
+ * v1.4a + v1.4f shipped the buttons WITHOUT the
+ * round-trip (only repainted via [WidgetUpdater.refreshAll])
+ * — closing the latent gap is the v1.4g scope.
+ *
  * No network calls, no DB writes, no broadcast receivers
  * beyond APPWIDGET_UPDATE.
  *
  * v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042.
  * v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047.
+ * v1.4g / Phase 34 / SYS-121 / ADR-051 / WF-048.
  */
 class DoitWidgetProvider : AppWidgetProvider() {
+    /**
+     * Coroutine scope for the suspending
+     * [WidgetChannel.invokeAction] calls. We use the IO
+     * dispatcher because the channel call posts to the
+     * platform main thread and awaits a Dart-side result;
+     * using IO keeps [onReceive] non-blocking on the main
+     * thread.
+     */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override fun onUpdate(
         ctx: Context,
         mgr: AppWidgetManager,
@@ -115,68 +142,73 @@ class DoitWidgetProvider : AppWidgetProvider() {
                 }
             }
             ACTION_MARK_DONE -> {
-                // The widget's "Done" button was tapped.
-                // Forward to WidgetChannel.markDone which
-                // triggers a Dart round-trip. The Dart side
-                // resolves the active habit id from the
-                // cache, appends the completion via
-                // CompletionLogService.append, re-computes
-                // the widget state, and writes the new cache.
+                // v1.4g / Phase 34 / SYS-121 / ADR-051 /
+                // WF-048. The widget's "Done" button was
+                // tapped. Forward to [WidgetChannel.invokeAction]
+                // which sends an INBOUND `MethodChannel` call
+                // to Dart's [WidgetActionInvoker]. The Dart
+                // side resolves the active habit id from
+                // the cache (or, in this case, from the
+                // intent extras — the widget's "Done"
+                // PendingIntent sets `EXTRA_HABIT_ID` for
+                // the case where the cache is stale), then
+                // appends the completion via
+                // [CompletionLogService], re-derives the
+                // state, and writes the new cache. We
+                // launch the suspending `invokeAction` on
+                // the IO dispatcher so the BroadcastReceiver
+                // doesn't block the main thread.
                 WidgetChannel.setAppContext(ctx.applicationContext)
-                val state = WidgetStateCache.cachedFromPrefs(ctx)
-                val habitId = state?.optString("habitId")
+                val habitId = intent.getStringExtra(EXTRA_HABIT_ID)
+                    ?: WidgetStateCache.cachedFromPrefs(ctx)?.optString("habitId")
                 if (!habitId.isNullOrEmpty()) {
-                    // Mirror the WidgetChannel.markDone
-                    // dispatch shape so the Dart side reads
-                    // the same `{habitId: ...}` argument
-                    // shape. We bypass the engine here
-                    // because WidgetUpdater.refreshAll
-                    // (called via WidgetChannel) re-derives
-                    // the state and repaints.
-                    WidgetUpdater.refreshAll(ctx)
+                    scope.launch {
+                        WidgetChannel.invokeAction(ctx, "markDone", habitId)
+                        WidgetUpdater.refreshAll(ctx)
+                    }
                 }
             }
             ACTION_WIDGET_SKIP -> {
-                // v1.4f / Phase 33 / SYS-120 / ADR-050 /
-                // WF-047. The widget's "Skip today" button
-                // was tapped. Same shape as
-                // `ACTION_MARK_DONE` — forward to
-                // WidgetChannel.skip which triggers a Dart
-                // round-trip. The Dart side reads the habit
-                // id from the cache and appends a rest-day
-                // completion via
-                // CompletionLogService.append (consuming
-                // one rest-day budget unit for the current
-                // month). Defensive: skip the round-trip
-                // when the cache has no habitId (the button
-                // should be hidden, but the broadcast could
-                // still fire on a race).
+                // v1.4g / Phase 34 / SYS-121 / ADR-051 /
+                // WF-048. The widget's "Skip today" button
+                // was tapped. Same shape as `ACTION_MARK_DONE`
+                // — forward to [WidgetChannel.invokeAction]
+                // with the `skip` arm. The Dart side reads
+                // the habit id (intent extras preferred,
+                // cache fallback) and appends a rest-day
+                // completion via [CompletionLogService].
                 WidgetChannel.setAppContext(ctx.applicationContext)
-                val state = WidgetStateCache.cachedFromPrefs(ctx)
-                val habitId = state?.optString("habitId")
+                val habitId = intent.getStringExtra(EXTRA_HABIT_ID)
+                    ?: WidgetStateCache.cachedFromPrefs(ctx)?.optString("habitId")
                 if (!habitId.isNullOrEmpty()) {
-                    WidgetUpdater.refreshAll(ctx)
+                    scope.launch {
+                        WidgetChannel.invokeAction(ctx, "skip", habitId)
+                        WidgetUpdater.refreshAll(ctx)
+                    }
                 }
             }
             ACTION_WIDGET_UNDO -> {
-                // v1.4f / Phase 33 / SYS-120 / ADR-050 /
-                // WF-047. The widget's "Undo today" button
+                // v1.4g / Phase 34 / SYS-121 / ADR-051 /
+                // WF-048. The widget's "Undo today" button
                 // was tapped. Same shape as
                 // `ACTION_MARK_DONE` — forward to
-                // WidgetChannel.undo which triggers a Dart
-                // round-trip. The Dart side reads the habit
-                // id from the cache and deletes today's
-                // completion row via
-                // CompletionLogService.deleteById. The
-                // button is hidden by the renderer when no
-                // completion row exists for today; the
+                // [WidgetChannel.invokeAction] with the
+                // `undo` arm. The Dart side reads the habit
+                // id (intent extras preferred, cache
+                // fallback) and deletes today's completion
+                // row via [CompletionLogService.deleteById].
+                // The button is hidden by the renderer when
+                // no completion row exists for today; the
                 // habitId-empty check below is a defensive
                 // belt-and-suspenders guard.
                 WidgetChannel.setAppContext(ctx.applicationContext)
-                val state = WidgetStateCache.cachedFromPrefs(ctx)
-                val habitId = state?.optString("habitId")
+                val habitId = intent.getStringExtra(EXTRA_HABIT_ID)
+                    ?: WidgetStateCache.cachedFromPrefs(ctx)?.optString("habitId")
                 if (!habitId.isNullOrEmpty()) {
-                    WidgetUpdater.refreshAll(ctx)
+                    scope.launch {
+                        WidgetChannel.invokeAction(ctx, "undo", habitId)
+                        WidgetUpdater.refreshAll(ctx)
+                    }
                 }
             }
         }
@@ -190,9 +222,9 @@ class DoitWidgetProvider : AppWidgetProvider() {
         /** Custom action posted by the widget's "Done"
          *  button via a [PendingIntent.getBroadcast]. The
          *  provider's [onReceive] dispatches to Dart via
-         *  the [WidgetChannel.markDone] arm. The habit id
-         *  is read from the cache (the Kotlin side does
-         *  not own completion writes). */
+         *  the [WidgetChannel.invokeAction] arm. The habit
+         *  id is read from `EXTRA_HABIT_ID` (preferred) or
+         *  the cache (fallback). */
         const val ACTION_MARK_DONE = "com.doit.WIDGET_MARK_DONE"
 
         /** v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047.
@@ -200,9 +232,8 @@ class DoitWidgetProvider : AppWidgetProvider() {
          *  today" `ImageButton` via a
          *  [PendingIntent.getBroadcast]. The provider's
          *  [onReceive] dispatches to Dart via the
-         *  [WidgetChannel.skip] arm. The habit id is read
-         *  from the cache (the Kotlin side does not own
-         *  rest-day writes). */
+         *  [WidgetChannel.invokeAction] arm with the
+         *  `skip` action. */
         const val ACTION_WIDGET_SKIP = "com.doit.WIDGET_SKIP"
 
         /** v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047.
@@ -210,9 +241,17 @@ class DoitWidgetProvider : AppWidgetProvider() {
          *  today" `ImageButton` via a
          *  [PendingIntent.getBroadcast]. The provider's
          *  [onReceive] dispatches to Dart via the
-         *  [WidgetChannel.undo] arm. The habit id is read
-         *  from the cache (the Kotlin side does not own
-         *  completion deletes). */
+         *  [WidgetChannel.invokeAction] arm with the
+         *  `undo` action. */
         const val ACTION_WIDGET_UNDO = "com.doit.WIDGET_UNDO"
+
+        /** v1.4g / Phase 34 / SYS-121 / ADR-051 / WF-048.
+         *  Extras key on the widget's action `Intent`s
+         *  carrying the target habit id. The widget's
+         *  `ImageButton`s set this in the `PendingIntent`
+         *  so the provider's `onReceive` can route the
+         *  inbound call to the correct Dart-side
+         *  [com.doit.services.WidgetService] method. */
+        const val EXTRA_HABIT_ID = "com.doit.EXTRA_HABIT_ID"
     }
 }
