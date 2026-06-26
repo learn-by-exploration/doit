@@ -32,6 +32,7 @@ import 'package:doit/do/proof_mode.dart';
 import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/screens/home_tile_budget.dart';
 import 'package:doit/screens/home_tile_completion.dart';
+import 'package:doit/screens/home_tile_delete.dart';
 import 'package:doit/screens/home_tile_skip.dart';
 import 'package:doit/screens/home_tile_sparkline.dart';
 import 'package:doit/screens/home_tile_streak.dart';
@@ -242,6 +243,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       onTap: _selectMode
                           ? () => _toggleSelect(habits[i].id)
                           : () => _onTileTap(habits[i].id),
+                      // v1.4h / SYS-122: per-tile edit/delete
+                      // mutates the do set; re-fetch the
+                      // habits future so the tile disappears
+                      // immediately.
+                      onDoChanged: _refresh,
                     ),
                   );
                 },
@@ -295,12 +301,18 @@ class _HabitTile extends StatefulWidget {
     this.selectMode = false,
     this.onLongPress,
     this.onTap,
+    this.onDoChanged,
   });
   final Do habit;
   final bool selected;
   final bool selectMode;
   final VoidCallback? onLongPress;
   final VoidCallback? onTap;
+  // v1.4h / SYS-122: invoked when the tile mutates the
+  // do set (delete; or an edit that adds/removes a do).
+  // The home screen re-fetches its `_habitsFuture` on
+  // this callback so the tile disappears immediately.
+  final VoidCallback? onDoChanged;
 
   @override
   State<_HabitTile> createState() => _HabitTileState();
@@ -506,6 +518,130 @@ class _HabitTileState extends State<_HabitTile> {
     }
   }
 
+  /// v1.4h / SYS-122 — per-tile "Edit" handler. Mirrors
+  /// the home-screen `_onTileTap` (`lib/screens/home.dart:120`)
+  /// but invoked from an explicit IconButton on the tile
+  /// surface instead of the body-tap. The body-tap is
+  /// still the fastest path for power users; the new
+  /// IconButton is the discoverable affordance for users
+  /// who don't know that tapping the body opens the
+  /// editor.
+  ///
+  /// `AddHabitScreen` already pops `true` on a hard
+  /// delete (WF-022); on that signal we trigger the
+  /// parent's `_refresh()` via `widget.onDoChanged` so the
+  /// tile disappears immediately. A normal save pops
+  /// `false` (or `null`) and the tile stays.
+  Future<void> _onEditPressed() async {
+    final deleted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => AddHabitScreen(habitId: widget.habit.id),
+      ),
+    );
+    if (deleted == true) {
+      widget.onDoChanged?.call();
+    }
+  }
+
+  /// v1.4h / SYS-122 — per-tile "Delete" handler. Opens
+  /// an `AlertDialog` (gated on the user tapping "Delete"
+  /// in the dialog) → calls the pure-Dart `deleteDo`
+  /// helper → on `true` shows a SnackBar with an "Undo"
+  /// action that re-saves the captured `Do` reference.
+  ///
+  /// The undo path does NOT restore the completion-log
+  /// rows that were cascade-deleted with the do (the
+  /// `_db.delete(_db.habits)` FK pragma removes the
+  /// linked `completions` rows). Re-save only restores
+  /// the do row — the streak counter will start from 0
+  /// on the restored do. This is the v1.4h trade-off:
+  /// snapshotting the completion log for a true undo
+  /// would be a v1.4h+ follow-up (a soft-delete column
+  /// on the `habits` table).
+  ///
+  /// Flow: tap → open `AlertDialog` (gated on
+  /// confirm) → capture `messenger = ScaffoldMessenger.of(context)`
+  /// BEFORE the async gap → `setState(_busy = true)` →
+  /// `deleteDo(...)` → on `true` clear `_busy` + flip
+  /// `onDoChanged` → show SnackBar with Undo action →
+  /// on `false` (helper returned false) clear `_busy`
+  /// and show failure snackbar WITHOUT removing the
+  /// tile.
+  Future<void> _onDeletePressed() async {
+    if (_busy) return;
+    final l = AppLocalizations.of(context);
+    final habit = widget.habit;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l.homeTileDeleteConfirm(habit.name)),
+        content: Text(l.homeTileDeleteConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              MaterialLocalizations.of(dialogContext).cancelButtonLabel,
+            ),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l.homeTileDelete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+    // Capture the messenger BEFORE the async gap so we
+    // can surface the snackbar even if the post-delete
+    // setState disposes the widget (e.g., the parent
+    // rebuild removes the tile).
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    final ok = await deleteDo(
+      activeDo: habit,
+      repository: DoRepository.instance,
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!ok) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l.homeSnackbarDoDeleteFailed)),
+      );
+      return;
+    }
+    // Happy path: the do is gone from the DB. The
+    // captured `habit` reference is still valid in
+    // memory — we re-save it on Undo. The parent's
+    // `_refresh()` re-fetches the list so the tile
+    // disappears immediately.
+    widget.onDoChanged?.call();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(l.homeSnackbarDoDeleted(habit.name)),
+        action: SnackBarAction(
+          label: l.homeSnackbarDoDeletedUndo,
+          onPressed: () async {
+            try {
+              await DoRepository.instance.save(habit);
+              widget.onDoChanged?.call();
+            } catch (_) {
+              // Defensive: if the re-save fails (e.g., the
+              // user created a new do with the same name in
+              // the gap), the SnackBar stays the success
+              // state — the user can add the do back
+              // manually via the FAB. The DB is the source
+              // of truth, not the in-memory `habit`.
+            }
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final habit = widget.habit;
@@ -618,6 +754,16 @@ class _HabitTileState extends State<_HabitTile> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // v1.4h / SYS-122: per-tile edit
+                      // button. Renders first (leftmost) in
+                      // the action row, separated from the
+                      // completion buttons (Skip / Undo /
+                      // Done) so the destructive-action
+                      // cluster (Edit / Delete) is visually
+                      // distinct from the completion
+                      // cluster.
+                      _EditButton(onPressed: _onEditPressed),
+                      _DeleteButton(busy: _busy, onPressed: _onDeletePressed),
                       // v1.4c / SYS-117: skip-today button.
                       // Hidden when the do has no rest-day
                       // budget configured (the user opted
@@ -802,6 +948,66 @@ class _DoneButton extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           : Icon(icon),
+      iconSize: Sizing.tapHome / 2,
+      onPressed: busy ? null : onPressed,
+    );
+  }
+}
+
+/// v1.4h / SYS-122 — the per-tile "Edit" button. Opens
+/// `AddHabitScreen` in edit mode for this do. Mirrors the
+/// body-tap affordance (the existing path that opens the
+/// editor from the home screen, see
+/// `_HomeScreenState._onTileTap`) but as an explicit,
+/// discoverable IconButton so the affordance is visible
+/// without knowing the body-tap gesture.
+///
+/// No busy state — the edit screen is a navigation push,
+/// not an in-flight write. The IconButton is always
+/// tappable; the tile's `_busy` flag (which gates the
+/// completion buttons) does not apply here.
+class _EditButton extends StatelessWidget {
+  const _EditButton({required this.onPressed});
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return IconButton(
+      tooltip: l.homeTileEdit,
+      icon: const Icon(Icons.edit_outlined),
+      iconSize: Sizing.tapHome / 2,
+      onPressed: onPressed,
+    );
+  }
+}
+
+/// v1.4h / SYS-122 — the per-tile "Delete" button. Opens
+/// an `AlertDialog` (the parent `_HabitTileState._onDeletePressed`
+/// pops `true` on confirm) that calls
+/// `DoRepository.deleteById` and shows a SnackBar with an
+/// "Undo" action that re-saves the captured do.
+///
+/// Visual states mirror `_SkipButton`:
+///   - busy → spinner (in-flight `deleteById` call)
+///   - otherwise → outlined trash icon
+class _DeleteButton extends StatelessWidget {
+  const _DeleteButton({required this.busy, required this.onPressed});
+  final bool busy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return IconButton(
+      tooltip: l.homeTileDelete,
+      icon: busy
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.delete_outline),
       iconSize: Sizing.tapHome / 2,
       onPressed: busy ? null : onPressed,
     );

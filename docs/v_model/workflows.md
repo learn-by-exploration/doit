@@ -1766,3 +1766,40 @@ Closes the latent v1.4a + v1.4f gap where the widget surface's "Done" / "Skip to
 - ADR-050 (v1.4f widget-side Skip + Undo — the latent "doesn't round-trip to Dart" gap is now closed; v1.4g activates the inbound direction the v1.4f ADR deferred)
 - ADR-013 (defensive `MissingPluginException` swallow — extended to the inbound channel path via `widgetActionDispatch`'s top-level try/catch returning `false`)
 - ADR-049 (v1.4e sparkline first-match-wins tiebreak — mirrored for the inbound `undo` day-match)
+
+## WF-049 — Edit or delete a do from the in-app home tile (v1.4h / Phase 35 / SYS-122 / ADR-052)
+
+Surfaces Edit + Delete as discoverable per-tile `IconButton`s on every `_HabitTile` in the right-edge action row, alongside the existing v1.4b/c/d Skip / Undo / Done buttons. Closes the discoverability gap on the v0.2 long-press → select-mode → app-bar-trash path: every user with tiles on the home screen now has two one-tap affordances for the most common do-mutation flows.
+
+### Sequence
+
+1. **User taps the per-tile Delete `IconButton`.** The button (`_DeleteButton` at `lib/screens/home.dart`) renders `Icons.delete_outline` with the `homeTileDelete` tooltip. Tapping it calls `_HabitTileState._onDeletePressed()` (`lib/screens/home.dart`).
+
+2. **Confirm dialog opens.** The handler `await showDialog<bool>(context: ..., builder: (dialogContext) => AlertDialog(title: Text(l.homeTileDeleteConfirm(habit.name)), content: Text(l.homeTileDeleteConfirmBody), actions: [TextButton(cancel), FilledButton('Delete')]))`. The dialog title carries the do name in quotes (`Delete "Stretch"?`) so the user can verify the target. Cancel pops `false` and the handler returns early — no DB write, no snackbar.
+
+3. **Confirm path captures the messenger.** On the `true` pop, the handler captures `messenger = ScaffoldMessenger.of(context)` BEFORE the async gap (to avoid the post-delete `setState` disposing the widget before the snackbar can render), sets `_busy = true` (the spinner replaces the trash icon on the `_DeleteButton` AND gates the v1.4b/c/d buttons), and `await deleteDo(activeDo: widget.habit, repository: DoRepository.instance)`.
+
+4. **The pure-Dart `deleteDo` helper calls `DoRepository.deleteById`.** `deleteDo` (`lib/screens/home_tile_delete.dart`) translates any throwable into a `bool` return — `true` on the happy path, `false` on a DB-locked / FK-constraint / drift exception. The helper is pure-Dart, no Flutter import, no `DateTime.now()`. The single `await repository.deleteById(activeDo.id)` call cascades the FK delete on the `completions` table.
+
+5. **Happy path branches.** On `true`, the handler clears `_busy`, calls `widget.onDoChanged?.call()` (the parent `_HomeScreenState._refresh()` re-fetches the `FutureBuilder<List<Do>>` so the deleted tile disappears), and shows `messenger.showSnackBar(SnackBar(content: Text(l.homeSnackbarDoDeleted(habit.name)), action: SnackBarAction(label: l.homeSnackbarDoDeletedUndo, onPressed: () async { try { await DoRepository.instance.save(habit); widget.onDoChanged?.call(); } catch (_) { /* DuplicateDoName swallowed — user can re-add via FAB */ } })))`. The captured `habit` reference is the `@immutable` `Do` (valid for re-save without a clone per `lib/do/do.dart:160`). On `false`, the handler clears `_busy` and shows `messenger.showSnackBar(SnackBar(content: Text(l.homeSnackbarDoDeleteFailed)))` WITHOUT removing the tile — the DB is the source of truth.
+
+6. **User taps Edit instead.** The `_EditButton` `IconButton` (with `Icons.edit_outlined` + `homeTileEdit` tooltip) calls `_HabitTileState._onEditPressed()` which pushes `AddHabitScreen(habitId: widget.habit.id)` (the same destination `_HomeScreenState._onTileTap` at `lib/screens/home.dart:120` uses). On `true` pop (hard-delete from the edit screen, per WF-022) the handler calls `widget.onDoChanged?.call()` so the tile disappears.
+
+7. **Undo snackbar restore.** If the user taps `Undo` inside the ~4 s snackbar window, the closure `await DoRepository.instance.save(habit)` re-inserts the row (the same `id`) and triggers `widget.onDoChanged?.call()` to re-fetch the list. The completion-log rows are NOT restored — they were cascade-deleted with the do. The streak counter starts at 0 on the restored do. This is the v1.4h documented trade-off; a v1.4h+ soft-delete column on `habits` would enable a true undo.
+
+### Failure paths
+
+- **User taps Cancel on the confirm dialog.** No DB write, no snackbar, no `setState`. The tile stays intact. The captured `_busy` flag was never set.
+- **`DoRepository.deleteById` throws (DB locked, FK constraint).** The helper catches any throwable and returns `false`. The handler shows `homeSnackbarDoDeleteFailed` ("Could not delete. Try again.") WITHOUT removing the tile. The user can retry.
+- **`DoRepository.save` throws `DuplicateDoName` on Undo** (user created a new do with the same name in the gap). The Undo closure swallows the throw. The snackbar has already dismissed. The user can re-add the do manually via the FAB. The DB is the source of truth; the snackbar's success state was a hint, not a guarantee.
+- **`AddHabitScreen` pops `null` or `false` on a normal save.** The `_onEditPressed` handler does not call `widget.onDoChanged` — the tile stays. The edit screen's own save success SnackBar is the user's signal.
+- **Widget is unmounted mid-delete** (e.g., the user backs out of the home screen during the `await deleteById`). The captured `messenger` survives the unmount because it was captured from `ScaffoldMessenger.of(context)` BEFORE the async gap. The `setState(() => _busy = false)` is guarded by `if (!mounted) return`. The snackbar may render on a different screen — acceptable degradation.
+
+### Requirements covered
+
+- SYS-122 (this cycle's primary requirement)
+- ADR-052 (this cycle's primary architectural decision — per-tile Edit + Delete IconButtons)
+- ADR-046 (v1.4b in-app `_DoneButton` pattern — the `_DeleteButton` mirrors its busy-state spinner + disabled-on-busy shape)
+- ADR-047 (v1.4c in-app `_SkipButton` pattern — the `_DeleteButton`'s busy / disabled shape is identical)
+- ADR-048 (v1.4d in-app `_UndoButton` pattern — the `_DeleteButton`'s confirm-dialog + messenger-capture-before-async-gap pattern is identical)
+- ADR-013 (defensive `MissingPluginException` swallow — extended to the delete path via `deleteDo`'s top-level `catch (_)` returning `false`)

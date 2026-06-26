@@ -108,6 +108,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeRetryButton => 'Retry';
 
   @override
+  String get homeTileEdit => 'Edit';
+
+  @override
+  String get homeTileDelete => 'Delete';
+
+  @override
+  String homeTileDeleteConfirm(String doName) {
+    return 'Delete \"$doName\"?';
+  }
+
+  @override
+  String get homeTileDeleteConfirmBody =>
+      'This will remove the do and all of its completions. You can undo for a few seconds after.';
+
+  @override
+  String homeSnackbarDoDeleted(String doName) {
+    return 'Deleted \"$doName\".';
+  }
+
+  @override
+  String get homeSnackbarDoDeletedUndo => 'Undo';
+
+  @override
+  String get homeSnackbarDoDeleteFailed => 'Could not delete. Try again.';
+
+  @override
   String get homeAddSheetNewDo => 'New do';
 
   @override

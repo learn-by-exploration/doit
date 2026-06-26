@@ -834,3 +834,38 @@ bump + V-Model docs (CHANGELOG `[1.4.0]` block +
 `chore/v1.4-sign-off`. The user's hands-on `release(v1.4)`
 debug-signed APK commit is the final sign-off line (mirrors
 the v1.1i pattern at `222f860`).
+- **v1.4h / Phase 35 / SYS-122 / ADR-052 / WF-049** —
+  In-app home tile Edit + Delete IconButtons: _this PR_.
+  Closes the discoverability gap on the v0.2
+  long-press → select-mode → app-bar-trash path. Every
+  tile now has discoverable per-tile Edit + Delete
+  IconButtons in the same right-edge action `Row` as
+  the v1.4b/c/d Skip / Undo / Done buttons (with
+  localized tooltips). `_EditButton` re-uses the
+  existing `AddHabitScreen(habitId: ...)` destination
+  (no new navigation path). `_DeleteButton` opens an
+  `AlertDialog` (title carries the do name in quotes
+  per the destructive-action contract), awaits the
+  pure-Dart `deleteDo` helper, and shows a SnackBar
+  with an `Undo` action that re-saves the captured `Do`
+  reference via `DoRepository.save`. The `_busy` flag
+  is shared with the v1.4b/c/d buttons so the spinner
+  + disabled-on-busy pattern is consistent across the
+  whole action row. New `onDoChanged: VoidCallback?`
+  prop on `_HabitTile` bound to
+  `_HomeScreenState._refresh()`. 7 new ARB keys
+  (`homeTileEdit`, `homeTileDelete`,
+  `homeTileDeleteConfirm(doName)`,
+  `homeTileDeleteConfirmBody`,
+  `homeSnackbarDoDeleted(doName)`,
+  `homeSnackbarDoDeletedUndo`,
+  `homeSnackbarDoDeleteFailed`) added in lockstep
+  across `app_en.arb` + `app_es.arb`. Pure-Dart — no
+  new `<uses-permission>`, no new pubspec deps, no
+  new Drift tables, no new MethodChannels, no Kotlin
+  changes. Documented trade-off (per ADR-052 §8):
+  the Undo snackbar restores the do row but does NOT
+  restore the streak history — the streak counter
+  starts at 0 on the restored do. A v1.4h+ follow-up
+  could add a soft-delete column to `habits` for a
+  true undo.
