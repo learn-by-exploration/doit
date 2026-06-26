@@ -607,7 +607,7 @@ intentionally incomplete for that slice.
   the long-form summary; `implementation_status.md` row
   v1.4a for the file-by-file breakdown; `feature.md` §2.8
   B9 for the deferral that v1.4a closes.
-## Milestone 11 — v1.4: Home-screen widget + tile parity (in flight)
+## Milestone 11 — v1.4: Home-screen widget + tile parity (shipped)
 
 **Goal.** Two-phase cycle. Phase 28 ships the Android
 home-screen widget (the missing primary surface). Phase 29
@@ -807,4 +807,14 @@ re-used verbatim; no new Drift methods, no new
   In-app tile Skip today + rest-day budget: shipped
   (PR #35, commit `252191c` on main).
 - **v1.4d / Phase 31 / SYS-118 / ADR-048 / WF-045** —
-  In-app tile Undo today's completion: _this PR_.
+  In-app tile Undo today's completion: shipped (PR #37,
+  commit `34b6940` on main).
+
+**Milestone 11 v1.4 — fully shipped on `main`.** Version
+bump + V-Model docs (CHANGELOG `[1.4.0]` block +
+`implementation_status.md` sign-off row + `v1_4_release_baseline.md`
++ `v1_4_release_checklist.md` + `plan.md` Milestone 11 flip
++ `feature.md` closeout) land in the v1.4 sign-off PR on
+`chore/v1.4-sign-off`. The user's hands-on `release(v1.4)`
+debug-signed APK commit is the final sign-off line (mirrors
+the v1.1i pattern at `222f860`).
