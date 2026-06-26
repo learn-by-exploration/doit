@@ -1002,4 +1002,227 @@ void main() {
       );
     },
   );
+
+  // ---- v1.4h / Phase 35 / SYS-122 / ADR-052 / WF-049 ----
+  //
+  // In-app home tile per-tile Edit + Delete IconButtons.
+  // Closes the discoverability gap on the v0.2 long-press
+  // → select-mode → app-bar action by surfacing explicit
+  // Edit and Delete buttons on every tile. The Edit button
+  // re-uses the AddHabitScreen navigation that the body-tap
+  // already drives; the Delete button opens a confirm
+  // dialog, calls DoRepository.deleteById, and shows a
+  // SnackBar with an Undo action that re-saves the captured
+  // do.
+
+  testWidgets('tile renders an Edit IconButton with the Edit tooltip '
+      '(v1.4h / SYS-122)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Edit'), findsOneWidget);
+  });
+
+  testWidgets('tile renders a Delete IconButton with the Delete tooltip '
+      '(v1.4h / SYS-122)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Delete'), findsOneWidget);
+  });
+
+  testWidgets('delete-tap opens a confirm dialog with the do name in the '
+      'title (v1.4h / SYS-122)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Delete'));
+    await tester.pumpAndSettle();
+    // Dialog title includes the do name in quotes.
+    expect(find.text('Delete "Stretch"?'), findsOneWidget);
+    // Dialog body hints at the cascade + undo.
+    expect(
+      find.text(
+        'This will remove the do and all of its completions. '
+        'You can undo for a few seconds after.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('confirm-tap on the delete dialog deletes the do and shows '
+      'the deleted snackbar with Undo action (v1.4h / SYS-122)', (
+    tester,
+  ) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    // Tap Delete → confirm dialog opens.
+    await tester.tap(find.byTooltip('Delete'));
+    await tester.pumpAndSettle();
+    // Tap "Delete" in the dialog (the action button).
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    // Drift write is async — let the runAsync microtask
+    // resolve before asserting.
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    // The do is gone from the DB.
+    final remaining = await DoRepository.instance.getById('h1');
+    expect(remaining, isNull);
+    // The SnackBar reads the deleted name and offers an Undo.
+    expect(find.text('Deleted "Stretch".'), findsOneWidget);
+    expect(find.text('Undo'), findsOneWidget);
+  });
+
+  testWidgets('cancel-tap on the delete dialog leaves the do intact '
+      '(v1.4h / SYS-122)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Delete'));
+    await tester.pumpAndSettle();
+    // Find the dialog's "Cancel" text button and tap it.
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    // The do is still present.
+    final stillThere = await DoRepository.instance.getById('h1');
+    expect(stillThere, isNotNull);
+    expect(stillThere!.name, 'Stretch');
+    // No snackbar surfaced.
+    expect(find.text('Deleted "Stretch".'), findsNothing);
+  });
+
+  testWidgets('Undo action on the deleted snackbar re-saves the captured '
+      'do (v1.4h / SYS-122)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    // Delete the do.
+    await tester.tap(find.byTooltip('Delete'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    expect(await DoRepository.instance.getById('h1'), isNull);
+    // Tap the Undo action.
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    // The do is back in the DB.
+    final restored = await DoRepository.instance.getById('h1');
+    expect(restored, isNotNull);
+    expect(restored!.name, 'Stretch');
+  });
+
+  testWidgets('edit-tap pushes AddHabitScreen in edit mode for the do '
+      '(v1.4h / SYS-122)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    final observer = _RecordingNavigatorObserver();
+    await tester.pumpWidget(
+      ChangeNotifierProvider<SettingsService>.value(
+        value: SettingsService.instance,
+        child: localizedApp(
+          theme: AppTheme.dark,
+          navigatorObservers: [observer],
+          home: const HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Edit'));
+    await tester.pumpAndSettle();
+    // The AddHabitScreen was pushed. Assert via the observer
+    // (the screen may pop quickly on auto-init in tests,
+    // but the push event is the durable contract).
+    expect(observer.pushed, isTrue);
+  });
 }

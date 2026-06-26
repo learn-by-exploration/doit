@@ -110,6 +110,33 @@ class AppLocalizationsEs extends AppLocalizations {
   String get homeRetryButton => 'Reintentar';
 
   @override
+  String get homeTileEdit => 'Editar';
+
+  @override
+  String get homeTileDelete => 'Eliminar';
+
+  @override
+  String homeTileDeleteConfirm(String doName) {
+    return '¿Eliminar \"$doName\"?';
+  }
+
+  @override
+  String get homeTileDeleteConfirmBody =>
+      'Esto eliminará la tarea y todas sus marcas. Puedes deshacer durante unos segundos.';
+
+  @override
+  String homeSnackbarDoDeleted(String doName) {
+    return 'Eliminado \"$doName\".';
+  }
+
+  @override
+  String get homeSnackbarDoDeletedUndo => 'Deshacer';
+
+  @override
+  String get homeSnackbarDoDeleteFailed =>
+      'No se pudo eliminar. Inténtalo de nuevo.';
+
+  @override
   String get homeAddSheetNewDo => 'Nueva tarea';
 
   @override

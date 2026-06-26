@@ -248,6 +248,48 @@ abstract class AppLocalizations {
   /// **'Retry'**
   String get homeRetryButton;
 
+  /// Tooltip for the in-app home tile's per-tile edit IconButton (v1.4h / SYS-122). Tapping opens the AddHabitScreen in edit mode for this do — same destination as the body-tap but explicit so the affordance is discoverable without long-press.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get homeTileEdit;
+
+  /// Tooltip for the in-app home tile's per-tile delete IconButton (v1.4h / SYS-122). Tapping opens a confirm dialog; on confirm, the do is removed from the DB and the tile disappears. The post-delete SnackBar offers an Undo action that re-saves the captured do.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get homeTileDelete;
+
+  /// Title of the AlertDialog that confirms a per-tile delete tap (v1.4h / SYS-122). Includes the do name so the user can verify they're deleting the right entry — destructive actions should always confirm. The {doName} placeholder is the do's display name.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{doName}\"?'**
+  String homeTileDeleteConfirm(String doName);
+
+  /// Body copy of the AlertDialog that confirms a per-tile delete tap (v1.4h / SYS-122). Sets the expectation: cascade-delete the completions too (the CompletionLogService.deleteByHabit foreign-key cascade handles this), and tells the user the SnackBar will offer an Undo affordance.
+  ///
+  /// In en, this message translates to:
+  /// **'This will remove the do and all of its completions. You can undo for a few seconds after.'**
+  String get homeTileDeleteConfirmBody;
+
+  /// Snackbar copy after a successful per-tile delete tap (v1.4h / SYS-122). The {doName} placeholder is the captured do's name. The SnackBar has an Undo action that re-saves the captured do via DoRepository.save.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted \"{doName}\".'**
+  String homeSnackbarDoDeleted(String doName);
+
+  /// Action label for the per-tile delete SnackBar's Undo affordance (v1.4h / SYS-122). Tapping it re-saves the captured do via DoRepository.save, restoring the row + its streak history (the streak calculator re-derives from the surviving completions). Matches the standard Material 'Undo' pattern.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get homeSnackbarDoDeletedUndo;
+
+  /// Snackbar copy when the per-tile delete helper returns false (DB locked, constraint violation, etc.) — the tile is NOT removed and the user can retry. Defensive: the home screen keeps its previous state so a partial delete doesn't leave the UI inconsistent.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not delete. Try again.'**
+  String get homeSnackbarDoDeleteFailed;
+
   /// No description provided for @homeAddSheetNewDo.
   ///
   /// In en, this message translates to:
