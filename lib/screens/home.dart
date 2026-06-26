@@ -25,10 +25,16 @@
 
 import 'package:flutter/material.dart';
 
+import 'package:doit/do/consecutive_counter.dart';
 import 'package:doit/do/do.dart';
 import 'package:doit/do/do_description.dart';
+import 'package:doit/do/proof_mode.dart';
 import 'package:doit/l10n/gen/app_localizations.dart';
+import 'package:doit/screens/home_tile_completion.dart';
+import 'package:doit/screens/home_tile_streak.dart';
+import 'package:doit/screens/mission_launcher.dart';
 import 'package:doit/services/completion_log_service.dart';
+import 'package:doit/services/db/schema.dart';
 import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
@@ -278,7 +284,7 @@ class _AddAnchorButton extends StatelessWidget {
   }
 }
 
-class _HabitTile extends StatelessWidget {
+class _HabitTile extends StatefulWidget {
   const _HabitTile({
     required this.habit,
     this.selected = false,
@@ -293,7 +299,81 @@ class _HabitTile extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
+  State<_HabitTile> createState() => _HabitTileState();
+}
+
+class _HabitTileState extends State<_HabitTile> {
+  // v1.4b / Phase 29 / SYS-116: the tile is a
+  // StatefulWidget so the per-tile "Done" button can
+  // reflect in-flight state and the same-day "already
+  // done" hint without round-tripping to the parent.
+  bool _busy = false;
+  bool _isCompletedToday = false;
+
+  Future<void> _onMarkDonePressed() async {
+    if (_busy) return;
+    if (_isCompletedToday) {
+      // Same-day re-tap is a no-op (CompletionLogService
+      // dedupes anyway, but we short-circuit here so the
+      // SnackBar + busy state don't flicker).
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context).homeTileAlreadyDoneTooltip,
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() => _busy = true);
+    final habit = widget.habit;
+    if (habit.proofMode is StrongProof) {
+      // v1.3d / SYS-114 path: push the mission UI. The
+      // launcher writes the completion itself on
+      // ChainPassed. We mirror the widget's strong-mode
+      // contract — the tile does NOT call
+      // CompletionLogService.append for strong-mode
+      // habits; the mission UI owns that write.
+      final result = await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(
+          builder: (_) => MissionLauncherScreen(habitId: habit.id),
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        if (result == true) _isCompletedToday = true;
+      });
+      return;
+    }
+    // Soft / Auto: fire-and-forget manual completion via
+    // the shared helper. Mirrors WidgetService.markDone
+    // (v1.4a) — same dedupe key, same proofMode tag.
+    final now = DateTime.now();
+    await markDoDone(
+      activeDo: habit,
+      asOf: now,
+      completionLog: CompletionLogService.instance,
+    );
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _isCompletedToday = true;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AppLocalizations.of(context).homeSnackbarMarkedDone),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final habit = widget.habit;
+    final selected = widget.selected;
+    final selectMode = widget.selectMode;
+    final onTap = widget.onTap;
+    final onLongPress = widget.onLongPress;
     final visual = CategoryChipResolver.resolveFor(
       category: habit.category,
       colorSeed: habit.colorSeed,
@@ -301,6 +381,14 @@ class _HabitTile extends StatelessWidget {
     final color = Color(visual.color);
     final isPaused =
         habit.pausedUntil != null && habit.pausedUntil!.isAfter(DateTime.now());
+    final completions = CompletionLogService.instance.listForHabit(habit.id);
+    // The frozen `asOf` for the streak compute is the
+    // build-time clock. A new completion write triggers a
+    // rebuild via the parent's `_refresh()` — see the
+    // SnackBar handler. Same as the widget's surface
+    // (v1.4a), this avoids `DateTime.now()` calls inside
+    // the streak helper.
+    final asOf = DateTime.now();
     return Semantics(
       label:
           'Do ${habit.name}'
@@ -350,6 +438,15 @@ class _HabitTile extends StatelessWidget {
                               style: Theme.of(context).textTheme.titleLarge,
                             ),
                           ),
+                          // v1.4b / SYS-116: streak badge.
+                          // Renders the run length next to
+                          // the name. Mirrors the widget's
+                          // middle row.
+                          _DoStreakBadge(
+                            completions: completions,
+                            activeDo: habit,
+                            asOf: asOf,
+                          ),
                           if (isPaused)
                             Tooltip(
                               message: 'Paused',
@@ -366,31 +463,129 @@ class _HabitTile extends StatelessWidget {
                         describeDo(habit),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
-                      if (habit is DoTimeWindow)
-                        _FastingTimer(habit: habit as DoTimeWindow),
+                      if (habit is DoTimeWindow) _FastingTimer(habit: habit),
                     ],
                   ),
                 ),
                 if (!selectMode)
-                  IconButton(
-                    tooltip: 'Mark done',
-                    icon: const Icon(Icons.check_circle_outline),
-                    iconSize: Sizing.tapHome / 2,
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            AppLocalizations.of(context).homeSnackbarMarkedDone,
-                          ),
-                        ),
-                      );
-                    },
+                  _DoneButton(
+                    busy: _busy,
+                    isCompletedToday: _isCompletedToday,
+                    isStrong: habit.proofMode is StrongProof,
+                    onPressed: _onMarkDonePressed,
                   ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// v1.4b / SYS-116 — the streak number + "day streak"
+/// subtitle rendered next to the do name on the home
+/// tile. Mirrors the widget's `streak_number` row.
+class _DoStreakBadge extends StatelessWidget {
+  const _DoStreakBadge({
+    required this.completions,
+    required this.activeDo,
+    required this.asOf,
+  });
+  final Future<List<CompletionRow>> completions;
+  final Do activeDo;
+  final DateTime asOf;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return FutureBuilder<List<CompletionRow>>(
+      future: completions,
+      builder: (context, snap) {
+        final rows = snap.data ?? const <CompletionRow>[];
+        // Convert DB rows → pure-Dart log entries. The
+        // streak helper takes CompletionLogEntry so it
+        // stays Flutter-free. `dayMillis` is local-midnight
+        // stored as millis-since-epoch (see
+        // CompletionLogService._toDayMillis).
+        final entries = rows
+            .map(
+              (r) => CompletionLogEntry(
+                doId: r.habitId,
+                date: DateTime.fromMillisecondsSinceEpoch(r.dayMillis),
+              ),
+            )
+            .toList(growable: false);
+        final streak = streakForDo(
+          activeDo: activeDo,
+          completions: entries,
+          asOf: asOf,
+        );
+        return Semantics(
+          label: '$streak ${l.homeTileStreakLabel}',
+          child: Padding(
+            padding: const EdgeInsets.only(left: Spacing.sm),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$streak',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                Text(
+                  l.homeTileStreakLabel,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// v1.4b / SYS-116 — the per-tile "Done" button. Renders
+/// a spinner while the completion write is in flight; a
+/// filled check after a same-day completion.
+class _DoneButton extends StatelessWidget {
+  const _DoneButton({
+    required this.busy,
+    required this.isCompletedToday,
+    required this.isStrong,
+    required this.onPressed,
+  });
+  final bool busy;
+  final bool isCompletedToday;
+  final bool isStrong;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final tooltip = isCompletedToday
+        ? l.homeTileAlreadyDoneTooltip
+        : isStrong
+        ? l.homeTileStrongModeHint
+        : l.homeTileMarkDone;
+    final icon = isCompletedToday
+        ? Icons.check_circle
+        : Icons.check_circle_outline;
+    return IconButton(
+      tooltip: tooltip,
+      icon: busy
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(icon),
+      iconSize: Sizing.tapHome / 2,
+      onPressed: busy ? null : onPressed,
     );
   }
 }

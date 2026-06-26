@@ -201,10 +201,11 @@ is brand purple. Deferred to v1.2+ per the v1.1i CHANGELOG.
 ### 2.8 B9 — Widget re-arm indicator (v1.2g explicit deferral)
 
 `v1.2g` explicitly deferred B9 ("Android home-widget re-arm
-indicator") because the project does not yet ship an Android
-home-screen widget. Tracking this in the v1.x batch
-(see §4 — the home widget is Phase 28 in the 30-phase roadmap).
-No work in v1.2.
+indicator") because the project did not yet ship an Android
+home-screen widget. **Closed by v1.4a** (Phase 28 / SYS-115 /
+ADR-045 / WF-042 — the widget surface landed with the streak +
+"Mark done" affordance, including a re-arm indicator driven by
+the reliability badge caption).
 
 ---
 
@@ -269,10 +270,6 @@ These items are deferred beyond v1.2 but are explicitly **v1
 work** (no v2.0 jump). They are tracked here so they don't get
 lost between the v1.2 closeout and the next milestone kickoff.
 
-- **v1.x** — Home screen widget (Phase 28 of the 30-phase
-  roadmap). The widget is the missing primary surface; the
-  reliability design (WF-038) was scoped for it but the widget
-  itself is not yet built.
 - **v1.x** — iOS port. v0.1 + v1.0 are Android-only; the
   `lib/habits/` + `lib/people/` + `lib/missions/` model layer
   is already pure Dart and would port cleanly. The Kotlin side
@@ -293,6 +290,15 @@ lost between the v1.2 closeout and the next milestone kickoff.
   across v1.x (RoutineConfig, Person.pausedUntil, the
   v1.1f/v1.2h reliability badge states, etc.). Same
   backwards-compat-reads-from-v1 pattern; v1.x point release.
+- **v1.4b → v1.4c follow-up** — Tile-level surface gaps after
+  the v1.4a widget + v1.4b tile streak ship: tile "Skip today"
+  button (consumes a rest-day budget); tile streak history
+  visualization (7-day sparkline); tile edit / delete
+  affordance (currently long-press select-mode only); widget
+  small / large variants, widget config activity, widget list
+  (scrolling), widget deep-link to a specific do. See
+  `docs/v_model/plan.md` Milestone 11 (v1.4) for the candidate
+  list.
 
 ---
 
@@ -300,15 +306,15 @@ lost between the v1.2 closeout and the next milestone kickoff.
 
 | Item | Doc | Status |
 |---|---|---|
-| v1.0 / v1.1 / v1.2a..m implementation | `docs/v_model/implementation_status.md` | v1.0..v1.2 fully logged; 13 v1.2 rows + sign-off row appended (v1.2a + v1.2b are doc-only stubs, v1.2c..v1.2m are code commits) |
-| v1.0 / v1.1 / v1.2 deferred items | `docs/v_model/plan.md` (Milestone 7-9 sections) | Milestones 7 (v1.0), 8 (v1.1), and 9 (v1.2) all shipped; the v1.2 closeout PR flipped Milestone 9 to "shipped" with closing date 2026-06-23 |
+| v1.0 / v1.1 / v1.2a..m + v1.3 + v1.4a..b implementation | `docs/v_model/implementation_status.md` | v1.0..v1.3 fully logged; v1.4 cycle in flight (v1.4a widget shipped, v1.4b tile streak + Done shipping in this PR) |
+| v1.0 / v1.1 / v1.2 deferred items | `docs/v_model/plan.md` (Milestone 7-11 sections) | Milestones 7 (v1.0), 8 (v1.1), 9 (v1.2), 10 (v1.3) shipped; Milestone 11 (v1.4) flipped from `stub` to `in flight` with v1.4a shipped + v1.4b shipping |
 | 30-phase roadmap | scattered across `CHANGELOG.md` v1.2 sub-entries | needs `v1_2_30_phase_roadmap.md` (see §3.2) |
-| ADRs | `docs/v_model/decision_record.md` | up to ADR-041 (9 v1.2 ADRs appended in the closeout PR — ADR-033..ADR-041 covering SYS-098..SYS-110); v1.2c/d/e/f/h/i/j/l/m earned ADRs; v1.2g/k did not (doc-only closeout / routine UI affordance respectively) |
-| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
-| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; cross-check the rest are in `traceability_matrix.md` |
+| ADRs | `docs/v_model/decision_record.md` | up to ADR-046 (4 v1.3 ADRs appended — ADR-042..ADR-044 covering SYS-112..SYS-114 + ADR-045 covering SYS-115 + ADR-046 covering SYS-116) |
+| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 appended SYS-111..SYS-114 (4 IDs); v1.4a appended SYS-115; v1.4b appends SYS-116. v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
+| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 added WF-040, WF-041; v1.4a added WF-042; v1.4b adds WF-043. Cross-check the rest are in `traceability_matrix.md` |
 | Open questions | `docs/v_model/open_questions.md` | all 21 closed (last closure: v0.5e-fix ADR-017) |
 | Spanish translation | `lib/l10n/app_es.arb` + `CHANGELOG.md` v1.1h block | smoke-test only; see §2.4 |
-| On-device hands-on | none on disk | v0.5e / v1.0h / v1.1k / v1.1h all reference a "user runs ..." step but there is no checklist doc — see §1.6 |
+| On-device hands-on | none on disk | v0.5e / v1.0h / v1.1k / v1.1h / v1.3x all reference a "user runs ..." step but there is no checklist doc — see §1.6 |
 
 ---
 

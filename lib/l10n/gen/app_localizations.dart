@@ -128,6 +128,30 @@ abstract class AppLocalizations {
   /// **'Marked {count} do(s) done.'**
   String homeSnackbarMarkedCount(int count);
 
+  /// Tooltip / aria-label for the in-app home tile's 'Mark done' IconButton. Mirrors the widget surface (v1.4a).
+  ///
+  /// In en, this message translates to:
+  /// **'Mark done'**
+  String get homeTileMarkDone;
+
+  /// Subtitle rendered next to the streak number on the in-app home tile (e.g. '5 day streak'). Mirrors the widget's middle row.
+  ///
+  /// In en, this message translates to:
+  /// **'day streak'**
+  String get homeTileStreakLabel;
+
+  /// Tooltip shown when the user long-presses a 'Done' tile that has already been marked done today.
+  ///
+  /// In en, this message translates to:
+  /// **'Already done for today'**
+  String get homeTileAlreadyDoneTooltip;
+
+  /// Tooltip shown for the tile's 'Mark done' IconButton on a Strong-mode do. The tap launches the mission UI (v1.3d / SYS-114) which writes the completion on ChainPassed.
+  ///
+  /// In en, this message translates to:
+  /// **'Opens the mission chain'**
+  String get homeTileStrongModeHint;
+
   /// No description provided for @homeEmptyTitle.
   ///
   /// In en, this message translates to:

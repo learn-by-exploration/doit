@@ -1441,3 +1441,56 @@ Condition), SYS-071 (sealed Action), SYS-077 (cross-
 reference to the BLUETOOTH_CONNECT banner pattern in
 `notification_reliability.md`).
 
+
+## WF-042 — Mark a do done from the Android home-screen widget (v1.4a / Phase 28 / SYS-115 / ADR-045)
+
+**Actor.** User, on the Android home screen, looking at the `DoitAppWidgetProvider` widget surface.
+
+**Goal.** Mark a do done without opening the app, from the home-screen widget.
+
+**Preconditions.** The widget has been added to the home screen; `DoitAppWidgetProvider` is registered; the user is signed in.
+
+**Flow.**
+
+1. The widget renders the first-active do (via `WidgetStateLocator.firstActiveDo(...)` ordered by `createdAt` ascending), the streak number (via `WidgetStateBuilder.buildWidgetState(...)` using `ConsecutiveCounter.compute`), and the reliability caption.
+2. The user taps "Mark done" on the widget.
+3. The widget fires a `BroadcastReceiver` over the `doit/widget` MethodChannel; the Dart side calls `WidgetService.markDone(habitId: do.id, day: <local-midnight at now>)`.
+4. `WidgetService.markDone` calls `CompletionLogService.instance.append(...)` with `source: CompletionSource.manual` + `proofModeAtTime: <soft|strong|auto>`. The append dedupes on `(habitId, day)`.
+5. The widget refreshes (via `handleRefreshRequest`) and re-renders with the new streak.
+6. (Strong-mode only.) The widget deep-links to `MissionLauncherScreen` via the existing v1.3d path; the chain UI runs; on `ChainPassed` the completion is appended by the mission UI itself (`MissionLauncherScreen` is the single writer for strong-mode completions on the widget surface too).
+
+**Alternate paths.**
+
+- **Channel missing (no native side, e.g. tests / web).** `MissingPluginException` is swallowed; the mark-done call is a no-op. (ADR-013.)
+- **Strong-mode chain timeout / cancel.** `MissionLauncherScreen` pops with `null`; the streak stays broken per the v1.1f grace-window contract.
+
+**Out of scope (v1.4c candidates).**
+
+- Widget small / large variants, widget config activity, widget list (scrolling), widget deep-link to a specific do.
+
+## WF-043 — Mark a do done from the home tile (v1.4b / Phase 29 / SYS-116 / ADR-046)
+
+**Actor.** User, inside the app, looking at the home screen.
+
+**Goal.** Mark a do done without entering select mode, from the home tile.
+
+**Preconditions.** The user has at least one active (non-paused) do. The reliability banner is irrelevant.
+
+**Flow.**
+
+1. The home screen renders each `_HabitTile` with the do name (left), a `_DoStreakBadge` (right — streak number + "day streak" subtitle), and a `_DoneButton` (far right).
+2. The user taps the tile's "Mark done" button.
+3. (Soft / Auto do.) `markDoDone(activeDo, asOf, CompletionLogService.instance)` calls `completionLog.append(habitId: activeDo.id, day: <local-midnight at asOf>, source: CompletionSource.manual, proofModeAtTime: <soft|strong|auto>)`. The tile flips `_isCompletedToday = true`; the SnackBar `homeSnackbarMarkedDone` ("Marked done.") shows; the `IconButton` re-renders as a filled `Icons.check_circle`.
+4. (Strong do.) The tile pushes `MissionLauncherScreen(habitId: do.id)` via `Navigator.push<bool>(...)` and `await`s the pop. The mission UI runs the chain end-to-end. On `ChainPassed` the launcher pops with `true`; the tile flips `_isCompletedToday = true`. On a `null` pop (cancel / timeout), the tile does NOT flip the bool — the streak stays broken per the v1.1f grace-window contract.
+5. A re-tap on an already-done tile shows the `homeTileAlreadyDoneTooltip` SnackBar — no second append (the dedupe happens upstream inside `CompletionLogService.append`).
+
+**Alternate paths.**
+
+- **DB write failure.** The `_busy` flag reverts in `setState`; the tile stays in the "not done" state; no SnackBar. (The service's append throws — caller catches upstream; the tile currently does not surface a SnackBar on failure; the existing `_completeSelected` SnackBar pattern is the model.)
+
+**Out of scope (v1.4c candidates).**
+
+- In-app tile reliability badge inside the tile body (currently shown as a small icon at the top-right; the v1.4b streak is added next to the name, not replacing the badge).
+- Tile "Skip today" button (consumes a rest-day budget).
+- Tile streak history visualization (7-day sparkline).
+- Tile edit / delete affordance (currently in the long-press select-mode only).

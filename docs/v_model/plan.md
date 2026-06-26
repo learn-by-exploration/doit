@@ -582,3 +582,74 @@ intentionally incomplete for that slice.
   verification on the Android emulator (or a real
   SM-S918B device), the same shape as v0.5e / v1.0h /
   v1.1k / v1.2x.
+
+## Milestone 11 — v1.4: Home-screen widget + tile parity (in flight)
+
+**Goal.** Two-phase cycle. Phase 28 ships the Android
+home-screen widget (the missing primary surface). Phase 29
+ships feature-parity on the in-app home tile so the user gets
+the same affordance whether they look at the launcher or
+open the app.
+
+**Sub-entries:**
+
+- **v1.4a — Android home-screen widget (Phase 28 / SYS-115 /
+  ADR-045 / WF-042).** First time the app surfaces a habit
+  on the home screen without opening the app. New: native
+  `AppWidgetProvider` + `RemoteViews` (ADR-045 explicitly
+  rejects `home_widget` pubspec dep); `lib/widget/`
+  sub-folder (`widget_state_locator`, `widget_state_builder`,
+  `widget_service`); `AndroidManifest.xml` receiver
+  registration. Strong-mode "Done" deep-links to the
+  existing `MissionLauncherScreen` (SYS-114). No new
+  `<uses-permission>`, no new pubspec dep. **Status: shipped**
+  (PR #33, awaiting merge to `main`).
+- **v1.4b — In-app tile streak + Done button (Phase 29 /
+  SYS-116 / ADR-046 / WF-043).** Mirror the v1.4a widget's
+  surface on the home tile. `_HabitTile` becomes a
+  `StatefulWidget` (`_HabitTileState`); a new `_DoStreakBadge`
+  sub-widget renders the streak + "day streak" subtitle; a
+  new `_DoneButton` sub-widget rewires the existing
+  `IconButton` to call `markDoDone(...)` (soft/auto) or push
+  `MissionLauncherScreen` (strong). New pure-Dart helpers
+  `lib/screens/home_tile_streak.dart` + `lib/screens/home_tile_completion.dart`.
+  4 new ARB keys. **Status: shipping in this PR.**
+- **v1.4c candidates (parking lot).** Tile "Skip today"
+  button (consumes a rest-day budget); tile streak history
+  visualization (7-day sparkline); tile edit / delete
+  affordance (currently long-press select-mode only);
+  widget small / large variants, widget config activity,
+  widget list (scrolling), widget deep-link to a specific
+  do. See `feature.md` §4.
+
+**Constraints.**
+
+- **No new pubspec deps.** v1.4a rejects `home_widget` per
+  ADR-045. v1.4b is pure-Dart + a single ARB addition.
+- **No new `<uses-permission>`.** The widget runs without a
+  foreground service. The tile is a stateless surface.
+- **No DB migrations.** The widget reads via the existing
+  `doit/widget` MethodChannel + the existing
+  `DoRepository.listAll()`. The tile reads via the existing
+  `CompletionLogService.instance.listForHabit`.
+- **Strong-mode completion write ownership.** Both surfaces
+  (widget strong-mode "Done" + tile strong-mode "Done")
+  delegate to `MissionLauncherScreen` (SYS-114), which owns
+  the `CompletionLogService.append` call for strong-mode
+  completions. The tile's `markDoDone` helper writes only
+  for soft/auto do.
+- **Single source of truth for the completion write.** Both
+  surfaces call the same `CompletionLogService.append(
+  habitId, day, source: CompletionSource.manual,
+  proofModeAtTime: <soft|strong|auto>)` shape. The append
+  already dedupes on `(habitId, day)` — a double-tap inserts
+  one row, not two.
+- **Right-side gate (this milestone):** user's hands-on
+  `flutter build appbundle --release` + on-device install +
+  add a do with 3+ consecutive completions + verify the
+  streak renders on the home tile + tap the tile's Done
+  button + verify the completion appends + verify the
+  SnackBar. The widget's verification path is the same
+  shape (add the widget, verify the streak renders, tap
+  "Mark done", verify the streak advances after re-render).
+

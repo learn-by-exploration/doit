@@ -45,6 +45,18 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get homeTileMarkDone => 'Marcar como hecho';
+
+  @override
+  String get homeTileStreakLabel => 'días seguidos';
+
+  @override
+  String get homeTileAlreadyDoneTooltip => 'Ya marcado como hecho hoy';
+
+  @override
+  String get homeTileStrongModeHint => 'Abre la cadena de misiones';
+
+  @override
   String get homeEmptyTitle => 'Sin tareas aún.';
 
   @override
@@ -103,7 +115,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsThemeSystem => 'Sistema';
 
   @override
-  String get settingsAnchorManual => 'Manual — toco \"Ya estoy despierto\"';
+  String get settingsAnchorManual => 'Manual — tocas \"Ya estoy despierto\"';
 
   @override
   String get settingsAnchorFirstUnlock => 'Primer desbloqueo del día';

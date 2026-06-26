@@ -4763,3 +4763,36 @@ v1.3d ships the launch path end-to-end:
   Inventory" — the new `FullScreenActivity`,
   `MissionLauncherScreen`, and `RoutineOverlayScreen`
   entries.
+
+## ADR-045 — Native `AppWidgetProvider` + `RemoteViews` over the `doit/widget` MethodChannel (rejects `home_widget` pubspec dep) (v1.4a / SYS-115)
+
+**Context.** The Android home-screen widget (Phase 28 / SYS-115) needs a transport between the Flutter side and the Android `AppWidgetProvider`. Two reasonable shapes:
+
+1. The `home_widget` pubspec package — a thin wrapper around the platform channel.
+2. A hand-rolled `doit/widget` MethodChannel with a `DoitAppWidgetProvider` Kotlin class that uses `RemoteViews` directly.
+
+**Decision.** Use option 2 (hand-rolled). The widget surface is small (one screen, four rows, one button); the package would add a layer of indirection without simplifying the Kotlin side and would pull a new transitive dep into pubspec for one channel.
+
+**Consequences.**
+
+- **Pubspec stays clean.** No new package. The Kotlin side already had `AppWidgetProvider` + `RemoteViews` in scope for v1.3d's `FullScreenActivity` (SYS-114). Adding the same shape for the widget is a 50-line Kotlin class.
+- **The Dart side is a thin singleton-with-`_ready` wrapper.** `lib/services/widget_service.dart` exposes `handleRefreshRequest()`, `markDone(...)`, and `applyReliability(Reliability)`. The widget refresh round-trip is one MethodChannel call: `widget.refresh()` → renders `DoitWidgetState` → pushes via `appWidgetManager.updateAppWidget(...)`.
+- **No new `<uses-permission>`.** The widget runs without a foreground service — the platform re-renders on the next refresh tick. The widget does NOT use `home_widget`'s `WidgetSize` / `WidgetBackground` abstractions.
+- **Strong-mode "Done" opens the existing `MissionLauncherScreen` (SYS-114).** The widget's strong-mode path mirrors the notification's strong-mode path — both deep-link to the chain orchestrator.
+
+## ADR-046 — Home-tile streak number + per-tile "Done" button (v1.4b / SYS-116)
+
+**Context.** v1.4a (SYS-115) shipped the Android home-screen widget with the streak number + "Mark done" affordance. The in-app home tile (`_HabitTile` at `lib/screens/home.dart:281`) currently shows the do name + schedule subtitle but does NOT render a streak number; the per-tile `IconButton` at lines 374-388 is still a `SnackBar` stub. The widget and the in-app tile should be feature-parity — same UX surface, same affordance, same single source of truth for the completion write.
+
+**Decision.** Add a `_DoStreakBadge` sub-widget to `_HabitTile` (which becomes a `StatefulWidget`) and rewire the `IconButton` to write via the same `CompletionLogService.append(...)` path the widget uses. Two pure-Dart helpers land in `lib/screens/`:
+
+- `home_tile_streak.dart` — `streakForDo({...})` + `isCompletedOnDay({...})`. Pure-Dart, no Flutter import. Calls `ConsecutiveCounter.compute({log, config, asOf})` for the streak; floors entries to local midnight for the day check.
+- `home_tile_completion.dart` — `markDoDone({...})`. The `_proofModeTag` helper is inlined (mirrors `WidgetService._proofModeTag`) — kept in lockstep manually until a future PR extracts both into `lib/do/proof_mode_tag.dart` (deferred until v1.4a lands on `main`).
+
+**Consequences.**
+
+- **Single source of truth for the completion write.** Both surfaces (widget + in-app tile) call `CompletionLogService.append(habitId, day, source: CompletionSource.manual, proofModeAtTime: <soft|strong|auto>)`. The append already dedupes on `(habitId, day)` — a double-tap inserts one row, not two.
+- **Strong-mode habit completion writes the completion via the mission UI.** The widget's strong-mode path is "fire the FSI mission UI, write the completion from there". The tile's strong-mode path mirrors it — `Navigator.push(MissionLauncherScreen(habitId: do.id))`, `await` the pop, write the completion on `ChainPassed` (SYS-114). The tile does NOT call `CompletionLogService.append` for strong-mode habits; the mission UI owns that write.
+- **Re-compute streak on every rebuild.** Cheap: pure-Dart, ~10 entries per visible tile. Matches the widget's behavior (same algorithm, same call shape). No `StreakService` needed.
+- **Frozen `asOf` per build.** The tile freezes `asOf = DateTime.now()` at `build()` time. A new completion write triggers a rebuild via the parent's `_refresh()` and the new `isCompletedToday` reflects the write. This avoids drift between the per-tile `asOf` and the global app time.
+- **No new pubspec deps, no new `<uses-permission>`.** Pure-Dart + a single ARB addition (4 new keys in `app_en.arb` + `app_es.arb`).
