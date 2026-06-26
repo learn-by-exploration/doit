@@ -99,6 +99,10 @@
   "@homeTileUndoNotToday": {
     "description": "Snackbar copy when the in-app home tile Undo tap completes but the DB has no row to delete (v1.4d / SYS-118). Defensive — the dialog is gated on _isResolvedToday == true, but the DB is the source of truth and a concurrent app-tile rebuild could leave a dangling flag."
   },
+  "homeTileSparklineSemantics": "Last 7 days",
+  "@homeTileSparklineSemantics": {
+    "description": "Semantics label for the 7-day streak history sparkline row on the in-app home tile (v1.4e / SYS-119). Wraps the 7 dots in a single Semantics node so screen readers announce 'Last 7 days' once instead of 7 separate dots."
+  },
   "homeEmptyTitle": "No dos yet.",
   "homeRetryButton": "Retry",
   "homeAddSheetNewDo": "New do",

@@ -22,6 +22,7 @@
   "homeTileUndoConfirmBody": "Se eliminará el registro de hoy. La racha se actualizará.",
   "homeTileUndoSuccess": "Registro eliminado.",
   "homeTileUndoNotToday": "No hay nada que deshacer para hoy.",
+  "homeTileSparklineSemantics": "Últimos 7 días",
   "homeEmptyTitle": "Sin tareas aún.",
   "homeRetryButton": "Reintentar",
   "homeAddSheetNewDo": "Nueva tarea",

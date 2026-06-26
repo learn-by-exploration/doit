@@ -809,6 +809,8 @@ re-used verbatim; no new Drift methods, no new
 - **v1.4d / Phase 31 / SYS-118 / ADR-048 / WF-045** —
   In-app tile Undo today's completion: shipped (PR #37,
   commit `34b6940` on main).
+- **v1.4e / Phase 32 / SYS-119 / ADR-049 / WF-046** —
+  In-app tile 7-day streak history sparkline: _this PR_.
 
 **Milestone 11 v1.4 — fully shipped on `main`.** Version
 bump + V-Model docs (CHANGELOG `[1.4.0]` block +

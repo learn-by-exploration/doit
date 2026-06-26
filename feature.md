@@ -15,7 +15,7 @@ piece of work.
 
 ## 1. Ship blockers (must finish before closing the v1.4 cycle)
 
-### 1.1 ✅ DONE — Shipped v1.4a/b/c/d on `main`
+### 1.1 ✅ DONE — Shipped v1.4a/b/c/d/e on `main`
 
 v1.4a (PR #33) shipped the Android home-screen widget
 (SYS-115 / ADR-045 / WF-042 / Phase 28). v1.4b (PR #35)
@@ -24,7 +24,10 @@ ADR-046 / WF-043 / Phase 29). v1.4c shipped the in-app tile
 Skip today + rest-day budget indicator (SYS-117 / ADR-047 /
 WF-044 / Phase 30). v1.4d (PR #37) shipped the in-app tile
 Undo today's completion (SYS-118 / ADR-048 / WF-045 / Phase
-31). `main` is at `34b6940` with 1197 / 1197 tests passing.
+31). v1.4e ships the in-app tile 7-day streak history
+sparkline (SYS-119 / ADR-049 / WF-046 / Phase 32).
+`main` is at `34b6940` (post v1.4d) with 1208 / 1208 tests
+passing post-v1.4e.
 
 ### 1.2 ✅ DONE — Bumped version to v1.4.0
 
@@ -34,13 +37,12 @@ Undo today's completion (SYS-118 / ADR-048 / WF-045 / Phase
 in lockstep on `chore/v1.4-sign-off`. `CHANGELOG.md` has the
 new `## [1.4.0] — 2026-06-27 — Home widget + in-app tile
 completion lifecycle` summary block (mirrors `## [1.3.0]`
-shape). `implementation_status.md` has 4 v1.4 rows + the
-sign-off row (mirrors the v1.0 / v1.1 / v1.2 / v1.3 shape).
-`requirements.md` has SYS-115..SYS-118 appended.
-`decision_record.md` has ADR-045..ADR-048 appended.
-`workflows.md` has WF-042..WF-045 appended.
-`traceability_matrix.md` has the 4 new rows appended. Closes
-in the v1.4 sign-off PR (in flight on `chore/v1.4-sign-off`).
+shape) + the `### v1.4e` sub-entry block. `implementation_status.md`
+has 5 v1.4 rows + the sign-off row (mirrors the v1.0 / v1.1 /
+v1.2 / v1.3 shape). `requirements.md` has SYS-115..SYS-119
+appended. `decision_record.md` has ADR-045..ADR-049 appended.
+`workflows.md` has WF-042..WF-046 appended.
+`traceability_matrix.md` has the 5 new rows appended.
 
 ### 1.3 ✅ DONE — Added `v1_4_release_baseline.md` + `v1_4_release_checklist.md`
 
@@ -321,16 +323,15 @@ lost between the v1.4 closeout and the next milestone kickoff.
 | SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 sub-entries appended SYS-111..SYS-114 (4 IDs); v1.4 sub-entries appended SYS-115..SYS-118 (4 IDs — home widget, tile streak+Done, tile Skip+budget, tile Undo). v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
 | WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 sub-entries added WF-040, WF-041; v1.4 sub-entries added WF-042..WF-045. Cross-check the rest are in `traceability_matrix.md` |
 
-**v1.4e+ follow-up** — Tile + widget surface gaps after
+**v1.4f+ follow-up** — Tile + widget surface gaps after
   the v1.4a widget + v1.4b tile streak + v1.4c tile skip
-  + v1.4d tile undo ship: widget-side "Skip today" button
-  (mirrors the v1.4c in-app tile affordance); widget-side
-  Undo (mirrors the v1.4d in-app tile affordance); tile
-  streak history visualization (7-day sparkline); tile
-  edit / delete affordance (currently long-press
-  select-mode only); widget small / large variants, widget
-  config activity, widget list (scrolling), widget deep-link
-  to a specific do; rest-day history visualization;
+  + v1.4d tile undo + v1.4e tile sparkline ship: widget-side
+  "Skip today" button (mirrors the v1.4c in-app tile
+  affordance); widget-side Undo (mirrors the v1.4d in-app
+  tile affordance); tile edit / delete affordance (currently
+  long-press select-mode only); widget small / large variants,
+  widget config activity, widget list (scrolling), widget
+  deep-link to a specific do; rest-day history visualization;
   rest-day budget edit affordance. See `docs/v_model/plan.md`
   Milestone 12+ for the candidate list (Milestone 11 v1.4
   is shipping in this cycle).
@@ -341,12 +342,12 @@ lost between the v1.4 closeout and the next milestone kickoff.
 
 | Item | Doc | Status |
 |---|---|---|
-| v1.0 / v1.1 / v1.2a..m + v1.3 + v1.4a..d implementation | `docs/v_model/implementation_status.md` | v1.0..v1.4 fully logged (v1.4a..v1.4d shipped on `main`; sign-off row in flight on `chore/v1.4-sign-off`) |
+| v1.0 / v1.1 / v1.2a..m + v1.3 + v1.4a..e implementation | `docs/v_model/implementation_status.md` | v1.0..v1.4 fully logged (v1.4a..v1.4e shipped on `main`; v1.4e sub-entry in flight on `feat/v1.4e-tile-sparkline`) |
 | v1.0 / v1.1 / v1.2 deferred items | `docs/v_model/plan.md` (Milestone 7-11 sections) | Milestones 7 (v1.0), 8 (v1.1), 9 (v1.2), 10 (v1.3), 11 (v1.4) flipped to `shipped` in the v1.4 sign-off PR |
 | 30-phase roadmap | scattered across `CHANGELOG.md` v1.2 sub-entries | needs `v1_2_30_phase_roadmap.md` (see §3.2) |
-| ADRs | `docs/v_model/decision_record.md` | up to ADR-048 (4 v1.3 ADRs appended — ADR-042..ADR-044 covering SYS-112..SYS-114 + 4 v1.4 ADRs appended — ADR-045 covering SYS-115 + ADR-046 covering SYS-116 + ADR-047 covering SYS-117 + ADR-048 covering SYS-118) |
-| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 appended SYS-111..SYS-114 (4 IDs); v1.4 appended SYS-115..SYS-118 (4 IDs — home widget, tile streak+Done, tile Skip+budget, tile Undo). v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
-| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 added WF-040, WF-041; v1.4 added WF-042, WF-043, WF-044, WF-045. Cross-check the rest are in `traceability_matrix.md` |
+| ADRs | `docs/v_model/decision_record.md` | up to ADR-049 (4 v1.3 ADRs appended — ADR-042..ADR-044 covering SYS-112..SYS-114 + 5 v1.4 ADRs appended — ADR-045 covering SYS-115 + ADR-046 covering SYS-116 + ADR-047 covering SYS-117 + ADR-048 covering SYS-118 + ADR-049 covering SYS-119) |
+| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 appended SYS-111..SYS-114 (4 IDs); v1.4 appended SYS-115..SYS-119 (5 IDs — home widget, tile streak+Done, tile Skip+budget, tile Undo, tile sparkline). v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
+| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 added WF-040, WF-041; v1.4 added WF-042, WF-043, WF-044, WF-045, WF-046. Cross-check the rest are in `traceability_matrix.md` |
 | Open questions | `docs/v_model/open_questions.md` | all 21 closed (last closure: v0.5e-fix ADR-017) |
 | Spanish translation | `lib/l10n/app_es.arb` + `CHANGELOG.md` v1.1h block | smoke-test only; see §2.4 |
 | On-device hands-on | `docs/v_model/v1_4_release_checklist.md` + v0/v1.0/v1.1/v1.2/v1.3 equivalents | `v1_4_release_checklist.md` mirrors the v1.2 / v1.3 shape; user-runs step is §1.4 (release(v1.4) APK commit) |

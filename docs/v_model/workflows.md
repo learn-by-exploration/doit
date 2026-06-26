@@ -1617,3 +1617,47 @@ feature, shares the native-channel precedent).
 - "Undo all" (clear every completion row for the do — used for a fresh-start scenario). The existing v1.2m `CompletionLogSection.deleteById` is single-row; the bulk version is a v1.5 candidate.
 
 **Requirements covered:** SYS-118 (per-tile undo), SYS-108 (the parent `CompletionLogSection` pattern from v1.2m that v1.4d mirrors at the tile surface).
+
+## WF-046 — View the last 7 days as a sparkline on the home tile (v1.4e / Phase 32 / SYS-119 / ADR-049)
+
+**Trigger.** The user opens the home screen with at least one saved do.
+
+**Actor.** The user (visual inspection only).
+
+**Preconditions.**
+- The app is installed and at least one do is saved (the home screen is non-empty).
+- The completion log is reachable via `CompletionLogService.listForHabit(habitId)`.
+
+**Steps.**
+
+1. The home screen renders `_HabitTile` rows for each saved do. Each tile's `_DoStreakBadge` Column now includes the `_Sparkline` sub-widget under the streak number + "day streak" subtitle + budget caption.
+2. The `_Sparkline` widget reads its 7-dot row from `sparklineForDo(activeDo, asOf, completionLog)`. The helper builds the 7-day window `[asOf - 6 days .. asOf]` (local-midnight each), then emits one `SparklineDot` per day:
+   - `SparklineDot.filled(day, source)` when a row exists for that day's `dayMillis` — both `manual` and `rest_day` count.
+   - `SparklineDot.empty(day)` when no row exists for that day's `dayMillis`.
+   - `SparklineDot.future(day)` when the day is in the future of `asOf` (defensive — the helper is robust to a frozen `asOf`).
+3. Each dot renders as a 6 dp circle. Filled circles use `colorScheme.primary`; outlined circles use `colorScheme.outline` with a 1.2 dp border.
+4. The rightmost dot (today) bumps to 8 dp + filled when `_isResolvedToday == true` (i.e., at least one row in the parent's `completions` future matches today's `dayMillis`). The size bump mirrors the widget's today-done affordance.
+5. While `sparklineForDo` is in flight, the widget renders `_SparklineSkeleton` (7 outlined 6 dp dots) to reserve space and prevent layout shift on resolve.
+6. A `Semantics(label: l.homeTileSparklineSemantics, readOnly: true)` node wraps all 7 dots so screen readers announce "Last 7 days" / "Últimos 7 días" once instead of 7 separate dots.
+
+**Postconditions.**
+
+- The user sees a 7-dot row under the streak badge on every tile.
+- The dot row reflects the last 7 days of completion (today on the right, oldest on the left).
+- The today dot is visibly larger + filled when today is resolved; today is outlined when today is not yet resolved.
+- A screen reader announces "Last 7 days" once per tile (not 7 separate dot announcements).
+
+**Edge cases.**
+
+- **No completions at all.** All 7 dots are outlined (empty). The user sees an empty 7-day row.
+- **Today is not yet resolved.** The today dot (rightmost) is outlined at 6 dp — visually identical to any other empty day.
+- **Multiple completions for the same day (e.g., manual at 8 AM + rest-day at 8 PM).** The helper emits exactly one `SparklineDot.filled` for that day; the `source` is the first-matching row in `listForHabit` order (oldest-first).
+- **Future `asOf` (frozen time from a unit test).** The helper emits `SparklineDot.future` for any day past `asOf`'s local-midnight, in addition to empty dots for the present-or-past days. The widget renders future dots as outlined at 6 dp (same visual as empty); the sealed split is for future widget variants that may want a different glyph.
+- **Out-of-window rows (e.g., a row 30 days ago).** The helper ignores them — only the 7 days in the window are scanned.
+
+**Failure paths.**
+
+- **Drift read fails.** The widget stays on the skeleton; no error is surfaced to the user (the parent `_DoStreakBadge` is also showing its own skeleton state, so the entire right column is consistent). Future v1.4f+ candidates may surface a "retry" affordance.
+- **The user has 10+ visible tiles.** Each tile spawns its own `sparklineForDo` future against `CompletionLogService.listForHabit(habitId)`. Drift's read cache means the wall-clock cost is one Drift read per rebuild cycle (≤ 1 ms for the memoized path), so the per-frame cost is negligible. The screen does not stutter.
+
+**Requirements covered:** SYS-119 (per-tile 7-day sparkline), SYS-108 (the parent `CompletionLogSection` review-row pattern from v1.2m that v1.4e mirrors at the tile surface).

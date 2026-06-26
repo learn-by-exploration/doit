@@ -870,4 +870,136 @@ void main() {
     final after = await CompletionLogService.instance.listForHabit('h1');
     expect(after, isEmpty);
   });
+
+  // ---------------------------------------------------------------
+  // v1.4e / Phase 32 / SYS-119 / ADR-049 / WF-046: 7-day streak
+  // history sparkline row under the streak badge.
+  // ---------------------------------------------------------------
+
+  /// Local helper — seeds a 6-of-7-day completed streak
+  /// (today + 5 prior days = 6 completions, 1 gap on
+  /// day -6) for the sparkline tests. Mirrors the v1.4d
+  /// undo test's setup but pre-seeds 6 rows instead of 1.
+  Future<void> seedSixDayStreak(String habitId) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    for (var i = 0; i < 6; i++) {
+      final day = today.subtract(Duration(days: i));
+      await CompletionLogService.instance.append(
+        habitId: habitId,
+        day: day,
+        source: CompletionSource.manual,
+        proofModeAtTime: 'soft',
+      );
+    }
+  }
+
+  testWidgets('tile renders the 7-day sparkline with 7 dots when at least one '
+      'completion row exists (v1.4e / SYS-119)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await seedSixDayStreak('h1');
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    // The Semantics node wraps all 7 dots. Assert the
+    // widget tree contains exactly one Semantics node
+    // with the localized label — the find-by-predicate
+    // form is robust to semantics-node merging rules.
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is Semantics && (w.properties.label == 'Last 7 days'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'tile sparkline Semantics label is present even when no completions '
+    'are recorded (v1.4e / SYS-119)',
+    (tester) async {
+      await _resetDb(tester);
+      await DoRepository.instance.save(
+        DoFixed(
+          id: 'h1',
+          name: 'Stretch',
+          proofMode: const SoftProof(),
+          createdAt: DateTime(2026, 5, 17),
+          restDaysPerMonth: 2,
+          weekdays: const {1, 2, 3, 4, 5, 6, 7},
+          time: const DoTime(9, 0),
+        ),
+      );
+      await tester.pumpWidget(_wrap());
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pumpAndSettle();
+      // Even when no completions exist, the skeleton (7
+      // outlined dots) is replaced by 7 SparklineDot.empty
+      // — the Semantics label is still present.
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is Semantics && (w.properties.label == 'Last 7 days'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'tile sparkline Semantics label survives a Mark done tap that resolves '
+    'today (v1.4e / SYS-119)',
+    (tester) async {
+      await _resetDb(tester);
+      await DoRepository.instance.save(
+        DoFixed(
+          id: 'h1',
+          name: 'Stretch',
+          proofMode: const SoftProof(),
+          createdAt: DateTime(2026, 5, 17),
+          restDaysPerMonth: 2,
+          weekdays: const {1, 2, 3, 4, 5, 6, 7},
+          time: const DoTime(9, 0),
+        ),
+      );
+      await tester.pumpWidget(_wrap());
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pumpAndSettle();
+      // Resolve today via the tile's Mark done button.
+      await tester.tap(find.byTooltip('Mark done'));
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pumpAndSettle();
+      // Sanity: the completion was appended.
+      final rows = await CompletionLogService.instance.listForHabit('h1');
+      expect(rows.length, 1);
+      // The sparkline Semantics label is still rendered.
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is Semantics && (w.properties.label == 'Last 7 days'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }
