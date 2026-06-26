@@ -10,9 +10,11 @@
 //      `WidgetStateCache` (via the `doit/widget`
 //      MethodChannel) so the cold-start fallback has the
 //      last-known state.
-//   3. Handle the "Done" tap from the widget: append the
-//      completion via `CompletionLogService`, re-derive
-//      the state, and ask the platform to repaint.
+//   3. Handle widget taps: "Done" (v1.4a), "Skip today"
+//      (v1.4f / SYS-120), and "Undo today" (v1.4f /
+//      SYS-120). Each tap appends / deletes via
+//      `CompletionLogService`, re-derives the state, and
+//      asks the platform to repaint.
 //
 // Layer rules (per .claude/rules/lib-services.md):
 //   - Singleton with `Completer<void> _ready`.
@@ -24,6 +26,10 @@
 // platform side. `FakeWidgetBridge` is the test seam.
 //
 // v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042.
+// v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047: added
+// skip(habitId) + undo(habitId) to bring the widget to
+// feature-parity with the in-app tile (mirrors v1.4c +
+// v1.4d at the widget surface).
 
 // ignore_for_file: prefer_initializing_formals
 
@@ -33,7 +39,7 @@ import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 
 import 'package:doit/do/consecutive_counter.dart';
 import 'package:doit/do/do.dart';
-import 'package:doit/do/proof_mode.dart';
+import 'package:doit/do/proof_mode_tag.dart';
 import 'package:doit/do/skip_budget.dart';
 import 'package:doit/reminders/alarm_scheduler.dart' show Reliability;
 import 'package:doit/services/completion_log_service.dart';
@@ -209,9 +215,93 @@ class WidgetService {
       habitId: habitId,
       day: day,
       source: CompletionSource.manual,
-      proofModeAtTime: _proofModeTag(activeDo.proofMode),
+      proofModeAtTime: proofModeTag(activeDo.proofMode),
     );
     await handleRefreshRequest();
+  }
+
+  /// Append a rest-day completion for [habitId] via
+  /// `CompletionLogService.append` (v1.4f / SYS-120 /
+  /// ADR-050 / WF-047). Called from the widget's "Skip
+  /// today" ImageButton via the Kotlin
+  /// `WidgetChannel.skip` arm.
+  ///
+  /// Mirrors the in-app tile's `markDoSkipped` (v1.4c /
+  /// SYS-117) at the widget surface — same source tag
+  /// (`CompletionSource.restDay`), same
+  /// `proofModeAtTime` snapshot, same rest-day budget
+  /// check (`restDaysPerMonth > 0` and `used < limit`).
+  ///
+  /// Returns `true` if the rest-day row was appended,
+  /// `false` if the do has no rest-day budget configured
+  /// or the budget for the current month is exhausted.
+  /// The widget shows no SnackBar surface (no
+  /// `homeTileSkipBudgetExhausted` copy); the button is
+  /// hidden on the widget surface when
+  /// `restDaysPerMonth == 0` (see `WidgetRenderer` /
+  /// `widget_medium.xml`), so the false return is purely
+  /// defensive.
+  Future<bool> skip(String habitId) async {
+    if (_disposed) return false;
+    final activeDo = await _doRepository.getById(habitId);
+    if (activeDo == null) return false;
+    if (activeDo.restDaysPerMonth <= 0) return false;
+    final asOf = DateTime.now();
+    final monthRestDays = await _completionLog.listRestDaysInMonth(
+      activeDo.id,
+      year: asOf.year,
+      month: asOf.month,
+    );
+    if (monthRestDays.length >= activeDo.restDaysPerMonth) return false;
+    final day = DateTime(asOf.year, asOf.month, asOf.day);
+    await _completionLog.append(
+      habitId: habitId,
+      day: day,
+      source: CompletionSource.restDay,
+      proofModeAtTime: proofModeTag(activeDo.proofMode),
+    );
+    await handleRefreshRequest();
+    return true;
+  }
+
+  /// Delete today's completion (or rest-day) row for
+  /// [habitId] via `CompletionLogService.deleteById`
+  /// (v1.4f / SYS-120 / ADR-050 / WF-047). Called from
+  /// the widget's "Undo today" ImageButton via the Kotlin
+  /// `WidgetChannel.undo` arm.
+  ///
+  /// Mirrors the in-app tile's `undoToday` (v1.4d /
+  /// SYS-118) at the widget surface — same day-local-
+  /// midnight filter (`dayMillis == midnight at now`), same
+  /// first-match-wins tiebreak (matches `sparklineForDo` +
+  /// `undoToday`), same single `deleteById` call on the
+  /// happy path.
+  ///
+  /// Returns `true` if a row was deleted, `false` if no
+  /// row matched today's local-midnight filter
+  /// (`deleteById` was NOT called). The widget button is
+  /// hidden when no completion row exists for today (the
+  /// Dart-side state compute already returns
+  /// `isCompletedToday == false`), so the false return is
+  /// purely defensive against a concurrent rebuild
+  /// racing the cached state read.
+  Future<bool> undo(String habitId) async {
+    if (_disposed) return false;
+    final asOf = DateTime.now();
+    final dayMillis = DateTime(
+      asOf.year,
+      asOf.month,
+      asOf.day,
+    ).millisecondsSinceEpoch;
+    final rows = await _completionLog.listForHabit(habitId);
+    for (final row in rows) {
+      if (row.dayMillis == dayMillis) {
+        await _completionLog.deleteById(row.id);
+        await handleRefreshRequest();
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Read the completion log for [activeDo] and convert each
@@ -229,13 +319,6 @@ class WidgetService {
           ),
         )
         .toList(growable: false);
-  }
-
-  String _proofModeTag(DoProofMode m) {
-    if (m is SoftProof) return 'soft';
-    if (m is StrongProof) return 'strong';
-    if (m is AutoProof) return 'auto';
-    throw ArgumentError('Unknown proof mode: $m');
   }
 
   void _dispose() {

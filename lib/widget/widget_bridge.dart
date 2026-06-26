@@ -9,6 +9,16 @@
 //     broadcasts `ACTION_MARK_DONE` to `DoitWidgetProvider`
 //     and asks the provider to repaint via
 //     `WidgetUpdater.refreshAll`.
+//   - Dart → Kotlin `skip(habitId)` (v1.4f / SYS-120):
+//     the user tapped the widget's "Skip today" button.
+//     The Kotlin side broadcasts `ACTION_WIDGET_SKIP` to
+//     `DoitWidgetProvider` and asks the provider to
+//     repaint.
+//   - Dart → Kotlin `undo(habitId)` (v1.4f / SYS-120):
+//     the user tapped the widget's "Undo today" button.
+//     The Kotlin side broadcasts `ACTION_WIDGET_UNDO` to
+//     `DoitWidgetProvider` and asks the provider to
+//     repaint.
 //   - Dart → Kotlin `cacheSnapshot(json)`: the Dart side
 //     writes the freshly-computed state to the
 //     `WidgetStateCache` SharedPreferences so the cold-
@@ -54,6 +64,24 @@ abstract class WidgetBridge {
   /// `WidgetStateCache` directly; this method exists for
   /// test parity with the MethodChannel.
   Future<DoitWidgetState?> snapshot();
+
+  /// v1.4f / SYS-120 / ADR-050 / WF-047. Round-trip the
+  /// widget's "Skip today" tap (v1.4f) to Dart. The Kotlin
+  /// side broadcasts `ACTION_WIDGET_SKIP` so the
+  /// provider's `onReceive` dispatches to Dart's
+  /// `WidgetService.skip`. Returns `true` on a clean
+  /// round-trip (a `MissingPluginException` from the host
+  /// platform surfaces as `false` per ADR-013).
+  Future<bool> skip(String habitId);
+
+  /// v1.4f / SYS-120 / ADR-050 / WF-047. Round-trip the
+  /// widget's "Undo today" tap (v1.4f) to Dart. The Kotlin
+  /// side broadcasts `ACTION_WIDGET_UNDO` so the
+  /// provider's `onReceive` dispatches to Dart's
+  /// `WidgetService.undo`. Returns `true` on a clean
+  /// round-trip (a `MissingPluginException` from the host
+  /// platform surfaces as `false` per ADR-013).
+  Future<bool> undo(String habitId);
 }
 
 /// Production implementation of [WidgetBridge]. Wraps a
@@ -89,6 +117,28 @@ class PlatformWidgetBridge implements WidgetBridge {
         result.map((k, v) => MapEntry(k.toString(), v)),
       );
     });
+  }
+
+  @override
+  Future<bool> skip(String habitId) async {
+    final result = await _safeResult<bool>('skip', () async {
+      final r = await _channel.invokeMethod<bool>('skip', <String, Object?>{
+        'habitId': habitId,
+      });
+      return r ?? false;
+    });
+    return result ?? false;
+  }
+
+  @override
+  Future<bool> undo(String habitId) async {
+    final result = await _safeResult<bool>('undo', () async {
+      final r = await _channel.invokeMethod<bool>('undo', <String, Object?>{
+        'habitId': habitId,
+      });
+      return r ?? false;
+    });
+    return result ?? false;
   }
 
   /// Defense-in-depth (ADR-013): swallows
@@ -131,6 +181,18 @@ class FakeWidgetBridge implements WidgetBridge {
   /// override this to simulate a platform-side read.
   DoitWidgetState? nextSnapshot;
 
+  /// Habit ids passed to every `skip` call (v1.4f).
+  final List<String> skipHabitIds = <String>[];
+
+  /// Habit ids passed to every `undo` call (v1.4f).
+  final List<String> undoHabitIds = <String>[];
+
+  /// What the next `skip` call returns. Defaults to `true`.
+  bool nextSkipResult = true;
+
+  /// What the next `undo` call returns. Defaults to `true`.
+  bool nextUndoResult = true;
+
   @override
   Future<void> cacheSnapshot(DoitWidgetState state) async {
     cachedSnapshots.add(state);
@@ -144,5 +206,17 @@ class FakeWidgetBridge implements WidgetBridge {
   @override
   Future<DoitWidgetState?> snapshot() async {
     return nextSnapshot;
+  }
+
+  @override
+  Future<bool> skip(String habitId) async {
+    skipHabitIds.add(habitId);
+    return nextSkipResult;
+  }
+
+  @override
+  Future<bool> undo(String habitId) async {
+    undoHabitIds.add(habitId);
+    return nextUndoResult;
   }
 }

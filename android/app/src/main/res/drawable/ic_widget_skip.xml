@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047.
+
+     "Skip today" glyph. 48dp touch target. Moon icon
+     mirrors the in-app tile's "_SkipButton" so the
+     widget feels native to the rest of the UI. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/widget_accent"
+        android:pathData="M21,12.79A9,9 0,1 1,11.21 3,7 7,0 0,0 21,12.79z" />
+</vector>

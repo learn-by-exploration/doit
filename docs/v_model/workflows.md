@@ -1661,3 +1661,66 @@ feature, shares the native-channel precedent).
 - **The user has 10+ visible tiles.** Each tile spawns its own `sparklineForDo` future against `CompletionLogService.listForHabit(habitId)`. Drift's read cache means the wall-clock cost is one Drift read per rebuild cycle (≤ 1 ms for the memoized path), so the per-frame cost is negligible. The screen does not stutter.
 
 **Requirements covered:** SYS-119 (per-tile 7-day sparkline), SYS-108 (the parent `CompletionLogSection` review-row pattern from v1.2m that v1.4e mirrors at the tile surface).
+
+## WF-047 — Skip or undo today from the Android home widget (v1.4f / Phase 33 / SYS-120 / ADR-050)
+
+### Trigger
+
+User taps the "Skip today" `ImageButton` (`@+id/widget_skip`) or the "Undo today" `ImageButton` (`@+id/widget_undo`) on the Android home-screen widget bound to `com.doit.DoitWidgetProvider`.
+
+### Actor
+
+The end user. They are looking at their Android home screen, not the do it app.
+
+### Preconditions
+
+- The widget is bound (added to a home-screen cell).
+- The do that is currently the first-active do (`firstActiveDo(repository: DoRepository)`) has a non-zero `restDaysPerMonth` for the Skip path; the Skip button is `View.GONE` otherwise.
+- The user has tapped "Done" or "Skip" earlier today for the Undo path; the Undo button is `View.GONE` otherwise.
+- The widget has been refreshed at least once since the do list changed (so the cached `DoitWidgetState` JSON includes the current `habitId`, `restDaysPerMonth`, and `isCompletedToday`).
+
+### Steps
+
+1. **User taps Skip.** Android delivers a click to the `ImageButton`, which fires its `PendingIntent.getBroadcast` for `ACTION_WIDGET_SKIP = "com.doit.WIDGET_SKIP"` with `EXTRA_HABIT_ID = <current habit id>`.
+2. **`DoitWidgetProvider.onReceive` dispatches.** The provider matches the `ACTION_WIDGET_SKIP` arm, reads `EXTRA_HABIT_ID`, and calls `WidgetUpdater.refreshAll(ctx)`.
+3. **`WidgetUpdater.refreshAll` boots a one-shot `FlutterEngine`** via `FlutterEngineCache` and dispatches the `markDone`/`skip`/`undo` MethodChannel arm to Dart.
+4. **`WidgetChannel.handleAction(call, result, "skip")`** returns `true` immediately. The Kotlin-side `WidgetUpdater.refreshAll` re-applies the cached `RemoteViews` and asks the Dart side to refresh via `cacheSnapshot` + `requestRefresh`.
+5. **Dart-side `WidgetService.skip(habitId)` resolves the do** via `DoRepository.getById(habitId)`. If the do is missing (race with a delete), returns `false`. If `restDaysPerMonth <= 0`, returns `false`.
+6. **Dart-side `WidgetService.skip` checks the month's rest-day rows** via `CompletionLogService.listRestDaysInMonth(habitId, year, month)`. If the count is `>= restDaysPerMonth`, returns `false`.
+7. **Dart-side `WidgetService.skip` appends** via `CompletionLogService.append(habitId, day: local-midnight at now, source: CompletionSource.restDay, proofModeAtTime: proofModeTag(activeDo.proofMode))`. The streak calculator (`ConsecutiveCounter.compute`) credits `rest_day` rows identically to `manual` rows, so the streak holds.
+8. **Dart-side `WidgetService.skip` re-derives** via `handleRefreshRequest()`: re-computes the `DoitWidgetState` (streak number is preserved, `isCompletedToday` flips to `true`), saves to `WidgetStateCache` (SharedPreferences), writes to the platform `WidgetStateCache` via `bridge.cacheSnapshot`, asks the platform to repaint via `bridge.requestRefresh`.
+9. **Kotlin-side `WidgetRenderer.render(ctx, state)` re-applies the `RemoteViews`.** The new state shows the updated streak number; the Skip button is still visible (the user can tap it again — `CompletionLogService.append` dedupes on `(habitId, day)` so a second tap is a no-op); the Undo button is now visible (`isCompletedToday == true`).
+10. **Undo path mirrors steps 1-9** but with `ACTION_WIDGET_UNDO = "com.doit.WIDGET_UNDO"` and the Dart-side handler is `WidgetService.undo(habitId)`: lists the habit's rows, finds the row whose `dayMillis == local-midnight at now` (first-match-wins tiebreak), calls `CompletionLogService.deleteById(row.id)`, and re-derives. The streak decrements by 1; the Undo button hides (`isCompletedToday == false`); the Skip + Done buttons remain visible.
+
+### Postconditions
+
+- The completion log has exactly one new `rest_day` row (Skip) or one fewer row (Undo) for the current `habitId` on today's local-calendar day.
+- The streak number reflects the change (preserved on Skip, decremented on Undo).
+- The widget surface is repainted with the updated streak + the appropriate visibility for Skip + Undo + Done.
+- The platform `WidgetStateCache` is updated to the new state so a cold-start fallback shows the right number.
+
+### Edge cases
+
+- **Concurrent rebuild races the cached state read.** The user taps Skip, but between the cached-state read and the Dart-side `DoRepository.getById` call, another tab deletes the do. `WidgetService.skip` returns `false` (no append). The widget repaints; the Skip button may now point at a deleted do (the next `handleRefreshRequest` cycle picks up the new first-active do).
+- **Skip tapped on an exhausted month.** The button is hidden (`restDaysPerMonth > 0` but `isExhausted == true` — currently we do NOT track `isExhausted` in the cached state, only `restDaysPerMonth`; if the user has burned all budget units but the widget has not refreshed yet, the Skip button may be visible). `WidgetService.skip` returns `false`; the widget repaints with the cached `isCompletedToday == false`; the Skip button stays visible. Closure candidate: thread `isExhausted` into `DoitWidgetState` in v1.4g+ so the renderer can hide the button on exhaustion.
+- **Undo tapped when there is no row for today.** The Undo button is hidden (`isCompletedToday == false`), but a concurrent rebuild can leave a dangling flag. `WidgetService.undo` returns `false`; no `deleteById` call. The widget repaints; the Undo button may still be visible for one cycle.
+- **Multiple rest-day rows for the same day.** `append` dedupes on `(habitId, day)` so a second tap is a no-op. The Skip button stays visible.
+- **App process killed between the broadcast and the Dart round-trip.** The widget repaints with the cached state (the pre-tap state) — the user sees no immediate effect. When the app process is restarted and `WidgetService.init` primes the cache + platform, the Dart side recomputes from the DB and the next refresh shows the right state. (The tap is "lost" in this case; the user can re-tap after the process restarts.)
+- **Timezone change while the widget is visible.** The completion log stores `dayMillis` (UTC-millis-of-local-midnight). A timezone change while the widget is bound does not invalidate today's row — `DateTime(now.year, now.month, now.day)` is re-computed in the new zone, and the row's `dayMillis` (now a different absolute moment) may or may not match. Defensive: a row from "yesterday in the old zone" might match "today in the new zone". Closure candidate: re-derive on `ACTION_TIMEZONE_CHANGED` in v1.4g+.
+
+### Failure paths
+
+- **MethodChannel `MissingPluginException` (test / older Android).** `WidgetBridge.skip` / `WidgetBridge.undo` swallow per ADR-013. The Dart side sees `false`; the widget repaints with the cached state; the user sees no effect. The next legitimate event (reliability change, completion write, manual refresh) re-derives and shows the right state.
+- **`DoRepository.getById` throws.** `WidgetService.skip` / `WidgetService.undo` catch and swallow (the surrounding `handleRefreshRequest` is best-effort). The widget repaints with the cached state.
+- **`CompletionLogService.deleteById` throws (DB locked).** `WidgetService.undo` returns `false`. The widget repaints with the cached state. The row is not deleted; the user can re-tap after the DB is unlocked.
+- **Kotlin `WidgetUpdater.refreshAll` fails to boot the FlutterEngine (corrupt engine cache).** The widget is left in the cached state. No Dart round-trip happens. The user sees no effect. `WidgetStateCache.cachedFromPrefs(ctx)` continues to serve the cached state on the next `onUpdate` cycle.
+
+### Requirements covered
+
+- SYS-120 (this cycle's primary requirement)
+- ADR-050 (this cycle's primary architectural decision)
+- ADR-013 (defensive `MissingPluginException` swallow — extended from ADR-045 to the new skip + undo bridge methods)
+- ADR-046 (v1.4b in-app `_SkipButton` pattern — mirrored at the widget surface)
+- ADR-047 (v1.4c shared `proofModeTag` helper — re-used, no inline copy)
+- ADR-048 (v1.4d in-app `_UndoButton` pattern — mirrored at the widget surface)
+- ADR-049 (v1.4e sparkline first-match-wins tiebreak — mirrored for the undo day-match)

@@ -103,6 +103,14 @@
   "@homeTileSparklineSemantics": {
     "description": "Semantics label for the 7-day streak history sparkline row on the in-app home tile (v1.4e / SYS-119). Wraps the 7 dots in a single Semantics node so screen readers announce 'Last 7 days' once instead of 7 separate dots."
   },
+  "widgetSkipToday": "Skip today",
+  "@widgetSkipToday": {
+    "description": "Tooltip / contentDescription for the Android home widget's 'Skip today' ImageButton (v1.4f / SYS-120). Tapping it appends a rest-day completion via CompletionLogService (consuming one rest-day budget unit) so the streak is credited and the day is marked intentionally off. Mirrors the in-app tile's `homeTileSkipToday`."
+  },
+  "widgetUndoToday": "Undo today",
+  "@widgetUndoToday": {
+    "description": "Tooltip / contentDescription for the Android home widget's 'Undo today' ImageButton (v1.4f / SYS-120). Tapping it deletes today's completion (or rest-day) row via CompletionLogService.deleteById. Visible only when isCompletedToday is true; mirrors the in-app tile's `homeTileUndoToday`."
+  },
   "homeEmptyTitle": "No dos yet.",
   "homeRetryButton": "Retry",
   "homeAddSheetNewDo": "New do",

@@ -50,6 +50,16 @@ object WidgetRenderer {
         val habitName = state.optString("habitName", "")
         val streak = state.optInt("streakNumber", 0)
         val reliability = state.optString("reliability", "unknown")
+        // v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047:
+        // the Skip / Undo visibility tracks the cached
+        // state — Skip is hidden when `restDaysPerMonth`
+        // is 0; Undo is hidden when there's no completion
+        // row for today (so a re-tap can't accidentally
+        // hit it after the user has not yet done anything).
+        // The renderer reads these from the state JSON
+        // (defensive: optInt returns 0 for missing keys).
+        val restDaysPerMonth = state.optInt("restDaysPerMonth", 0)
+        val isCompletedToday = state.optBoolean("isCompletedToday", false)
         views.setTextViewText(R.id.habit_name, habitName)
         views.setTextViewText(R.id.streak_number, streak.toString())
         views.setImageViewResource(
@@ -58,6 +68,21 @@ object WidgetRenderer {
         )
         views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(ctx, id))
         views.setOnClickPendingIntent(R.id.done, markDoneIntent(ctx, id))
+        // v1.4f: Skip + Undo wiring. Both buttons stay in
+        // the layout; visibility toggles keep the layout
+        // stable across renders (no jump on repaint).
+        views.setOnClickPendingIntent(R.id.skip, skipIntent(ctx, id))
+        views.setOnClickPendingIntent(R.id.undo, undoIntent(ctx, id))
+        views.setViewVisibility(
+            R.id.skip,
+            if (restDaysPerMonth > 0) android.view.View.VISIBLE
+            else android.view.View.GONE,
+        )
+        views.setViewVisibility(
+            R.id.undo,
+            if (isCompletedToday) android.view.View.VISIBLE
+            else android.view.View.GONE,
+        )
         mgr.updateAppWidget(id, views)
     }
 
@@ -71,8 +96,14 @@ object WidgetRenderer {
         views.setTextViewText(R.id.streak_number, "—")
         views.setImageViewResource(R.id.reliability_badge, R.drawable.ic_widget_unknown)
         views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(ctx, id))
-        // No Done button — there is nothing to mark done.
+        // No Done / Skip / Undo — there is nothing to act
+        // on. v1.4f: all three fall back to opening the
+        // app, matching the v1.4a "open app" shape.
         views.setOnClickPendingIntent(R.id.done, openAppIntent(ctx, id))
+        views.setOnClickPendingIntent(R.id.skip, openAppIntent(ctx, id))
+        views.setOnClickPendingIntent(R.id.undo, openAppIntent(ctx, id))
+        views.setViewVisibility(R.id.skip, android.view.View.GONE)
+        views.setViewVisibility(R.id.undo, android.view.View.GONE)
         mgr.updateAppWidget(id, views)
     }
 
@@ -87,6 +118,10 @@ object WidgetRenderer {
         views.setImageViewResource(R.id.reliability_badge, R.drawable.ic_widget_unknown)
         views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(ctx, id))
         views.setOnClickPendingIntent(R.id.done, openAppIntent(ctx, id))
+        views.setOnClickPendingIntent(R.id.skip, openAppIntent(ctx, id))
+        views.setOnClickPendingIntent(R.id.undo, openAppIntent(ctx, id))
+        views.setViewVisibility(R.id.skip, android.view.View.GONE)
+        views.setViewVisibility(R.id.undo, android.view.View.GONE)
         mgr.updateAppWidget(id, views)
     }
 
@@ -121,6 +156,39 @@ object WidgetRenderer {
         // (single source of truth: CompletionLogService).
         val intent = Intent(ctx, DoitWidgetProvider::class.java).apply {
             action = DoitWidgetProvider.ACTION_MARK_DONE
+        }
+        return PendingIntent.getBroadcast(
+            ctx, id, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun skipIntent(ctx: Context, id: Int): PendingIntent {
+        // v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047.
+        // The "Skip today" tap broadcasts to
+        // DoitWidgetProvider, which dispatches to
+        // WidgetChannel.skip (Kotlin -> Dart round-trip).
+        // The Dart side appends a rest-day completion via
+        // CompletionLogService.append (consuming one
+        // rest-day budget unit for the current month).
+        val intent = Intent(ctx, DoitWidgetProvider::class.java).apply {
+            action = DoitWidgetProvider.ACTION_WIDGET_SKIP
+        }
+        return PendingIntent.getBroadcast(
+            ctx, id, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun undoIntent(ctx: Context, id: Int): PendingIntent {
+        // v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047.
+        // The "Undo today" tap broadcasts to
+        // DoitWidgetProvider, which dispatches to
+        // WidgetChannel.undo (Kotlin -> Dart round-trip).
+        // The Dart side deletes today's completion (or
+        // rest-day) row via CompletionLogService.deleteById.
+        val intent = Intent(ctx, DoitWidgetProvider::class.java).apply {
+            action = DoitWidgetProvider.ACTION_WIDGET_UNDO
         }
         return PendingIntent.getBroadcast(
             ctx, id, intent,

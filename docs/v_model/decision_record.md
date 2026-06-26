@@ -5012,3 +5012,53 @@ The `SparklineDot` hierarchy is a sealed class with three value-equal subclasses
 - **Spanish localization is part of the same PR.** The ARB parity test catches missing `app_es.arb` entries automatically.
 
 (v1.4e / Phase 32 / SYS-119 / WF-046.)
+
+## ADR-050 — Widget-side Skip today + Undo buttons (v1.4f / Phase 33 / SYS-120 / WF-047)
+
+### Context
+
+v1.4a (PR #33, ADR-045) shipped the Android home-screen widget with a single "Done" button. v1.4c (PR #36, ADR-047) added the in-app `_SkipButton` to every `_HabitTile`. v1.4d (PR #38, ADR-048) added the in-app `_UndoButton`. The widget surface is now two tile affordances behind: a user can skip or undo from the in-app tile but NOT from the home-screen widget, which means the launcher widget loses its feature-parity promise (one of the explicit goals of v1.4a).
+
+`feature.md` §4 parking lot explicitly tracks "widget-side Skip" + "widget-side Undo" as v1.4f candidates. v1.4f picks them both up at once because they are two `ImageButton`s in the same XML layout, two `ACTION_*` constants in the same provider, two MethodChannel arms in the same Kotlin channel, two bridge methods on the same abstract class, and two service methods on the same singleton — separate PRs would duplicate the wiring with no incremental value.
+
+### Decision
+
+Bring the widget to feature-parity with the in-app tile by adding "Skip today" + "Undo today" `ImageButton`s to `widget_medium.xml`, routing their taps through the existing `doit/widget` MethodChannel + `DoitWidgetProvider` BroadcastReceiver, and exposing pure-Dart `WidgetService.skip(habitId)` + `WidgetService.undo(habitId)` helpers that mirror the in-app `markDoSkipped` + `undoToday` contracts.
+
+### Architectural choices
+
+- **Mirror the v1.4a pattern verbatim.** Just like the existing "Done" `ImageButton`, the new Skip + Undo buttons each get a Kotlin `ACTION_WIDGET_*` constant, a dispatch arm in `DoitWidgetProvider.onReceive()`, a MethodChannel arm in `WidgetChannel.kt`, an abstract bridge method, and a pure-Dart service method. The wiring is structurally identical so the cognitive load is zero — a reviewer who understands v1.4a reads v1.4f in five minutes.
+
+- **Shared `handleAction` helper in `WidgetChannel.kt`.** The three MethodChannel arms (`markDone`, `skip`, `undo`) all do the same thing — read the `habitId` arg, ask the provider to repaint via `WidgetUpdater.refreshAll(ctx)`, return `true` — so v1.4f extracts a `private fun handleAction(call, result, action)` helper rather than three near-duplicate `when` arms. The helper is private to the channel object; the only public surface remains the `attach(engine)` / `detach()` / `setAppContext(ctx)` shape.
+
+- **Conditional visibility mirrors the in-app `_SkipButton` + `_UndoButton` rules.** `widget_skip` is hidden (`View.GONE`) when the do's `restDaysPerMonth == 0` (a do with no rest-day budget never gets a Skip button — mirrors SYS-117). `widget_undo` is hidden when `isCompletedToday == false` (no row to undo — mirrors SYS-118). Both rules are enforced in `WidgetRenderer.render(...)` by reading the cached `DoitWidgetState` JSON — no Dart round-trip required for the visibility check, so the repaint is cheap.
+
+- **New `restDaysPerMonth` field on `DoitWidgetState`.** The renderer needs to know `restDaysPerMonth` to decide `widget_skip` visibility, but the field is not part of the widget's *displayed* state. We add it anyway (with `toJson` / `fromJson` round-trip) because (a) it's tiny, (b) the widget surface is the natural place to surface "0 rest days left this month" copy in a future v1.4g+, and (c) keeping the visibility logic on the Kotlin side avoids a Dart round-trip just to flip `View.GONE`.
+
+- **`skip(habitId)` returns `bool`, not `void`.** The in-app `markDoSkipped` throws `NoRestDaysRemaining` so the widget can branch the SnackBar copy. The widget has no SnackBar surface — a `false` return from `WidgetService.skip` simply means "the button shouldn't have been tappable; repaint and move on". `WidgetService.skip` returns `true` on the happy path, `false` on (a) missing do, (b) `restDaysPerMonth <= 0`, or (c) budget exhausted. The widget hides the button at render time so (b) and (c) should never be reachable from a real tap, but the defensive returns are kept because `doRepository.getById` + `completionLog.listRestDaysInMonth` are async and a concurrent rebuild can race the cached state read.
+
+- **`undo(habitId)` returns `bool` and matches the `undoToday` first-match-wins tiebreak.** The in-app `undoToday` returns `UndoResult.removed(rowId, source)` / `UndoResult.nothingToUndo()` so the widget can branch the SnackBar copy. The widget has no SnackBar surface — a `false` return simply means "no row matched; repaint and move on". First-match-wins for the day-match tiebreak matches the v1.4e `sparklineForDo` contract (ADR-049) and the v1.4d `undoToday` contract (ADR-048) so the three surfaces stay in lockstep.
+
+- **Re-use the existing `doit/widget` MethodChannel + `DoitWidgetProvider` BroadcastReceiver.** No new `MethodChannel`, no new `<receiver>` block, no new `<uses-permission>`. The widget already has all the wiring it needs; v1.4f just extends the contract.
+
+- **Re-use the existing `_proofModeTag` → `proofModeTag` shared helper.** v1.4c (ADR-047) extracted the helper to `lib/do/proof_mode_tag.dart`; v1.4f imports it from `WidgetService` rather than re-introducing an inline copy. The DRY principle + the user's lint policy + the v1.4c precedent all point the same way.
+
+- **Two new ARB keys (`widgetSkipToday` + `widgetUndoToday`) in both `app_en.arb` and `app_es.arb`.** The existing ARB parity test (`test/l10n/app_localizations_test.dart` "every non-template ARB has the same key set as the template") catches missing Spanish entries automatically. Two new `<string>` resources (`widget_skip_content_description` + `widget_undo_content_description`) in `res/values/strings.xml` for the `ImageButton`'s `contentDescription` (TalkBack label).
+
+- **Latent v1.4a gap noted but NOT closed in v1.4f.** The existing widget "Done" tap (v1.4a) only triggers `WidgetUpdater.refreshAll(ctx)` from the Kotlin `ACTION_MARK_DONE` broadcast — it does NOT round-trip the `markDone` call to Dart's `WidgetService.markDone` like the Skip + Undo paths do in v1.4f. The widget still shows the correct state on the next refresh cycle because the Dart side recomputes on every reliability change AND on the next `markDone`-adjacent event, but a power-cycle race between the manual tile-Done tap and a freshness probe can leave the widget stale for ~30 s. Closure candidate for v1.4g+ (or whichever cycle picks up the next widget surface work).
+
+### Consequences
+
+- **Positive.** The widget surface gains feature-parity with the in-app tile for the two most common mid-day corrections (rest-day credit + accidental completion delete). The user's mental model "tap the widget, the streak updates" is now uniformly true for Skip and Undo, not just for Done.
+- **Positive.** The shared `handleAction` Kotlin helper reduces three near-duplicate `when` arms to one, lowering the cost of any future action (e.g., v1.4g+ "Reset streak" or "Mark as paused").
+- **Positive.** The new `restDaysPerMonth` field on `DoitWidgetState` is a stepping stone for future widget surfaces that surface budget copy (e.g., "X/Y rest days left" in v1.4g+).
+- **Positive.** No new permissions, no new deps, no new tables, no new channels — v1.4f is a pure UI + wiring extension.
+- **Negative (minor).** The latent v1.4a "Done tap doesn't round-trip to Dart" gap is a known limitation. v1.4f deliberately does NOT close it; closing it is a v1.4g+ candidate.
+- **Negative (minor).** `WidgetService.skip` returns `false` on `restDaysPerMonth == 0` / budget exhausted, but the widget button is hidden in both cases. The defensive `false` return is unreachable from a real tap; we keep it so a concurrent rebuild racing the cached state read cannot crash the service.
+
+### Alternatives considered
+
+- **Single "Actions" overflow menu instead of two more `ImageButton`s.** Rejected: the widget is 4×2 cells — the overflow chevron would consume ~25% of the available width and add a tap. Two side-by-side icons is more discoverable and keeps the widget single-tap to act on.
+- **Reuse the existing "Done" button with a long-press to expose Skip + Undo.** Rejected: long-press affordances on Android widgets are undocumented and inconsistent across launchers. Two buttons is unambiguous and matches the in-app tile.
+- **Round-trip the "Done" tap through Dart as part of v1.4f (close the latent gap).** Rejected: it would expand v1.4f scope and risk regressing the v1.4a behavior the user has been running for a cycle. The closure is a separate PR.
+- **Add the rest-day-budget caption to the widget in v1.4f.** Rejected: out of scope for v1.4f's "feature-parity with the in-app tile" goal. The in-app tile shows the caption via `_BudgetCaption` (SYS-117), but the widget already hides the Skip button when the budget is exhausted, which is the more important UX signal. Adding the caption is a v1.4g+ candidate.

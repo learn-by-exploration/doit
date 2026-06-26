@@ -70,7 +70,11 @@ class _FakeDoRepo implements DoRepository {
 
 class _FakeCompletionLog implements CompletionLogService {
   final List<String> appendedHabitIds = <String>[];
+  final List<CompletionSource> appendedSources = <CompletionSource>[];
   final List<CompletionRow> rows = <CompletionRow>[];
+  // v1.4f / Phase 33 / SYS-120: track deleted ids so
+  // the undo tests can assert against the deleted row.
+  final List<String> deletedIds = <String>[];
 
   @override
   Future<String> append({
@@ -82,14 +86,15 @@ class _FakeCompletionLog implements CompletionLogService {
     String? missionResultsJson,
   }) async {
     appendedHabitIds.add(habitId);
-    final id = 'fake-${appendedHabitIds.length}';
+    appendedSources.add(source);
+    final id = 'fake-${rows.length + 1}';
     rows.add(
       CompletionRow(
         id: id,
         habitId: habitId,
         dayMillis: day.millisecondsSinceEpoch,
         completedAtMillis: day.millisecondsSinceEpoch,
-        source: 'manual',
+        source: _sourceTag(source),
         proofModeAtTime: proofModeAtTime,
         note: note,
         missionResultsJson: missionResultsJson,
@@ -103,7 +108,47 @@ class _FakeCompletionLog implements CompletionLogService {
       rows.where((r) => r.habitId == habitId).toList(growable: false);
 
   @override
+  Future<List<CompletionRow>> listRestDaysInMonth(
+    String habitId, {
+    required int year,
+    required int month,
+  }) async {
+    final first = DateTime(year, month).millisecondsSinceEpoch;
+    final last = month == 12
+        ? DateTime(year + 1).millisecondsSinceEpoch
+        : DateTime(year, month + 1).millisecondsSinceEpoch;
+    return rows
+        .where(
+          (r) =>
+              r.habitId == habitId &&
+              r.source == 'rest_day' &&
+              r.dayMillis >= first &&
+              r.dayMillis < last,
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> deleteById(String id) async {
+    deletedIds.add(id);
+    rows.removeWhere((r) => r.id == id);
+  }
+
+  @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
+  static String _sourceTag(CompletionSource s) {
+    switch (s) {
+      case CompletionSource.manual:
+        return 'manual';
+      case CompletionSource.notification:
+        return 'notification';
+      case CompletionSource.mission:
+        return 'mission';
+      case CompletionSource.restDay:
+        return 'rest_day';
+    }
+  }
 }
 
 class _FakeReliabilityService implements ReliabilityService {
@@ -218,6 +263,207 @@ void main() {
     await WidgetService.ready;
     await WidgetService.instance.markDone('nope');
     expect(log.appendedHabitIds, isEmpty);
+  });
+
+  test(
+    'skip appends a rest_day completion then re-derives (v1.4f / SYS-120)',
+    () async {
+      final bridge = FakeWidgetBridge();
+      final repo = _FakeDoRepo(<Do>[_fixed('h1', 'Read')]);
+      final log = _FakeCompletionLog();
+      final rel = _FakeReliabilityService();
+      await WidgetService.init(
+        bridge: bridge,
+        doRepository: repo,
+        completionLog: log,
+        reliabilityService: rel,
+      );
+      await WidgetService.ready;
+      await WidgetService.instance.handleRefreshRequest();
+      final primeCount = bridge.cachedSnapshots.length;
+
+      final ok = await WidgetService.instance.skip('h1');
+      expect(ok, isTrue);
+      expect(log.appendedSources.last, CompletionSource.restDay);
+      expect(bridge.cachedSnapshots.length, greaterThan(primeCount));
+    },
+  );
+
+  test('skip returns false when the do has restDaysPerMonth == 0 '
+      '(v1.4f / SYS-120)', () async {
+    final bridge = FakeWidgetBridge();
+    final noRestDo = _fixed('h1', 'Read').copyWith(restDaysPerMonth: 0);
+    final repo = _FakeDoRepo(<Do>[noRestDo]);
+    final log = _FakeCompletionLog();
+    final rel = _FakeReliabilityService();
+    await WidgetService.init(
+      bridge: bridge,
+      doRepository: repo,
+      completionLog: log,
+      reliabilityService: rel,
+    );
+    await WidgetService.ready;
+    final ok = await WidgetService.instance.skip('h1');
+    expect(ok, isFalse);
+    expect(log.appendedHabitIds, isEmpty);
+  });
+
+  test('skip returns false when the rest-day budget is exhausted for '
+      'the current month (v1.4f / SYS-120)', () async {
+    final bridge = FakeWidgetBridge();
+    final repo = _FakeDoRepo(<Do>[_fixed('h1', 'Read')]);
+    final log = _FakeCompletionLog();
+    final rel = _FakeReliabilityService();
+    await WidgetService.init(
+      bridge: bridge,
+      doRepository: repo,
+      completionLog: log,
+      reliabilityService: rel,
+    );
+    await WidgetService.ready;
+    // Seed two rest-day rows in the current month
+    // (limit is 3 in _fixed). After 2 consumes, 1 unit
+    // is still available; the third consume should succeed.
+    // For this test we want exhaustion, so seed 3 rows.
+    final now = DateTime.now();
+    for (var i = 0; i < 3; i++) {
+      await log.append(
+        habitId: 'h1',
+        day: DateTime(now.year, now.month, i + 1),
+        source: CompletionSource.restDay,
+        proofModeAtTime: 'soft',
+      );
+    }
+    final ok = await WidgetService.instance.skip('h1');
+    expect(ok, isFalse);
+    // The third seeded append means we've issued 3 log
+    // writes; the failing skip should NOT add a 4th.
+    expect(log.appendedHabitIds.length, 3);
+  });
+
+  test(
+    'skip returns false when the habit does not exist (v1.4f / SYS-120)',
+    () async {
+      final bridge = FakeWidgetBridge();
+      final repo = _FakeDoRepo(<Do>[_fixed('h1', 'Read')]);
+      final log = _FakeCompletionLog();
+      final rel = _FakeReliabilityService();
+      await WidgetService.init(
+        bridge: bridge,
+        doRepository: repo,
+        completionLog: log,
+        reliabilityService: rel,
+      );
+      await WidgetService.ready;
+      final ok = await WidgetService.instance.skip('nope');
+      expect(ok, isFalse);
+      expect(log.appendedHabitIds, isEmpty);
+    },
+  );
+
+  test('undo deletes today\'s completion then re-derives '
+      '(v1.4f / SYS-120)', () async {
+    final bridge = FakeWidgetBridge();
+    final repo = _FakeDoRepo(<Do>[_fixed('h1', 'Read')]);
+    final log = _FakeCompletionLog();
+    final rel = _FakeReliabilityService();
+    await WidgetService.init(
+      bridge: bridge,
+      doRepository: repo,
+      completionLog: log,
+      reliabilityService: rel,
+    );
+    await WidgetService.ready;
+    // Seed a row for today so undo has something to
+    // delete.
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final seededId = await log.append(
+      habitId: 'h1',
+      day: today,
+      source: CompletionSource.manual,
+      proofModeAtTime: 'soft',
+    );
+    await WidgetService.instance.handleRefreshRequest();
+    final primeCount = bridge.cachedSnapshots.length;
+
+    final ok = await WidgetService.instance.undo('h1');
+    expect(ok, isTrue);
+    expect(log.deletedIds, contains(seededId));
+    expect(bridge.cachedSnapshots.length, greaterThan(primeCount));
+  });
+
+  test('undo returns false when there is no completion row for today '
+      '(v1.4f / SYS-120)', () async {
+    final bridge = FakeWidgetBridge();
+    final repo = _FakeDoRepo(<Do>[_fixed('h1', 'Read')]);
+    final log = _FakeCompletionLog();
+    final rel = _FakeReliabilityService();
+    await WidgetService.init(
+      bridge: bridge,
+      doRepository: repo,
+      completionLog: log,
+      reliabilityService: rel,
+    );
+    await WidgetService.ready;
+    final ok = await WidgetService.instance.undo('h1');
+    expect(ok, isFalse);
+    expect(log.deletedIds, isEmpty);
+  });
+
+  test(
+    'undo only matches today\'s day-local-midnight (v1.4f / SYS-120)',
+    () async {
+      final bridge = FakeWidgetBridge();
+      final repo = _FakeDoRepo(<Do>[_fixed('h1', 'Read')]);
+      final log = _FakeCompletionLog();
+      final rel = _FakeReliabilityService();
+      await WidgetService.init(
+        bridge: bridge,
+        doRepository: repo,
+        completionLog: log,
+        reliabilityService: rel,
+      );
+      await WidgetService.ready;
+      // Seed a row for YESTERDAY only. The undo helper
+      // filters by today's local-midnight; yesterday's row
+      // must NOT be deleted.
+      final now = DateTime.now();
+      final yesterday = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).subtract(const Duration(days: 1));
+      final seededId = await log.append(
+        habitId: 'h1',
+        day: yesterday,
+        source: CompletionSource.manual,
+        proofModeAtTime: 'soft',
+      );
+      final ok = await WidgetService.instance.undo('h1');
+      expect(ok, isFalse);
+      expect(log.deletedIds, isNot(contains(seededId)));
+      // The yesterday row is still in the log.
+      expect(log.rows.where((r) => r.id == seededId), isNotEmpty);
+    },
+  );
+
+  test('undo returns false when the habit does not exist '
+      '(v1.4f / SYS-120)', () async {
+    final bridge = FakeWidgetBridge();
+    final repo = _FakeDoRepo(<Do>[_fixed('h1', 'Read')]);
+    final log = _FakeCompletionLog();
+    final rel = _FakeReliabilityService();
+    await WidgetService.init(
+      bridge: bridge,
+      doRepository: repo,
+      completionLog: log,
+      reliabilityService: rel,
+    );
+    await WidgetService.ready;
+    final ok = await WidgetService.instance.undo('nope');
+    expect(ok, isFalse);
+    expect(log.deletedIds, isEmpty);
   });
 
   test('reliability change triggers a re-derive', () async {
