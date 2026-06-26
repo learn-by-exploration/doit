@@ -77,6 +77,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeTileBudgetNoRemaining => 'No rest days left';
 
   @override
+  String get homeTileUndoToday => 'Undo today';
+
+  @override
+  String get homeTileUndoConfirm => 'Undo today\'s completion?';
+
+  @override
+  String get homeTileUndoConfirmBody =>
+      'This will remove today\'s check-in. The streak will update.';
+
+  @override
+  String get homeTileUndoSuccess => 'Completion removed.';
+
+  @override
+  String get homeTileUndoNotToday => 'Nothing to undo for today.';
+
+  @override
   String get homeEmptyTitle => 'No dos yet.';
 
   @override

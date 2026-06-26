@@ -79,6 +79,26 @@
   "@homeTileBudgetNoRemaining": {
     "description": "Caption under the streak badge on the home tile when restDaysPerMonth > 0 but the user has used all budget units for the month (v1.4c / SYS-117). Distinct from 'No budget configured' — the do opted into rest days but has used them all."
   },
+  "homeTileUndoToday": "Undo today",
+  "@homeTileUndoToday": {
+    "description": "Tooltip / aria-label for the in-app home tile's 'Undo today' IconButton (v1.4d / SYS-118). Visible only when the tile is 'resolved' for today (Done tap or Skip tap recorded). Tap opens a confirm dialog; the confirm reverts the completion via CompletionLogService.deleteById."
+  },
+  "homeTileUndoConfirm": "Undo today's completion?",
+  "@homeTileUndoConfirm": {
+    "description": "Title of the AlertDialog that confirms an in-app home tile Undo tap (v1.4d / SYS-118). Mirrors the CompletionLogSection's 'Delete this completion?' title but at the tile surface."
+  },
+  "homeTileUndoConfirmBody": "This will remove today's check-in. The streak will update.",
+  "@homeTileUndoConfirmBody": {
+    "description": "Body copy of the AlertDialog that confirms an in-app home tile Undo tap (v1.4d / SYS-118). Sets the user's expectation: the row is deleted, the streak decrements by 1 (or the rest-day budget re-increments by 1 for the skip path)."
+  },
+  "homeTileUndoSuccess": "Completion removed.",
+  "@homeTileUndoSuccess": {
+    "description": "Snackbar copy after a successful in-app home tile Undo tap (v1.4d / SYS-118). Mirrors the CompletionLogSection's 'Completion removed.' snackbar but at the tile surface."
+  },
+  "homeTileUndoNotToday": "Nothing to undo for today.",
+  "@homeTileUndoNotToday": {
+    "description": "Snackbar copy when the in-app home tile Undo tap completes but the DB has no row to delete (v1.4d / SYS-118). Defensive — the dialog is gated on _isResolvedToday == true, but the DB is the source of truth and a concurrent app-tile rebuild could leave a dangling flag."
+  },
   "homeEmptyTitle": "No dos yet.",
   "homeRetryButton": "Retry",
   "homeAddSheetNewDo": "New do",

@@ -79,6 +79,22 @@ class AppLocalizationsEs extends AppLocalizations {
   String get homeTileBudgetNoRemaining => 'No quedan días de descanso';
 
   @override
+  String get homeTileUndoToday => 'Deshacer hoy';
+
+  @override
+  String get homeTileUndoConfirm => '¿Deshacer el registro de hoy?';
+
+  @override
+  String get homeTileUndoConfirmBody =>
+      'Se eliminará el registro de hoy. La racha se actualizará.';
+
+  @override
+  String get homeTileUndoSuccess => 'Registro eliminado.';
+
+  @override
+  String get homeTileUndoNotToday => 'No hay nada que deshacer para hoy.';
+
+  @override
   String get homeEmptyTitle => 'Sin tareas aún.';
 
   @override

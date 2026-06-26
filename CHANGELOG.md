@@ -848,6 +848,78 @@ extensions — remain green; the 6 pre-existing `home_test`
 cases still pass; the v1.4b + v1.4c net delta against the
 v1.4a `main` baseline of 1130 is +18).
 
+### v1.4d — In-app home tile Undo today's completion (Phase 31 / SYS-118 / ADR-048 / WF-045)
+
+Closes the v1.4c → v1.4d parking-lot item: the home tile
+now exposes an "Undo" affordance that reverts an accidental
+Done or Skip tap on today's tile in a single confirm-tap.
+The existing `CompletionLogService.deleteById(rowId)` (v1.2m)
+is re-used verbatim; no new Drift methods, no new
+`lib/services/` surface. Mirrors the `CompletionLogSection`
+(SYS-108 / WF-025) review-and-undo flow but with one fewer
+tap (no scroll, no list, no per-row delete icon — just a
+confirm dialog on the tile itself). New code:
+
+- `lib/screens/home_tile_undo.dart` (NEW) —
+  `undoToday({required Do activeDo, required DateTime
+  asOf, required CompletionLogService completionLog})`
+  fetches `completionLog.listForHabit(activeDo.id)` (re-
+  uses the v1.0 query that backs `CompletionLogSection`),
+  filters rows whose `day` equals `DateTime(asOf.year,
+  asOf.month, asOf.day)` (local-midnight comparison —
+  same convention as `markDoDone` + `markDoSkipped`), and
+  on the happy path calls `completionLog.deleteById(row.id)`
+  exactly once. Returns `UndoResult.removed(rowId, source)`
+  (carries the deleted row's id + source) or
+  `UndoResult.nothingToUndo()` (defensive — the dialog is
+  gated on `_isResolvedToday == true`, but the DB is the
+  source of truth and a concurrent app-tile rebuild could
+  leave a dangling flag). Pure-Dart, no Flutter import, no
+  `DateTime.now()`.
+- `lib/screens/home.dart` — `_HabitTileState` grows a
+  `_UndoButton` sub-widget (`Icons.undo`, tooltip
+  `homeTileUndoToday`, sits between `_SkipButton` and
+  `_DoneButton`). Visibility is gated on
+  `_isResolvedToday == true` — the tile is "resolved" for
+  the day via either Done (`_isCompletedToday`) or Skip
+  (`_isSkippedToday`). The undo affordance disappears for
+  fresh tiles, eliminating the temptation to undo a row
+  that does not exist. Tap opens an `AlertDialog` titled
+  `homeTileUndoConfirm` with body `homeTileUndoConfirmBody`;
+  the confirm callback calls `undoToday(...)` and on the
+  `removed` branch flips `_isCompletedToday` /
+  `_isSkippedToday` (whichever was true) back to `false`
+  and shows the `homeTileUndoSuccess` SnackBar; on the
+  `nothingToUndo` branch shows the `homeTileUndoNotToday`
+  SnackBar.
+- `lib/l10n/app_en.arb` + `app_es.arb` — 5 new keys
+  (`homeTileUndoToday`, `homeTileUndoConfirm`,
+  `homeTileUndoConfirmBody`, `homeTileUndoSuccess`,
+  `homeTileUndoNotToday`).
+
+**ADR-048** locks the design: pure-Dart helper re-using
+the existing `CompletionLogService.deleteById` (no new
+service surface), `UndoResult` sealed value class
+matching the `BudgetRemaining` value-class shape from
+v1.4c, dialog-gated `_UndoButton` visibility on
+`_isResolvedToday == true` (a derived getter that
+already exists from v1.4c), DB-driven source-of-truth
+via `listForHabit` (the same query `CompletionLogSection`
+uses), defensive `nothingToUndo` branch even though
+the dialog is gated (DB-as-truth principle), no new
+pubspec dep; no new `<uses-permission>`.
+
+**SYS-118 + ADR-048 + WF-045 appended.** `feature.md`
+§4 per-tile undo bullet removed; §5 quick-index updated
+to ADR-048 / SYS-118 / WF-045.
+
+Tests: 1183 / 1183 (1183 v1.4c tip + 13 new — 8
+home_tile_undo + 5 home_test widget extensions per the
+3-gate at this commit; the 19 added in v1.4b + the 19
+added in v1.4c remain green; the v1.4a + v1.4b + v1.4c
++ v1.4d net delta against the v1.4a `main` baseline of
+1130 is +53).
+
 ### v1.3d — Light-theme icon variant for the FSI tile (feature.md §2.7)
 
 Closes the §2.7 follow-up: the Settings → Permissions

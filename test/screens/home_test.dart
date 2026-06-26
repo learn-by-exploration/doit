@@ -677,4 +677,197 @@ void main() {
     // just with the alternate tooltip).
     expect(find.byTooltip('Rest day taken'), findsOneWidget);
   });
+
+  // ---- v1.4d / Phase 31 / SYS-118 / ADR-048 / WF-045 ----
+  //
+  // In-app home tile "Undo today" button. Mirrors the
+  // `CompletionLogSection` (SYS-108) review-and-undo flow
+  // but with one fewer tap. Visibility is gated on
+  // `_isResolvedToday == true` (the day is resolved via
+  // Done or Skip). Tap opens a confirm dialog; confirm
+  // calls `undoToday` which deletes today's row from the
+  // completion log.
+
+  testWidgets('tile renders the Undo button only when the day is resolved '
+      '(v1.4d / SYS-118)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    // Fresh tile — day not resolved → Undo button hidden.
+    expect(find.byTooltip('Undo today'), findsNothing);
+    // Tap Done to resolve the day.
+    await tester.tap(find.byTooltip('Mark done'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    // Day now resolved → Undo button visible.
+    expect(find.byTooltip('Undo today'), findsOneWidget);
+  });
+
+  testWidgets('tile hides the Undo button when neither completion nor '
+      'skip is recorded for today (v1.4d / SYS-118)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    // Fresh tile — no completion, no skip → Undo hidden.
+    expect(find.byTooltip('Undo today'), findsNothing);
+  });
+
+  testWidgets('undo-tap on a completed-today tile opens the confirm dialog '
+      'with the localized body copy (v1.4d / SYS-118)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    // Tap Done to resolve the day.
+    await tester.tap(find.byTooltip('Mark done'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    // Tap Undo.
+    await tester.tap(find.byTooltip('Undo today'));
+    await tester.pumpAndSettle();
+    // The dialog renders the localized body copy.
+    expect(
+      find.text('This will remove today\'s check-in. The streak will update.'),
+      findsOneWidget,
+    );
+    expect(find.text('Undo today\'s completion?'), findsOneWidget);
+  });
+
+  testWidgets(
+    'undo-tap → confirm on a completed-today tile deletes the row and '
+    'shows the success snackbar (v1.4d / SYS-118)',
+    (tester) async {
+      await _resetDb(tester);
+      await DoRepository.instance.save(
+        DoFixed(
+          id: 'h1',
+          name: 'Stretch',
+          proofMode: const SoftProof(),
+          createdAt: DateTime(2026, 5, 17),
+          restDaysPerMonth: 2,
+          weekdays: const {1, 2, 3, 4, 5, 6, 7},
+          time: const DoTime(9, 0),
+        ),
+      );
+      await tester.pumpWidget(_wrap());
+      await tester.pumpAndSettle();
+      // Tap Done.
+      await tester.tap(find.byTooltip('Mark done'));
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pumpAndSettle();
+      final before = await CompletionLogService.instance.listForHabit('h1');
+      expect(before.length, 1);
+      // Tap Undo.
+      await tester.tap(find.byTooltip('Undo today'));
+      await tester.pumpAndSettle();
+      // Confirm. The dialog's FilledButton label is
+      // "Undo today" — find the FilledButton descendant
+      // and tap it (avoids matching the AlertDialog title
+      // which uses the same words).
+      await tester.tap(
+        find.descendant(
+          of: find.byType(FilledButton),
+          matching: find.text('Undo today'),
+        ),
+      );
+      // Dismiss any prior snackbars so the new one is
+      // visible immediately.
+      ScaffoldMessenger.of(
+        tester.element(find.byType(Scaffold).first),
+      ).clearSnackBars();
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pump();
+      final after = await CompletionLogService.instance.listForHabit('h1');
+      expect(after, isEmpty);
+      expect(find.text('Completion removed.'), findsOneWidget);
+    },
+  );
+
+  testWidgets('undo-tap on a skipped-today tile deletes the rest-day row '
+      '(v1.4d / SYS-118)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    // Tap Skip to resolve the day via rest-day.
+    await tester.tap(find.byTooltip('Skip today'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    final before = await CompletionLogService.instance.listForHabit('h1');
+    expect(before.length, 1);
+    expect(before.first.source, 'rest_day');
+    // Tap Undo.
+    await tester.tap(find.byTooltip('Undo today'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(FilledButton),
+        matching: find.text('Undo today'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    final after = await CompletionLogService.instance.listForHabit('h1');
+    expect(after, isEmpty);
+  });
 }
