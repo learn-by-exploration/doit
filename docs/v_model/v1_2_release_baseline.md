@@ -124,12 +124,17 @@ v1.x candidates (still v1 track, not v2.0 jump):
 
 - Strong-mode full-screen launch hardening (Phase 6a —
   `USE_FULL_SCREEN_INTENT` on API 34+). See `feature.md`
-  §2.1.
+  §2.1. **Shipped in v1.3c** (SYS-113 / ADR-043 / commit
+  `4c721af`).
 - Action-side permission disambiguation in the
   `AutomationReliabilityDialog`. See `feature.md` §2.2.
+  **Shipped in PR #27** (v1.5b / Phase 25).
 - `TriggerCallIncoming*` reliability arm once
   `PermissionService.callScreening` is fully probed. See
-  `feature.md` §2.3.
+  `feature.md` §2.3. **Shipped in PR #28** (v1.3b — the
+  arm folds in `PermissionKind.callScreening`; PR #27's
+  v1.5b action-side work shipped the matching
+  `ActionCallIntercept` mapping).
 - Spanish translation by a native speaker (the v1.1h
   smoke-test locale is the only translation). See
   `feature.md` §2.4.

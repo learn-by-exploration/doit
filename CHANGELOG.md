@@ -1447,6 +1447,47 @@ changed file.
   deferred.
 - The Android home-screen widget (Phase 28).
 
+### v1.3d — `TriggerCallIncoming*` reliability arm closeout (docs, Phase 25b)
+
+Doc-only closeout (no code changes, no new tests). The
+`TriggerCallIncoming*` → `PermissionKind.callScreening`
+arm — explicitly deferred in v1.2h (`feature.md` §2.3)
+because `PermissionService.callScreening` was not fully
+probed at the time — is now folded in via
+`lib/routines/automation_reliability.dart`'s
+`_requiredPermissionForTrigger` exhaustive switch. The
+probe side (`refreshCallScreening()` +
+`_refreshCallScreeningAfterInit()` + the `refresh()`
+cascade) landed in v1.2c/v1.2i; the missing arm was
+the only outstanding wire.
+
+**Why docs-only.** No new code, no new permissions, no
+new tests, no `INTERNET`. The arm was the v1.2h explicit
+deferral point — closing it requires only the doc
+annotation: the model + service were already wired.
+
+**Doc edits:**
+- `v1_2_release_baseline.md` §5 — the §2.3 entry now
+  reads "Shipped in PR #28".
+- `decision_record.md` ADR-035 — adds an "Update v1.3b"
+  block that points at the live
+  `_requiredPermissionForTrigger` switch + the
+  `PermissionService.callScreening` probe chain.
+- `implementation_status.md` v1.2h row gets an
+  "Update v1.3b" annotation; a new v1.3b row is added
+  at the bottom of the table mirroring the v1.2g
+  closeout shape.
+
+**Verification.**
+```
+dart format --output=none --set-exit-if-changed .   →   0 changed
+flutter analyze --fatal-infos                        →   0 issues
+flutter test                                         →   1064 / 1064 passed (no count delta)
+```
+
+(The doc-only annotation is the entire diff; the test
+count is unchanged because no Dart code moved.)
+
 ### v1.3a — Monthly stats + per-do grace factory (Phase 12)
 
 Phase 12 of the v1.3 reliability + lifecycle hardening

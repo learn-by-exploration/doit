@@ -3927,6 +3927,17 @@ reliability arm is also deferred until
 `PermissionService.callScreening` is fully probed (see
 `feature.md` §2.3).
 
+**Update v1.3b / Phase 25.** The
+`TriggerCallIncoming*` → `PermissionKind.callScreening` arm
+is now folded in via
+`lib/routines/automation_reliability.dart`'s
+`_requiredPermissionForTrigger` exhaustive switch.
+`PermissionService.callScreening` is fully probed through
+`refreshCallScreening()` + `_refreshCallScreeningAfterInit()`
++ the `refresh()` cascade. PR #27 (v1.5b / Phase 25) closed
+the §2.2 follow-up as well, so the dialog renders both
+sides today.
+
 **Consequences.** The user can now act on a degraded
 automation without leaving the app. The deep-link CTA is the
 same pattern as the v1.1g `UsageStatsService.openSettings()`
