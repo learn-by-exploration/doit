@@ -500,6 +500,30 @@ the settings tile. 2 new widget tests pin both branches.
 Test count: 1047 → 1049. `dart format` clean,
 `flutter analyze --fatal-infos` clean.
 
+### v1.3d — Regenerate legacy launcher PNGs from the master vector (feature.md §2.6)
+
+Closes the §2.6 follow-up: the API 21..25 launcher icon
+fallback (`mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png`)
+was the default Flutter blue 'F' (left over from the
+v0.1 scaffold). PR #31 regenerates those PNGs from the
+v1.1i / ADR-032 master vector (the same shapes used by
+`mipmap-anydpi-v26/ic_launcher.xml`'s `<adaptive-icon>`
+foreground + background layers) so the API 21..25 fallback
+shows the brand-purple 'd' + check dot icon on devices that
+do not support adaptive icons. New `tool/regen_launcher_icons.py`
+(Pillow-based, idempotent, runs offline) draws the four
+shapes (stem rectangle + outer bowl ellipse + inner
+counter ellipse + check dot ellipse) on a brand-purple
+canvas at each density bucket size (48 / 72 / 96 / 144 /
+192 px). New `test/app_icon_test.dart` test pins the
+PNG signature + IHDR width/height for all 5 buckets
+so a half-written regen is caught at CI. Test count:
+1047 → 1048. `dart format` clean,
+`flutter analyze --fatal-infos` clean. No new permissions,
+no `INTERNET`, no `flutter pub` changes (Pillow is a
+dev-only tool dependency; the script is not in the
+runtime pubspec).
+
 ### v1.2e — `NotificationService.dismiss` + `PlatformNotificationService.show` real implementations
 
 Phase 5 of the v1.2 code-TODO closure (`30-phase roadmap`).

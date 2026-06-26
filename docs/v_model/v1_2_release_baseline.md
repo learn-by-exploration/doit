@@ -145,7 +145,11 @@ v1.x candidates (still v1 track, not v2.0 jump):
 - `google_maps_flutter` for `LocationMapPreview` (would
   add `INTERNET`). See `feature.md` §2.5.
 - Legacy `mipmap-*/ic_launcher.png` regeneration from the
-  master vector. See `feature.md` §2.6.
+  master vector. See `feature.md` §2.6. **Shipped in
+  PR #31** (v1.3d — `tool/regen_launcher_icons.py`
+  regenerates the 5 API 21..25 density buckets from the
+  v1.1i / ADR-032 master vector; new test pins PNG
+  signature + IHDR width/height for all 5 buckets).
 - Light-theme icon variant. See `feature.md` §2.7.
   **Shipped in PR #30** (v1.3d — `Settings._PermissionsRow`
   branches the FSI tile icon on `Theme.of(context).brightness`
