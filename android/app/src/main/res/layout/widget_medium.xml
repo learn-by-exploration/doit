@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042.
+
+     4x2 home widget layout (medium).
+
+     Three rows stacked vertically inside the widget root:
+       (a) top — habit name (left) + reliability badge (right).
+       (b) middle — streak number (large) + "day streak"
+           subtitle.
+       (c) bottom — "Done" ImageButton (right). The root
+           FrameLayout captures the body tap.
+
+     RemoteViews constraints (Android's documented widget
+     set only — see
+     https://developer.android.com/develop/ui/views/appwidgets#CreatingLayout):
+     FrameLayout, LinearLayout, TextView, ImageView,
+     ImageButton, Button. No ConstraintLayout, no Material
+     components, no custom views.
+
+     IDs are referenced by WidgetRenderer.kt. Changing
+     them requires updating the renderer too. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <!-- Top row: habit name + reliability badge. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/habit_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textColor="@color/widget_text_primary"
+                android:contentDescription="@string/widget_description"
+                android:text="do it" />
+
+            <ImageView
+                android:id="@+id/reliability_badge"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginStart="6dp"
+                android:src="@drawable/ic_widget_unknown"
+                android:contentDescription="@string/widget_reliability_badge"
+                android:importantForAccessibility="yes" />
+        </LinearLayout>
+
+        <!-- Middle row: streak number (large) + "day
+             streak" subtitle. The streak number has its
+             own TextView so the renderer can re-size it
+             freely. -->
+        <TextView
+            android:id="@+id/streak_number"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:textColor="@color/widget_text_primary"
+            android:contentDescription="@string/widget_streak_content_description"
+            android:text="0" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:textColor="@color/widget_text_secondary"
+            android:text="@string/widget_streak_subtitle" />
+
+        <!-- Bottom row: spacer + Done button. The
+             spacer pushes the button to the right edge. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="end|bottom">
+
+            <ImageButton
+                android:id="@+id/done"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@android:color/transparent"
+                android:src="@drawable/ic_widget_done"
+                android:scaleType="centerInside"
+                android:contentDescription="@string/widget_done_content_description" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

@@ -4763,3 +4763,158 @@ v1.3d ships the launch path end-to-end:
   Inventory" — the new `FullScreenActivity`,
   `MissionLauncherScreen`, and `RoutineOverlayScreen`
   entries.
+
+## ADR-045 — Android home-screen widget: native `AppWidgetProvider` + `RemoteViews` over the `doit/widget` MethodChannel (v1.4a / SYS-115 / Phase 28 / WF-042)
+
+### Context
+
+v1.3 just shipped (Phases 12-15). `feature.md §4` lists
+the v1.x parking lot; v1.3's CHANGELOG sign-off summary
+explicitly defers Phase 28 to v1.x. `feature.md §2.8 B9
+— Widget re-arm indicator` was the v1.2g explicit
+deferral: the project does not yet ship a home-screen
+widget, so the B9 "render reliability in the widget"
+requirement had no surface.
+
+Phase 28 ships that surface. The widget is the missing
+primary surface for the "see my streak at a glance" use
+case — the user adds a Do, sets it as their anchor, and
+wants the streak number visible without unlocking the
+phone. It also closes B9 (the reliability badge mirrors
+the existing `Reliability { optimal, degraded, unknown }`
+enum) and adds a "Done" affordance on the home screen so
+the streak is reachable without launching the app.
+
+The widget is **greenfield** — no existing
+`AppWidgetProvider`, no `home_widget` dependency, no
+`<receiver>` for widget update. The existing project
+strongly favors **native `MethodChannel` + Flutter
+rendering** over pub.dev convenience wrappers (5 native
+channels already: `doit/reminders`, `doit/full_screen`,
+`doit/calendar`, `doit/device_state`,
+`doit/call_interceptor`). The no-deps-unless-necessary
+pubspec precedent + `home_widget` being a 0.x package
+leans against pulling it in.
+
+### Decision
+
+Ship the widget as a native `AppWidgetProvider` +
+`RemoteViews` surface with Dart as the source of truth
+over a new `doit/widget` MethodChannel. Specifically:
+
+1. **Which Do does the widget show?** The **first-active
+   Do** (oldest by `createdAtMillis`, skipping paused).
+   Mirrors the "anchor do" mental model: user adds a Do,
+   sets it as their recurring anchor, widget surfaces
+   its state. Paused dos are skipped (matches
+   `DoRepository.listActive()` query shape). No active
+   do → empty-state ("Add a do in do it").
+   User-configurable widget selection is v1.4b.
+2. **Sizes / layouts.** Single `medium` (4×2) only for
+   v1.4a. Two/three sizes triples `RemoteViews` surface
+   area; medium fits streak + reliability badge + Done +
+   tap-to-open in one row.
+3. **Update cadence.** `updatePeriodMillis = 1800000`
+   (30-min Android floor) + event-driven via
+   `CompletionLogService.append` post-write hook +
+   `ReliabilityService.notifier` listener + boot
+   re-arm via the existing `BootReceiver`. Dart-side
+   `handleRefreshRequest` is the source of truth; the
+   30-min fallback covers the case where the app process
+   is dead.
+4. **"Done" button behavior.** Dart-side
+   `CompletionLogService.append` via `MethodChannel`.
+   Single source of truth (mirrors the home-tile Done
+   semantics and re-uses the `(habitId, day)` dedupe).
+   The Kotlin side never touches the DB directly — it
+   round-trips to Dart via `doit/widget.markDone(habitId)`.
+5. **Body-tap behavior.** Opens `MainActivity` to the
+   home screen via `PendingIntent.getActivity`
+   (single-top). Deep-linking to a specific Do needs
+   new `MaterialApp.routes` infra + v1.4b.
+6. **Show streak number.** Yes — `currentStreak` from
+   `ConsecutiveCounter.compute(...)`. Closes the
+   "widget = see my streak" user expectation.
+7. **Show reliability badge.** Yes — single icon
+   (optimal / degraded / unknown). Closes B9.
+8. **Test surface.** ~35 Dart tests with
+   `FakeWidgetBridge` across 5 test files; no Robolectric
+   / androidTest / `integration_test`. Matches the
+   project's "Dart-only unit tests + FakeBridge"
+   convention (1130 tests today, all `flutter test`).
+   Kotlin side stays untested at the unit level
+   (matches `ReminderChannelProxy` / `FullScreenIntentChannel`
+   precedent).
+9. **Channel name.** `doit/widget` (third native
+   `MethodChannel` alongside `doit/reminders` +
+   `doit/full_screen`).
+10. **No new `<uses-permission>`.** Widget rendering
+    needs none.
+11. **No new pubspec dependencies.** Native
+    `AppWidgetProvider` only; no `home_widget` package.
+
+### Consequences
+
+- The widget is the first Dart consumer of the unified
+  `ReliabilityService.instance.value` (SYS-112) from a
+  non-foreground context. The reliability stream's
+  `Reliability.degraded` flips the widget badge without
+  any user interaction.
+- The widget closes the B9 item from `feature.md §2.8`
+  — that section's checklist entry is removed in the
+  same PR.
+- The cold-start fallback (`WidgetStateCache.cachedFromPrefs(ctx)`
+  on Kotlin) makes the widget usable even when the OS
+  has killed the AppWidgetProvider process between
+  `updatePeriodMillis` fires.
+- The widget adds 3 new Kotlin files + 1 new manifest
+  block + 4 new Android resources, but ZERO new
+  permissions and ZERO new pubspec dependencies. The
+  pubspec stays at `1.3.0+10` until v1.4a signs off.
+- The Kotlin side is untested at the unit level per the
+  established precedent (5 native channels, none with
+  androidTest). The right-side gate is the user's
+  hands-on `flutter build appbundle --release` + on-
+  device install + drop the widget + tap Done + verify
+  completion wrote.
+- The next widget work (small / large variants, in-app
+  tile streak, widget config activity, deep-link to a
+  specific Do, iOS / Wear OS) is parked under v1.4b.
+
+### Rejected alternatives
+
+- **`home_widget` pub.dev package** — the project has a
+  "no new pubspec dependencies unless necessary"
+  precedent (ADR-013 + ADR-018). `home_widget` is a
+  0.x package, brings a second opinion on the
+  `AppWidgetProvider` lifecycle, and would obscure the
+  Kotlin side from the existing 5 native channels.
+  Rejected.
+- **Flutter-rendered widget via Picture-in-Picture
+  trick** — Android home widgets cannot host a Flutter
+  renderer; only `RemoteViews` works. Rejected (not
+  technically possible).
+- **Widget-as-foreground-service** — over-engineering
+  for a streak display. The 30-min floor +
+  event-driven refresh is sufficient. Rejected.
+- **System-rendered widget framework (Glance)** —
+  Android-only, requires Compose dependencies, and
+  doesn't fit the project's Flutter-rendering-only
+  posture. Rejected.
+
+### Linked
+
+- `feature.md` §2.8 B9 (now removed — shipped in v1.4a).
+- `feature.md` §4 parking lot (home-widget bullet now
+  removed).
+- ADR-013 (defense-in-depth via `_safe` wrapper) —
+  `WidgetBridge` swallows `MissingPluginException`.
+- ADR-018 (no new pubspec dependencies unless
+  necessary) — the foundation for rejecting
+  `home_widget`.
+- SYS-112 (unified `ReliabilityService`) — the source
+  for the widget's reliability badge.
+- SYS-114 (full-screen intent launch path) — the
+  sibling Phase 15 feature that also ships a native
+  MethodChannel.
+- WF-042 — the end-to-end workflow this ADR defines.

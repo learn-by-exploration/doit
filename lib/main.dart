@@ -20,15 +20,19 @@ import 'package:doit/screens/routine_overlay_screen.dart';
 import 'package:doit/services/backup_scheduler.dart';
 import 'package:doit/services/backup_service.dart';
 import 'package:doit/services/call_interceptor.dart';
+import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/db.dart';
+import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/geofence_service.dart';
 import 'package:doit/services/permission_service.dart';
 import 'package:doit/services/permission_lifecycle_observer.dart';
 import 'package:doit/services/platform_alarm_scheduler.dart';
 import 'package:doit/services/platform_full_screen_intent.dart';
 import 'package:doit/services/platform_notification_service.dart';
+import 'package:doit/widget/widget_bridge.dart';
 import 'package:doit/services/reliability_service.dart';
 import 'package:doit/services/reminder_service.dart';
+import 'package:doit/services/widget_service.dart';
 import 'package:doit/services/settings_service.dart';
 import 'package:doit/services/template_repository.dart';
 import 'package:doit/templates/template_library.dart';
@@ -118,6 +122,26 @@ Future<void> main() async {
   await ReliabilityService.init(
     bridge: bridge,
     permissionService: PermissionService.instance,
+  );
+
+  // v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042: init
+  //    the home widget service. The service subscribes to
+  //    `ReliabilityService.instance.reliability` and re-
+  //    derives the widget state on every change. The
+  //    bridge writes the freshly-computed state to the
+  //    Kotlin `WidgetStateCache` so the cold-start
+  //    fallback has the last-known state. Order matters:
+  //    `ReliabilityService.init` must run BEFORE
+  //    `WidgetService.init` so the first derive step
+  //    reads a populated reliability value. The do
+  //    repository + completion-log singleton are already
+  //    ready by this point (the Drift init at step 1
+  //    primed them).
+  await WidgetService.init(
+    bridge: PlatformWidgetBridge(),
+    doRepository: DoRepository.instance,
+    completionLog: CompletionLogService.instance,
+    reliabilityService: ReliabilityService.instance,
   );
 
   // 4a. v1.0 Phase C PR 2 (SYS-072 / ADR-021): init the
