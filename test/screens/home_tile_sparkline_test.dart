@@ -244,6 +244,102 @@ void main() {
       }
     });
 
+    test('extendedSparklineForDo with days: 14 returns 14 dots with today as '
+        'the last dot (v1.4i / SYS-123)', () async {
+      final today = DateTime(2026, 6, 13, 14, 30);
+      final fake = _FakeCompletionLog();
+      final dots = await extendedSparklineForDo(
+        activeDo: _do(),
+        asOf: today,
+        completionLog: fake,
+      );
+      expect(dots, hasLength(14));
+      // First dot is today - 13 days.
+      expect(
+        dots.first.day,
+        DateTime(
+          today.year,
+          today.month,
+          today.day,
+        ).subtract(const Duration(days: 13)),
+      );
+      // Last dot is today (local-midnight at asOf).
+      expect(dots.last.day, DateTime(today.year, today.month, today.day));
+    });
+
+    test('extendedSparklineForDo defaults to 14 days when no window arg is '
+        'passed (v1.4i / SYS-123)', () async {
+      final today = DateTime(2026, 6, 13, 14, 30);
+      final fake = _FakeCompletionLog();
+      final dots = await extendedSparklineForDo(
+        activeDo: _do(),
+        asOf: today,
+        completionLog: fake,
+      );
+      expect(dots, hasLength(14));
+    });
+
+    test(
+      'extendedSparklineForDo honors an arbitrary window (v1.4i / SYS-123)',
+      () async {
+        final today = DateTime(2026, 6, 13, 14, 30);
+        final fake = _FakeCompletionLog();
+        final dots30 = await extendedSparklineForDo(
+          activeDo: _do(),
+          asOf: today,
+          completionLog: fake,
+          days: 30,
+        );
+        expect(dots30, hasLength(30));
+        final dots3 = await extendedSparklineForDo(
+          activeDo: _do(),
+          asOf: today,
+          completionLog: fake,
+          days: 3,
+        );
+        expect(dots3, hasLength(3));
+        expect(dots3.last.day, DateTime(today.year, today.month, today.day));
+      },
+    );
+
+    test(
+      'extendedSparklineForDo preserves the source tag on filled dots '
+      '(v1.4i / SYS-123) — the widget uses the tag to pick the color',
+      () async {
+        final today = DateTime(2026, 6, 13, 14, 30);
+        final dayMinus2 = DateTime(
+          today.year,
+          today.month,
+          today.day,
+        ).subtract(const Duration(days: 2));
+        final dayMinus7 = DateTime(
+          today.year,
+          today.month,
+          today.day,
+        ).subtract(const Duration(days: 7));
+        final fake = _FakeCompletionLog(
+          seeded: [
+            _row(id: 'c1', habitId: 'h1', day: dayMinus2, source: 'rest_day'),
+            _row(id: 'c2', habitId: 'h1', day: dayMinus7),
+          ],
+        );
+        final dots = await extendedSparklineForDo(
+          activeDo: _do(),
+          asOf: today,
+          completionLog: fake,
+        );
+        // Day -2 is the 12th dot (index 11) in a 14-day
+        // window — rest day.
+        final dMinus2 = dots[11];
+        expect(dMinus2, isA<SparklineDotFilled>());
+        expect((dMinus2 as SparklineDotFilled).source, 'rest_day');
+        // Day -7 is the 7th dot (index 6) — manual.
+        final dMinus7 = dots[6];
+        expect(dMinus7, isA<SparklineDotFilled>());
+        expect((dMinus7 as SparklineDotFilled).source, 'manual');
+      },
+    );
+
     test('SparklineDot value-equality holds for all three factories', () {
       // Filled equality: same day + same source → equal.
       final today = DateTime(2026, 6, 13);

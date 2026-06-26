@@ -1803,3 +1803,45 @@ Surfaces Edit + Delete as discoverable per-tile `IconButton`s on every `_HabitTi
 - ADR-047 (v1.4c in-app `_SkipButton` pattern — the `_DeleteButton`'s busy / disabled shape is identical)
 - ADR-048 (v1.4d in-app `_UndoButton` pattern — the `_DeleteButton`'s confirm-dialog + messenger-capture-before-async-gap pattern is identical)
 - ADR-013 (defensive `MissingPluginException` swallow — extended to the delete path via `deleteDo`'s top-level `catch (_)` returning `false`)
+
+## WF-050 — View rest-day history on the home tile (v1.4i / Phase 36 / SYS-123 / ADR-053)
+
+Surfaces the last 14 days of completion history as an extended sparkline below the v1.4e / SYS-119 / WF-046 7-day streak badge, color-coded to distinguish manual completions (`CompletionSource.manual`) from rest-day rows (`CompletionSource.restDay`). Adds an inline legend row below the dot row so the source-aware coloring is discoverable. Closes the v1.4e "we know rest-day rows exist but you can't tell them apart on the sparkline" gap.
+
+### Sequence
+
+1. **Home screen mounts.** `_HomeScreenState` (`lib/screens/home.dart`) renders the `ListView.builder` of `_HabitTile`s. Each tile's `_DoStreakBadge` renders the v1.4e 7-day streak badge + a `_Sparkline` sub-widget (v1.4e / SYS-119 / WF-046). The v1.4i extended sparkline is the same `_Sparkline` widget with the v1.4i `days: 14` (default) + `restDayColor: Theme.of(context).colorScheme.tertiary` + `showLegend: true` (default) constructor params.
+
+2. **`_Sparkline` builds a `FutureBuilder<List<SparklineDot>>`.** The future is `extendedSparklineForDo(activeDo: tile.habit, asOf: asOf, completionLog: CompletionLogService.instance, days: 14)` (v1.4i / SYS-123). The helper is pure-Dart: takes a frozen `asOf` + the singleton `CompletionLogService`, returns 14 dots in oldest-first order with today as the last dot.
+
+3. **`extendedSparklineForDo` builds the 14-day window.** The helper (`lib/screens/home_tile_sparkline.dart`) builds `dayList = [asOf - 13 days, ..., asOf]` (local-midnight each), fetches `completionLog.listForHabit(activeDo.id)`, and for each day emits a `SparklineDot.filled(day, source)` if a row exists for that day's `dayMillis` (carrying the first-matching row's source tag), a `SparklineDot.future(day)` if the day is in the future of `asOf` (defensive), or a `SparklineDot.empty(day)` otherwise. First-match semantic mirrors `home_tile_undo.undoToday` (v1.4d / SYS-118) + `sparklineForDo` (v1.4e / SYS-119).
+
+4. **The future resolves; the widget paints the dot row.** `_Sparkline` renders 14 `_SparklineDot` circles (6 dp outlined by default; today bumps to 8 dp + filled when `_isResolvedToday == true`). Each dot wraps its `Padding > Container` in `Semantics(label: ...)` (NOT a per-dot `Tooltip` — see ADR-053 §"Alternatives considered" for why `Tooltip` was rejected: gesture interception + 14 small dots × 3 localized messages = 42 competing tooltips). The widget reads `SparklineDotFilled.source` and switches colors: `source == 'rest_day'` → `restDayColor ?? colorScheme.tertiary`; else (manual / notification / mission) → `colorScheme.primary`. The widget's outer `Semantics(label: l.homeTileSparklineSemantics, readOnly: true, container: true)` node announces "Last 14 days" / "Últimos 14 días" once on TalkBack focus.
+
+5. **The widget paints the legend row.** Below the dot row, `_SparklineLegend` (v1.4i / SYS-123) renders 3 `_LegendSwatch` entries — a filled primary-color circle + `homeTileSparklineLegendDone` ("Done" / "Hecho"); a filled tertiary-color circle + `homeTileSparklineLegendRestDay` ("Rest day" / "Día de descanso"); an outlined circle + `homeTileSparklineLegendMissed` ("Missed" / "Perdido") — using `Theme.of(context).textTheme.labelSmall`. The legend is the discoverability mechanism for the source-aware coloring; a user with no prior knowledge of the app sees 14 dots + a legend row and learns that the two fill colors mean different things.
+
+6. **User taps `Skip today`.** The v1.4c / SYS-117 `_SkipButton`'s `onPressed` calls `markDoSkipped(...)` → `completionLog.append(habitId, day, source: CompletionSource.restDay, proofModeAtTime: proofModeTag(activeDo.proofMode))` (v1.4c helper at `lib/screens/home_tile_skip.dart`). The append re-derives via the parent's `_HomeScreenState._refresh()` setState cascade (same trigger the v1.4b Done / v1.4c Skip / v1.4d Undo buttons use). The streak badge's `completions` future re-fires; the `_Sparkline`'s `FutureBuilder` re-fetches `extendedSparklineForDo`; the new rest-day row paints as a `tertiary` dot in today's slot.
+
+7. **User long-presses the tile.** The parent `_HabitTile`'s `onLongPress` fires (no `Tooltip` gesture intercept on the dot row per ADR-053 §"Alternatives considered"), `_HomeScreenState._toggleSelectMode(habitId)` is called, the tile enters select mode, and the existing v1.4b select-mode UI (app-bar action set, per-tile check marks) renders. The v1.4b "long-press enters select mode" widget test at `test/screens/home_test.dart:165-213` continues to pass after the v1.4i source-aware coloring + per-dot `Semantics` migration.
+
+8. **User navigates to the edit screen.** The v1.4h `_EditButton`'s `onPressed` pushes `AddHabitScreen(habitId: ...)` (same destination as `_HomeScreenState._onTileTap` at `lib/screens/home.dart:120`). The edit screen's `CompletionLogSection` (v1.2m / SYS-108) renders the full completion log with each row's source tag, which is the deeper-dive view of what the v1.4i sparkline visualizes at-a-glance.
+
+### Failure paths
+
+- **`completionLog.listForHabit(activeDo.id)` throws (DB locked, drift exception).** The helper re-throws (no try/catch — the caller is a `FutureBuilder` that surfaces the error via the standard error-builder path). The widget would render `_SparklineSkeleton` (7 outlined dots per the v1.4e baseline; v1.4i does not change the skeleton shape — same outline count, no count animation) until the next refresh cycle. Defensive — the v0.x test surface has zero known drift exceptions on `listForHabit`.
+- **`SparklineDotFilled.source` is an unknown source tag** (e.g., a future v2.0 adds `'weather'` or `'mission_chain_passed'` and the DB has a stale row from a previous install). The widget falls through to `colorScheme.primary` (the manual color) — unknown sources are treated as "completed" rather than "rest day". Defensive against schema-evolution drift.
+- **User has 0 completions in the past 14 days.** All 14 dots are `SparklineDot.empty` (outlined circles). The legend row still renders — this is intentional, the empty-state is the teaching surface for the source-aware coloring.
+- **User has 14+ completions in the past 14 days (perfect record).** All 14 dots are `SparklineDot.filled` with `source: 'manual'` (or `'rest_day'` if they used Skip). The legend row still renders — perfect records still benefit from the legend being visible so the user knows rest-day dots would look different.
+- **DST boundary at the start of the 14-day window.** The helper uses local-midnight `DateTime(asOf.year, asOf.month, asOf.day)` for each day, same convention as the v1.4e `sparklineForDo` + v1.4d `undoToday` + v1.4b `streakForDo` helpers. A DST transition that pushes a local-midnight to 1 AM or 23:30 of the previous/next day is handled by the same convention — the day boundary is the day boundary, regardless of clock math. The existing v1.4e DST edge cases (no explicit test, but the convention is identical) continue to hold.
+- **Widget is unmounted mid-FutureBuilder (e.g., the user navigates away before the future resolves).** The `FutureBuilder` snapshot is dropped; the next mount of the same tile re-fetches. No memory leak — the singleton `CompletionLogService` holds no per-tile state.
+
+### Requirements covered
+
+- SYS-123 (this cycle's primary requirement)
+- ADR-053 (this cycle's primary architectural decision — rest-day history visualization on the home tile)
+- ADR-049 (v1.4e / SYS-119 — the original 7-day streak sparkline; v1.4i extends the helper signature while preserving the v1.4e return shape)
+- ADR-047 (v1.4c / SYS-117 — the `_SkipButton` is the surface that produces rest-day rows; the v1.4i sparkline visualizes the rows the Skip button writes)
+- ADR-046 (v1.4b / SYS-116 — the `_DoneButton` is the surface that produces manual rows; the v1.4i sparkline visualizes the rows the Done button writes)
+- SYS-119 (v1.4e — the 7-day baseline; v1.4i extends to 14 days with color + legend)
+- SYS-117 (v1.4c — rest-day rows are the trigger for the `tertiary` color)
+- SYS-116 (v1.4b — manual rows are the trigger for the `primary` color)

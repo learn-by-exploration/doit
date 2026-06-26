@@ -921,7 +921,7 @@ void main() {
     // form is robust to semantics-node merging rules.
     expect(
       find.byWidgetPredicate(
-        (w) => w is Semantics && (w.properties.label == 'Last 7 days'),
+        (w) => w is Semantics && (w.properties.label == 'Last 14 days'),
       ),
       findsOneWidget,
     );
@@ -929,7 +929,7 @@ void main() {
 
   testWidgets(
     'tile sparkline Semantics label is present even when no completions '
-    'are recorded (v1.4e / SYS-119)',
+    'are recorded (v1.4e / SYS-119 / extended to 14 days in v1.4i / SYS-123)',
     (tester) async {
       await _resetDb(tester);
       await DoRepository.instance.save(
@@ -949,12 +949,12 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 200));
       });
       await tester.pumpAndSettle();
-      // Even when no completions exist, the skeleton (7
-      // outlined dots) is replaced by 7 SparklineDot.empty
+      // Even when no completions exist, the skeleton (14
+      // outlined dots) is replaced by 14 SparklineDot.empty
       // — the Semantics label is still present.
       expect(
         find.byWidgetPredicate(
-          (w) => w is Semantics && (w.properties.label == 'Last 7 days'),
+          (w) => w is Semantics && (w.properties.label == 'Last 14 days'),
         ),
         findsOneWidget,
       );
@@ -996,12 +996,172 @@ void main() {
       // The sparkline Semantics label is still rendered.
       expect(
         find.byWidgetPredicate(
-          (w) => w is Semantics && (w.properties.label == 'Last 7 days'),
+          (w) => w is Semantics && (w.properties.label == 'Last 14 days'),
         ),
         findsOneWidget,
       );
     },
   );
+
+  // ---- v1.4i / Phase 36 / SYS-123 / ADR-053 / WF-050 ----
+  //
+  // Rest-day history visualization: the sparkline is
+  // extended from 7 to 14 days and rest-day dots are
+  // colored with colorScheme.tertiary (visually distinct
+  // from the primary "done" color). A legend row below
+  // the dots labels the three states. Each dot carries
+  // a Semantics label (not a Tooltip, which would
+  // intercept the parent tile's long-press → select-mode
+  // gesture).
+  group('tile rest-day history sparkline (v1.4i / SYS-123)', () {
+    Future<void> seedTile(WidgetTester tester) async {
+      await _resetDb(tester);
+      await DoRepository.instance.save(
+        DoFixed(
+          id: 'h1',
+          name: 'Stretch',
+          proofMode: const SoftProof(),
+          createdAt: DateTime(2026, 5, 17),
+          restDaysPerMonth: 2,
+          weekdays: const {1, 2, 3, 4, 5, 6, 7},
+          time: const DoTime(9, 0),
+        ),
+      );
+      await tester.pumpWidget(_wrap());
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('renders 14 outlined dots when no completions exist', (
+      tester,
+    ) async {
+      await seedTile(tester);
+      // 14 outlined dots (SparklineDot.empty). Each dot is
+      // a Padding > Container pair with a Border (no fill
+      // color). The legend's "Missed" swatch is also a
+      // outlined Container but is NOT wrapped in
+      // Padding(horizontal: 1.5), so the predicate below
+      // distinguishes them.
+      final dotContainers = find.byWidgetPredicate(
+        (w) =>
+            w is Padding &&
+            w.padding == const EdgeInsets.symmetric(horizontal: 1.5) &&
+            w.child is Container,
+      );
+      expect(dotContainers, findsNWidgets(14));
+    });
+
+    testWidgets(
+      'renders the legend row below the dots with the three state labels',
+      (tester) async {
+        await seedTile(tester);
+        expect(find.text('Done'), findsOneWidget);
+        expect(find.text('Rest day'), findsOneWidget);
+        expect(find.text('Missed'), findsOneWidget);
+      },
+    );
+
+    testWidgets('colors rest-day dots with colorScheme.tertiary so they are '
+        'visually distinct from manual completions', (tester) async {
+      await seedTile(tester);
+      // Use the in-app tile's Skip button (v1.4c / SYS-117)
+      // to take a rest day for today. This goes through
+      // the tile's `_onSkipPressed` → `_onDoChanged` →
+      // home `_refresh()` → setState → badge re-fetches
+      // pipeline. Direct DB writes via
+      // `CompletionLogService.append` do NOT trigger
+      // setState and would leave the FutureBuilder
+      // holding a stale future.
+      await tester.tap(find.byTooltip('Skip today'));
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pumpAndSettle();
+      // Sanity: the rest-day row exists for today.
+      final rows = await CompletionLogService.instance.listForHabit('h1');
+      expect(rows.length, 1);
+      expect(rows.first.source, 'rest_day');
+      // At least one Padding > Container is filled with
+      // tertiary (today's rest-day dot, the rightmost).
+      // Compare against the primary color to ensure they
+      // are distinct.
+      final cs = Theme.of(tester.element(find.byType(HomeScreen))).colorScheme;
+      expect(cs.tertiary, isNot(equals(cs.primary)));
+      final restDayDots = find.byWidgetPredicate(
+        (w) =>
+            w is Padding &&
+            w.padding == const EdgeInsets.symmetric(horizontal: 1.5) &&
+            w.child is Container &&
+            (w.child as Container).decoration is BoxDecoration &&
+            ((w.child as Container).decoration as BoxDecoration).color ==
+                cs.tertiary,
+      );
+      expect(restDayDots, findsAtLeastNWidgets(1));
+    });
+
+    testWidgets(
+      'rest-day dot carries the "Rest day" Semantics label for a11y',
+      (tester) async {
+        await seedTile(tester);
+        // Tap Skip today so the badge re-fetches with the
+        // rest-day row in the DB.
+        await tester.tap(find.byTooltip('Skip today'));
+        await tester.pumpAndSettle();
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 200));
+        });
+        await tester.pumpAndSettle();
+        // The Semantics node wrapping the (now resolved)
+        // today dot carries the "Rest day" label.
+        expect(
+          find.byWidgetPredicate(
+            (w) => w is Semantics && (w.properties.label == 'Rest day'),
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'manual-completion dot carries the "Done" Semantics label for a11y '
+      '(v1.4i / SYS-123)',
+      (tester) async {
+        await seedTile(tester);
+        // Resolve today via the tile's Mark done button.
+        await tester.tap(find.byTooltip('Mark done'));
+        await tester.pumpAndSettle();
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 200));
+        });
+        await tester.pumpAndSettle();
+        // The "Done" Semantics label wraps the resolved
+        // today dot. (The legend's "Done" Text is a
+        // separate widget, not a Semantics label.)
+        expect(
+          find.byWidgetPredicate(
+            (w) => w is Semantics && (w.properties.label == 'Done'),
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'long-press on a tile with the new sparkline still enters select mode '
+      '— the legend + Semantics do not steal the gesture (v1.4i / SYS-123)',
+      (tester) async {
+        await seedTile(tester);
+        await tester.longPress(find.byKey(const ValueKey('habit_tile.h1')));
+        await tester.pumpAndSettle();
+        // The select-mode appbar shows the count.
+        expect(find.text('1 selected'), findsOneWidget);
+      },
+    );
+  });
 
   // ---- v1.4h / Phase 35 / SYS-122 / ADR-052 / WF-049 ----
   //
