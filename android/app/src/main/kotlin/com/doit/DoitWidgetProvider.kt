@@ -9,7 +9,6 @@ import android.content.Intent
 import android.widget.RemoteViews
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
-import io.flutter.view.FlutterMain
 
 /**
  * The Android home-screen widget provider (v1.4a / Phase 28 /

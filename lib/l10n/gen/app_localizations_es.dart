@@ -103,7 +103,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsThemeSystem => 'Sistema';
 
   @override
-  String get settingsAnchorManual => 'Manual — toco \"Ya estoy despierto\"';
+  String get settingsAnchorManual => 'Manual — tocas \"Ya estoy despierto\"';
 
   @override
   String get settingsAnchorFirstUnlock => 'Primer desbloqueo del día';

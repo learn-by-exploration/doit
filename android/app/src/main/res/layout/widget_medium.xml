@@ -47,7 +47,7 @@
                 android:textStyle="bold"
                 android:singleLine="true"
                 android:ellipsize="end"
-                android:textColor="?android:attr/textColorPrimary"
+                android:textColor="@color/widget_text_primary"
                 android:contentDescription="@string/widget_description"
                 android:text="do it" />
 
@@ -72,7 +72,7 @@
             android:layout_marginTop="4dp"
             android:textSize="32sp"
             android:textStyle="bold"
-            android:textColor="?android:attr/textColorPrimary"
+            android:textColor="@color/widget_text_primary"
             android:contentDescription="@string/widget_streak_content_description"
             android:text="0" />
 
@@ -80,7 +80,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textSize="11sp"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/widget_text_secondary"
             android:text="@string/widget_streak_subtitle" />
 
         <!-- Bottom row: spacer + Done button. The
