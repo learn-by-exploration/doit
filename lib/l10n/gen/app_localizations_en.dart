@@ -45,6 +45,18 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get homeTileMarkDone => 'Mark done';
+
+  @override
+  String get homeTileStreakLabel => 'day streak';
+
+  @override
+  String get homeTileAlreadyDoneTooltip => 'Already done for today';
+
+  @override
+  String get homeTileStrongModeHint => 'Opens the mission chain';
+
+  @override
   String get homeEmptyTitle => 'No dos yet.';
 
   @override

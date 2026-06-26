@@ -657,6 +657,109 @@ notification-icon resource reference.
 
 ## [Unreleased]
 
+### v1.4a — Android home-screen widget (Phase 28 / SYS-115 / ADR-045 / WF-042)
+
+First time the app surfaces a habit on the Android home screen
+without opening the app. The widget renders the user's
+first-active do (the soonest-paused-eligible do in
+`DoRepository.listAll()`, sorted by `createdAt` ascending), the
+current `currentStreak` number, the localized "day streak"
+subtitle, the unified `Reliability` caption, and a "Mark done"
+`RemoteViews` button. New code:
+
+- `lib/widget/widget_state_locator.dart` (NEW) —
+  `firstActiveDo({required DoRepository repo, required DateTime reference}) → Do?`
+  (sorted by `createdAt` ascending; paused dos skipped).
+- `lib/widget/widget_state_builder.dart` (NEW) —
+  `buildWidgetState({required Do? do, required List<CompletionRow> completions, required Reliability reliability, required DateTime asOf}) → DoitWidgetState`
+  (pure-Dart; calls `ConsecutiveCounter.compute` for the streak).
+- `lib/services/widget_service.dart` (NEW) — singleton-with-`_ready`
+  wrapper around the `doit/widget` MethodChannel; exposes
+  `handleRefreshRequest`, `markDone`, `applyReliability`
+  (swallows `MissingPluginException` per ADR-013).
+- `android/app/src/main/kotlin/com/doit/DoitAppWidgetProvider.kt`
+  (NEW) — `AppWidgetProvider` + `RemoteViews` rendering
+  `widget_medium.xml` (do name / streak / reliability / Done
+  button).
+- `AndroidManifest.xml` — declares `<receiver
+  android:name=".DoitAppWidgetProvider" android:exported="false">`
+  with the `android.appwidget.action.APPWIDGET_UPDATE` intent
+  filter.
+
+**ADR-045** explicitly rejects the `home_widget` pubspec
+package — the widget surface is small, the Kotlin side
+already had `AppWidgetProvider` + `RemoteViews` in scope from
+v1.3d's `FullScreenActivity` (SYS-114), and adding the
+package for one channel is unjustified. Strong-mode "Done"
+deep-links to the existing `MissionLauncherScreen` (SYS-114);
+soft/auto paths write the completion directly via
+`CompletionLogService.append` with `source:
+CompletionSource.manual`. No new `<uses-permission>`, no new
+pubspec dep.
+
+**SYS-115 + ADR-045 + WF-042 appended.** `feature.md` §2.8
+B9 closed; §4 widget bullet removed.
+
+Tests: 1130 / 1130 (1085 prior + 45 new — 3
+widget_state_locator + 3 widget_state_builder + 6
+widget_service + 3 widget_locale + 30 across the existing
+`test/services/reminder_service_test.dart` +
+`test/routines/action_dispatch_test.dart` smoke fixtures).
+
+### v1.4b — In-app home tile streak + Done button (Phase 29 / SYS-116 / ADR-046 / WF-043)
+
+Brings the v1.4a widget's UX surface to the in-app home tile.
+The home tile (`_HabitTile` in `lib/screens/home.dart`) now
+shows the streak number next to the do name, a "day streak"
+subtitle, and a per-tile "Mark done" `IconButton` that mirrors
+the widget's affordance. The existing SnackBar stub at the
+bottom-right of each tile is replaced with a real completion
+write via `CompletionLogService.append(habitId, day, source:
+CompletionSource.manual, proofModeAtTime: <soft|strong|auto>)`
+— same call shape as `WidgetService.markDone`. New code:
+
+- `lib/screens/home_tile_streak.dart` (NEW) — pure-Dart
+  helpers: `streakForDo({required Do activeDo, required
+  List<CompletionLogEntry> completions, required DateTime
+  asOf})` (calls `ConsecutiveCounter.compute` for the streak)
+  + `isCompletedOnDay({required List<CompletionLogEntry>
+  completions, required DateTime asOf})` (the local-day
+  presence check).
+- `lib/screens/home_tile_completion.dart` (NEW) — `markDoDone(
+  {required Do activeDo, required DateTime asOf, required
+  CompletionLogService completionLog})`. The `_proofModeTag`
+  helper is inlined here, mirroring the widget's helper — kept
+  in lockstep manually until a future PR extracts both into
+  `lib/do/proof_mode_tag.dart` (deferred until v1.4a lands on
+  `main`).
+- `lib/screens/home.dart` — `_HabitTile` is now a
+  `StatefulWidget` (`_HabitTileState`) holding `_busy` and
+  `_isCompletedToday`. A new `_DoStreakBadge` sub-widget renders
+  the streak + subtitle. A new `_DoneButton` sub-widget
+  replaces the SnackBar stub: soft/auto → `markDoDone(...)`;
+  strong → push `MissionLauncherScreen` (SYS-114) and await the
+  pop; already-done → `homeTileAlreadyDoneTooltip` SnackBar.
+- `lib/l10n/app_en.arb` + `app_es.arb` — 4 new keys
+  (`homeTileMarkDone`, `homeTileStreakLabel`,
+  `homeTileAlreadyDoneTooltip`, `homeTileStrongModeHint`). The
+  existing `homeSnackbarMarkedDone` is re-used.
+
+**ADR-046** locks the design: pure-Dart helpers, frozen `asOf`
+per build, re-compute on every rebuild (cheap: pure-Dart + ~10
+entries per visible tile), single source of truth for the
+completion write (both surfaces call the same
+`CompletionLogService.append` shape), no `StreakService`
+needed. No new pubspec dep; no new `<uses-permission>`.
+
+**SYS-116 + ADR-046 + WF-043 appended.** `feature.md` §4 home
+tile streak bullet removed; §5 quick-index updated to ADR-046
+/ SYS-116 / WF-043.
+
+Tests: 1149 / 1149 (1130 prior + 19 new — 12 home_tile_streak
++ 4 home_tile_completion + 7 home_test widget extensions per
+the 3-gate at this commit; the 6 pre-existing `home_test` cases
+still pass).
+
 ### v1.3d — Light-theme icon variant for the FSI tile (feature.md §2.7)
 
 Closes the §2.7 follow-up: the Settings → Permissions

@@ -607,18 +607,23 @@ intentionally incomplete for that slice.
   the long-form summary; `implementation_status.md` row
   v1.4a for the file-by-file breakdown; `feature.md` §2.8
   B9 for the deferral that v1.4a closes.
-- **v1.4b candidates** (parking lot, TBD): in-app tile
-  streak number (`_HabitTile` rewrite);
-  in-app tile "Done" button (replace the v0.1 SnackBar
-  stub at `home.dart:374-388` with a real completion
-  append); widget small / large variants (the
-  `resizeMode=horizontal|vertical` attribute is already
-  set; only `widget_medium.xml` ships in v1.4a); widget
-  config activity (user picks which do the widget tracks);
-  widget list (scrolling widget that walks the whole
-  repo); per-automation reliability badge inside the
-  widget; deep-link from widget body to a specific do
-  (needs new `MaterialApp.routes` infra).
+- **v1.4b — In-app tile streak + Done button (Phase 29 /
+  SYS-116 / ADR-046 / WF-043).** Mirror the v1.4a widget's
+  surface on the home tile. `_HabitTile` becomes a
+  `StatefulWidget` (`_HabitTileState`); a new `_DoStreakBadge`
+  sub-widget renders the streak + "day streak" subtitle; a
+  new `_DoneButton` sub-widget rewires the existing
+  `IconButton` to call `markDoDone(...)` (soft/auto) or push
+  `MissionLauncherScreen` (strong). New pure-Dart helpers
+  `lib/screens/home_tile_streak.dart` + `lib/screens/home_tile_completion.dart`.
+  4 new ARB keys. **Status: shipping in this PR.**
+- **v1.4c candidates (parking lot).** Tile "Skip today"
+  button (consumes a rest-day budget); tile streak history
+  visualization (7-day sparkline); tile edit / delete
+  affordance (currently long-press select-mode only);
+  widget small / large variants, widget config activity,
+  widget list (scrolling), widget deep-link to a specific
+  do. See `feature.md` §4.
 - **v1.4c candidates** (parking lot, TBD): iOS / Wear OS
   widget surfaces (each needs a separate platform port
   + a shared widget spec); native Spanish translator

@@ -45,6 +45,18 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get homeTileMarkDone => 'Marcar como hecho';
+
+  @override
+  String get homeTileStreakLabel => 'días seguidos';
+
+  @override
+  String get homeTileAlreadyDoneTooltip => 'Ya marcado como hecho hoy';
+
+  @override
+  String get homeTileStrongModeHint => 'Abre la cadena de misiones';
+
+  @override
   String get homeEmptyTitle => 'Sin tareas aún.';
 
   @override

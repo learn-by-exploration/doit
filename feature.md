@@ -278,44 +278,12 @@ These items are deferred beyond v1.2 but are explicitly **v1
 work** (no v2.0 jump). They are tracked here so they don't get
 lost between the v1.2 closeout and the next milestone kickoff.
 
-_(Home-screen widget item removed in v1.4a — shipped as
-SYS-115 / ADR-045 / WF-042. See §2.8 above.)_
-- **v1.x** — iOS port. v0.1 + v1.0 are Android-only; the
-  `lib/habits/` + `lib/people/` + `lib/missions/` model layer
-  is already pure Dart and would port cleanly. The Kotlin side
-  (`lib/reminders/`, `lib/services/platform_*`) is the bulk of
-  the port work. A v1.x port keeps the project on a single
-  version track and lets iOS users land on the same
-  `RoutineConfig` / `Person.pausedUntil` / reliability-badge
-  work that v1.2 has shipped on Android.
-- **v1.x** — Wear OS target. Same v1-versioning reasoning —
-  ships as a v1.x point release, not a v2.0 milestone.
-- **v1.x** — Backup encryption upgrade from PBKDF2-HMAC-SHA256
-  (100k iterations) to Argon2id or a higher PBKDF2 round count,
-  in line with current OWASP guidance. The change is
-  backwards-compatible reads-from-v1 (per the v0.4c.1
-  precedent) so it can land as a v1.x point release without
-  forcing a v2.0.
-- **v1.x** — Backup format v2 → v3 to support new fields added
-  across v1.x (RoutineConfig, Person.pausedUntil, the
-  v1.1f/v1.2h reliability badge states, etc.). Same
-  backwards-compat-reads-from-v1 pattern; v1.x point release.
-
----
-
-## 5. Quick index: where each piece is documented
-
-| Item | Doc | Status |
-|---|---|---|
-| v1.0 / v1.1 / v1.2a..m implementation | `docs/v_model/implementation_status.md` | v1.0..v1.2 fully logged; 13 v1.2 rows + sign-off row appended (v1.2a + v1.2b are doc-only stubs, v1.2c..v1.2m are code commits) |
-| v1.0 / v1.1 / v1.2 deferred items | `docs/v_model/plan.md` (Milestone 7-9 sections) | Milestones 7 (v1.0), 8 (v1.1), and 9 (v1.2) all shipped; the v1.2 closeout PR flipped Milestone 9 to "shipped" with closing date 2026-06-23 |
-| 30-phase roadmap | scattered across `CHANGELOG.md` v1.2 sub-entries | needs `v1_2_30_phase_roadmap.md` (see §3.2) |
 | ADRs | `docs/v_model/decision_record.md` | up to ADR-045 (9 v1.2 ADRs appended in the closeout PR — ADR-033..ADR-041 covering SYS-098..SYS-110; v1.3 sub-entries appended ADR-042..ADR-044 covering SYS-112..SYS-114; v1.4a appended ADR-045 covering SYS-115); v1.2c/d/e/f/h/i/j/l/m earned ADRs; v1.2g/k did not (doc-only closeout / routine UI affordance respectively) |
 | SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 sub-entries appended SYS-111..SYS-114 (4 IDs); v1.4a appended SYS-115 (1 ID — the home widget). v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
 | WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 sub-entries added WF-040, WF-041; v1.4a appended WF-042 (home widget). Cross-check the rest are in `traceability_matrix.md` |
 | Open questions | `docs/v_model/open_questions.md` | all 21 closed (last closure: v0.5e-fix ADR-017) |
 | Spanish translation | `lib/l10n/app_es.arb` + `CHANGELOG.md` v1.1h block | smoke-test only; see §2.4 |
-| On-device hands-on | none on disk | v0.5e / v1.0h / v1.1k / v1.1h all reference a "user runs ..." step but there is no checklist doc — see §1.6 |
+| On-device hands-on | none on disk | v0.5e / v1.0h / v1.1k / v1.1h / v1.3x all reference a "user runs ..." step but there is no checklist doc — see §1.6 |
 
 ---
 
