@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042.
+     v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047: added
+     Skip (R.id.skip) + Undo (R.id.undo) ImageButtons next
+     to the Done button. Brings the widget to feature-
+     parity with the in-app tile.
 
      4x2 home widget layout (medium).
 
@@ -7,8 +11,8 @@
        (a) top — habit name (left) + reliability badge (right).
        (b) middle — streak number (large) + "day streak"
            subtitle.
-       (c) bottom — "Done" ImageButton (right). The root
-           FrameLayout captures the body tap.
+       (c) bottom — Skip + Undo + Done ImageButtons (right).
+           The root FrameLayout captures the body tap.
 
      RemoteViews constraints (Android's documented widget
      set only — see
@@ -83,14 +87,40 @@
             android:textColor="@color/widget_text_secondary"
             android:text="@string/widget_streak_subtitle" />
 
-        <!-- Bottom row: spacer + Done button. The
-             spacer pushes the button to the right edge. -->
+        <!-- Bottom row: spacer + Skip + Undo + Done
+             buttons. v1.4f adds the Skip (R.id.skip) and
+             Undo (R.id.undo) buttons between the spacer
+             and the existing Done button. Each button is
+             48dp × 48dp (per .claude/rules/lib-screens.md
+             touch-target rule). The renderer hides Skip
+             and Undo via visibility="gone" when the
+             widget state says they should not be shown
+             (no rest-day budget / no completion row for
+             today). -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:orientation="horizontal"
             android:gravity="end|bottom">
+
+            <ImageButton
+                android:id="@+id/skip"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@android:color/transparent"
+                android:src="@drawable/ic_widget_skip"
+                android:scaleType="centerInside"
+                android:contentDescription="@string/widget_skip_content_description" />
+
+            <ImageButton
+                android:id="@+id/undo"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@android:color/transparent"
+                android:src="@drawable/ic_widget_undo"
+                android:scaleType="centerInside"
+                android:contentDescription="@string/widget_undo_content_description" />
 
             <ImageButton
                 android:id="@+id/done"

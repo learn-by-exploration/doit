@@ -98,6 +98,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get homeTileSparklineSemantics => 'Últimos 7 días';
 
   @override
+  String get widgetSkipToday => 'Saltar hoy';
+
+  @override
+  String get widgetUndoToday => 'Deshacer hoy';
+
+  @override
   String get homeEmptyTitle => 'Sin tareas aún.';
 
   @override

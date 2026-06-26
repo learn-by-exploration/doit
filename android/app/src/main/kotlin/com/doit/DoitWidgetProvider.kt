@@ -21,6 +21,10 @@ import io.flutter.embedding.engine.dart.DartExecutor
  *   - the current consecutive-run number + "day streak" subtitle
  *     (middle row),
  *   - a reliability badge (optimal / degraded / unknown icon),
+ *   - a "Skip today" `ImageButton` (v1.4f / SYS-120) that
+ *     round-trips to Dart via [WidgetChannel.skip],
+ *   - an "Undo today" `ImageButton` (v1.4f / SYS-120) that
+ *     round-trips to Dart via [WidgetChannel.undo],
  *   - a "Done" `ImageButton` that round-trips to Dart via
  *     [WidgetChannel.markDone].
  *
@@ -41,13 +45,16 @@ import io.flutter.embedding.engine.dart.DartExecutor
  *     Prime the cache.
  *   - [onDisabled]: last widget removed. Drop the cache
  *     (the user is done; do not leak the row).
- *   - [onReceive]: dispatch the `ACTION_REFRESH_WIDGET`
- *     custom action posted by [WidgetUpdater.refreshAll].
+ *   - [onReceive]: dispatch the `ACTION_REFRESH_WIDGET` /
+ *     `ACTION_MARK_DONE` / `ACTION_WIDGET_SKIP` /
+ *     `ACTION_WIDGET_UNDO` custom actions posted by
+ *     [WidgetUpdater] + the widget buttons.
  *
  * No network calls, no DB writes, no broadcast receivers
  * beyond APPWIDGET_UPDATE.
  *
  * v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042.
+ * v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047.
  */
 class DoitWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(
@@ -129,6 +136,49 @@ class DoitWidgetProvider : AppWidgetProvider() {
                     WidgetUpdater.refreshAll(ctx)
                 }
             }
+            ACTION_WIDGET_SKIP -> {
+                // v1.4f / Phase 33 / SYS-120 / ADR-050 /
+                // WF-047. The widget's "Skip today" button
+                // was tapped. Same shape as
+                // `ACTION_MARK_DONE` — forward to
+                // WidgetChannel.skip which triggers a Dart
+                // round-trip. The Dart side reads the habit
+                // id from the cache and appends a rest-day
+                // completion via
+                // CompletionLogService.append (consuming
+                // one rest-day budget unit for the current
+                // month). Defensive: skip the round-trip
+                // when the cache has no habitId (the button
+                // should be hidden, but the broadcast could
+                // still fire on a race).
+                WidgetChannel.setAppContext(ctx.applicationContext)
+                val state = WidgetStateCache.cachedFromPrefs(ctx)
+                val habitId = state?.optString("habitId")
+                if (!habitId.isNullOrEmpty()) {
+                    WidgetUpdater.refreshAll(ctx)
+                }
+            }
+            ACTION_WIDGET_UNDO -> {
+                // v1.4f / Phase 33 / SYS-120 / ADR-050 /
+                // WF-047. The widget's "Undo today" button
+                // was tapped. Same shape as
+                // `ACTION_MARK_DONE` — forward to
+                // WidgetChannel.undo which triggers a Dart
+                // round-trip. The Dart side reads the habit
+                // id from the cache and deletes today's
+                // completion row via
+                // CompletionLogService.deleteById. The
+                // button is hidden by the renderer when no
+                // completion row exists for today; the
+                // habitId-empty check below is a defensive
+                // belt-and-suspenders guard.
+                WidgetChannel.setAppContext(ctx.applicationContext)
+                val state = WidgetStateCache.cachedFromPrefs(ctx)
+                val habitId = state?.optString("habitId")
+                if (!habitId.isNullOrEmpty()) {
+                    WidgetUpdater.refreshAll(ctx)
+                }
+            }
         }
     }
 
@@ -144,5 +194,25 @@ class DoitWidgetProvider : AppWidgetProvider() {
          *  is read from the cache (the Kotlin side does
          *  not own completion writes). */
         const val ACTION_MARK_DONE = "com.doit.WIDGET_MARK_DONE"
+
+        /** v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047.
+         *  Custom action posted by the widget's "Skip
+         *  today" `ImageButton` via a
+         *  [PendingIntent.getBroadcast]. The provider's
+         *  [onReceive] dispatches to Dart via the
+         *  [WidgetChannel.skip] arm. The habit id is read
+         *  from the cache (the Kotlin side does not own
+         *  rest-day writes). */
+        const val ACTION_WIDGET_SKIP = "com.doit.WIDGET_SKIP"
+
+        /** v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047.
+         *  Custom action posted by the widget's "Undo
+         *  today" `ImageButton` via a
+         *  [PendingIntent.getBroadcast]. The provider's
+         *  [onReceive] dispatches to Dart via the
+         *  [WidgetChannel.undo] arm. The habit id is read
+         *  from the cache (the Kotlin side does not own
+         *  completion deletes). */
+        const val ACTION_WIDGET_UNDO = "com.doit.WIDGET_UNDO"
     }
 }

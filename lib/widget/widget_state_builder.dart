@@ -82,6 +82,12 @@ DoitWidgetState buildWidgetState({
     isCompletedToday: done,
     reliability: _mapReliability(reliability),
     asOf: asOf,
+    // v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047:
+    // thread the active do's rest-day budget so the Kotlin
+    // `WidgetRenderer` can show / hide the "Skip today"
+    // ImageButton. The home tile has the same conditional
+    // render via `_SkipButton`.
+    restDaysPerMonth: activeDo.restDaysPerMonth,
   );
 }
 

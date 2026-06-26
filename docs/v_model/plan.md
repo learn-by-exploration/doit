@@ -810,7 +810,10 @@ re-used verbatim; no new Drift methods, no new
   In-app tile Undo today's completion: shipped (PR #37,
   commit `34b6940` on main).
 - **v1.4e / Phase 32 / SYS-119 / ADR-049 / WF-046** —
-  In-app tile 7-day streak history sparkline: _this PR_.
+  In-app tile 7-day streak history sparkline: shipped
+  (PR #39, commit `4049866` on main).
+- **v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047** —
+  Android home widget Skip today + Undo today: _this PR_.
 
 **Milestone 11 v1.4 — fully shipped on `main`.** Version
 bump + V-Model docs (CHANGELOG `[1.4.0]` block +

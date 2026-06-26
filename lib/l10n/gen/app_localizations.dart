@@ -224,6 +224,18 @@ abstract class AppLocalizations {
   /// **'Last 7 days'**
   String get homeTileSparklineSemantics;
 
+  /// Tooltip / contentDescription for the Android home widget's 'Skip today' ImageButton (v1.4f / SYS-120). Tapping it appends a rest-day completion via CompletionLogService (consuming one rest-day budget unit) so the streak is credited and the day is marked intentionally off. Mirrors the in-app tile's `homeTileSkipToday`.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip today'**
+  String get widgetSkipToday;
+
+  /// Tooltip / contentDescription for the Android home widget's 'Undo today' ImageButton (v1.4f / SYS-120). Tapping it deletes today's completion (or rest-day) row via CompletionLogService.deleteById. Visible only when isCompletedToday is true; mirrors the in-app tile's `homeTileUndoToday`.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo today'**
+  String get widgetUndoToday;
+
   /// No description provided for @homeEmptyTitle.
   ///
   /// In en, this message translates to:

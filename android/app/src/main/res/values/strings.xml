@@ -13,6 +13,8 @@
          labels for the streak number. -->
     <string name="widget_description">do it: your streak on the home screen</string>
     <string name="widget_done_content_description">Mark done for today</string>
+    <string name="widget_skip_content_description">Skip today</string>
+    <string name="widget_undo_content_description">Undo today</string>
     <string name="widget_streak_content_description">Current streak</string>
     <string name="widget_streak_subtitle">day streak</string>
     <string name="widget_empty_state">Add a do in do it</string>

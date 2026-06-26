@@ -79,6 +79,7 @@ class DoitWidgetState {
     required this.isCompletedToday,
     required this.reliability,
     required this.asOf,
+    this.restDaysPerMonth = 0,
   });
 
   /// The active do's id. Used by the widget's "Done" button
@@ -117,6 +118,16 @@ class DoitWidgetState {
   /// Dart compute.
   final DateTime asOf;
 
+  /// v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047. The
+  /// active do's configured rest-day budget. The Kotlin
+  /// `WidgetRenderer` hides the "Skip today" ImageButton
+  /// when this is 0 (mirrors the in-app tile's
+  /// `_SkipButton` conditional render). Defaults to 0
+  /// for backwards compatibility with v1.4a caches (the
+  /// `fromJson` factory reads the field defensively; a
+  /// missing field is treated as 0).
+  final int restDaysPerMonth;
+
   /// Returns a copy with selected fields replaced. Used by
   /// tests + the `WidgetService` to derive small variations
   /// (e.g., after a single completion write) without
@@ -128,6 +139,7 @@ class DoitWidgetState {
     bool? isCompletedToday,
     DoitWidgetReliability? reliability,
     DateTime? asOf,
+    int? restDaysPerMonth,
   }) {
     return DoitWidgetState(
       habitId: habitId ?? this.habitId,
@@ -136,6 +148,7 @@ class DoitWidgetState {
       isCompletedToday: isCompletedToday ?? this.isCompletedToday,
       reliability: reliability ?? this.reliability,
       asOf: asOf ?? this.asOf,
+      restDaysPerMonth: restDaysPerMonth ?? this.restDaysPerMonth,
     );
   }
 
@@ -150,6 +163,7 @@ class DoitWidgetState {
       'isCompletedToday': isCompletedToday,
       'reliability': reliability.toJsonTag(),
       'asOfIso': asOf.toIso8601String(),
+      'restDaysPerMonth': restDaysPerMonth,
     };
   }
 
@@ -170,6 +184,7 @@ class DoitWidgetState {
         json['reliability'] as String?,
       ),
       asOf: asOf,
+      restDaysPerMonth: (json['restDaysPerMonth'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -182,7 +197,8 @@ class DoitWidgetState {
         other.streakNumber == streakNumber &&
         other.isCompletedToday == isCompletedToday &&
         other.reliability == reliability &&
-        other.asOf == asOf;
+        other.asOf == asOf &&
+        other.restDaysPerMonth == restDaysPerMonth;
   }
 
   @override
@@ -193,11 +209,13 @@ class DoitWidgetState {
     isCompletedToday,
     reliability,
     asOf,
+    restDaysPerMonth,
   );
 
   @override
   String toString() =>
       'DoitWidgetState(habitId: $habitId, habitName: $habitName, '
       'streakNumber: $streakNumber, isCompletedToday: $isCompletedToday, '
-      'reliability: ${reliability.toJsonTag()}, asOf: $asOf)';
+      'reliability: ${reliability.toJsonTag()}, '
+      'restDaysPerMonth: $restDaysPerMonth, asOf: $asOf)';
 }

@@ -2,6 +2,7 @@ package com.doit
 
 import android.content.Context
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
 /**
@@ -21,6 +22,11 @@ import io.flutter.plugin.common.MethodChannel
  *     [CompletionLogService] is the single source of truth
  *     for completion writes. The Kotlin handler does NOT
  *     touch the DB directly.
+ *   - v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047: also
+ *     receive `skip` + `undo` calls from the widget's
+ *     "Skip today" + "Undo today" buttons. Same
+ *     round-trip pattern as `markDone` (Kotlin → Dart →
+ *     `CompletionLogService`).
  *
  * The `AppWidgetProvider` ([DoitWidgetProvider]) and the
  * Dart `WidgetService` are the two callers. The Dart side
@@ -35,6 +41,7 @@ import io.flutter.plugin.common.MethodChannel
  *     uniformly (defense in depth).
  *
  * v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042.
+ * v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047.
  */
 object WidgetChannel {
     private const val CHANNEL = "doit/widget"
@@ -66,51 +73,60 @@ object WidgetChannel {
                         // responsible for the real read.
                         //
                         // This arm exists for symmetry with
-                        // the inbound `markDone` arm and for
+                        // the inbound action arms and for
                         // future Kotlin-side debug surfaces.
                         result.success(null)
                     }
                 }
-                "markDone" -> {
-                    val ctx = appContext
-                    if (ctx == null) {
-                        result.error(
-                            "NO_CONTEXT",
-                            "WidgetChannel has no app context",
-                            null,
-                        )
-                    } else {
-                        val args = call.arguments as? Map<*, *>
-                        val habitId = args?.get("habitId") as? String
-                        if (habitId.isNullOrEmpty()) {
-                            result.error(
-                                "BAD_ARGS",
-                                "markDone requires non-empty habitId",
-                                null,
-                            )
-                        } else {
-                            // The Dart-side round-trip:
-                            // `PlatformWidgetBridge.markDone`
-                            // re-enters this channel and the
-                            // Dart `WidgetService.handleRefreshRequest`
-                            // appends the completion via
-                            // `CompletionLogService.append`,
-                            // then asks `WidgetUpdater.refreshAll`
-                            // to repaint the RemoteViews.
-                            //
-                            // From the widget's point of view
-                            // the "Done" tap is one round-trip;
-                            // internally the Kotlin side has
-                            // no DB-write authority.
-                            WidgetUpdater.refreshAll(ctx)
-                            result.success(true)
-                        }
-                    }
-                }
+                "markDone" -> handleAction(call, result, "markDone")
+                "skip" -> handleAction(call, result, "skip")
+                "undo" -> handleAction(call, result, "undo")
                 else -> result.notImplemented()
             }
         }
         channel = ch
+    }
+
+    /**
+     * Common handler for `markDone` / `skip` / `undo`
+     * (v1.4a + v1.4f). The Kotlin side does not own the
+     * completion writes; it round-trips to the Dart side
+     * via `WidgetUpdater.refreshAll` which (a) ensures the
+     * `FlutterEngine` is alive and (b) broadcasts the
+     * matching `ACTION_*` so [DoitWidgetProvider.onReceive]
+     * can re-derive + repaint.
+     *
+     * From the widget's point of view the action tap is one
+     * round-trip; internally the Kotlin side has no
+     * DB-write authority. Mirrors the v1.4a `markDone` shape
+     * so the three actions stay symmetric.
+     */
+    private fun handleAction(
+        call: MethodCall,
+        result: MethodChannel.Result,
+        action: String,
+    ) {
+        val ctx = appContext
+        if (ctx == null) {
+            result.error(
+                "NO_CONTEXT",
+                "WidgetChannel has no app context",
+                null,
+            )
+            return
+        }
+        val args = call.arguments as? Map<*, *>
+        val habitId = args?.get("habitId") as? String
+        if (habitId.isNullOrEmpty()) {
+            result.error(
+                "BAD_ARGS",
+                "$action requires non-empty habitId",
+                null,
+            )
+            return
+        }
+        WidgetUpdater.refreshAll(ctx)
+        result.success(true)
     }
 
     /** Public so MainActivity can call it. */
