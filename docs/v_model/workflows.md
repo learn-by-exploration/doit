@@ -1442,55 +1442,115 @@ reference to the BLUETOOTH_CONNECT banner pattern in
 `notification_reliability.md`).
 
 
-## WF-042 — Mark a do done from the Android home-screen widget (v1.4a / Phase 28 / SYS-115 / ADR-045)
+## WF-042 — View streak on the Android home widget (v1.4a / Phase 28 / SYS-115)
 
-**Actor.** User, on the Android home screen, looking at the `DoitAppWidgetProvider` widget surface.
+The user drops the do it widget from their launcher's
+widget picker, long-presses the home screen, and taps
+"Widgets". The widget shows the first-active Do's name,
+streak number (e.g. "7"), "day streak" subtitle, an
+`ic_widget_optimal` / `ic_widget_degraded` /
+`ic_widget_unknown` reliability badge, and a circular
+"Done" button.
 
-**Goal.** Mark a do done without opening the app, from the home-screen widget.
+**Primary path (happy flow):**
 
-**Preconditions.** The widget has been added to the home screen; `DoitAppWidgetProvider` is registered; the user is signed in.
+1. User long-presses home screen → Widgets → finds
+   "do it: your streak on the home screen" in the
+   picker.
+2. User drags the medium (4×2) variant to a home-screen
+   cell and releases.
+3. The OS calls `DoitWidgetProvider.onUpdate(ctx, mgr,
+   ids)`. The Kotlin side reads
+   `WidgetStateCache.cachedFromPrefs(ctx)` FIRST; if the
+   cache is empty (first install), it renders the
+   empty-state placeholder ("Add a do in do it").
+4. The Kotlin side then boots a one-shot `FlutterEngine`
+   via `WidgetUpdater.refreshIds(ctx, ids)`, which calls
+   `WidgetChannel.snapshot()` to get the live JSON.
+5. `WidgetService.instance.handleRefreshRequest()`
+   computes the state: `firstActiveDo(...)` reads
+   `DoRepository.listAll()` + sorts ascending by
+   `createdAt` + filters paused, then
+   `buildWidgetState(...)` runs `ConsecutiveCounter.compute`
+   + maps `ReliabilityService.instance.value` to the
+   badge enum.
+6. The state is persisted to
+   `WidgetStateCache.cachedFromPrefs(ctx)` (a
+   `SharedPreferences` key `doit.widget.cached_v1`) AND
+   sent over `doit/widget.cacheSnapshot(state)` to the
+   Kotlin `WidgetStateCache` (separate `SharedPreferences`
+   file used by the Kotlin side directly).
+7. `WidgetRenderer.render(ctx, state)` applies the
+   `RemoteViews` to the widget's `appWidgetIds`. The
+   widget is now visible: habit name, streak number,
+   badge, Done button.
+8. The widget registers a 30-min `updatePeriodMillis`
+   fallback so the OS re-fires `onUpdate` even if the
+   app process is dead.
 
-**Flow.**
+**Done button (in-widget):**
 
-1. The widget renders the first-active do (via `WidgetStateLocator.firstActiveDo(...)` ordered by `createdAt` ascending), the streak number (via `WidgetStateBuilder.buildWidgetState(...)` using `ConsecutiveCounter.compute`), and the reliability caption.
-2. The user taps "Mark done" on the widget.
-3. The widget fires a `BroadcastReceiver` over the `doit/widget` MethodChannel; the Dart side calls `WidgetService.markDone(habitId: do.id, day: <local-midnight at now>)`.
-4. `WidgetService.markDone` calls `CompletionLogService.instance.append(...)` with `source: CompletionSource.manual` + `proofModeAtTime: <soft|strong|auto>`. The append dedupes on `(habitId, day)`.
-5. The widget refreshes (via `handleRefreshRequest`) and re-renders with the new streak.
-6. (Strong-mode only.) The widget deep-links to `MissionLauncherScreen` via the existing v1.3d path; the chain UI runs; on `ChainPassed` the completion is appended by the mission UI itself (`MissionLauncherScreen` is the single writer for strong-mode completions on the widget surface too).
+9. User taps "Done" on the widget. The
+   `ImageButton.done` `PendingIntent.getBroadcast`
+   fires `ACTION_MARK_DONE` with the cached
+   `habitId` extra.
+10. `DoitWidgetProvider.onReceive` dispatches the action
+    to `WidgetChannel.markDone(habitId)`, which calls
+    back into Dart.
+11. Dart-side `WidgetService.instance.markDone(habitId)`
+    appends a completion via `CompletionLogService.append`
+    (with `source: CompletionSource.manual` + the
+    do's current `proofModeAtTime` tag), then re-derives
+    the state via `handleRefreshRequest()`.
+12. The new state is written to both the Dart
+    `WidgetStateCache` and the Kotlin
+    `WidgetStateCache`, and `WidgetRenderer.render(...)`
+    repaints the widget. The Done button now appears
+    grayed-out (`isCompletedToday == true`).
 
-**Alternate paths.**
+**Body tap (open app):**
 
-- **Channel missing (no native side, e.g. tests / web).** `MissingPluginException` is swallowed; the mark-done call is a no-op. (ADR-013.)
-- **Strong-mode chain timeout / cancel.** `MissionLauncherScreen` pops with `null`; the streak stays broken per the v1.1f grace-window contract.
+13. User taps the widget body (not the Done button).
+    The `widget_root` `FrameLayout` `PendingIntent.getActivity`
+    opens `MainActivity` to the home screen via the
+    existing launch intent (single-top).
 
-**Out of scope (v1.4c candidates).**
+**Reliability change path:**
 
-- Widget small / large variants, widget config activity, widget list (scrolling), widget deep-link to a specific do.
+14. User revokes a gated permission (e.g. `location`)
+    in Android Settings. `PermissionService.statuses`
+    emits a `Denied` for the gated kind.
+15. `ReliabilityService` re-derives its value to
+    `Reliability.degraded` (per SYS-112's combine rule)
+    and emits to `ReliabilityService.reliability`.
+16. `WidgetService`'s subscription fires
+    `handleRefreshRequest()`. The new state's
+    `reliability` field is `DoitWidgetReliability.degraded`,
+    and the badge icon swaps from `ic_widget_optimal`
+    to `ic_widget_degraded`.
 
-## WF-043 — Mark a do done from the home tile (v1.4b / Phase 29 / SYS-116 / ADR-046)
+**Failure paths:**
 
-**Actor.** User, inside the app, looking at the home screen.
+- **`MissingPluginException` on `doit/widget` calls** —
+  the Dart `PlatformWidgetBridge._safe` wrapper swallows
+  the exception and returns `null` / completes normally
+  (ADR-013). The widget falls back to the cached state
+  or the empty-state placeholder.
+- **No active Do** — the locator returns `null` and the
+  builder produces the empty-state snapshot. The widget
+  shows the `widget_empty_state` copy ("Add a do in
+  do it") and hides the Done button.
+- **OS process kill between updates** — the cold-start
+  fallback in `WidgetStateCache.cachedFromPrefs(ctx)`
+  rehydrates the last-known-good state. The widget is
+  never blank between OS process-kill and the first Dart
+  frame.
+- **Permission denied for the `doit/widget` channel**
+  — the platform impl returns `null`; the widget renders
+  the cached state or empty-state.
 
-**Goal.** Mark a do done without entering select mode, from the home tile.
-
-**Preconditions.** The user has at least one active (non-paused) do. The reliability banner is irrelevant.
-
-**Flow.**
-
-1. The home screen renders each `_HabitTile` with the do name (left), a `_DoStreakBadge` (right — streak number + "day streak" subtitle), and a `_DoneButton` (far right).
-2. The user taps the tile's "Mark done" button.
-3. (Soft / Auto do.) `markDoDone(activeDo, asOf, CompletionLogService.instance)` calls `completionLog.append(habitId: activeDo.id, day: <local-midnight at asOf>, source: CompletionSource.manual, proofModeAtTime: <soft|strong|auto>)`. The tile flips `_isCompletedToday = true`; the SnackBar `homeSnackbarMarkedDone` ("Marked done.") shows; the `IconButton` re-renders as a filled `Icons.check_circle`.
-4. (Strong do.) The tile pushes `MissionLauncherScreen(habitId: do.id)` via `Navigator.push<bool>(...)` and `await`s the pop. The mission UI runs the chain end-to-end. On `ChainPassed` the launcher pops with `true`; the tile flips `_isCompletedToday = true`. On a `null` pop (cancel / timeout), the tile does NOT flip the bool — the streak stays broken per the v1.1f grace-window contract.
-5. A re-tap on an already-done tile shows the `homeTileAlreadyDoneTooltip` SnackBar — no second append (the dedupe happens upstream inside `CompletionLogService.append`).
-
-**Alternate paths.**
-
-- **DB write failure.** The `_busy` flag reverts in `setState`; the tile stays in the "not done" state; no SnackBar. (The service's append throws — caller catches upstream; the tile currently does not surface a SnackBar on failure; the existing `_completeSelected` SnackBar pattern is the model.)
-
-**Out of scope (v1.4c candidates).**
-
-- In-app tile reliability badge inside the tile body (currently shown as a small icon at the top-right; the v1.4b streak is added next to the name, not replacing the badge).
-- Tile "Skip today" button (consumes a rest-day budget).
-- Tile streak history visualization (7-day sparkline).
-- Tile edit / delete affordance (currently in the long-press select-mode only).
+**Requirements covered:** SYS-115 (widget),
+SYS-112 (`ReliabilityService` as the source for the
+badge), SYS-111 (`Do.effectiveStreakConfig` as the
+source for the streak), SYS-114 (sibling Phase 15
+feature, shares the native-channel precedent).

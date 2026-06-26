@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042.
+
+     "Done" button glyph. 48dp touch target. The check icon
+     mirrors the in-app "Done" affordance language so the
+     widget feels native to the rest of the UI. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/widget_accent"
+        android:pathData="M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z" />
+</vector>

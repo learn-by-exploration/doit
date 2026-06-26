@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042.
+
+     Background drawable for the home widget. A rounded
+     rectangle with a 1dp outline. The widget is rendered
+     by the launcher against a `RemoteViews` context,
+     which does NOT have access to the host app's theme,
+     so the fill + outline must be literal `@color/`
+     references (no `?android:attr/...` — those resolve
+     against the app's theme at *paint* time, not at
+     layout-inflation time, and the launcher process
+     has no theme context). The hex values match the
+     Material 3 dark surface tokens (`@color/widget_*`)
+     declared in `values/colors.xml`. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="12dp" />
+    <solid android:color="@color/widget_background" />
+    <stroke
+        android:width="1dp"
+        android:color="@color/widget_outline" />
+</shape>

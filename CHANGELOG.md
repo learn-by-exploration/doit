@@ -45,6 +45,180 @@ deferred" (Phase 6a proper). The deferred items
 translator, Wear OS, iOS port, home widget) are tracked in
 [`feature.md`](feature.md) §2-4 as v1.x candidates.
 
+## v1.4a — Android home-screen widget (Phase 28 / SYS-115 / ADR-045 / WF-042)
+
+The first v1.x parking-lot item ships: a native Android
+home-screen widget (`com.doit.DoitWidgetProvider`) that
+renders the user's first-active do, current streak number,
+"Done" button, and the unified `Reliability` badge
+(`ic_widget_optimal` / `ic_widget_degraded` /
+`ic_widget_unknown`). This closes the v1.2g-deferred
+`feature.md` §2.8 B9 ("Widget re-arm indicator") — the
+"widget re-arm indicator" requirement now has a surface.
+
+### Dart side (6 new files)
+
+- `lib/widget/doit_widget_state.dart` — `@immutable` value
+  class with `==` / `hashCode` / `toJson` / `fromJson` /
+  `copyWith`; defensive `fromJson` (missing fields default
+  to empty / 0 / `unknown`; unrecognized reliability tag
+  falls back to `unknown`; unparseable `asOfIso` falls back
+  to epoch). Pure-Dart, no Flutter import.
+- `lib/widget/widget_bridge.dart` — abstract `WidgetBridge`
+  + `PlatformWidgetBridge` (MethodChannel `doit/widget`
+  with `_safe` wrapper per ADR-013) + `FakeWidgetBridge`
+  (records `cachedSnapshots` + `refreshCount`).
+- `lib/widget/widget_state_builder.dart` — pure-Dart
+  `buildWidgetState(...)` factory using
+  `ConsecutiveCounter.compute` for the streak +
+  `Do.effectiveStreakConfig(...)` for the per-do grace
+  window override + reliability→badge 1:1 mapping; `null
+  activeDo` produces the empty-state snapshot.
+- `lib/widget/widget_state_cache.dart` —
+  `SharedPreferences`-backed singleton (key
+  `doit.widget.cached_v1`) for the cold-start fallback.
+- `lib/widget/widget_state_locator.dart` — `firstActiveDo(...)`
+  sorts `DoRepository.listAll()` ascending by `createdAt`
+  and returns the first non-paused entry (or `null`).
+- `lib/services/widget_service.dart` — singleton-with-`_ready`
+  (per `.claude/rules/lib-services.md`); `init({bridge,
+  doRepository, completionLog, reliabilityService, cache?})`
+  is idempotent, subscribes to `ReliabilityService.reliability`
+  so every value change triggers a re-derive, primes the cache
+  + platform on init, exposes `handleRefreshRequest()` +
+  `markDone(habitId)` (no-op when habit missing; otherwise
+  appends via `CompletionLogService` with `source:
+  CompletionSource.manual` then re-derives); platform-side
+  failures swallowed per ADR-013.
+
+### Kotlin side (4 new files + MainActivity wiring)
+
+- `android/app/src/main/kotlin/com/doit/DoitWidgetProvider.kt`
+  — `AppWidgetProvider` subclass; `onUpdate` reads
+  `WidgetStateCache.cachedFromPrefs(ctx)` FIRST for
+  cold-start fallback then attempts a Dart round-trip via
+  `WidgetUpdater.refreshIds(ctx, ids)`; `onEnabled` +
+  `onDisabled` lifecycle hooks; `onReceive` dispatches
+  `ACTION_REFRESH_WIDGET` + `ACTION_MARK_DONE`.
+- `android/app/src/main/kotlin/com/doit/WidgetChannel.kt`
+  — `object` mirroring `FullScreenIntentChannel.kt` shape
+  with `attach(engine)` / `detach()` / `setAppContext(ctx)`;
+  dispatches `snapshot` + `cacheSnapshot` + `markDone`
+  MethodChannel calls.
+- `android/app/src/main/kotlin/com/doit/WidgetUpdater.kt`
+  — boots a one-shot `FlutterEngine` via `FlutterEngineCache`,
+  applies the cached `RemoteViews`, then triggers a Dart
+  round-trip.
+- `android/app/src/main/kotlin/com/doit/WidgetStateCache.kt`
+  — Kotlin-side `SharedPreferences` at `doit_widget` prefs,
+  key `doit.widget.cached_v1`; mirrors the Dart
+  `WidgetStateCache` so the widget is never blank between
+  OS process-kill and first Dart frame.
+- `MainActivity.kt` — `WidgetChannel.setAppContext(...)` +
+  `WidgetChannel.attach(flutterEngine)` in
+  `configureFlutterEngine`; `WidgetChannel.detach()` in
+  `onDestroy`.
+
+### Android resources (5 new)
+
+- `res/xml/doit_widget_info.xml` — 4×2 cell,
+  `updatePeriodMillis=1800000`,
+  `targetCellWidth=4 targetCellHeight=2`,
+  `widgetCategory="home_screen"`, `initialLayout=@layout/widget_medium`.
+- `res/layout/widget_medium.xml` — vertical `LinearLayout`
+  with habit-name + reliability badge, streak number +
+  "day streak" subtitle, "Done" `ImageButton`; tap-target
+  `FrameLayout` root with id `widget_root`.
+- `res/drawable/widget_bg.xml` + `ic_widget_optimal|degraded|unknown|done.xml`
+  — monochrome vector icons + 12 dp rounded rect.
+- `res/values/strings.xml` — 6 new `<string>` entries
+  (`widget_description`, `widget_done_content_description`,
+  `widget_streak_content_description`,
+  `widget_streak_subtitle`, `widget_empty_state`,
+  `widget_reliability_badge`).
+
+### AndroidManifest.xml
+
+- ONE new `<receiver android:name=".DoitWidgetProvider"
+  android:exported="false">` block inside `<application>`
+  with `APPWIDGET_UPDATE` intent-filter + `@xml/doit_widget_info`
+  meta-data. **No new `<uses-permission>`** — widget
+  rendering needs none.
+
+### Tests (5 new files, 35 tests)
+
+- `test/widget/widget_state_builder_test.dart` (8 tests)
+  — streak from empty log is 0; streak with 3 consecutive
+  days; streak broken at grace-window edge; streak still
+  alive within grace window; `isCompletedToday` true only
+  when today is in the log; reliability maps to widget
+  badge; `null activeDo` produces the empty-state snapshot;
+  `Do.effectiveStreakConfig` flows through the factory
+  end-to-end.
+- `test/widget/widget_bridge_test.dart` (11 tests) —
+  `FakeWidgetBridge` cacheSnapshot records;
+  `FakeWidgetBridge` requestRefresh increments;
+  `FakeWidgetBridge` snapshot returns scripted / null by
+  default; `PlatformWidgetBridge` cacheSnapshot forwards
+  the JSON envelope; `PlatformWidgetBridge` snapshot happy
+  path; `PlatformWidgetBridge` snapshot swallows
+  `MissingPluginException`; `PlatformWidgetBridge` snapshot
+  swallows `PlatformException`; `PlatformWidgetBridge`
+  requestRefresh swallows `MissingPluginException`;
+  `DoitWidgetState` JSON round-trips; `fromJson` is
+  defensive against missing fields; `fromJson` tolerates
+  an unknown reliability tag.
+- `test/widget/widget_state_cache_test.dart` (5 tests) —
+  save-then-load round-trips; load returns null on empty
+  prefs; clear removes the key; save overwrites previous;
+  corrupt cache is dropped.
+- `test/widget/widget_state_locator_test.dart` (4 tests) —
+  returns first-active do by oldest `createdAt`; skips
+  paused dos; returns null on empty repository; returns
+  null when every do is paused.
+- `test/widget/widget_service_test.dart` (6 tests) —
+  `init` is idempotent; `handleRefreshRequest` computes +
+  caches + persists state; `markDone` appends the completion
+  then re-derives; `markDone` is a no-op when the habit
+  does not exist; reliability change triggers a re-derive;
+  `MissingPluginException` from the bridge is swallowed
+  (ADR-013).
+
+### V-Model
+
+- SYS-115 appended (requirements.md).
+- ADR-045 appended (decision_record.md) — native
+  `AppWidgetProvider` + `RemoteViews` over the `doit/widget`
+  MethodChannel; rejects `home_widget` pubspec dep per
+  ADR-018.
+- WF-042 appended (workflows.md) — end-to-end "View streak
+  on the Android home widget" flow.
+- `traceability_matrix.md` — WF-042 row added with the 5
+  new test files + Kotlin compile gate + manual device
+  check.
+- `implementation_status.md` — `### v1.4a` row appended.
+- `feature.md` §2.8 B9 → shipped in v1.4a; §4 parking-lot
+  home-widget bullet removed; §5 quick-index row updated.
+- 1130 / 1130 tests pass (1064 prior + 66 new across the
+  v1.3 sign-off PRs and v1.4a). `dart format` clean,
+  `flutter analyze --fatal-infos` clean.
+
+### Notes
+
+- pubspec stays at `1.3.0+10` until v1.4a signs off; the
+  v1.4a sign-off commit is a separate PR that flips
+  `pubspec.yaml` + `lib/build_info.dart` + `test/release_signing_test.dart`
+  in lockstep, mirroring the v1.2 sign-off at `8684a6e` +
+  the v1.3 sign-off at `f51602c`.
+- No new pubspec dependencies; no new `<uses-perpermission>`;
+  no `wakelock_plus`; no `home_widget` package. The widget
+  renders from `RemoteViews` not a `FlutterActivity`.
+- The deferred items (small / large widget variants,
+  in-app tile streak number, widget config activity,
+  deep-link from widget body to a specific do, iOS / Wear
+  OS widget surfaces) are tracked in `feature.md` §4 as
+  v1.4b candidates.
+
 ## [1.2.0] — 2026-06-23 — Code-TODO closure
 
 Thirteen v1.2 sub-entries (v1.2a..v1.2m) ship the
