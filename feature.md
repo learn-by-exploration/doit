@@ -200,6 +200,20 @@ is brand purple. Deferred to v1.2+ per the v1.1i CHANGELOG.
 
 ### 2.8 B9 — Widget re-arm indicator (v1.2g explicit deferral)
 
+**Shipped in v1.4a (SYS-115 / ADR-045 / WF-042 / Phase 28).**
+The project now ships an Android home-screen widget
+(`com.doit.DoitWidgetProvider`) that renders the
+first-active do's streak + the unified `Reliability`
+badge (`ic_widget_optimal` / `ic_widget_degraded` /
+`ic_widget_unknown`). The v1.2g deferral is closed — the
+"widget re-arm indicator" requirement now has a surface.
+The widget is a native `AppWidgetProvider` + `RemoteViews`
+over the `doit/widget` MethodChannel (no `home_widget`
+pubspec dep); the cold-start fallback uses a
+`SharedPreferences` cache so the widget is never blank
+between OS process-kill and first Dart frame. See
+`docs/v_model/decision_record.md` ADR-045 + `workflows.md`
+WF-042 for the long-form rationale and end-to-end flow.
 `v1.2g` explicitly deferred B9 ("Android home-widget re-arm
 indicator") because the project did not yet ship an Android
 home-screen widget. **Closed by v1.4a** (Phase 28 / SYS-115 /
@@ -270,27 +284,10 @@ These items are deferred beyond v1.2 but are explicitly **v1
 work** (no v2.0 jump). They are tracked here so they don't get
 lost between the v1.2 closeout and the next milestone kickoff.
 
-- **v1.x** — iOS port. v0.1 + v1.0 are Android-only; the
-  `lib/habits/` + `lib/people/` + `lib/missions/` model layer
-  is already pure Dart and would port cleanly. The Kotlin side
-  (`lib/reminders/`, `lib/services/platform_*`) is the bulk of
-  the port work. A v1.x port keeps the project on a single
-  version track and lets iOS users land on the same
-  `RoutineConfig` / `Person.pausedUntil` / reliability-badge
-  work that v1.2 has shipped on Android.
-- **v1.x** — Wear OS target. Same v1-versioning reasoning —
-  ships as a v1.x point release, not a v2.0 milestone.
-- **v1.x** — Backup encryption upgrade from PBKDF2-HMAC-SHA256
-  (100k iterations) to Argon2id or a higher PBKDF2 round count,
-  in line with current OWASP guidance. The change is
-  backwards-compatible reads-from-v1 (per the v0.4c.1
-  precedent) so it can land as a v1.x point release without
-  forcing a v2.0.
-- **v1.x** — Backup format v2 → v3 to support new fields added
-  across v1.x (RoutineConfig, Person.pausedUntil, the
-  v1.1f/v1.2h reliability badge states, etc.). Same
-  backwards-compat-reads-from-v1 pattern; v1.x point release.
-- **v1.4c → v1.4d follow-up** — Tile-level surface gaps after
+| ADRs | `docs/v_model/decision_record.md` | up to ADR-045 (9 v1.2 ADRs appended in the closeout PR — ADR-033..ADR-041 covering SYS-098..SYS-110; v1.3 sub-entries appended ADR-042..ADR-044 covering SYS-112..SYS-114; v1.4a appended ADR-045 covering SYS-115); v1.2c/d/e/f/h/i/j/l/m earned ADRs; v1.2g/k did not (doc-only closeout / routine UI affordance respectively) |
+| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 sub-entries appended SYS-111..SYS-114 (4 IDs); v1.4a appended SYS-115 (1 ID — the home widget). v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
+| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 sub-entries added WF-040, WF-041; v1.4a appended WF-042 (home widget). Cross-check the rest are in `traceability_matrix.md` |
+v1.4c → v1.4d follow-up** — Tile-level surface gaps after
   the v1.4a widget + v1.4b tile streak + v1.4c tile skip
   ship: widget-side "Skip today" button (mirrors the v1.4c
   in-app tile affordance); tile streak history visualization

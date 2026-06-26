@@ -583,6 +583,30 @@ intentionally incomplete for that slice.
   SM-S918B device), the same shape as v0.5e / v1.0h /
   v1.1k / v1.2x.
 
+## Milestone 11 — v1.4: Home-screen widget + remaining parking-lot items
+
+- **Date:** _TBD_ (sign-off pending v1.4a device
+  verification).
+- **Status:** stub (Milestone 11 placeholder; v1.4a
+  lands as the first sub-entry, with v1.4b / v1.4c
+  parking-lot candidates to follow).
+- **Scope:** ship the first v1.x parking-lot items. The
+  headline feature for v1.4a is the Android home-screen
+  widget — the missing primary surface that closes
+  `feature.md` §2.8 B9.
+- **v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042** (the
+  first sub-entry): a native `AppWidgetProvider` +
+  `RemoteViews` over the `doit/widget` MethodChannel
+  renders the user's first-active do, current streak,
+  "Done" button, and unified `Reliability` badge. No
+  `home_widget` pubspec dep (per ADR-018); no new
+  `<uses-permission>`; no `wakelock_plus`. The
+  cold-start fallback uses a `SharedPreferences` cache so
+  the widget is never blank between OS process-kill and
+  first Dart frame. See `CHANGELOG.md` v1.4a block for
+  the long-form summary; `implementation_status.md` row
+  v1.4a for the file-by-file breakdown; `feature.md` §2.8
+  B9 for the deferral that v1.4a closes.
 ## Milestone 11 — v1.4: Home-screen widget + tile parity (in flight)
 
 **Goal.** Two-phase cycle. Phase 28 ships the Android
@@ -613,10 +637,29 @@ open the app.
   `IconButton` to call `markDoDone(...)` (soft/auto) or push
   `MissionLauncherScreen` (strong). New pure-Dart helpers
   `lib/screens/home_tile_streak.dart` + `lib/screens/home_tile_completion.dart`.
-  4 new ARB keys. **Status: shipped** (PR #34, awaiting
-  merge to `main`; v1.4b branch is still present after
-  the post-merge revert per the user's auto-mode note).
-- **v1.4c — In-app tile Skip today button + rest-day
+  4 new ARB keys. **Status: shipping in this PR.**
+- **v1.4c candidates (parking lot).** Tile "Skip today"
+  button (consumes a rest-day budget); tile streak history
+  visualization (7-day sparkline); tile edit / delete
+  affordance (currently long-press select-mode only);
+  widget small / large variants, widget config activity,
+  widget list (scrolling), widget deep-link to a specific
+  do. See `feature.md` §4.
+- **v1.4c candidates** (parking lot, TBD): iOS / Wear OS
+  widget surfaces (each needs a separate platform port
+  + a shared widget spec); native Spanish translator
+  (smoke-test translation only today — see `feature.md`
+  §2.4).
+- **Right-side gate:** the user runs `flutter build
+  appbundle --release` + installs on an Android 13+ device
+  + drags the widget from the launcher's widget picker +
+  verifies streak number renders + taps Done + verifies
+  completion appends + revokes a gated permission +
+  verifies badge flips to degraded. Mirrors the v0.5e /
+  v1.0h / v1.1k / v1.2x / v1.3x user-side on-device
+  checks. Kotlin side is untested at the unit level per
+  the established 5-native-channel precedent.
+v1.4c — In-app tile Skip today button + rest-day
   budget indicator (Phase 30 / SYS-117 / ADR-047 / WF-044).**
   Extend `_HabitTile` with a `_SkipButton` sub-widget
   (Icons.bedtime / bedtime_outlined; tap calls `markDoSkipped(...)`
@@ -687,4 +730,3 @@ open the app.
   decrements. The widget's verification path is the same
   shape (add the widget, verify the streak renders, tap
   "Mark done", verify the streak advances after re-render).
-

@@ -4764,40 +4764,161 @@ v1.3d ships the launch path end-to-end:
   `MissionLauncherScreen`, and `RoutineOverlayScreen`
   entries.
 
-## ADR-045 — Native `AppWidgetProvider` + `RemoteViews` over the `doit/widget` MethodChannel (rejects `home_widget` pubspec dep) (v1.4a / SYS-115)
+## ADR-045 — Android home-screen widget: native `AppWidgetProvider` + `RemoteViews` over the `doit/widget` MethodChannel (v1.4a / SYS-115 / Phase 28 / WF-042)
 
-**Context.** The Android home-screen widget (Phase 28 / SYS-115) needs a transport between the Flutter side and the Android `AppWidgetProvider`. Two reasonable shapes:
+### Context
 
-1. The `home_widget` pubspec package — a thin wrapper around the platform channel.
-2. A hand-rolled `doit/widget` MethodChannel with a `DoitAppWidgetProvider` Kotlin class that uses `RemoteViews` directly.
+v1.3 just shipped (Phases 12-15). `feature.md §4` lists
+the v1.x parking lot; v1.3's CHANGELOG sign-off summary
+explicitly defers Phase 28 to v1.x. `feature.md §2.8 B9
+— Widget re-arm indicator` was the v1.2g explicit
+deferral: the project does not yet ship a home-screen
+widget, so the B9 "render reliability in the widget"
+requirement had no surface.
 
-**Decision.** Use option 2 (hand-rolled). The widget surface is small (one screen, four rows, one button); the package would add a layer of indirection without simplifying the Kotlin side and would pull a new transitive dep into pubspec for one channel.
+Phase 28 ships that surface. The widget is the missing
+primary surface for the "see my streak at a glance" use
+case — the user adds a Do, sets it as their anchor, and
+wants the streak number visible without unlocking the
+phone. It also closes B9 (the reliability badge mirrors
+the existing `Reliability { optimal, degraded, unknown }`
+enum) and adds a "Done" affordance on the home screen so
+the streak is reachable without launching the app.
 
-**Consequences.**
+The widget is **greenfield** — no existing
+`AppWidgetProvider`, no `home_widget` dependency, no
+`<receiver>` for widget update. The existing project
+strongly favors **native `MethodChannel` + Flutter
+rendering** over pub.dev convenience wrappers (5 native
+channels already: `doit/reminders`, `doit/full_screen`,
+`doit/calendar`, `doit/device_state`,
+`doit/call_interceptor`). The no-deps-unless-necessary
+pubspec precedent + `home_widget` being a 0.x package
+leans against pulling it in.
 
-- **Pubspec stays clean.** No new package. The Kotlin side already had `AppWidgetProvider` + `RemoteViews` in scope for v1.3d's `FullScreenActivity` (SYS-114). Adding the same shape for the widget is a 50-line Kotlin class.
-- **The Dart side is a thin singleton-with-`_ready` wrapper.** `lib/services/widget_service.dart` exposes `handleRefreshRequest()`, `markDone(...)`, and `applyReliability(Reliability)`. The widget refresh round-trip is one MethodChannel call: `widget.refresh()` → renders `DoitWidgetState` → pushes via `appWidgetManager.updateAppWidget(...)`.
-- **No new `<uses-permission>`.** The widget runs without a foreground service — the platform re-renders on the next refresh tick. The widget does NOT use `home_widget`'s `WidgetSize` / `WidgetBackground` abstractions.
-- **Strong-mode "Done" opens the existing `MissionLauncherScreen` (SYS-114).** The widget's strong-mode path mirrors the notification's strong-mode path — both deep-link to the chain orchestrator.
+### Decision
 
-## ADR-046 — Home-tile streak number + per-tile "Done" button (v1.4b / SYS-116)
+Ship the widget as a native `AppWidgetProvider` +
+`RemoteViews` surface with Dart as the source of truth
+over a new `doit/widget` MethodChannel. Specifically:
 
-**Context.** v1.4a (SYS-115) shipped the Android home-screen widget with the streak number + "Mark done" affordance. The in-app home tile (`_HabitTile` at `lib/screens/home.dart:281`) currently shows the do name + schedule subtitle but does NOT render a streak number; the per-tile `IconButton` at lines 374-388 is still a `SnackBar` stub. The widget and the in-app tile should be feature-parity — same UX surface, same affordance, same single source of truth for the completion write.
+1. **Which Do does the widget show?** The **first-active
+   Do** (oldest by `createdAtMillis`, skipping paused).
+   Mirrors the "anchor do" mental model: user adds a Do,
+   sets it as their recurring anchor, widget surfaces
+   its state. Paused dos are skipped (matches
+   `DoRepository.listActive()` query shape). No active
+   do → empty-state ("Add a do in do it").
+   User-configurable widget selection is v1.4b.
+2. **Sizes / layouts.** Single `medium` (4×2) only for
+   v1.4a. Two/three sizes triples `RemoteViews` surface
+   area; medium fits streak + reliability badge + Done +
+   tap-to-open in one row.
+3. **Update cadence.** `updatePeriodMillis = 1800000`
+   (30-min Android floor) + event-driven via
+   `CompletionLogService.append` post-write hook +
+   `ReliabilityService.notifier` listener + boot
+   re-arm via the existing `BootReceiver`. Dart-side
+   `handleRefreshRequest` is the source of truth; the
+   30-min fallback covers the case where the app process
+   is dead.
+4. **"Done" button behavior.** Dart-side
+   `CompletionLogService.append` via `MethodChannel`.
+   Single source of truth (mirrors the home-tile Done
+   semantics and re-uses the `(habitId, day)` dedupe).
+   The Kotlin side never touches the DB directly — it
+   round-trips to Dart via `doit/widget.markDone(habitId)`.
+5. **Body-tap behavior.** Opens `MainActivity` to the
+   home screen via `PendingIntent.getActivity`
+   (single-top). Deep-linking to a specific Do needs
+   new `MaterialApp.routes` infra + v1.4b.
+6. **Show streak number.** Yes — `currentStreak` from
+   `ConsecutiveCounter.compute(...)`. Closes the
+   "widget = see my streak" user expectation.
+7. **Show reliability badge.** Yes — single icon
+   (optimal / degraded / unknown). Closes B9.
+8. **Test surface.** ~35 Dart tests with
+   `FakeWidgetBridge` across 5 test files; no Robolectric
+   / androidTest / `integration_test`. Matches the
+   project's "Dart-only unit tests + FakeBridge"
+   convention (1130 tests today, all `flutter test`).
+   Kotlin side stays untested at the unit level
+   (matches `ReminderChannelProxy` / `FullScreenIntentChannel`
+   precedent).
+9. **Channel name.** `doit/widget` (third native
+   `MethodChannel` alongside `doit/reminders` +
+   `doit/full_screen`).
+10. **No new `<uses-permission>`.** Widget rendering
+    needs none.
+11. **No new pubspec dependencies.** Native
+    `AppWidgetProvider` only; no `home_widget` package.
 
-**Decision.** Add a `_DoStreakBadge` sub-widget to `_HabitTile` (which becomes a `StatefulWidget`) and rewire the `IconButton` to write via the same `CompletionLogService.append(...)` path the widget uses. Two pure-Dart helpers land in `lib/screens/`:
+### Consequences
 
-- `home_tile_streak.dart` — `streakForDo({...})` + `isCompletedOnDay({...})`. Pure-Dart, no Flutter import. Calls `ConsecutiveCounter.compute({log, config, asOf})` for the streak; floors entries to local midnight for the day check.
-- `home_tile_completion.dart` — `markDoDone({...})`. The `_proofModeTag` helper is inlined (mirrors `WidgetService._proofModeTag`) — kept in lockstep manually until a future PR extracts both into `lib/do/proof_mode_tag.dart` (deferred until v1.4a lands on `main`).
+- The widget is the first Dart consumer of the unified
+  `ReliabilityService.instance.value` (SYS-112) from a
+  non-foreground context. The reliability stream's
+  `Reliability.degraded` flips the widget badge without
+  any user interaction.
+- The widget closes the B9 item from `feature.md §2.8`
+  — that section's checklist entry is removed in the
+  same PR.
+- The cold-start fallback (`WidgetStateCache.cachedFromPrefs(ctx)`
+  on Kotlin) makes the widget usable even when the OS
+  has killed the AppWidgetProvider process between
+  `updatePeriodMillis` fires.
+- The widget adds 3 new Kotlin files + 1 new manifest
+  block + 4 new Android resources, but ZERO new
+  permissions and ZERO new pubspec dependencies. The
+  pubspec stays at `1.3.0+10` until v1.4a signs off.
+- The Kotlin side is untested at the unit level per the
+  established precedent (5 native channels, none with
+  androidTest). The right-side gate is the user's
+  hands-on `flutter build appbundle --release` + on-
+  device install + drop the widget + tap Done + verify
+  completion wrote.
+- The next widget work (small / large variants, in-app
+  tile streak, widget config activity, deep-link to a
+  specific Do, iOS / Wear OS) is parked under v1.4b.
 
-**Consequences.**
+### Rejected alternatives
 
-- **Single source of truth for the completion write.** Both surfaces (widget + in-app tile) call `CompletionLogService.append(habitId, day, source: CompletionSource.manual, proofModeAtTime: <soft|strong|auto>)`. The append already dedupes on `(habitId, day)` — a double-tap inserts one row, not two.
-- **Strong-mode habit completion writes the completion via the mission UI.** The widget's strong-mode path is "fire the FSI mission UI, write the completion from there". The tile's strong-mode path mirrors it — `Navigator.push(MissionLauncherScreen(habitId: do.id))`, `await` the pop, write the completion on `ChainPassed` (SYS-114). The tile does NOT call `CompletionLogService.append` for strong-mode habits; the mission UI owns that write.
-- **Re-compute streak on every rebuild.** Cheap: pure-Dart, ~10 entries per visible tile. Matches the widget's behavior (same algorithm, same call shape). No `StreakService` needed.
-- **Frozen `asOf` per build.** The tile freezes `asOf = DateTime.now()` at `build()` time. A new completion write triggers a rebuild via the parent's `_refresh()` and the new `isCompletedToday` reflects the write. This avoids drift between the per-tile `asOf` and the global app time.
-- **No new pubspec deps, no new `<uses-permission>`.** Pure-Dart + a single ARB addition (4 new keys in `app_en.arb` + `app_es.arb`).
+- **`home_widget` pub.dev package** — the project has a
+  "no new pubspec dependencies unless necessary"
+  precedent (ADR-013 + ADR-018). `home_widget` is a
+  0.x package, brings a second opinion on the
+  `AppWidgetProvider` lifecycle, and would obscure the
+  Kotlin side from the existing 5 native channels.
+  Rejected.
+- **Flutter-rendered widget via Picture-in-Picture
+  trick** — Android home widgets cannot host a Flutter
+  renderer; only `RemoteViews` works. Rejected (not
+  technically possible).
+- **Widget-as-foreground-service** — over-engineering
+  for a streak display. The 30-min floor +
+  event-driven refresh is sufficient. Rejected.
+- **System-rendered widget framework (Glance)** —
+  Android-only, requires Compose dependencies, and
+  doesn't fit the project's Flutter-rendering-only
+  posture. Rejected.
 
-## ADR-047 — In-app home tile "Skip today" + rest-day budget indicator (v1.4c / SYS-117)
+### Linked
+
+- `feature.md` §2.8 B9 (now removed — shipped in v1.4a).
+- `feature.md` §4 parking lot (home-widget bullet now
+  removed).
+- ADR-013 (defense-in-depth via `_safe` wrapper) —
+  `WidgetBridge` swallows `MissingPluginException`.
+- ADR-018 (no new pubspec dependencies unless
+  necessary) — the foundation for rejecting
+  `home_widget`.
+- SYS-112 (unified `ReliabilityService`) — the source
+  for the widget's reliability badge.
+- SYS-114 (full-screen intent launch path) — the
+  sibling Phase 15 feature that also ships a native
+  MethodChannel.
+- WF-042 — the end-to-end workflow this ADR defines.
+ADR-047 — In-app home tile "Skip today" + rest-day budget indicator (v1.4c / SYS-117)
 
 **Context.** v1.4b (SYS-116) shipped the in-app home tile streak number + per-tile "Done" button, mirroring the Android home-screen widget's UX surface. The tile still lacks the **rest-day affordance**: today, a user who wants to mark a do as a planned rest day has to either (a) miss the day and accept the streak break (defeats the rest-day budget feature in the streak calculator), or (b) edit the do's schedule to skip a weekday. The rest-day budget was designed to *credit* rest-day rows in `ConsecutiveCounter.compute` identically to manual rows, but the user has no UI to write a rest-day row from the in-app tile. The widget-side equivalent is parked for v1.4d; the in-app side is v1.4c.
 

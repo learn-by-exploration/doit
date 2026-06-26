@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042.
+
+     Reliability badge — "optimal" (green check). 16dp icon,
+     no fill on the vector root so the widget tints it
+     against the theme background. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp"
+    android:height="16dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF1B5E20"
+        android:pathData="M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z" />
+</vector>

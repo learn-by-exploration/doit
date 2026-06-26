@@ -4,4 +4,17 @@
          space). Pinned here so the manifest does not hardcode the
          label. Future renames are a v0.6+ decision and require an ADR. -->
     <string name="app_name">do it</string>
+
+    <!-- v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042:
+         home widget strings. The `widget_description`
+         is the picker copy; the `widget_done_*` strings
+         are the a11y labels for the action button; the
+         `widget_streak_*` strings are the a11y + subtitle
+         labels for the streak number. -->
+    <string name="widget_description">do it: your streak on the home screen</string>
+    <string name="widget_done_content_description">Mark done for today</string>
+    <string name="widget_streak_content_description">Current streak</string>
+    <string name="widget_streak_subtitle">day streak</string>
+    <string name="widget_empty_state">Add a do in do it</string>
+    <string name="widget_reliability_badge">Reliability</string>
 </resources>
