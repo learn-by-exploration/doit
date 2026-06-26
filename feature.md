@@ -1,9 +1,9 @@
 # `do it` — feature.md (remaining work)
 
-> Last updated: 2026-06-23.
-> Branch: `main` @ `acf9c32` (clean working tree, up to date with `origin/main`).
-> Test state: 1001/1001 passing. `dart format` clean. `flutter analyze --fatal-infos` clean.
-> Version in `pubspec.yaml` / `lib/build_info.dart`: `1.2.0+9`.
+> Last updated: 2026-06-27.
+> Branch: `main` @ `34b6940` (v1.4d PR #37 squash-merged).
+> Test state: 1197/1197 passing. `dart format` clean. `flutter analyze --fatal-infos` clean.
+> Version in `pubspec.yaml` / `lib/build_info.dart`: `1.4.0+11` (sign-off in flight on `chore/v1.4-sign-off`).
 
 This file tracks everything that is **not yet shipped** and is not
 already covered by the V-Model docs (`docs/v_model/plan.md`,
@@ -13,69 +13,76 @@ piece of work.
 
 ---
 
-## 1. Ship blockers (must finish before closing the v1.2 cycle)
+## 1. Ship blockers (must finish before closing the v1.4 cycle)
 
-### 1.1 ✅ DONE — Resolved the v1.2l / v1.2m CHANGELOG ordering + merge conflict
+### 1.1 ✅ DONE — Shipped v1.4a/b/c/d on `main`
 
-`CHANGELOG.md` `[Unreleased]` block now has the 9 v1.2
-sub-entries (v1.2e..v1.2m) in clean alphabetic order
-(e, f, g, h, i, j, k, l, m). The pre-existing `<<<<<<<< /
-======== / >>>>>>>>` markers at the v1.2l/v1.2m junction are
-gone (the duplicate 3-gate blocks are collapsed into a single
-consolidated block). The `## [1.2.0]` summary block points
-to the 9 entries. v1.2c + v1.2d remain tracked only in
-`implementation_status.md` (they shipped via PRs #5 / #6
-without `CHANGELOG.md` updates — a known gap, retro-fix
-deferred per the v1.1h backfill precedent). Closed in the
-v1.2 closeout PR (`acf9c32`).
+v1.4a (PR #33) shipped the Android home-screen widget
+(SYS-115 / ADR-045 / WF-042 / Phase 28). v1.4b (PR #35)
+shipped the in-app tile streak + Done button (SYS-116 /
+ADR-046 / WF-043 / Phase 29). v1.4c shipped the in-app tile
+Skip today + rest-day budget indicator (SYS-117 / ADR-047 /
+WF-044 / Phase 30). v1.4d (PR #37) shipped the in-app tile
+Undo today's completion (SYS-118 / ADR-048 / WF-045 / Phase
+31). `main` is at `34b6940` with 1197 / 1197 tests passing.
 
-### 1.2 ✅ DONE — Bumped version to v1.2.0
+### 1.2 ✅ DONE — Bumped version to v1.4.0
 
-`pubspec.yaml` is at `1.2.0+9`. `lib/build_info.dart` mirrors
-(`kAppVersion = '1.2.0'`, `kAppVersionCode = 9`).
+`pubspec.yaml` → `version: 1.4.0+11`. `lib/build_info.dart` →
+`kAppVersion = '1.4.0'`, `kAppVersionCode = 11`.
 `test/release_signing_test.dart` mirror-pin assertions updated
-in lockstep (commit `8684a6e`). `CHANGELOG.md` has the new
-`## [1.2.0] — 2026-06-23 — Code-TODO closure` summary block.
-`implementation_status.md` has 13 v1.2 rows + the sign-off row
-(mirrors the v1.0 / v1.1 shape). `requirements.md` has
-SYS-098..SYS-110 appended. `decision_record.md` has
-ADR-033..ADR-041 appended. Closed in the v1.2 closeout PR
-(`acf9c32`).
+in lockstep on `chore/v1.4-sign-off`. `CHANGELOG.md` has the
+new `## [1.4.0] — 2026-06-27 — Home widget + in-app tile
+completion lifecycle` summary block (mirrors `## [1.3.0]`
+shape). `implementation_status.md` has 4 v1.4 rows + the
+sign-off row (mirrors the v1.0 / v1.1 / v1.2 / v1.3 shape).
+`requirements.md` has SYS-115..SYS-118 appended.
+`decision_record.md` has ADR-045..ADR-048 appended.
+`workflows.md` has WF-042..WF-045 appended.
+`traceability_matrix.md` has the 4 new rows appended. Closes
+in the v1.4 sign-off PR (in flight on `chore/v1.4-sign-off`).
 
-### 1.3 ✅ DONE — Added `v1_2_release_baseline.md` + `v1_2_release_checklist.md`
+### 1.3 ✅ DONE — Added `v1_4_release_baseline.md` + `v1_4_release_checklist.md`
 
 Both docs are on disk and current:
 
-- `docs/v_model/v1_2_release_baseline.md` (181 lines) —
-  left-side baseline: scope, the 30-phase roadmap status
-  table, the SYS-098..SYS-110 requirements table (matches
-  `requirements.md`), the ADR-033..ADR-041 decisions table,
-  the deferred-items table (Phase 6a / action-side permission
-  disambiguation / `TriggerCallIncoming*` arm / native Spanish
-  translator / `google_maps_flutter` / legacy PNG
-  regeneration / light-theme icon / B9 widget re-arm / Phases
-  12-30), the no-new-permissions / no-`INTERNET` confirmation,
-  and the version-bump section.
-- `docs/v_model/v1_2_release_checklist.md` — right-side gate:
+- `docs/v_model/v1_4_release_baseline.md` — left-side baseline:
+  scope (home widget + in-app tile completion lifecycle), the
+  30-phase roadmap status table (Phases 28-31 shipped; 16-27 +
+  32-36 in v1.x parking lot), the SYS-115..SYS-118
+  requirements table (matches `requirements.md`), the
+  ADR-045..ADR-048 decisions table, the deferred-items table
+  (widget-side Skip today / Undo / 7-day sparkline / tile
+  edit-delete / widget variants / widget config activity /
+  widget list / widget deep-link / rest-day history /
+  rest-day budget edit / Phases 16-27 + 32-36 / Kotlin-side
+  widget unit tests / widget "open app" deep-link / per-mission
+  retry UX / native Spanish / google_maps_flutter / legacy
+  mipmap regen / light-theme icon), the no-new-permissions /
+  no-`INTERNET` confirmation, and the version-bump section.
+- `docs/v_model/v1_4_release_checklist.md` — right-side gate:
   pre-flight mechanical checks, build + install steps (user's
-  hands-on), per-sub-entry on-device verification, regression
-  checks (re-runs the v1.1k checks), and the new SYS- exit
-  criteria table that maps every SYS-098..SYS-110 to its
-  test files + on-device check.
+  hands-on), per-sub-entry on-device verification (v1.4a/b/c/d
+  checks), regression checks (re-runs the v1.3x checks), and
+  the new SYS- exit criteria table that maps every
+  SYS-115..SYS-118 to its test files + on-device check.
 
-Closed in the v1.2 closeout PR (`acf9c32`).
+Landing in the v1.4 sign-off PR.
 
-### 1.4 Commit a `release(v1.2)` debug-signed APK
+### 1.4 Commit a `release(v1.4)` debug-signed APK
 
 `v1.1i` shipped as `222f860` (debug-signed APK, 75.1 MB, SHA1
-`c3e0f6c6`). v1.2 needs the same pattern: `flutter build apk
---debug` (no signing-config touch), record the SHA1 + size in a
-`release(v1.2)` commit that mirrors the v1.1i sign-off shape. This
-is a build artefact, not a code change.
+`c3e0f6c6`). `v1.2` and `v1.3` did NOT ship a debug-signed APK
+build artefact (the project shifted to "code PR + sign-off PR"
+shape in v1.2). v1.4 re-introduces the APK commit so the
+release artefact is on disk and easy to install: `flutter build
+apk --debug` (no signing-config touch), record the SHA1 + size
+in a `release(v1.4)` commit that mirrors the v1.1i sign-off
+shape. This is a build artefact, not a code change.
 
-### 1.5 Optional: v1.2.0 git tag
+### 1.5 Optional: v1.4.0 git tag
 
-A `git tag -a v1.2.0 -m "<message>"` at the release commit,
+A `git tag -a v1.4.0 -m "<message>"` at the release commit,
 mirroring the `[1.0.0]` / `[1.1.0]` CHANGELOG anchors. Optional
 because the project has not used git tags before v1.1i; CLAUDE.md
 treats `git push --force` / branch deletes on shared branches as
@@ -87,7 +94,7 @@ new ref. **User decision** required.
 CLAUDE.md gates this with "ask first (touches signing)". The
 v1.1i sign-off cited this as the user's hands-on step but the
 user has not exercised it. If the user wants a Play-Store-ready
-AAB for v1.2, this is the missing piece.
+AAB for v1.4, this is the missing piece.
 
 ---
 
@@ -280,14 +287,15 @@ The 4 lessons worth capturing from the v1.2 sub-entries:
 
 ## 4. v1 candidate batch (parking lot — still v1 scope)
 
-These items are deferred beyond v1.2 but are explicitly **v1
+These items are deferred beyond v1.4 but are explicitly **v1
 work** (no v2.0 jump). They are tracked here so they don't get
-lost between the v1.2 closeout and the next milestone kickoff.
+lost between the v1.4 closeout and the next milestone kickoff.
 
-| ADRs | `docs/v_model/decision_record.md` | up to ADR-045 (9 v1.2 ADRs appended in the closeout PR — ADR-033..ADR-041 covering SYS-098..SYS-110; v1.3 sub-entries appended ADR-042..ADR-044 covering SYS-112..SYS-114; v1.4a appended ADR-045 covering SYS-115); v1.2c/d/e/f/h/i/j/l/m earned ADRs; v1.2g/k did not (doc-only closeout / routine UI affordance respectively) |
-| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 sub-entries appended SYS-111..SYS-114 (4 IDs); v1.4a appended SYS-115 (1 ID — the home widget). v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
-| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 sub-entries added WF-040, WF-041; v1.4a appended WF-042 (home widget). Cross-check the rest are in `traceability_matrix.md` |
-v1.4e+ follow-up** — Tile-level surface gaps after
+| ADRs | `docs/v_model/decision_record.md` | up to ADR-048 (9 v1.2 ADRs appended in the closeout PR — ADR-033..ADR-041 covering SYS-098..SYS-110; v1.3 sub-entries appended ADR-042..ADR-044 covering SYS-112..SYS-114; v1.4 sub-entries appended ADR-045..ADR-048 covering SYS-115..SYS-118); v1.2c/d/e/f/h/i/j/l/m earned ADRs; v1.2g/k did not (doc-only closeout / routine UI affordance respectively) |
+| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 sub-entries appended SYS-111..SYS-114 (4 IDs); v1.4 sub-entries appended SYS-115..SYS-118 (4 IDs — home widget, tile streak+Done, tile Skip+budget, tile Undo). v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
+| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 sub-entries added WF-040, WF-041; v1.4 sub-entries added WF-042..WF-045. Cross-check the rest are in `traceability_matrix.md` |
+
+**v1.4e+ follow-up** — Tile + widget surface gaps after
   the v1.4a widget + v1.4b tile streak + v1.4c tile skip
   + v1.4d tile undo ship: widget-side "Skip today" button
   (mirrors the v1.4c in-app tile affordance); widget-side
@@ -298,7 +306,8 @@ v1.4e+ follow-up** — Tile-level surface gaps after
   config activity, widget list (scrolling), widget deep-link
   to a specific do; rest-day history visualization;
   rest-day budget edit affordance. See `docs/v_model/plan.md`
-  Milestone 11 (v1.4) for the candidate list.
+  Milestone 12+ for the candidate list (Milestone 11 v1.4
+  is shipping in this cycle).
 
 ---
 
@@ -306,32 +315,43 @@ v1.4e+ follow-up** — Tile-level surface gaps after
 
 | Item | Doc | Status |
 |---|---|---|
-| v1.0 / v1.1 / v1.2a..m + v1.3 + v1.4a..d implementation | `docs/v_model/implementation_status.md` | v1.0..v1.3 fully logged; v1.4 cycle in flight (v1.4a widget shipped, v1.4b tile streak + Done shipped, v1.4c tile Skip + budget shipped, v1.4d tile Undo shipping in this PR) |
-| v1.0 / v1.1 / v1.2 deferred items | `docs/v_model/plan.md` (Milestone 7-11 sections) | Milestones 7 (v1.0), 8 (v1.1), 9 (v1.2), 10 (v1.3) shipped; Milestone 11 (v1.4) flipped from `stub` to `in flight` with v1.4a + v1.4b + v1.4c shipped and v1.4d shipping |
+| v1.0 / v1.1 / v1.2a..m + v1.3 + v1.4a..d implementation | `docs/v_model/implementation_status.md` | v1.0..v1.4 fully logged (v1.4a..v1.4d shipped on `main`; sign-off row in flight on `chore/v1.4-sign-off`) |
+| v1.0 / v1.1 / v1.2 deferred items | `docs/v_model/plan.md` (Milestone 7-11 sections) | Milestones 7 (v1.0), 8 (v1.1), 9 (v1.2), 10 (v1.3), 11 (v1.4) flipped to `shipped` in the v1.4 sign-off PR |
 | 30-phase roadmap | scattered across `CHANGELOG.md` v1.2 sub-entries | needs `v1_2_30_phase_roadmap.md` (see §3.2) |
-| ADRs | `docs/v_model/decision_record.md` | up to ADR-048 (4 v1.3 ADRs appended — ADR-042..ADR-044 covering SYS-112..SYS-114 + ADR-045 covering SYS-115 + ADR-046 covering SYS-116 + ADR-047 covering SYS-117 + ADR-048 covering SYS-118) |
-| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 appended SYS-111..SYS-114 (4 IDs); v1.4a appended SYS-115; v1.4b appended SYS-116; v1.4c appended SYS-117; v1.4d appends SYS-118. v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
-| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 added WF-040, WF-041; v1.4a added WF-042; v1.4b added WF-043; v1.4c added WF-044; v1.4d adds WF-045. Cross-check the rest are in `traceability_matrix.md` |
+| ADRs | `docs/v_model/decision_record.md` | up to ADR-048 (4 v1.3 ADRs appended — ADR-042..ADR-044 covering SYS-112..SYS-114 + 4 v1.4 ADRs appended — ADR-045 covering SYS-115 + ADR-046 covering SYS-116 + ADR-047 covering SYS-117 + ADR-048 covering SYS-118) |
+| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 appended SYS-111..SYS-114 (4 IDs); v1.4 appended SYS-115..SYS-118 (4 IDs — home widget, tile streak+Done, tile Skip+budget, tile Undo). v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
+| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 added WF-040, WF-041; v1.4 added WF-042, WF-043, WF-044, WF-045. Cross-check the rest are in `traceability_matrix.md` |
 | Open questions | `docs/v_model/open_questions.md` | all 21 closed (last closure: v0.5e-fix ADR-017) |
 | Spanish translation | `lib/l10n/app_es.arb` + `CHANGELOG.md` v1.1h block | smoke-test only; see §2.4 |
-| On-device hands-on | none on disk | v0.5e / v1.0h / v1.1k / v1.1h / v1.3x all reference a "user runs ..." step but there is no checklist doc — see §1.6 |
+| On-device hands-on | `docs/v_model/v1_4_release_checklist.md` + v0/v1.0/v1.1/v1.2/v1.3 equivalents | `v1_4_release_checklist.md` mirrors the v1.2 / v1.3 shape; user-runs step is §1.4 (release(v1.4) APK commit) |
 
 ---
 
 ## 6. Recommended next step (single recommendation)
 
-The v1.2 closeout doc-only PR (`acf9c32`) has landed. The
-remaining v1.2 work is the user's hands-on step: §1.4
-(commit a `release(v1.2)` debug-signed APK mirroring the
-v1.1i pattern at `222f860`), then §1.5 (optionally tag
-`v1.2.0`), then §1.6 (optionally build + install the
-`app-release.aab` on the emulator). After those, the v1.2
-cycle is fully closed and the next milestone kickoff can pick
-from §2-4.
+The v1.4 cycle is in closeout. The four v1.4 sub-entries
+(v1.4a/b/c/d) are shipped on `main`. The sign-off commit
+`chore/v1.4-sign-off` lands the version bump + V-Model docs
+(`pubspec.yaml` → `1.4.0+11`, `lib/build_info.dart` mirror,
+`test/release_signing_test.dart` pin updates, `CHANGELOG.md`
+`## [1.4.0]` block, `implementation_status.md` sign-off row,
+`v1_4_release_baseline.md` + `v1_4_release_checklist.md` new
+docs, `plan.md` Milestone 11 flipped to `shipped`).
 
-This sequence keeps the v1.2 cycle audit-clean: every code PR
-landed with its CHANGELOG entry (with the documented v1.2c/d
-gap), every v1.2 sub-entry has an `implementation_status.md`
-row, the milestone block in `plan.md` is flipped to "shipped",
-the new baseline + checklist docs are on disk, and the
-release artefact is the single sign-off line.
+After the sign-off PR lands, the user's hands-on step is the
+`release(v1.4)` debug-signed APK commit: `flutter build apk
+--debug` (no signing-config touch), record the SHA1 + size in
+the commit message (mirrors the v1.1i pattern at `222f860`).
+Then optionally tag `v1.4.0`, then optionally
+`flutter build appbundle --release` + on-device install.
+
+The v1.4e+ parking lot at `feature.md` §4 has fresh candidates
+ready for the next cycle: widget-side Skip today / Undo
+(parity with the in-app tile); in-app tile streak history
+visualization (7-day sparkline); in-app tile edit / delete
+affordance (currently long-press select-mode only); widget
+small / large variants, widget config activity, widget list
+(scrolling), widget deep-link to a specific do; rest-day
+history visualization; rest-day budget edit affordance.
+See `docs/v_model/plan.md` Milestone 12+ for the candidate
+list.

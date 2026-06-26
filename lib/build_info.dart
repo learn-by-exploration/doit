@@ -7,5 +7,5 @@
 // `pubspec.yaml` value at compile time, while runtime Dart code
 // reads this constant for display purposes (Flutter does not expose
 // the pubspec version to runtime Dart without `--dart-define`).
-const String kAppVersion = '1.3.0';
-const int kAppVersionCode = 10;
+const String kAppVersion = '1.4.0';
+const int kAppVersionCode = 11;

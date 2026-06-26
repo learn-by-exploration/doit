@@ -7,6 +7,51 @@ checklist (`v<major>_<minor>_release_checklist.md`). This changelog
 is the user-facing summary of what shipped in each release; the
 V-Model artifacts are the engineering contract.
 
+## [1.4.0] — 2026-06-27 — Home widget + in-app tile completion lifecycle
+
+Four v1.4 sub-entries (v1.4a..v1.4d) ship the **home widget + the
+in-app tile's full completion lifecycle**. The headline themes:
+**Android home-screen widget** (v1.4a — the first launcher
+surface; a native `AppWidgetProvider` + `RemoteViews` over the
+`doit/widget` MethodChannel; renders the first-active do's streak
++ a unified `Reliability` badge; cold-start fallback uses
+`SharedPreferences` so the widget is never blank between OS
+process-kill and first Dart frame; closes B9 / `feature.md` §2.8
++ the home-widget gap from the 30-phase roadmap), **in-app tile
+streak + Done button** (v1.4b — the home tile grows the same
+streak number + "Mark done" affordance as the widget, mirroring
+`WidgetService.markDone` via `CompletionLogService.append`;
+strong-mode habits push `MissionLauncherScreen` end-to-end),
+**in-app tile Skip today + rest-day budget indicator** (v1.4c —
+per-tile "Skip today" `IconButton` consumes a rest-day slot from
+the per-do `restDaysPerMonth` budget; the success snackbar reads
+"Rest day taken"; the budget caption updates from "X / Y rest
+days left" → "No rest days left" on exhaustion), **in-app tile
+Undo today's completion** (v1.4d — per-tile `IconButton` visible
+only when today is resolved; opens a confirm dialog; calls the
+new pure-Dart `undoToday` helper which deletes the matching
+`CompletionRow` via the existing
+`CompletionLogService.deleteById` from v1.2m / SYS-108; mirrors
+`CompletionLogSection._confirmAndDelete` with one fewer tap).
+
+The four sub-entries ship in chronological order across this
+CHANGELOG block (see `## v1.4a` / `## v1.4b` / `## v1.4c` /
+`## v1.4d` below for the per-sub-entry detail). The left-side
+baseline is [`docs/v_model/v1_4_release_baseline.md`](docs/v_model/v1_4_release_baseline.md);
+the right-side checklist is
+[`docs/v_model/v1_4_release_checklist.md`](docs/v_model/v1_4_release_checklist.md).
+`pubspec.yaml` is bumped `1.3.0+10` → `1.4.0+11`; `lib/build_info.dart`
+mirrors; `test/release_signing_test.dart` mirror-pin assertions
+updated in lockstep.
+
+No new `<uses-permission>`, no `INTERNET`, no DB migration. The
+`doit/widget` MethodChannel is a new Kotlin-side handler (no
+new pubspec dep — `home_widget` is NOT used). The `FullScreenActivity`
+launch path from v1.3d is unchanged. The CI grep rejecting
+`import 'package:http'` and `Uri.http(s)` in production code is
+unchanged. `flutter test` ends the cycle at **1197 / 1197** tests
+passing (+133 over the v1.3 sign-off tip of 1064).
+
 ## [1.3.0] — 2026-06-25 — Reliability + lifecycle hardening
 
 Four v1.3 sub-entries (v1.3a..v1.3d) ship the reliability +

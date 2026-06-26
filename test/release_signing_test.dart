@@ -220,7 +220,7 @@ void main() {
     );
   });
 
-  test('pubspec.yaml name is "doit" and version is 1.3.0+10 (v1.3)', () {
+  test('pubspec.yaml name is "doit" and version is 1.4.0+11 (v1.4)', () {
     final pubspec = _read('pubspec.yaml');
     expect(
       pubspec,
@@ -231,15 +231,15 @@ void main() {
     );
     expect(
       pubspec,
-      contains('version: 1.3.0+10'),
+      contains('version: 1.4.0+11'),
       reason:
-          'v1.3 bumped the version from 1.2.0+9 to 1.3.0+10 to mark '
-          'the reliability + lifecycle hardening milestone (4 sub-entries '
-          'v1.3a..d — Phase 12 monthly stats, Phase 13 unified '
-          'ReliabilityService, Phase 14 USE_FULL_SCREEN_INTENT probe, '
-          'Phase 15 FullScreenActivity launch path). A drift back to '
-          '1.2.0+9 would indicate a forgotten version bump on a future '
-          'v1.x change.',
+          'v1.4 bumped the version from 1.3.0+10 to 1.4.0+11 to mark '
+          'the home widget + in-app tile completion-lifecycle milestone '
+          '(4 sub-entries v1.4a..d — Phase 28 Android home widget, '
+          'Phase 29 in-app tile streak + Done, Phase 30 in-app tile '
+          'Skip today + rest-day budget, Phase 31 in-app tile Undo '
+          'today). A drift back to 1.3.0+10 would indicate a forgotten '
+          'version bump on a future v1.x change.',
     );
     expect(
       pubspec,
@@ -248,17 +248,17 @@ void main() {
     );
   });
 
-  test('lib/build_info.dart mirrors pubspec 1.3.0+10 (v1.3)', () {
+  test('lib/build_info.dart mirrors pubspec 1.4.0+11 (v1.4)', () {
     final info = _read('lib/build_info.dart');
     expect(
       info,
-      contains("kAppVersion = '1.3.0'"),
-      reason: 'lib/build_info.dart must mirror pubspec.yaml version (1.3.0).',
+      contains("kAppVersion = '1.4.0'"),
+      reason: 'lib/build_info.dart must mirror pubspec.yaml version (1.4.0).',
     );
     expect(
       info,
-      contains('kAppVersionCode = 10'),
-      reason: 'lib/build_info.dart must mirror pubspec.yaml versionCode (10).',
+      contains('kAppVersionCode = 11'),
+      reason: 'lib/build_info.dart must mirror pubspec.yaml versionCode (11).',
     );
   });
 
@@ -433,7 +433,7 @@ void main() {
     );
   });
 
-  test('app_name + kAppVersion are pinned together at v1.3', () {
+  test('app_name + kAppVersion are pinned together at v1.4', () {
     final strings = _read('android/app/src/main/res/values/strings.xml');
     final buildInfo = _read('lib/build_info.dart');
     final pubspec = _read('pubspec.yaml');
@@ -444,13 +444,13 @@ void main() {
     );
     expect(
       buildInfo,
-      contains("kAppVersion = '1.3.0'"),
-      reason: 'kAppVersion must be 1.3.0 (v1.3 bump).',
+      contains("kAppVersion = '1.4.0'"),
+      reason: 'kAppVersion must be 1.4.0 (v1.4 bump).',
     );
     expect(
       pubspec,
-      contains('version: 1.3.0+10'),
-      reason: 'pubspec.yaml version must be 1.3.0+10 (v1.3 bump).',
+      contains('version: 1.4.0+11'),
+      reason: 'pubspec.yaml version must be 1.4.0+11 (v1.4 bump).',
     );
   });
 }
