@@ -1724,3 +1724,45 @@ The end user. They are looking at their Android home screen, not the do it app.
 - ADR-047 (v1.4c shared `proofModeTag` helper — re-used, no inline copy)
 - ADR-048 (v1.4d in-app `_UndoButton` pattern — mirrored at the widget surface)
 - ADR-049 (v1.4e sparkline first-match-wins tiebreak — mirrored for the undo day-match)
+
+## WF-048 — Widget action button taps round-trip to Dart's `WidgetService` (v1.4g / Phase 34 / SYS-121 / ADR-051)
+
+Closes the latent v1.4a + v1.4f gap where the widget surface's "Done" / "Skip today" / "Undo today" `ImageButton`s repainted via `WidgetUpdater.refreshAll(ctx)` from Kotlin but never wrote to the completion log. The user could tap the widget "Done" button all day and the in-app tile's streak would not advance because the Drift DB had no row. v1.4g activates the INBOUND direction on the existing `doit/widget` MethodChannel so the widget taps now share the write path with the in-app tile.
+
+### Sequence
+
+1. **User taps the widget "Done" `ImageButton`.** `WidgetRenderer.markDoneIntent(ctx, id, habitId)` (`android/app/src/main/kotlin/com/doit/WidgetRenderer.kt`) built a `PendingIntent.getBroadcast` with `action = DoitWidgetProvider.ACTION_MARK_DONE` and `putExtra(EXTRA_HABIT_ID, habitId)`. The OS delivers the broadcast to `DoitWidgetProvider.onReceive(...)`.
+
+2. **Kotlin side dispatches the action.** `DoitWidgetProvider.onReceive` (`android/app/src/main/kotlin/com/doit/DoitWidgetProvider.kt`) reads `habitId` from `intent.getStringExtra(EXTRA_HABIT_ID)` (preferred) or falls back to `WidgetStateCache.cachedFromPrefs(ctx)?.optString("habitId")` (for stale `PendingIntent`s created before v1.4g). With a non-empty `habitId`, the receiver calls `scope.launch { WidgetChannel.invokeAction(ctx, "markDone", habitId); WidgetUpdater.refreshAll(ctx) }` on `Dispatchers.IO` so the BroadcastReceiver doesn't block.
+
+3. **Kotlin `invokeAction` boots the FlutterEngine if needed.** `WidgetChannel.invokeAction(ctx, action, habitId)` (`android/app/src/main/kotlin/com/doit/WidgetChannel.kt`) validates `action ∈ {markDone, skip, undo}` and `habitId.isNotEmpty()` (returns `false` otherwise), calls `WidgetUpdater.ensureFlutterEngine(ctx)` to boot the `FlutterEngine` if it isn't alive (a 1-3 s cost on cold-start; sub-100 ms on warm), then posts `ch.invokeMethod(action, mapOf("habitId" to habitId), resultProxy)` to the platform main thread via `android.os.Handler(Looper.getMainLooper()).post { ... }` because `MethodChannel.invokeMethod` must run on the platform thread.
+
+4. **Dart-side `WidgetActionInvoker` handles the inbound call.** `MethodChannel.setMethodCallHandler` was wired by `WidgetActionInvoker.attach()` (called from `WidgetService.init(...)`) on the `doit/widget` channel. The handler matches `case 'markDone': case 'skip': case 'undo':` and returns `widgetActionDispatch(call)`. Any other method (`cacheSnapshot`, `requestRefresh`, `snapshot`) falls through to `null`.
+
+5. **Dispatcher routes to `WidgetService`.** The top-level `widgetActionDispatch(MethodCall)` function (`lib/widget/widget_action_invoker.dart`) extracts `habitId` from `call.arguments` (returns `false` on missing/empty), reads `WidgetService.instance` (catches `StateError` if not initialized → returns `false`), then switches on `call.method` to `service.markDone(habitId)` / `.skip(habitId)` / `.undo(habitId)` and returns the service's `Future<bool>` result. Any throw from the service is caught and returns `false`.
+
+6. **`WidgetService.markDone` writes the completion row.** `markDone(habitId)` (`lib/services/widget_service.dart`) fetches the active habit via `_doRepository.getById(habitId)` (returns `false` if null), constructs `day = DateTime(now.year, now.month, now.day)` (local-midnight), calls `_completionLog.append(habitId: habitId, day: day, source: CompletionSource.manual, proofModeAtTime: proofModeTag(activeDo.proofMode))` (the `append` dedupes on `(habitId, day)`), then `handleRefreshRequest()` to re-derive + persist the widget state + cache. Returns `true` on success, `false` on any throw.
+
+7. **Dispatcher relays the bool to the platform.** The `CompletableDeferred<Boolean>` is completed with the service's result (or `false` on a throwable). `WidgetChannel.invokeAction`'s `withTimeoutOrNull(5_000L)` awaits the deferred and returns the bool. The `WidgetUpdater.refreshAll(ctx)` follow-up always runs regardless of the bool — the widget repaints with the cached state, which has just been updated by `handleRefreshRequest`.
+
+8. **Widget shows the new streak.** The next `RemoteViews` paint reflects the new `streakNumber` + `isCompletedToday` derived from the now-non-empty completion log. The user sees the streak number advance within 1 s of the tap on a warm engine; within 3 s on a cold engine (covered by the 5 s timeout).
+
+### Failure paths
+
+- **`invokeAction` returns `false` on missing channel / engine / habitId / action.** The Kotlin side's `scope.launch` catches the false and the follow-up `WidgetUpdater.refreshAll(ctx)` still runs. The widget repaints with the cached state (no visual change).
+- **`invokeAction` returns `false` on 5 s timeout.** The `FlutterEngine` boot is the longest plausible cause (1-3 s on cold-start; should never hit 5 s). If it does, the timeout protects the BroadcastReceiver's `CoroutineScope` from leaking. The follow-up refresh still runs.
+- **Dart-side `WidgetService` throws on the `append` call (DB locked).** The dispatcher's try/catch returns `false`. The follow-up refresh runs. The user can re-tap after the DB is unlocked.
+- **Dart-side `WidgetService.instance` throws `StateError` (not initialized).** The dispatcher's `try { ... } on StateError catch` returns `false`. The follow-up refresh runs. This is the cold-start case where the BroadcastReceiver fires before `WidgetService.init` has been called from `main.dart` (e.g., the app process was killed and the widget tap woke it up). The follow-up refresh boots the engine but the dart entrypoint hasn't run init yet — the widget repaints with the cached state.
+- **`habitId` is empty in the intent extras AND the cache is empty (renderEmpty was the last paint).** The Kotlin side's `if (!habitId.isNullOrEmpty())` guard skips the `scope.launch` entirely. No Dart round-trip. No follow-up refresh. The widget stays in its renderEmpty state.
+
+### Requirements covered
+
+- SYS-121 (this cycle's primary requirement)
+- ADR-051 (this cycle's primary architectural decision — bidirectional `doit/widget` MethodChannel)
+- ADR-045 (v1.4a outbound `WidgetChannel` — preserved verbatim; the inbound handler is a new sibling)
+- ADR-046 (v1.4b in-app `_DoneButton` pattern — the widget's inbound "Done" now uses the same `WidgetService.markDone` write path)
+- ADR-047 (v1.4c shared `proofModeTag` helper — used by `WidgetService.markDone` for the `proofModeAtTime` field)
+- ADR-048 (v1.4d in-app `_UndoButton` pattern — the widget's inbound "Undo" now uses the same `WidgetService.undo` write path)
+- ADR-050 (v1.4f widget-side Skip + Undo — the latent "doesn't round-trip to Dart" gap is now closed; v1.4g activates the inbound direction the v1.4f ADR deferred)
+- ADR-013 (defensive `MissingPluginException` swallow — extended to the inbound channel path via `widgetActionDispatch`'s top-level try/catch returning `false`)
+- ADR-049 (v1.4e sparkline first-match-wins tiebreak — mirrored for the inbound `undo` day-match)

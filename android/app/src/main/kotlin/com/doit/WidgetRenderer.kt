@@ -67,12 +67,20 @@ object WidgetRenderer {
             reliabilityIcon(reliability),
         )
         views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(ctx, id))
-        views.setOnClickPendingIntent(R.id.done, markDoneIntent(ctx, id))
+        // v1.4g / Phase 34 / SYS-121 / ADR-051 / WF-048:
+        // the action PendingIntents now carry `EXTRA_HABIT_ID`
+        // so the provider's `onReceive` can route the call
+        // to the correct Dart-side
+        // [com.doit.services.WidgetService] method. The
+        // habit id is read from the cached state JSON
+        // (`habitId` key).
+        val habitId = state.optString("habitId", "")
+        views.setOnClickPendingIntent(R.id.done, markDoneIntent(ctx, id, habitId))
         // v1.4f: Skip + Undo wiring. Both buttons stay in
         // the layout; visibility toggles keep the layout
         // stable across renders (no jump on repaint).
-        views.setOnClickPendingIntent(R.id.skip, skipIntent(ctx, id))
-        views.setOnClickPendingIntent(R.id.undo, undoIntent(ctx, id))
+        views.setOnClickPendingIntent(R.id.skip, skipIntent(ctx, id, habitId))
+        views.setOnClickPendingIntent(R.id.undo, undoIntent(ctx, id, habitId))
         views.setViewVisibility(
             R.id.skip,
             if (restDaysPerMonth > 0) android.view.View.VISIBLE
@@ -99,6 +107,10 @@ object WidgetRenderer {
         // No Done / Skip / Undo — there is nothing to act
         // on. v1.4f: all three fall back to opening the
         // app, matching the v1.4a "open app" shape.
+        // v1.4g: pass empty habitId — the provider's
+        // `onReceive` falls back to the cache (which is
+        // empty in the renderEmpty path) and the action
+        // is a no-op.
         views.setOnClickPendingIntent(R.id.done, openAppIntent(ctx, id))
         views.setOnClickPendingIntent(R.id.skip, openAppIntent(ctx, id))
         views.setOnClickPendingIntent(R.id.undo, openAppIntent(ctx, id))
@@ -141,21 +153,22 @@ object WidgetRenderer {
         )
     }
 
-    private fun markDoneIntent(ctx: Context, id: Int): PendingIntent {
-        // The "Done" tap broadcasts to DoitWidgetProvider,
-        // which dispatches to WidgetChannel.markDone (Kotlin
-        // -> Dart round-trip). The Dart side writes the
-        // completion via CompletionLogService.append and
-        // then asks WidgetUpdater to repaint.
-        //
-        // The Kotlin side does NOT have the habit id at this
-        // point — the widget state in the cache does. We
-        // post a generic broadcast; the Dart side reads the
-        // cache to find the active habit id. This keeps the
-        // "Done" semantics identical to the home-tile "Done"
-        // (single source of truth: CompletionLogService).
+    private fun markDoneIntent(ctx: Context, id: Int, habitId: String): PendingIntent {
+        // v1.4g / Phase 34 / SYS-121 / ADR-051 / WF-048:
+        // the "Done" tap broadcasts to DoitWidgetProvider
+        // with `EXTRA_HABIT_ID` so the provider's
+        // `onReceive` can route the call through
+        // [WidgetChannel.invokeAction] (Kotlin → Dart
+        // round-trip). The Dart side's
+        // [WidgetActionInvoker] handles the inbound call
+        // and invokes
+        // [com.doit.services.WidgetService.markDone(habitId)]
+        // which appends via [CompletionLogService] and
+        // re-derives the widget state. The Kotlin side does
+        // NOT touch the DB directly.
         val intent = Intent(ctx, DoitWidgetProvider::class.java).apply {
             action = DoitWidgetProvider.ACTION_MARK_DONE
+            putExtra(DoitWidgetProvider.EXTRA_HABIT_ID, habitId)
         }
         return PendingIntent.getBroadcast(
             ctx, id, intent,
@@ -163,16 +176,19 @@ object WidgetRenderer {
         )
     }
 
-    private fun skipIntent(ctx: Context, id: Int): PendingIntent {
-        // v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047.
-        // The "Skip today" tap broadcasts to
-        // DoitWidgetProvider, which dispatches to
-        // WidgetChannel.skip (Kotlin -> Dart round-trip).
-        // The Dart side appends a rest-day completion via
-        // CompletionLogService.append (consuming one
-        // rest-day budget unit for the current month).
+    private fun skipIntent(ctx: Context, id: Int, habitId: String): PendingIntent {
+        // v1.4g / Phase 34 / SYS-121 / ADR-051 / WF-048:
+        // the "Skip today" tap broadcasts to
+        // DoitWidgetProvider with `EXTRA_HABIT_ID`. The
+        // provider's `onReceive` dispatches to Dart via
+        // [WidgetChannel.invokeAction] with the `skip`
+        // action. The Dart side appends a rest-day
+        // completion via [CompletionLogService.append]
+        // (consuming one rest-day budget unit for the
+        // current month).
         val intent = Intent(ctx, DoitWidgetProvider::class.java).apply {
             action = DoitWidgetProvider.ACTION_WIDGET_SKIP
+            putExtra(DoitWidgetProvider.EXTRA_HABIT_ID, habitId)
         }
         return PendingIntent.getBroadcast(
             ctx, id, intent,
@@ -180,15 +196,18 @@ object WidgetRenderer {
         )
     }
 
-    private fun undoIntent(ctx: Context, id: Int): PendingIntent {
-        // v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047.
-        // The "Undo today" tap broadcasts to
-        // DoitWidgetProvider, which dispatches to
-        // WidgetChannel.undo (Kotlin -> Dart round-trip).
-        // The Dart side deletes today's completion (or
-        // rest-day) row via CompletionLogService.deleteById.
+    private fun undoIntent(ctx: Context, id: Int, habitId: String): PendingIntent {
+        // v1.4g / Phase 34 / SYS-121 / ADR-051 / WF-048:
+        // the "Undo today" tap broadcasts to
+        // DoitWidgetProvider with `EXTRA_HABIT_ID`. The
+        // provider's `onReceive` dispatches to Dart via
+        // [WidgetChannel.invokeAction] with the `undo`
+        // action. The Dart side deletes today's completion
+        // (or rest-day) row via
+        // [CompletionLogService.deleteById].
         val intent = Intent(ctx, DoitWidgetProvider::class.java).apply {
             action = DoitWidgetProvider.ACTION_WIDGET_UNDO
+            putExtra(DoitWidgetProvider.EXTRA_HABIT_ID, habitId)
         }
         return PendingIntent.getBroadcast(
             ctx, id, intent,
