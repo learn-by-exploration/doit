@@ -586,6 +586,94 @@ Tests: 1149 / 1149 (1130 prior + 19 new — 12 home_tile_streak
 the 3-gate at this commit; the 6 pre-existing `home_test` cases
 still pass).
 
+### v1.4c — In-app home tile Skip today button + rest-day budget indicator (Phase 30 / SYS-117 / ADR-047 / WF-044)
+
+Closes the v1.4b → v1.4c parking-lot item: the home tile now
+exposes a "Skip today" affordance that consumes one unit of
+the do's monthly rest-day budget, plus a small "X / Y rest
+days left" caption inside the existing `_DoStreakBadge`. The
+streak calculator (`ConsecutiveCounter.compute`) already
+credits `CompletionSource.restDay` rows identically to manual
+rows, so a rest-day entry preserves the streak end-to-end.
+New code:
+
+- `lib/screens/home_tile_skip.dart` (NEW) — pure-Dart
+  helpers: `markDoSkipped({required Do activeDo, required
+  DateTime asOf, required CompletionLogService completionLog})`.
+  Reads `activeDo.restDaysPerMonth`; throws
+  `NoRestDaysRemaining(activeDo.id, asOf.year, asOf.month)`
+  on `<= 0` or exhausted month. Constructs
+  `SkipBudget(doId, monthlyLimit).consume(asOf)` (defensive:
+  `SkipBudgetExhausted` is converted to `NoRestDaysRemaining`
+  so the contract stays single-message). Calls
+  `completionLog.append(habitId, day, source:
+  CompletionSource.restDay, proofModeAtTime:
+  proofModeTag(activeDo.proofMode))`.
+- `lib/screens/home_tile_budget.dart` (NEW) — pure-Dart
+  helpers: `budgetRemainingForDo({required Do activeDo,
+  required DateTime asOf, required CompletionLogService
+  completionLog})` + `BudgetRemaining` immutable value class
+  (`used` / `limit` / `remaining`; `canSkip = remaining > 0`;
+  `isExhausted = remaining == 0 && limit > 0`; clamps
+  negative `remaining` to 0 so a do whose `restDaysPerMonth`
+  was lowered mid-month does not render a negative
+  caption).
+- `lib/do/proof_mode_tag.dart` (NEW) — the shared
+  `proofModeTag(DoProofMode)` helper. Consolidates 2 of the
+  3 inline copies left over from v1.4b
+  (`do_repository.dart` + `home_tile_completion.dart`).
+  `mission_launcher.dart` is **not** refactored because its
+  `'unknown'` defensive contract differs (it must never
+  throw on a future subclass).
+- `lib/services/do_repository.dart` (MODIFIED) — uses the
+  shared `proofModeTag` instead of the inline `_proofModeTag`.
+- `lib/screens/home_tile_completion.dart` (MODIFIED) — uses
+  the shared `proofModeTag` instead of the inline
+  `_proofModeTag`.
+- `lib/screens/home.dart` — `_HabitTileState` grows an
+  `_isSkippedToday` flag + `_isResolvedToday = _isCompletedToday
+  || _isSkippedToday` getter. New `_SkipButton` sub-widget
+  (Icons.bedtime / bedtime_outlined; tooltip
+  `homeTileSkipToday` / `homeTileSkipAlready`; tap calls
+  `markDoSkipped(...)` in `try/catch on NoRestDaysRemaining`
+  → `homeTileSkipSuccess` / `homeTileSkipBudgetExhausted`
+  SnackBar). New `_BudgetCaption` sub-widget renders inside
+  `_DoStreakBadge` (FutureBuilder over
+  `budgetRemainingForDo(...)`; `homeTileBudgetRemaining` /
+  `homeTileBudgetNoRemaining` / `SizedBox.shrink()` mid-fetch).
+  The `_DoneButton`'s post-tap SnackBar now branches on
+  `_isSkippedToday` for `homeTileSkipAlready` vs
+  `homeTileAlreadyDoneTooltip` (a Done tap on a skipped-today
+  tile shows the rest-day-taken snackbar instead of the
+  already-done snackbar — the row IS resolved, just by a
+  different mechanism).
+- `lib/l10n/app_en.arb` + `app_es.arb` — 6 new keys
+  (`homeTileSkipToday`, `homeTileSkipAlready`,
+  `homeTileSkipSuccess`, `homeTileSkipBudgetExhausted`,
+  `homeTileBudgetRemaining`, `homeTileBudgetNoRemaining`).
+
+**ADR-047** locks the design: pure-Dart helpers, state-only
+`_isSkippedToday` flag (DB drives the `_BudgetCaption` on
+every build via the existing `listRestDaysInMonth` query),
+rest-day budget exhaustion is a soft signal (the streak
+calculator only checks the budget at write time, not at
+compute time), single source of truth for the rest-day write
+(both surfaces call the same `CompletionLogService.append`
+shape with `source: CompletionSource.restDay`), no new
+pubspec dep; no new `<uses-permission>`.
+
+**SYS-117 + ADR-047 + WF-044 appended.** `feature.md` §4
+home-tile skip bullet removed; §5 quick-index updated to
+ADR-047 / SYS-117 / WF-044.
+
+Tests: 1148 / 1148 (1149 v1.4b tip − 1 duplicate-removed by
+lint cleanups + 19 new — 8 home_tile_skip + 11 home_tile_budget
++ 7 home_test widget extensions per the 3-gate at this commit;
+the 19 added in v1.4b — 12 streak + 4 completion + 7 home
+extensions — remain green; the 6 pre-existing `home_test`
+cases still pass; the v1.4b + v1.4c net delta against the
+v1.4a `main` baseline of 1130 is +18).
+
 ### v1.3d — Light-theme icon variant for the FSI tile (feature.md §2.7)
 
 Closes the §2.7 follow-up: the Settings → Permissions

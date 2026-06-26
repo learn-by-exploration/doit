@@ -613,25 +613,46 @@ open the app.
   `IconButton` to call `markDoDone(...)` (soft/auto) or push
   `MissionLauncherScreen` (strong). New pure-Dart helpers
   `lib/screens/home_tile_streak.dart` + `lib/screens/home_tile_completion.dart`.
-  4 new ARB keys. **Status: shipping in this PR.**
-- **v1.4c candidates (parking lot).** Tile "Skip today"
-  button (consumes a rest-day budget); tile streak history
-  visualization (7-day sparkline); tile edit / delete
-  affordance (currently long-press select-mode only);
-  widget small / large variants, widget config activity,
-  widget list (scrolling), widget deep-link to a specific
-  do. See `feature.md` §4.
+  4 new ARB keys. **Status: shipped** (PR #34, awaiting
+  merge to `main`; v1.4b branch is still present after
+  the post-merge revert per the user's auto-mode note).
+- **v1.4c — In-app tile Skip today button + rest-day
+  budget indicator (Phase 30 / SYS-117 / ADR-047 / WF-044).**
+  Extend `_HabitTile` with a `_SkipButton` sub-widget
+  (Icons.bedtime / bedtime_outlined; tap calls `markDoSkipped(...)`
+  in `try/catch on NoRestDaysRemaining` → `homeTileSkipSuccess`
+  / `homeTileSkipBudgetExhausted` SnackBar); a new `_BudgetCaption`
+  sub-widget renders inside `_DoStreakBadge` (FutureBuilder
+  over `budgetRemainingForDo(...)`; "X / Y rest days left" /
+  "No rest days left" / `SizedBox.shrink()` mid-fetch). The
+  `_DoneButton`'s post-tap SnackBar now branches on
+  `_isSkippedToday` for `homeTileSkipAlready` vs
+  `homeTileAlreadyDoneTooltip`. New pure-Dart helpers
+  `lib/screens/home_tile_skip.dart` +
+  `lib/screens/home_tile_budget.dart`. Shared
+  `proofModeTag(DoProofMode)` helper extracted to
+  `lib/do/proof_mode_tag.dart` (consolidates the v1.4b
+  inline copies in `do_repository.dart` +
+  `home_tile_completion.dart`; `mission_launcher.dart` left
+  untouched due to its different defensive `'unknown'`
+  contract). 6 new ARB keys. **Status: shipping in this PR.**
 
 **Constraints.**
 
 - **No new pubspec deps.** v1.4a rejects `home_widget` per
-  ADR-045. v1.4b is pure-Dart + a single ARB addition.
+  ADR-045. v1.4b + v1.4c are pure-Dart + a single ARB
+  addition.
 - **No new `<uses-permission>`.** The widget runs without a
   foreground service. The tile is a stateless surface.
 - **No DB migrations.** The widget reads via the existing
   `doit/widget` MethodChannel + the existing
   `DoRepository.listAll()`. The tile reads via the existing
-  `CompletionLogService.instance.listForHabit`.
+  `CompletionLogService.instance.listForHabit` +
+  `CompletionLogService.instance.listRestDaysInMonth`. The
+  rest-day budget was already a `RestDayBudgets` Drift
+  snapshot table in v0.5, and the `CompletionSource.restDay`
+  enum value already existed; v1.4c is pure-Dart + a
+  stateful tile extension + ARB additions.
 - **Strong-mode completion write ownership.** Both surfaces
   (widget strong-mode "Done" + tile strong-mode "Done")
   delegate to `MissionLauncherScreen` (SYS-114), which owns
@@ -642,14 +663,28 @@ open the app.
   surfaces call the same `CompletionLogService.append(
   habitId, day, source: CompletionSource.manual,
   proofModeAtTime: <soft|strong|auto>)` shape. The append
-  already dedupes on `(habitId, day)` — a double-tap inserts
-  one row, not two.
+  already dedupes on `(habitId, day, source)` — a
+  double-tap inserts one row, not two. The rest-day write
+  is `completionLog.append(habitId, day, source:
+  CompletionSource.restDay, proofModeAtTime: ...)` and
+  shares the same dedupe key — a Skip-tap and a Done-tap
+  on the same day resolves to a single row (the rest-day
+  row wins, since it is written first).
+- **Rest-day budget exhaustion is a soft signal.** A user
+  who hits `restDaysPerMonth == 0` mid-month sees a SnackBar
+  ("No rest days left this month.") and the tile continues
+  to render the streak + Done button normally. The user's
+  existing streak is NOT broken — `ConsecutiveCounter.compute`
+  only checks the budget at *write* time, not at *compute*
+  time.
 - **Right-side gate (this milestone):** user's hands-on
   `flutter build appbundle --release` + on-device install +
   add a do with 3+ consecutive completions + verify the
   streak renders on the home tile + tap the tile's Done
   button + verify the completion appends + verify the
-  SnackBar. The widget's verification path is the same
+  SnackBar + tap the tile's Skip button + verify the
+  rest-day row appends + verify the budget caption
+  decrements. The widget's verification path is the same
   shape (add the widget, verify the streak renders, tap
   "Mark done", verify the streak advances after re-render).
 

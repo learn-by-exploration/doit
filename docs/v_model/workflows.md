@@ -1494,3 +1494,35 @@ reference to the BLUETOOTH_CONNECT banner pattern in
 - Tile "Skip today" button (consumes a rest-day budget).
 - Tile streak history visualization (7-day sparkline).
 - Tile edit / delete affordance (currently in the long-press select-mode only).
+
+## WF-044 — Skip a do for today from the home tile (v1.4c / Phase 30 / SYS-117 / ADR-047)
+
+**Actor.** User, inside the app, looking at the home screen.
+
+**Goal.** Mark a do as a planned rest day from the in-app tile, consuming one unit of the do's monthly rest-day budget, without entering select mode and without breaking the streak.
+
+**Preconditions.** The user has at least one active (non-paused) do with `restDaysPerMonth > 0` (a do with `restDaysPerMonth == 0` is "opted out" — the `_SkipButton` is hidden). The reliability banner is irrelevant.
+
+**Flow.**
+
+1. The home screen renders each `_HabitTile` with the do name (left), a `_DoStreakBadge` (right — streak number + "day streak" subtitle + a `_BudgetCaption` reading `{remaining}/{limit} rest days left` when `limit > 0`), a `_SkipButton` (Icons.bedtime, left of the Done button), and a `_DoneButton` (Icons.check_circle_outlined, far right).
+2. The user taps the tile's `_SkipButton`.
+3. `markDoSkipped(activeDo, asOf, CompletionLogService.instance)` reads `activeDo.restDaysPerMonth`. If `<= 0`, throws `NoRestDaysRemaining(activeDo.id, asOf.year, asOf.month)`. Otherwise, fetches `completionLog.listRestDaysInMonth(activeDo.id, year, month)` and re-throws `NoRestDaysRemaining` if the count has already hit the limit.
+4. On the happy path, the helper constructs `SkipBudget(doId: activeDo.id, monthlyLimit: activeDo.restDaysPerMonth).consume(asOf)` (defensive: a `SkipBudgetExhausted` is converted to `NoRestDaysRemaining` so the contract stays single-message), then calls `completionLog.append(habitId: activeDo.id, day: DateTime(asOf.year, asOf.month, asOf.day), source: CompletionSource.restDay, proofModeAtTime: proofModeTag(activeDo.proofMode))`.
+5. The tile flips `_isSkippedToday = true`; the `_SkipButton` re-renders with `Icons.bedtime_outlined`; the SnackBar `homeTileSkipSuccess` ("Rest day taken — streak holds.") shows.
+6. The `_BudgetCaption` re-fetches via the nested `FutureBuilder` over `budgetRemainingForDo(...)` — the "X / Y rest days left" caption decrements.
+7. A Done tap on the same tile now branches on `_isSkippedToday == true` and shows `homeTileSkipAlready` ("Rest day taken") instead of `homeTileAlreadyDoneTooltip` (which would be confusing — the row IS resolved, just by a different mechanism). The Done tap itself does NOT call `markDoDone`; the existing `CompletionLogService.append` already dedupes on `(habitId, day, source)` and the rest-day row wins.
+8. A second Skip tap on the same day is a no-op — the append's `(habitId, day, source)` uniqueness prevents a double-count; the tile's `_isSkippedToday` flag remains `true`; the budget does NOT double-decrement.
+
+**Alternate paths.**
+
+- **Budget exhausted (mid-month).** The first check throws `NoRestDaysRemaining`. The tile shows the `homeTileSkipBudgetExhausted` SnackBar ("No rest days left this month."); the `_SkipButton` re-renders with `Icons.bedtime_outlined` and `homeTileSkipAlready` tooltip; the `_BudgetCaption` reads `homeTileBudgetNoRemaining` ("No rest days left"). The user can still mark the tile Done via the `_DoneButton` — the streak only breaks if they miss the day entirely.
+- **DB write failure.** The catch-all `try/catch` re-throws as a generic exception (matching the v1.4b `_onMarkDonePressed` shape); the tile stays in the "not skipped" state; no SnackBar. (Future PR can add a `homeTileSkipFailure` SnackBar + a retry.)
+- **`restDaysPerMonth == 0` (do opted out).** The `_SkipButton` is hidden entirely; the `_BudgetCaption` renders `SizedBox.shrink()` (no layout shift); the `_DoneButton` is the only action. The user can mark the do Done but cannot skip.
+
+**Out of scope (v1.4d candidates).**
+
+- Widget-side "Skip today" button on the Android home-screen widget (mirrors the v1.4a tile-vs-widget feature-parity plan). v1.4d candidate.
+- Rest-day history visualization ("you've used 1 of 2 this month" expansion tile showing the dates). v1.4d candidate.
+- Rest-day budget edit affordance (change `restDaysPerMonth` from the tile's overflow menu instead of the long-press → select-mode → edit flow). v1.4d candidate.
+- Per-tile undo (delete a stray rest-day row from the last 7 days). Mirrors the v1.3b `CompletionLogSection` pattern (SYS-108). v1.4d candidate.

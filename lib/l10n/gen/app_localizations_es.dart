@@ -57,6 +57,28 @@ class AppLocalizationsEs extends AppLocalizations {
   String get homeTileStrongModeHint => 'Abre la cadena de misiones';
 
   @override
+  String get homeTileSkipToday => 'Saltar hoy';
+
+  @override
+  String get homeTileSkipAlready => 'Día de descanso tomado';
+
+  @override
+  String get homeTileSkipSuccess =>
+      'Día de descanso tomado — la racha se mantiene.';
+
+  @override
+  String get homeTileSkipBudgetExhausted =>
+      'No quedan días de descanso este mes.';
+
+  @override
+  String homeTileBudgetRemaining(int remaining, int limit) {
+    return '$remaining/$limit días de descanso restantes';
+  }
+
+  @override
+  String get homeTileBudgetNoRemaining => 'No quedan días de descanso';
+
+  @override
   String get homeEmptyTitle => 'Sin tareas aún.';
 
   @override
