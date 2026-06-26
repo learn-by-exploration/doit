@@ -524,6 +524,30 @@ no `INTERNET`, no `flutter pub` changes (Pillow is a
 dev-only tool dependency; the script is not in the
 runtime pubspec).
 
+### v1.3d — CI grep rejects network calls in production code (SYS-026)
+
+Closes the SYS-026 verification gap. SYS-026 (in
+`requirements.md`) requires "a CI grep rule that fails on
+`import 'package:http'` and `Uri.https` outside the
+dev-only test harness", but no CI step enforces it — the
+contract has been a code-review discipline only since v0.1.
+PR #32 adds a new `Reject network calls in production
+code (SYS-026)` step to `.github/workflows/ci.yml`'s
+`quality` job. The grep covers `lib/` + `android/app/src/main/`
+(production Dart + Kotlin) and excludes `build/`, `.dart_tool/`,
+`tool/` (design-time scripts), `test/` (the dev-only
+test harness SYS-026 explicitly whitelists), and `.git/`.
+The grep looks for `import 'package:http`, `Uri.http(s)(`,
+and `HttpClient()`. Benign `import 'dart:io'` lines (for
+`File`, `Directory`, `Platform`, `Process`) are filtered
+out via a second-pass `grep -v` so the step only fails
+on real HTTP usage. New test in `test/ci_workflow_test.dart`
+pins the step's existence, the SYS- ID reference, and the
+`test/` + `tool/` exclusion list. Test count: 1047 → 1048.
+`dart format` clean, `flutter analyze --fatal-infos`
+clean. No new permissions, no `INTERNET`, no `flutter pub`
+changes.
+
 ### v1.2e — `NotificationService.dismiss` + `PlatformNotificationService.show` real implementations
 
 Phase 5 of the v1.2 code-TODO closure (`30-phase roadmap`).
