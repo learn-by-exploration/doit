@@ -30,7 +30,9 @@ import 'package:doit/do/do.dart';
 import 'package:doit/do/do_description.dart';
 import 'package:doit/do/proof_mode.dart';
 import 'package:doit/l10n/gen/app_localizations.dart';
+import 'package:doit/screens/home_tile_budget.dart';
 import 'package:doit/screens/home_tile_completion.dart';
+import 'package:doit/screens/home_tile_skip.dart';
 import 'package:doit/screens/home_tile_streak.dart';
 import 'package:doit/screens/mission_launcher.dart';
 import 'package:doit/services/completion_log_service.dart';
@@ -309,17 +311,29 @@ class _HabitTileState extends State<_HabitTile> {
   // done" hint without round-tripping to the parent.
   bool _busy = false;
   bool _isCompletedToday = false;
+  // v1.4c / Phase 30 / SYS-117: a rest-day tap for today
+  // resolves the day in the same way as a manual
+  // completion (the streak is credited). The tile
+  // treats either as "resolved today" — see
+  // `_isResolvedToday` below.
+  bool _isSkippedToday = false;
+
+  bool get _isResolvedToday => _isCompletedToday || _isSkippedToday;
 
   Future<void> _onMarkDonePressed() async {
     if (_busy) return;
-    if (_isCompletedToday) {
+    if (_isResolvedToday) {
       // Same-day re-tap is a no-op (CompletionLogService
       // dedupes anyway, but we short-circuit here so the
-      // SnackBar + busy state don't flicker).
+      // SnackBar + busy state don't flicker). The hint
+      // copy depends on which surface resolved the day.
+      final l = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            AppLocalizations.of(context).homeTileAlreadyDoneTooltip,
+            _isSkippedToday
+                ? l.homeTileSkipAlready
+                : l.homeTileAlreadyDoneTooltip,
           ),
         ),
       );
@@ -365,6 +379,52 @@ class _HabitTileState extends State<_HabitTile> {
         content: Text(AppLocalizations.of(context).homeSnackbarMarkedDone),
       ),
     );
+  }
+
+  /// v1.4c / SYS-117 — the tile-level handler for a
+  /// "Skip today" tap. Writes a rest-day completion via
+  /// `markDoSkipped` and reflects the resolved state in
+  /// `_isSkippedToday` so the "Done" button can no-op
+  /// (the day is resolved either way).
+  ///
+  /// Error path: a `NoRestDaysRemaining` from the helper
+  /// surfaces as a "no rest days left this month"
+  /// snackbar — the busy flag is cleared and the tile
+  /// stays in the un-resolved state.
+  Future<void> _onSkipTodayPressed() async {
+    if (_busy) return;
+    if (_isResolvedToday) return; // no-op second tap
+    final habit = widget.habit;
+    if (habit.restDaysPerMonth <= 0) {
+      // The button is hidden when the do has no budget,
+      // but defensively reject the tap if it ever leaks
+      // through (e.g., a config change mid-frame).
+      return;
+    }
+    setState(() => _busy = true);
+    final now = DateTime.now();
+    final l = AppLocalizations.of(context);
+    try {
+      await markDoSkipped(
+        activeDo: habit,
+        asOf: now,
+        completionLog: CompletionLogService.instance,
+      );
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _isSkippedToday = true;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.homeTileSkipSuccess)));
+    } on NoRestDaysRemaining {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.homeTileSkipBudgetExhausted)));
+    }
   }
 
   @override
@@ -441,11 +501,19 @@ class _HabitTileState extends State<_HabitTile> {
                           // v1.4b / SYS-116: streak badge.
                           // Renders the run length next to
                           // the name. Mirrors the widget's
-                          // middle row.
+                          // middle row. v1.4c / SYS-117
+                          // also takes a budget future to
+                          // render the rest-day caption
+                          // underneath.
                           _DoStreakBadge(
                             completions: completions,
                             activeDo: habit,
                             asOf: asOf,
+                            budget: budgetRemainingForDo(
+                              activeDo: habit,
+                              asOf: asOf,
+                              completionLog: CompletionLogService.instance,
+                            ),
                           ),
                           if (isPaused)
                             Tooltip(
@@ -468,11 +536,29 @@ class _HabitTileState extends State<_HabitTile> {
                   ),
                 ),
                 if (!selectMode)
-                  _DoneButton(
-                    busy: _busy,
-                    isCompletedToday: _isCompletedToday,
-                    isStrong: habit.proofMode is StrongProof,
-                    onPressed: _onMarkDonePressed,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // v1.4c / SYS-117: skip-today button.
+                      // Hidden when the do has no rest-day
+                      // budget configured (the user opted
+                      // out of rest days for this do).
+                      // Disabled-look is achieved by not
+                      // rendering at all — there's nothing
+                      // to skip.
+                      if (habit.restDaysPerMonth > 0)
+                        _SkipButton(
+                          busy: _busy,
+                          isSkippedToday: _isSkippedToday,
+                          onPressed: _onSkipTodayPressed,
+                        ),
+                      _DoneButton(
+                        busy: _busy,
+                        isCompletedToday: _isCompletedToday,
+                        isStrong: habit.proofMode is StrongProof,
+                        onPressed: _onMarkDonePressed,
+                      ),
+                    ],
                   ),
               ],
             ),
@@ -486,15 +572,21 @@ class _HabitTileState extends State<_HabitTile> {
 /// v1.4b / SYS-116 — the streak number + "day streak"
 /// subtitle rendered next to the do name on the home
 /// tile. Mirrors the widget's `streak_number` row.
+///
+/// v1.4c / SYS-117: also renders the budget caption
+/// ("X / Y rest days left") under the streak subtitle
+/// when the budget is configured AND has been touched.
 class _DoStreakBadge extends StatelessWidget {
   const _DoStreakBadge({
     required this.completions,
     required this.activeDo,
     required this.asOf,
+    required this.budget,
   });
   final Future<List<CompletionRow>> completions;
   final Do activeDo;
   final DateTime asOf;
+  final Future<BudgetRemaining> budget;
 
   @override
   Widget build(BuildContext context) {
@@ -539,6 +631,21 @@ class _DoStreakBadge extends StatelessWidget {
                 Text(
                   l.homeTileStreakLabel,
                   style: Theme.of(context).textTheme.bodySmall,
+                ),
+                // v1.4c / SYS-117: nested FutureBuilder for
+                // the budget caption. Two futures is fine —
+                // the parent FutureBuilder's `ConnectionState`
+                // already controls the badge skeleton.
+                FutureBuilder<BudgetRemaining>(
+                  future: budget,
+                  builder: (context, bSnap) {
+                    final b = bSnap.data;
+                    if (b == null) return const SizedBox.shrink();
+                    return _BudgetCaption(
+                      budget: b,
+                      isExhausted: b.isExhausted,
+                    );
+                  },
                 ),
               ],
             ),
@@ -900,6 +1007,87 @@ class _AddSheet extends StatelessWidget {
           const SizedBox(height: Spacing.md),
         ],
       ),
+    );
+  }
+}
+
+/// v1.4c / SYS-117 — the per-tile "Skip today" button.
+/// Renders next to the `_DoneButton` on the right edge
+/// of the tile, only when:
+///   - the do has a non-zero rest-day budget
+///   - the day is not already resolved (neither done
+///     nor skipped)
+///   - the tile is not in select-mode (long-press
+///     surfaces a different action set there)
+///
+/// Visual states mirror the `_DoneButton`:
+///   - busy → spinner
+///   - skipped today → filled moon icon (gray-out)
+///   - otherwise → outline moon icon
+class _SkipButton extends StatelessWidget {
+  const _SkipButton({
+    required this.busy,
+    required this.isSkippedToday,
+    required this.onPressed,
+  });
+  final bool busy;
+  final bool isSkippedToday;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final tooltip = isSkippedToday
+        ? l.homeTileSkipAlready
+        : l.homeTileSkipToday;
+    final icon = isSkippedToday ? Icons.bedtime : Icons.bedtime_outlined;
+    return IconButton(
+      tooltip: tooltip,
+      icon: busy
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(icon),
+      iconSize: Sizing.tapHome / 2,
+      onPressed: busy ? null : onPressed,
+    );
+  }
+}
+
+/// v1.4c / SYS-117 — small caption rendered under the
+/// streak badge showing "X / Y rest days left this
+/// month". Hidden when:
+///   - the do has no rest-day budget configured
+///   - the budget hasn't been touched yet (used == 0)
+///   - all budget units are still available (the caption
+///     would only say "2/2 rest days left", which is
+///     noise — the user hasn't engaged with the feature
+///     yet)
+/// Shows the "no rest days left" caption when the budget
+/// is exhausted.
+class _BudgetCaption extends StatelessWidget {
+  const _BudgetCaption({required this.budget, required this.isExhausted});
+  final BudgetRemaining budget;
+  final bool isExhausted;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    if (budget.limit <= 0) return const SizedBox.shrink();
+    if (isExhausted) {
+      return Text(
+        l.homeTileBudgetNoRemaining,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+    if (budget.used == 0) return const SizedBox.shrink();
+    return Text(
+      l.homeTileBudgetRemaining(budget.remaining, budget.limit),
+      style: Theme.of(context).textTheme.bodySmall,
     );
   }
 }

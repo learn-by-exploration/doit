@@ -22,6 +22,7 @@ import 'dart:convert';
 import 'package:doit/do/category.dart';
 import 'package:doit/do/do.dart' as domain;
 import 'package:doit/do/proof_mode.dart';
+import 'package:doit/do/proof_mode_tag.dart';
 import 'package:doit/missions/chain.dart';
 import 'package:doit/missions/mission.dart';
 import 'package:drift/drift.dart';
@@ -106,7 +107,7 @@ class DoRepository {
     return HabitRow(
       id: d.id,
       name: d.name.trim(),
-      proofMode: _proofModeTag(d.proofMode),
+      proofMode: proofModeTag(d.proofMode),
       createdAtMillis: d.createdAt.millisecondsSinceEpoch,
       restDaysPerMonth: d.restDaysPerMonth,
       scheduleType: _scheduleTypeTag(d),
@@ -229,13 +230,6 @@ class DoRepository {
       default:
         throw StateError('Unknown scheduleType: ${r.scheduleType}');
     }
-  }
-
-  String _proofModeTag(DoProofMode m) {
-    if (m is SoftProof) return 'soft';
-    if (m is StrongProof) return 'strong';
-    if (m is AutoProof) return 'auto';
-    throw ArgumentError('Unknown proof mode: $m');
   }
 
   DoProofMode _parseProofMode(String tag, String? chainJson) {

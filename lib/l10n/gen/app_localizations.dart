@@ -152,6 +152,42 @@ abstract class AppLocalizations {
   /// **'Opens the mission chain'**
   String get homeTileStrongModeHint;
 
+  /// Tooltip / aria-label for the in-app home tile's 'Skip today' IconButton (v1.4c / SYS-117). Tap writes a rest-day completion (consumes one budget unit) so the streak is credited and the day is marked intentionally off.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip today'**
+  String get homeTileSkipToday;
+
+  /// Tooltip shown when the user long-presses a tile that has already been marked as a rest day for today. Mirrors the 'Already done for today' hint for the manual-completion surface.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest day taken'**
+  String get homeTileSkipAlready;
+
+  /// Snackbar copy after a successful 'Skip today' tap (v1.4c / SYS-117).
+  ///
+  /// In en, this message translates to:
+  /// **'Rest day taken — streak holds.'**
+  String get homeTileSkipSuccess;
+
+  /// Snackbar copy when the user taps 'Skip today' but the do has zero rest-day budget remaining for the current month (v1.4c / SYS-117).
+  ///
+  /// In en, this message translates to:
+  /// **'No rest days left this month.'**
+  String get homeTileSkipBudgetExhausted;
+
+  /// Caption under the streak badge on the home tile (v1.4c / SYS-117). Renders only when restDaysPerMonth > 0 and at least one rest day has been used. placeholders: remaining (int) and limit (int).
+  ///
+  /// In en, this message translates to:
+  /// **'{remaining}/{limit} rest days left'**
+  String homeTileBudgetRemaining(int remaining, int limit);
+
+  /// Caption under the streak badge on the home tile when restDaysPerMonth > 0 but the user has used all budget units for the month (v1.4c / SYS-117). Distinct from 'No budget configured' — the do opted into rest days but has used them all.
+  ///
+  /// In en, this message translates to:
+  /// **'No rest days left'**
+  String get homeTileBudgetNoRemaining;
+
   /// No description provided for @homeEmptyTitle.
   ///
   /// In en, this message translates to:

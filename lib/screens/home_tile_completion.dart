@@ -8,15 +8,6 @@
 // `(habitId, day)` so a double-tap inserts one row, not
 // two).
 //
-// NOTE: the `_proofModeTag` helper inlined below mirrors
-// the one in `lib/services/widget_service.dart:234-239`
-// (v1.4a). A future PR will consolidate them into a
-// shared `lib/do/proof_mode_tag.dart` once the v1.4a
-// branch lands on `main`. Until then the two callers are
-// kept in lockstep manually (the unit tests in
-// `test/screens/home_tile_completion_test.dart` pin the
-// tag shape so a drift is caught at CI).
-//
 // Layer rules (per `.claude/rules/lib-screens.md`):
 //   - The helper does NOT import `package:flutter/*`.
 //     It is callable from a widget test without a Flutter
@@ -29,7 +20,7 @@
 // v1.4b / Phase 29 / SYS-116 / ADR-046 / WF-043.
 
 import 'package:doit/do/do.dart';
-import 'package:doit/do/proof_mode.dart';
+import 'package:doit/do/proof_mode_tag.dart';
 import 'package:doit/services/completion_log_service.dart';
 
 /// Append a manual completion for [activeDo] via
@@ -39,15 +30,11 @@ import 'package:doit/services/completion_log_service.dart';
 /// app-bar action — same audit trail).
 ///
 /// The `proofModeAtTime` tag mirrors the do's current
-/// `proofMode`:
+/// `proofMode` via the shared [proofModeTag] helper
+/// (v1.4c / SYS-117 consolidation):
 ///   - `SoftProof`  → `'soft'`
 ///   - `StrongProof` → `'strong'`
 ///   - `AutoProof`   → `'auto'`
-///
-/// Future consolidation: extract `_proofModeTag` into
-/// `lib/do/proof_mode_tag.dart` once the v1.4a branch is
-/// on `main`. Until then the two helpers are pinned
-/// byte-identical by `home_tile_completion_test.dart`.
 Future<void> markDoDone({
   required Do activeDo,
   required DateTime asOf,
@@ -58,17 +45,6 @@ Future<void> markDoDone({
     habitId: activeDo.id,
     day: day,
     source: CompletionSource.manual,
-    proofModeAtTime: _proofModeTag(activeDo.proofMode),
+    proofModeAtTime: proofModeTag(activeDo.proofMode),
   );
-}
-
-// Inline copy of `WidgetService._proofModeTag`. Keep in
-// lockstep with `lib/services/widget_service.dart` until
-// the v1.4a branch lands and the helper is extracted to
-// `lib/do/proof_mode_tag.dart`.
-String _proofModeTag(DoProofMode m) {
-  if (m is SoftProof) return 'soft';
-  if (m is StrongProof) return 'strong';
-  if (m is AutoProof) return 'auto';
-  throw ArgumentError('Unknown proof mode: $m');
 }

@@ -47,6 +47,38 @@
   "@homeTileStrongModeHint": {
     "description": "Tooltip shown for the tile's 'Mark done' IconButton on a Strong-mode do. The tap launches the mission UI (v1.3d / SYS-114) which writes the completion on ChainPassed."
   },
+  "homeTileSkipToday": "Skip today",
+  "@homeTileSkipToday": {
+    "description": "Tooltip / aria-label for the in-app home tile's 'Skip today' IconButton (v1.4c / SYS-117). Tap writes a rest-day completion (consumes one budget unit) so the streak is credited and the day is marked intentionally off."
+  },
+  "homeTileSkipAlready": "Rest day taken",
+  "@homeTileSkipAlready": {
+    "description": "Tooltip shown when the user long-presses a tile that has already been marked as a rest day for today. Mirrors the 'Already done for today' hint for the manual-completion surface."
+  },
+  "homeTileSkipSuccess": "Rest day taken — streak holds.",
+  "@homeTileSkipSuccess": {
+    "description": "Snackbar copy after a successful 'Skip today' tap (v1.4c / SYS-117)."
+  },
+  "homeTileSkipBudgetExhausted": "No rest days left this month.",
+  "@homeTileSkipBudgetExhausted": {
+    "description": "Snackbar copy when the user taps 'Skip today' but the do has zero rest-day budget remaining for the current month (v1.4c / SYS-117)."
+  },
+  "homeTileBudgetRemaining": "{remaining}/{limit} rest days left",
+  "@homeTileBudgetRemaining": {
+    "description": "Caption under the streak badge on the home tile (v1.4c / SYS-117). Renders only when restDaysPerMonth > 0 and at least one rest day has been used. placeholders: remaining (int) and limit (int).",
+    "placeholders": {
+      "remaining": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "homeTileBudgetNoRemaining": "No rest days left",
+  "@homeTileBudgetNoRemaining": {
+    "description": "Caption under the streak badge on the home tile when restDaysPerMonth > 0 but the user has used all budget units for the month (v1.4c / SYS-117). Distinct from 'No budget configured' — the do opted into rest days but has used them all."
+  },
   "homeEmptyTitle": "No dos yet.",
   "homeRetryButton": "Retry",
   "homeAddSheetNewDo": "New do",

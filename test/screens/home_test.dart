@@ -476,4 +476,205 @@ void main() {
     // the soft-mode hint.
     expect(find.byTooltip('Mark done'), findsOneWidget);
   });
+
+  // ---- v1.4c / Phase 30 / SYS-117 / ADR-047 / WF-044 ----
+  //
+  // In-app home tile "Skip today" button + rest-day
+  // budget caption. Builds on the v1.4b tile surface
+  // (streak + Done) and adds the rest-day affordance:
+  // soft / auto mode tap → `markDoSkipped` writes a
+  // `CompletionSource.restDay` row, the budget caption
+  // re-renders, and the "Done" button sees the day as
+  // resolved.
+
+  testWidgets('tile renders a Skip-today button when restDaysPerMonth > 0 '
+      '(v1.4c / SYS-117)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Skip today'), findsOneWidget);
+  });
+
+  testWidgets('tile hides Skip-today button when restDaysPerMonth == 0 '
+      '(v1.4c / SYS-117)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 0,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Skip today'), findsNothing);
+  });
+
+  testWidgets('soft-mode Skip-today tap appends a rest-day completion '
+      '(v1.4c / SYS-117)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Skip today'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    final log = await CompletionLogService.instance.listForHabit('h1');
+    expect(log.length, 1);
+    expect(log.first.habitId, 'h1');
+    expect(log.first.source, 'rest_day');
+    expect(log.first.proofModeAtTime, 'soft');
+  });
+
+  testWidgets('Skip-today success snackbar reads "Rest day taken" '
+      '(v1.4c / SYS-117)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Skip today'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Rest day taken — streak holds.'), findsOneWidget);
+  });
+
+  testWidgets('tile shows "X / Y rest days left" caption after a skip '
+      '(v1.4c / SYS-117)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Skip today'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('1/2 rest days left'), findsOneWidget);
+  });
+
+  testWidgets(
+    'tile SnackBar reads "no rest days left" when budget is exhausted '
+    '(v1.4c / SYS-117)',
+    (tester) async {
+      await _resetDb(tester);
+      await DoRepository.instance.save(
+        DoFixed(
+          id: 'h1',
+          name: 'Stretch',
+          proofMode: const SoftProof(),
+          createdAt: DateTime(2026, 5, 17),
+          restDaysPerMonth: 1,
+          weekdays: const {1, 2, 3, 4, 5, 6, 7},
+          time: const DoTime(9, 0),
+        ),
+      );
+      // Pre-seed a rest-day row for today so the budget
+      // is exhausted before the tap.
+      await CompletionLogService.instance.append(
+        habitId: 'h1',
+        day: DateTime.now(),
+        source: CompletionSource.restDay,
+        proofModeAtTime: 'soft',
+      );
+      await tester.pumpWidget(_wrap());
+      await tester.pumpAndSettle();
+      // The button is still rendered (the widget doesn't
+      // hide it; it surfaces the error via the snackbar).
+      // Actually no — the tile conditionally hides the
+      // button when `restDaysPerMonth == 0`. With limit
+      // > 0 but exhausted, the button is still shown.
+      // Tapping it surfaces the "no rest days left"
+      // snackbar.
+      await tester.tap(find.byTooltip('Skip today'));
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('No rest days left this month.'), findsOneWidget);
+    },
+  );
+
+  testWidgets('after Skip-today tap, the Skip button tooltip switches to '
+      '"Rest day taken" (v1.4c / SYS-117)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    // Initial state — tooltip is "Skip today".
+    expect(find.byTooltip('Skip today'), findsOneWidget);
+    // Tap, wait for the async append + state flip.
+    await tester.tap(find.byTooltip('Skip today'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    // After the tap, the tooltip switches to
+    // "Rest day taken" (the button is still rendered,
+    // just with the alternate tooltip).
+    expect(find.byTooltip('Rest day taken'), findsOneWidget);
+  });
 }

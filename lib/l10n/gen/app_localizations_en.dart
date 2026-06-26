@@ -57,6 +57,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeTileStrongModeHint => 'Opens the mission chain';
 
   @override
+  String get homeTileSkipToday => 'Skip today';
+
+  @override
+  String get homeTileSkipAlready => 'Rest day taken';
+
+  @override
+  String get homeTileSkipSuccess => 'Rest day taken — streak holds.';
+
+  @override
+  String get homeTileSkipBudgetExhausted => 'No rest days left this month.';
+
+  @override
+  String homeTileBudgetRemaining(int remaining, int limit) {
+    return '$remaining/$limit rest days left';
+  }
+
+  @override
+  String get homeTileBudgetNoRemaining => 'No rest days left';
+
+  @override
   String get homeEmptyTitle => 'No dos yet.';
 
   @override
