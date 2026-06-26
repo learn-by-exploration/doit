@@ -99,9 +99,33 @@
   "@homeTileUndoNotToday": {
     "description": "Snackbar copy when the in-app home tile Undo tap completes but the DB has no row to delete (v1.4d / SYS-118). Defensive — the dialog is gated on _isResolvedToday == true, but the DB is the source of truth and a concurrent app-tile rebuild could leave a dangling flag."
   },
-  "homeTileSparklineSemantics": "Last 7 days",
+  "homeTileSparklineSemantics": "Last 14 days",
   "@homeTileSparklineSemantics": {
-    "description": "Semantics label for the 7-day streak history sparkline row on the in-app home tile (v1.4e / SYS-119). Wraps the 7 dots in a single Semantics node so screen readers announce 'Last 7 days' once instead of 7 separate dots."
+    "description": "Semantics label for the streak history sparkline row on the in-app home tile. Originally wrapped a 7-dot row (v1.4e / SYS-119); extended to a 14-day window (a fortnight) in v1.4i / SYS-123 so the rest-day color distinction has enough context to be useful. The Semantics node wraps the dots so screen readers announce 'Last 14 days' once instead of 14 separate dots."
+  },
+  "homeTileSparklineRestDayTooltip": "Rest day",
+  "@homeTileSparklineRestDayTooltip": {
+    "description": "Tooltip / accessibility label for a sparkline dot whose underlying completion row has source = 'rest_day' (v1.4i / SYS-123). The dot is filled with colorScheme.tertiary so the user can spot rest days at a glance; the tooltip reinforces the meaning for screen-reader users."
+  },
+  "homeTileSparklineDoneTooltip": "Done",
+  "@homeTileSparklineDoneTooltip": {
+    "description": "Tooltip / accessibility label for a sparkline dot whose underlying completion row has source in 'manual' / 'notification' / 'mission' (v1.4i / SYS-123). The dot is filled with colorScheme.primary."
+  },
+  "homeTileSparklineMissedTooltip": "Missed",
+  "@homeTileSparklineMissedTooltip": {
+    "description": "Tooltip / accessibility label for a sparkline dot whose underlying day has no completion row (v1.4i / SYS-123). The dot is outlined with colorScheme.outline."
+  },
+  "homeTileSparklineLegendDone": "Done",
+  "@homeTileSparklineLegendDone": {
+    "description": "Legend label rendered below the sparkline row for the primary-filled 'done' swatch (v1.4i / SYS-123). Mirrors the homeTileSparklineDoneTooltip semantics."
+  },
+  "homeTileSparklineLegendRestDay": "Rest day",
+  "@homeTileSparklineLegendRestDay": {
+    "description": "Legend label rendered below the sparkline row for the tertiary-filled 'rest day' swatch (v1.4i / SYS-123). Mirrors the homeTileSparklineRestDayTooltip semantics."
+  },
+  "homeTileSparklineLegendMissed": "Missed",
+  "@homeTileSparklineLegendMissed": {
+    "description": "Legend label rendered below the sparkline row for the outlined 'missed' swatch (v1.4i / SYS-123). Mirrors the homeTileSparklineMissedTooltip semantics."
   },
   "widgetSkipToday": "Skip today",
   "@widgetSkipToday": {

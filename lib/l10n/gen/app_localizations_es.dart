@@ -95,7 +95,25 @@ class AppLocalizationsEs extends AppLocalizations {
   String get homeTileUndoNotToday => 'No hay nada que deshacer para hoy.';
 
   @override
-  String get homeTileSparklineSemantics => 'Últimos 7 días';
+  String get homeTileSparklineSemantics => 'Últimos 14 días';
+
+  @override
+  String get homeTileSparklineRestDayTooltip => 'Día de descanso';
+
+  @override
+  String get homeTileSparklineDoneTooltip => 'Hecho';
+
+  @override
+  String get homeTileSparklineMissedTooltip => 'Perdido';
+
+  @override
+  String get homeTileSparklineLegendDone => 'Hecho';
+
+  @override
+  String get homeTileSparklineLegendRestDay => 'Día de descanso';
+
+  @override
+  String get homeTileSparklineLegendMissed => 'Perdido';
 
   @override
   String get widgetSkipToday => 'Saltar hoy';

@@ -869,3 +869,50 @@ the v1.1i pattern at `222f860`).
   starts at 0 on the restored do. A v1.4h+ follow-up
   could add a soft-delete column to `habits` for a
   true undo.
+
+- **v1.4i / Phase 36 / SYS-123 / ADR-053 / WF-050** —
+  In-app home tile rest-day history visualization:
+  _this PR_. Extends the v1.4e / Phase 32 / SYS-119
+  7-day streak sparkline on every `_HabitTile` to
+  **14 days** with **source-aware color**
+  (`colorScheme.primary` for manual fills vs
+  `colorScheme.tertiary` for rest-day fills) + an
+  **inline legend row** (`Done` / `Rest day` /
+  `Missed`) below the dot row so the source-aware
+  coloring is discoverable. Closes the v1.4e
+  "we know rest-day rows exist but you can't tell
+  them apart on the sparkline" gap that v1.4e flagged
+  but did not close. New pure-Dart helper
+  `extendedSparklineForDo(...)` (configurable `days`
+  parameter, default 14) at
+  `lib/screens/home_tile_sparkline.dart`; the original
+  `sparklineForDo` (v1.4e) is a thin backwards-compatible
+  wrapper around the new helper with `days: 7` so
+  no caller breaks. `_Sparkline` widget gains 3 new
+  optional constructor params (`days`, `restDayColor`,
+  `showLegend`); the tile invocation passes
+  `restDayColor: Theme.of(context).colorScheme.tertiary`
+  so the rest-day color tracks the active theme.
+  Each `_SparklineDot` wraps in `Semantics(label: ...)`
+  (NOT per-dot `Tooltip` — see ADR-053 §"Alternatives
+  considered": `Tooltip` would (a) crowd the screen with
+  42 competing tooltips on a 360 dp tile, AND (b) intercept
+  the parent `_HabitTile`'s `onLongPress` select-mode
+  gesture — verified empirically via the v1.4i
+  "long-press still enters select mode" regression test).
+  6 new ARB keys (`homeTileSparklineRestDayTooltip`,
+  `homeTileSparklineDoneTooltip`,
+  `homeTileSparklineMissedTooltip`,
+  `homeTileSparklineLegendDone`,
+  `homeTileSparklineLegendRestDay`,
+  `homeTileSparklineLegendMissed`) added in lockstep
+  across `app_en.arb` + `app_es.arb`; the existing
+  `homeTileSparklineSemantics` key updated from
+  "Last 7 days" → "Last 14 days" (and `Últimos 7 días`
+  → `Últimos 14 días`). Pure-Dart — no new
+  `<uses-permission>`, no new pubspec deps, no new
+  Drift tables, no new MethodChannels, no Kotlin
+  changes. Widget re-fetch on any tile-state change
+  re-uses the existing `_HomeScreenState._refresh()`
+  setState cascade — no `ChangeNotifier` / `Stream`
+  is added.

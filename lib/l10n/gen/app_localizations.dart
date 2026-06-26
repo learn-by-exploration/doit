@@ -218,11 +218,47 @@ abstract class AppLocalizations {
   /// **'Nothing to undo for today.'**
   String get homeTileUndoNotToday;
 
-  /// Semantics label for the 7-day streak history sparkline row on the in-app home tile (v1.4e / SYS-119). Wraps the 7 dots in a single Semantics node so screen readers announce 'Last 7 days' once instead of 7 separate dots.
+  /// Semantics label for the streak history sparkline row on the in-app home tile. Originally wrapped a 7-dot row (v1.4e / SYS-119); extended to a 14-day window (a fortnight) in v1.4i / SYS-123 so the rest-day color distinction has enough context to be useful. The Semantics node wraps the dots so screen readers announce 'Last 14 days' once instead of 14 separate dots.
   ///
   /// In en, this message translates to:
-  /// **'Last 7 days'**
+  /// **'Last 14 days'**
   String get homeTileSparklineSemantics;
+
+  /// Tooltip / accessibility label for a sparkline dot whose underlying completion row has source = 'rest_day' (v1.4i / SYS-123). The dot is filled with colorScheme.tertiary so the user can spot rest days at a glance; the tooltip reinforces the meaning for screen-reader users.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest day'**
+  String get homeTileSparklineRestDayTooltip;
+
+  /// Tooltip / accessibility label for a sparkline dot whose underlying completion row has source in 'manual' / 'notification' / 'mission' (v1.4i / SYS-123). The dot is filled with colorScheme.primary.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get homeTileSparklineDoneTooltip;
+
+  /// Tooltip / accessibility label for a sparkline dot whose underlying day has no completion row (v1.4i / SYS-123). The dot is outlined with colorScheme.outline.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed'**
+  String get homeTileSparklineMissedTooltip;
+
+  /// Legend label rendered below the sparkline row for the primary-filled 'done' swatch (v1.4i / SYS-123). Mirrors the homeTileSparklineDoneTooltip semantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get homeTileSparklineLegendDone;
+
+  /// Legend label rendered below the sparkline row for the tertiary-filled 'rest day' swatch (v1.4i / SYS-123). Mirrors the homeTileSparklineRestDayTooltip semantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest day'**
+  String get homeTileSparklineLegendRestDay;
+
+  /// Legend label rendered below the sparkline row for the outlined 'missed' swatch (v1.4i / SYS-123). Mirrors the homeTileSparklineMissedTooltip semantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed'**
+  String get homeTileSparklineLegendMissed;
 
   /// Tooltip / contentDescription for the Android home widget's 'Skip today' ImageButton (v1.4f / SYS-120). Tapping it appends a rest-day completion via CompletionLogService (consuming one rest-day budget unit) so the streak is credited and the day is marked intentionally off. Mirrors the in-app tile's `homeTileSkipToday`.
   ///

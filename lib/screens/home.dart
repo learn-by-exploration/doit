@@ -890,6 +890,14 @@ class _DoStreakBadge extends StatelessWidget {
                 // already use — re-using it keeps the
                 // round-trip count to one Drift read per
                 // tile rebuild.
+                //
+                // v1.4i / Phase 36 / SYS-123: extended the
+                // default window to 14 days + colored
+                // rest-day fills with `colorScheme.tertiary`
+                // + added a legend row below the dots so the
+                // user can see at a glance which days were
+                // intentionally skipped (rest days) vs
+                // manually completed vs missed.
                 _Sparkline(
                   activeDo: activeDo,
                   asOf: asOf,
@@ -903,6 +911,7 @@ class _DoStreakBadge extends StatelessWidget {
                           asOf.day,
                         ).millisecondsSinceEpoch,
                   ),
+                  restDayColor: Theme.of(context).colorScheme.tertiary,
                 ),
               ],
             ),
@@ -1453,13 +1462,21 @@ class _BudgetCaption extends StatelessWidget {
 }
 
 /// v1.4e / Phase 32 / SYS-119 / ADR-049 / WF-046 — the
-/// 7-day streak history sparkline rendered under the
-/// streak badge on the in-app home tile.
+/// sparkline rendered under the streak badge on the in-app
+/// home tile. Originally a 7-day row (v1.4e); v1.4i /
+/// SYS-123 / ADR-053 / WF-050 extended the default window
+/// to **14 days** so the rest-day color distinction has
+/// enough context to be useful, and added an optional
+/// legend below the row.
 ///
-/// Wraps `sparklineForDo` (the pure-Dart helper) in a
-/// `FutureBuilder` and renders a row of 7 dots:
-///   - filled: at least one completion row exists for that
-///     day (manual or rest_day);
+/// Wraps `extendedSparklineForDo` (the pure-Dart helper)
+/// in a `FutureBuilder` and renders a row of [days] dots:
+///   - filled (primary): at least one completion row exists
+///     for that day with `source` in `manual`,
+///     `notification`, or `mission`;
+///   - filled ([restDayColor]): the only completion row for
+///     that day has `source = 'rest_day'` (the user took a
+///     rest day instead of completing the do);
 ///   - outlined: no completion row for that day;
 ///   - the rightmost dot (today) is larger + filled when
 ///     the user has resolved today.
@@ -1469,17 +1486,50 @@ class _BudgetCaption extends StatelessWidget {
 /// re-walk the rows; the hint is `true` when at least one
 /// row in `completions` matches today's local-midnight.
 class _Sparkline extends StatelessWidget {
+  // The `days` and `showLegend` optional parameters are
+  // intentionally unused by the production call site —
+  // they exist for future variants (e.g., a "compact"
+  // sparkline without legend for a denser layout, or a
+  // 30-day window for the stats screen). The defaults are
+  // what the in-app tile uses.
   const _Sparkline({
     required this.activeDo,
     required this.asOf,
     required this.completionLog,
     required this.resolvedToday,
+    // ignore: unused_element_parameter
+    this.days = 14,
+    this.restDayColor,
+    // ignore: unused_element_parameter
+    this.showLegend = true,
   });
 
   final Do activeDo;
   final DateTime asOf;
   final CompletionLogService completionLog;
   final bool resolvedToday;
+
+  /// The number of days to render. Defaults to 14 (v1.4i
+  /// / SYS-123) — a fortnight, half a calendar month, the
+  /// smallest window that gives the rest-day color
+  /// distinction enough context to be meaningful. The
+  /// v1.4e default of 7 is preserved for any caller that
+  /// explicitly opts in.
+  final int days;
+
+  /// Color used to fill dots whose underlying row has
+  /// `source = 'rest_day'`. When `null` (the default), the
+  /// rest-day dot falls back to `colorScheme.primary`
+  /// (the same color as a manual completion), preserving
+  /// the v1.4e "all fills are equal" semantic. Pass the
+  /// in-app tile's `colorScheme.tertiary` to enable the
+  /// rest-day color distinction (v1.4i / SYS-123).
+  final Color? restDayColor;
+
+  /// When `true` (the v1.4i default), render a small
+  /// legend row below the dot row showing what each color
+  /// means. Set to `false` for a denser compact view.
+  final bool showLegend;
 
   @override
   Widget build(BuildContext context) {
@@ -1489,35 +1539,51 @@ class _Sparkline extends StatelessWidget {
       label: l.homeTileSparklineSemantics,
       readOnly: true,
       child: FutureBuilder<List<SparklineDot>>(
-        future: sparklineForDo(
+        future: extendedSparklineForDo(
           activeDo: activeDo,
           asOf: asOf,
           completionLog: completionLog,
+          days: days,
         ),
         builder: (context, snap) {
           final dots = snap.data;
           if (dots == null) {
-            // Skeleton: 7 outlined tiny dots so the row
+            // Skeleton: 14 outlined tiny dots so the row
             // reserves its space while the DB read
             // resolves.
-            return const _SparklineSkeleton();
+            return _SparklineSkeleton(days: days);
           }
-          return Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var i = 0; i < dots.length; i++)
-                  _SparklineDot(
-                    dot: dots[i],
-                    isToday: i == dots.length - 1,
-                    isResolvedToday: resolvedToday,
-                    filledColor: colorScheme.primary,
-                    emptyColor: colorScheme.outline,
-                    futureColor: colorScheme.outlineVariant,
-                  ),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var i = 0; i < dots.length; i++)
+                      _SparklineDot(
+                        dot: dots[i],
+                        isToday: i == dots.length - 1,
+                        isResolvedToday: resolvedToday,
+                        filledColor: colorScheme.primary,
+                        restDayColor: restDayColor ?? colorScheme.primary,
+                        emptyColor: colorScheme.outline,
+                        futureColor: colorScheme.outlineVariant,
+                      ),
+                  ],
+                ),
+              ),
+              if (showLegend) ...[
+                const SizedBox(height: 2),
+                _SparklineLegend(
+                  doneColor: colorScheme.primary,
+                  restDayColor: restDayColor ?? colorScheme.primary,
+                  emptyColor: colorScheme.outline,
+                ),
               ],
-            ),
+            ],
           );
         },
       ),
@@ -1525,18 +1591,21 @@ class _Sparkline extends StatelessWidget {
   }
 }
 
-/// A single 6dp dot in the 7-day sparkline. Filled when
-/// the underlying day has at least one completion row,
-/// outlined otherwise. The today dot (last in the row)
-/// bumps to 8dp + primary when the user has resolved
-/// today; otherwise it stays outlined like any other
-/// day.
+/// A single 6dp dot in the sparkline. Filled when the
+/// underlying day has at least one completion row,
+/// outlined otherwise. Rest-day fills use [restDayColor]
+/// (a visually distinct accent so the user can spot the
+/// rest-day pattern at a glance). The today dot (last in
+/// the row) bumps to 8dp + the resolved color when the
+/// user has resolved today; otherwise it stays outlined
+/// like any other day.
 class _SparklineDot extends StatelessWidget {
   const _SparklineDot({
     required this.dot,
     required this.isToday,
     required this.isResolvedToday,
     required this.filledColor,
+    required this.restDayColor,
     required this.emptyColor,
     required this.futureColor,
   });
@@ -1545,43 +1614,142 @@ class _SparklineDot extends StatelessWidget {
   final bool isToday;
   final bool isResolvedToday;
   final Color filledColor;
+  final Color restDayColor;
   final Color emptyColor;
   final Color futureColor;
 
   @override
   Widget build(BuildContext context) {
     final isFilled = dot is SparklineDotFilled;
+    final isRestDay =
+        isFilled && (dot as SparklineDotFilled).source == 'rest_day';
     final isFuture = dot is SparklineDotFuture;
-    final color = isFilled
-        ? filledColor
-        : isFuture
-        ? futureColor
-        : emptyColor;
+    final Color color;
+    if (isRestDay) {
+      color = restDayColor;
+    } else if (isFilled) {
+      color = filledColor;
+    } else if (isFuture) {
+      color = futureColor;
+    } else {
+      color = emptyColor;
+    }
     final todayFilled = isToday && isResolvedToday;
     final size = todayFilled ? 8.0 : 6.0;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 1.5),
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: todayFilled || isFilled ? color : null,
-          border: todayFilled || isFilled
-              ? null
-              : Border.all(color: color, width: 1.2),
+    // The dot's *semantic* role (rest day / done / missed)
+    // is announced by the parent sparkline `Semantics` node
+    // + the legend row below. We intentionally do NOT wrap
+    // each dot in a `Tooltip` widget because:
+    //   1. 14 small dots × 3 localized messages = 42
+    //      tooltip triggers competing for the user's
+    //      pointer; this is worse than no tooltip.
+    //   2. `Tooltip` installs an internal `GestureDetector`
+    //      that intercepts long-press, which breaks the
+    //      parent tile's onLongPress → select-mode entry
+    //      (caught by the v1.4i widget test on main).
+    // The legend row below provides the discoverability
+    // for sighted users; the Semantics label carries the
+    // a11y affordance for screen readers.
+    return Semantics(
+      label: isRestDay
+          ? 'Rest day'
+          : isFilled
+          ? 'Done'
+          : isFuture
+          ? 'Future'
+          : 'Missed',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 1.5),
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: todayFilled || isFilled ? color : null,
+            border: todayFilled || isFilled
+                ? null
+                : Border.all(color: color, width: 1.2),
+          ),
         ),
       ),
     );
   }
 }
 
+/// The 14-day sparkline's legend row (v1.4i / SYS-123 /
+/// ADR-053 / WF-050). Two colored swatches + a label,
+/// rendered under the dot row so the user knows what each
+/// color means.
+///
+/// "● done · ◐ rest day · ○ missed" — the three states the
+/// dot can be in. The legend is semantic-only (no
+/// interaction); the dots' tooltips carry the
+/// per-dot affordance.
+class _SparklineLegend extends StatelessWidget {
+  const _SparklineLegend({
+    required this.doneColor,
+    required this.restDayColor,
+    required this.emptyColor,
+  });
+
+  final Color doneColor;
+  final Color restDayColor;
+  final Color emptyColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final textStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _LegendSwatch(color: doneColor, filled: true),
+        const SizedBox(width: 3),
+        Text(l.homeTileSparklineLegendDone, style: textStyle),
+        const SizedBox(width: 8),
+        _LegendSwatch(color: restDayColor, filled: true),
+        const SizedBox(width: 3),
+        Text(l.homeTileSparklineLegendRestDay, style: textStyle),
+        const SizedBox(width: 8),
+        _LegendSwatch(color: emptyColor, filled: false),
+        const SizedBox(width: 3),
+        Text(l.homeTileSparklineLegendMissed, style: textStyle),
+      ],
+    );
+  }
+}
+
+/// A 6dp circular swatch matching the dot vocabulary:
+/// filled (matches the "done" or "rest day" look) or
+/// outlined (matches the "missed" look).
+class _LegendSwatch extends StatelessWidget {
+  const _LegendSwatch({required this.color, required this.filled});
+  final Color color;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 6,
+      height: 6,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: filled ? color : null,
+        border: filled ? null : Border.all(color: color, width: 1.2),
+      ),
+    );
+  }
+}
+
 /// Skeleton placeholder for the sparkline row while the
-/// Drift read is in flight. Renders 7 outlined dots so the
-/// row reserves its space and the layout does not jump on
-/// resolve.
+/// Drift read is in flight. Renders [days] outlined dots
+/// so the row reserves its space and the layout does not
+/// jump on resolve.
 class _SparklineSkeleton extends StatelessWidget {
-  const _SparklineSkeleton();
+  const _SparklineSkeleton({this.days = 14});
+  final int days;
 
   @override
   Widget build(BuildContext context) {
@@ -1591,7 +1759,7 @@ class _SparklineSkeleton extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          for (var i = 0; i < 7; i++)
+          for (var i = 0; i < days; i++)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 1.5),
               child: Container(
