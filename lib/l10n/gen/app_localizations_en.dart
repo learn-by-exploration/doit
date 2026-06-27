@@ -152,6 +152,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeSnackbarDoDeleteFailed => 'Could not delete. Try again.';
 
   @override
+  String get homeTileBudgetZeroCaption => 'No rest days configured';
+
+  @override
+  String get homeTileBudgetEditTitle => 'Rest days per month';
+
+  @override
+  String get homeTileBudgetEditDescription =>
+      'How many rest days you can take each month. Resets on the 1st.';
+
+  @override
+  String get homeTileBudgetEditOk => 'Save';
+
+  @override
+  String get homeTileBudgetEditCancel => 'Cancel';
+
+  @override
+  String homeSnackbarBudgetUpdated(int newValue) {
+    return 'Rest-day budget set to $newValue.';
+  }
+
+  @override
+  String get homeSnackbarBudgetUpdateFailed =>
+      'Could not update budget. Try again.';
+
+  @override
+  String addHabitRestDaysLabel(int value) {
+    return 'Rest days per month: $value';
+  }
+
+  @override
   String get homeAddSheetNewDo => 'New do';
 
   @override

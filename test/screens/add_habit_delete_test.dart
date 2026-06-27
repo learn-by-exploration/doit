@@ -31,6 +31,8 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/localized_app.dart';
+
 DoFixed _habit({String id = 'h_existing', String name = 'Stretch'}) {
   return DoFixed(
     id: id,
@@ -115,12 +117,12 @@ Future<void> _openPushed(WidgetTester tester) async {
 Future<void> _openPushedWithId(WidgetTester tester, String habitId) async {
   // Re-host with the correct habitId so the pushed
   // AddHabitScreen loads it.
-  await tester.pumpWidget(MaterialApp(home: _PushedHost(habitId: habitId)));
+  await tester.pumpWidget(localizedApp(home: _PushedHost(habitId: habitId)));
   await tester.pump();
   await _openPushed(tester);
 }
 
-Widget _host() => const MaterialApp(home: _PushedHost());
+Widget _host() => localizedApp(home: const _PushedHost());
 
 void main() {
   testWidgets('new-do mode does NOT expose the Delete menu entry', (

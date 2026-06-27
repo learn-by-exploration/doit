@@ -155,6 +155,36 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se pudo eliminar. Inténtalo de nuevo.';
 
   @override
+  String get homeTileBudgetZeroCaption => 'Sin días de descanso configurados';
+
+  @override
+  String get homeTileBudgetEditTitle => 'Días de descanso al mes';
+
+  @override
+  String get homeTileBudgetEditDescription =>
+      'Cuántos días de descanso puedes tomar cada mes. Se reinicia el día 1.';
+
+  @override
+  String get homeTileBudgetEditOk => 'Guardar';
+
+  @override
+  String get homeTileBudgetEditCancel => 'Cancelar';
+
+  @override
+  String homeSnackbarBudgetUpdated(int newValue) {
+    return 'Días de descanso actualizados a $newValue.';
+  }
+
+  @override
+  String get homeSnackbarBudgetUpdateFailed =>
+      'No se pudo actualizar. Inténtalo de nuevo.';
+
+  @override
+  String addHabitRestDaysLabel(int value) {
+    return 'Días de descanso al mes: $value';
+  }
+
+  @override
   String get homeAddSheetNewDo => 'Nueva tarea';
 
   @override

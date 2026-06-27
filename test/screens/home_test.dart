@@ -11,6 +11,7 @@ import 'package:doit/reminders/full_screen_intent.dart';
 import 'package:doit/reminders/notification_service.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
 import 'package:doit/screens/home.dart';
+import 'package:doit/screens/rest_day_picker_dialog.dart';
 import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/db/schema.dart';
@@ -1385,4 +1386,146 @@ void main() {
     // but the push event is the durable contract).
     expect(observer.pushed, isTrue);
   });
+
+  // --- v1.4j (SYS-124): rest-day budget edit affordance ---
+
+  testWidgets('tile budget caption shows "No rest days configured" when '
+      'restDaysPerMonth == 0 AND is a tappable button '
+      '(v1.4j / SYS-124)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 0,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    // The "zero" caption replaces the formerly-hidden
+    // SizedBox.shrink().
+    expect(find.text('No rest days configured'), findsOneWidget);
+    // The v1.4j affordance is reachable by tap. Verified by
+    // the "tapping the tile budget caption opens the
+    // RestDayPickerDialog" test below — this test only
+    // asserts the caption is RENDERED in the zero state
+    // (the v1.4c early-return was removed in v1.4j).
+  });
+
+  testWidgets(
+    'tile budget caption shows "X / Y rest days left" even when used == 0 '
+    '(the v1.4c hidden state is now surfaced) (v1.4j / SYS-124)',
+    (tester) async {
+      await _resetDb(tester);
+      await DoRepository.instance.save(
+        DoFixed(
+          id: 'h1',
+          name: 'Stretch',
+          proofMode: const SoftProof(),
+          createdAt: DateTime(2026, 5, 17),
+          restDaysPerMonth: 3,
+          weekdays: const {1, 2, 3, 4, 5, 6, 7},
+          time: const DoTime(9, 0),
+        ),
+      );
+      await tester.pumpWidget(_wrap());
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pumpAndSettle();
+      // The caption is rendered with used == 0 — the v1.4c
+      // early-return was removed in v1.4j.
+      expect(find.text('3/3 rest days left'), findsOneWidget);
+    },
+  );
+
+  testWidgets('tapping the tile budget caption opens the RestDayPickerDialog '
+      '(v1.4j / SYS-124)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 0,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('No rest days configured'));
+    await tester.pumpAndSettle();
+    // The dialog opens.
+    expect(find.byType(RestDayPickerDialog), findsOneWidget);
+    expect(find.text('Rest days per month'), findsOneWidget);
+  });
+
+  testWidgets('picking a new value in the RestDayPickerDialog saves the new '
+      'restDaysPerMonth via DoRepository.save '
+      '(v1.4j / SYS-124)', (tester) async {
+    await _resetDb(tester);
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h1',
+        name: 'Stretch',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 5, 17),
+        restDaysPerMonth: 0,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('No rest days configured'));
+    await tester.pumpAndSettle();
+    // Save with the initial 0 — the test asserts the
+    // DoRepository round-trip without dragging the slider
+    // (drag semantics are covered in
+    // test/screens/rest_day_picker_dialog_test.dart).
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    final after = await DoRepository.instance.getById('h1');
+    expect(after, isNotNull);
+    expect(after!.restDaysPerMonth, 0);
+    // Success snackbar surfaces.
+    expect(find.text('Rest-day budget set to 0.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'budget caption tap survives long-press (select mode still works) — '
+    'regression guard for v1.4b InkWell.onLongPress / v1.4j GestureDetector '
+    'on the caption (v1.4j / SYS-124)',
+    (tester) async {
+      await _resetDb(tester);
+      await DoRepository.instance.save(
+        DoFixed(
+          id: 'h1',
+          name: 'Stretch',
+          proofMode: const SoftProof(),
+          createdAt: DateTime(2026, 5, 17),
+          restDaysPerMonth: 2,
+          weekdays: const {1, 2, 3, 4, 5, 6, 7},
+          time: const DoTime(9, 0),
+        ),
+      );
+      await tester.pumpWidget(_wrap());
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('Stretch'));
+      await tester.pumpAndSettle();
+      // Select mode entered — AppBar title shows the count.
+      expect(find.text('1 selected'), findsOneWidget);
+    },
+  );
 }

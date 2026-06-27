@@ -38,6 +38,8 @@ import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/action.dart';
 import 'package:doit/triggers/trigger.dart';
 import 'package:doit/widgets/category_chip.dart';
+import 'package:doit/l10n/gen/app_localizations.dart';
+import 'package:doit/screens/rest_day_picker_dialog.dart';
 import 'package:doit/widgets/calendar_picker.dart';
 import 'package:doit/widgets/icon_picker.dart';
 import 'package:doit/widgets/location_picker.dart';
@@ -102,6 +104,12 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   TimeOfDay _twEnd = const TimeOfDay(hour: 13, minute: 0);
   int? _twTargetHours; // null for meals, 12/14/16/18/20 for fasting
 
+  /// v1.4j (SYS-124): per-do rest-day budget. Default 2 (preserves
+  /// the v0.5 default). Edit mode loads the existing value so a save
+  /// does NOT silently reset a 3 / month habit to 2 / month (the
+  /// v1.0 silent-reset bug).
+  int _restDaysPerMonth = 2;
+
   // v0.2 visual identity (SYS-045, SYS-046).
   DoCategory _category = DoCategory.other;
   int _colorSeed = 0;
@@ -159,6 +167,12 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
       _iconName = h.iconName;
       _pausedUntil = h.pausedUntil;
       _automations = h.automations;
+      // v1.4j (SYS-124): preserve the existing rest-day budget so
+      // a Save tap does NOT silently reset it to the default 2.
+      // Was a long-standing v1.0 defect — the value was hardcoded
+      // to 2 in all 5 switch branches of _save() and never exposed
+      // as a form input.
+      _restDaysPerMonth = h.restDaysPerMonth;
     });
     // Type-specific fields.
     final self = h;
@@ -340,6 +354,26 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
               onRemove: (idx) => setState(
                 () => _automations = List.of(_automations)..removeAt(idx),
               ),
+            ),
+            const SizedBox(height: Spacing.lg),
+            const Divider(),
+            // v1.4j (SYS-124): rest-day budget form row. The
+            // label is the affordance — tapping the row opens the
+            // same shared picker as the home tile, so the two
+            // surfaces stay in lockstep. Was a long-standing v1.0
+            // defect that the value was hardcoded to 2 in all 5
+            // switch branches of _save() and never exposed as a
+            // form input.
+            Builder(
+              builder: (ctx) {
+                final l = AppLocalizations.of(ctx);
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l.addHabitRestDaysLabel(_restDaysPerMonth)),
+                  trailing: const Icon(Icons.tune),
+                  onTap: _pickRestDaysPerMonth,
+                );
+              },
             ),
             const SizedBox(height: Spacing.lg),
             const Divider(),
@@ -659,6 +693,17 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     if (picked != null) setState(() => _intervalNDays = picked);
   }
 
+  /// v1.4j (SYS-124): opens the shared rest-day budget picker
+  /// dialog and writes the picked value to `_restDaysPerMonth`.
+  /// Single source of truth for the picker UI is
+  /// `showRestDayPicker` in `lib/screens/rest_day_picker_dialog.dart`;
+  /// the home tile uses the same helper, so the two surfaces
+  /// stay in lockstep.
+  Future<void> _pickRestDaysPerMonth() async {
+    final picked = await showRestDayPicker(context, initial: _restDaysPerMonth);
+    if (picked != null) setState(() => _restDaysPerMonth = picked);
+  }
+
   Future<void> _pickAnchorTarget() async {
     // Lazy-load the other-habits list the first time the user
     // opens the anchor picker. This keeps the form's initState
@@ -908,7 +953,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             name: name,
             proofMode: proofMode,
             createdAt: createdAt,
-            restDaysPerMonth: 2,
+            restDaysPerMonth: _restDaysPerMonth,
             weekdays: Set<int>.from(_fixedWeekdays),
             time: DoTime(_fixedTime.hour, _fixedTime.minute),
             category: _category,
@@ -923,7 +968,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             name: name,
             proofMode: proofMode,
             createdAt: createdAt,
-            restDaysPerMonth: 2,
+            restDaysPerMonth: _restDaysPerMonth,
             nDays: _intervalNDays,
             referenceDate: now,
             category: _category,
@@ -942,7 +987,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             name: name,
             proofMode: proofMode,
             createdAt: createdAt,
-            restDaysPerMonth: 2,
+            restDaysPerMonth: _restDaysPerMonth,
             targetDoId: _anchorTargetId!,
             lastAnchor: null,
             category: _category,
@@ -957,7 +1002,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             name: name,
             proofMode: proofMode,
             createdAt: createdAt,
-            restDaysPerMonth: 2,
+            restDaysPerMonth: _restDaysPerMonth,
             dayOfMonth: _dayOfXDayOfMonth,
             nth: _dayOfXNth,
             weekday: _dayOfXWeekday,
@@ -978,7 +1023,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             name: name,
             proofMode: proofMode,
             createdAt: createdAt,
-            restDaysPerMonth: 2,
+            restDaysPerMonth: _restDaysPerMonth,
             weekdays: Set<int>.from(_fixedWeekdays),
             start: DoTime(_twStart.hour, _twStart.minute),
             end: DoTime(_twEnd.hour, _twEnd.minute),

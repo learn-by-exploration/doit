@@ -1,6 +1,10 @@
 // Tests for the AddHabitScreen.
 
+import 'dart:io';
+
 import 'package:doit/reminders/alarm_scheduler.dart';
+// ignore: unused_import
+import 'package:doit/do/do.dart' show Do;
 import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/reminders/full_screen_intent.dart';
 import 'package:doit/reminders/notification_service.dart';
@@ -14,6 +18,8 @@ import 'package:doit/services/reminder_service.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../support/localized_app.dart';
 
 void main() {
   setUp(() async {
@@ -34,7 +40,7 @@ void main() {
   });
 
   testWidgets('Save with empty name shows validation error', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: AddHabitScreen()));
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('add_habit.save')));
     await tester.pump();
@@ -42,7 +48,7 @@ void main() {
   });
 
   testWidgets('Save with valid name persists and pops', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: AddHabitScreen()));
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
     await tester.pump();
     expect(find.byType(TextField), findsOneWidget);
     await tester.enterText(find.byType(EditableText), 'Stretch');
@@ -72,7 +78,7 @@ void main() {
   testWidgets('Routines section renders the empty-state and both '
       'Add a location routine / Add a calendar routine buttons '
       '(SYS-072 / Phase C PR 2 + SYS-074 / Phase E PR 2)', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: AddHabitScreen()));
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
     await tester.pump();
     expect(find.text('Routines'), findsOneWidget);
     expect(
@@ -92,5 +98,39 @@ void main() {
       find.byKey(const ValueKey('add_habit.add_calendar_routine')),
       findsOneWidget,
     );
+  });
+
+  // v1.4j (SYS-124): the form row shows the current
+  // restDaysPerMonth value (the picker is the single source
+  // of truth for editing it). Add mode defaults to 2.
+  testWidgets('AddHabitScreen renders a Rest-days-per-month form row with '
+      'the default value 2 (v1.4j / SYS-124)', (tester) async {
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pump();
+    expect(find.text('Rest days per month: 2'), findsOneWidget);
+  });
+
+  // v1.4j (SYS-124): the widget round-trip is covered by the
+  // existing "Save with valid name persists and pops" test
+  // (it hits the AddHabitScreen's `_save()` DoFixed branch
+  // and asserts the row lands with the form's state-field
+  // value). The hardcoded `restDaysPerMonth: 2` literals at
+  // `lib/screens/add_habit.dart` (5 branches in `_save()`)
+  // have been replaced with `restDaysPerMonth:
+  // _restDaysPerMonth` — a grep regression test below pins
+  // the change.
+  test('no hardcoded restDaysPerMonth: 2 literals remain in '
+      '_save() — the v1.0 silent-reset bug '
+      '(v1.4j / SYS-124)', () async {
+    final src = await File('lib/screens/add_habit.dart').readAsString();
+    // The 5 switch branches used to have
+    // `restDaysPerMonth: 2,`. Now they read
+    // `restDaysPerMonth: _restDaysPerMonth,`. The 2 that
+    // remain in the file (the state-field default
+    // `_restDaysPerMonth = 2` and any reference in a comment)
+    // are intentional.
+    final pattern = RegExp(r'restDaysPerMonth:\s*2,');
+    final matches = pattern.allMatches(src).length;
+    expect(matches, 0);
   });
 }

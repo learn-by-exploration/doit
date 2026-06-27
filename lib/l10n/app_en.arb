@@ -175,6 +175,49 @@
   "@homeSnackbarDoDeleteFailed": {
     "description": "Snackbar copy when the per-tile delete helper returns false (DB locked, constraint violation, etc.) — the tile is NOT removed and the user can retry. Defensive: the home screen keeps its previous state so a partial delete doesn't leave the UI inconsistent."
   },
+  "homeTileBudgetZeroCaption": "No rest days configured",
+  "@homeTileBudgetZeroCaption": {
+    "description": "Caption under the streak badge on the home tile when restDaysPerMonth == 0 (v1.4j / SYS-124). The caption is the affordance — tapping it opens the RestDayPickerDialog so the user can set a non-zero budget. Previously this state was hidden entirely (the caption early-returned); v1.4j surfaces it so users learn the budget exists."
+  },
+  "homeTileBudgetEditTitle": "Rest days per month",
+  "@homeTileBudgetEditTitle": {
+    "description": "Title of the RestDayPickerDialog (v1.4j / SYS-124). Shown from both the home tile (tap the budget caption) and the AddHabitScreen (tap the form row). Title is the same on both surfaces — single source of truth via the shared picker helper."
+  },
+  "homeTileBudgetEditDescription": "How many rest days you can take each month. Resets on the 1st.",
+  "@homeTileBudgetEditDescription": {
+    "description": "Body copy of the RestDayPickerDialog (v1.4j / SYS-124). Explains the scope ('each month') and the roll-over behavior ('resets on the 1st') so the user can set a number with the right mental model. Mirrors the design docs on SkipBudget (v1.4c / SYS-117)."
+  },
+  "homeTileBudgetEditOk": "Save",
+  "@homeTileBudgetEditOk": {
+    "description": "Save button label of the RestDayPickerDialog (v1.4j / SYS-124). 'Save' matches the AddHabitScreen save pattern; 'OK' was rejected to avoid overloading the term (we already use 'OK' on the interval-picker dialog at add_habit.dart:621-660)."
+  },
+  "homeTileBudgetEditCancel": "Cancel",
+  "@homeTileBudgetEditCancel": {
+    "description": "Cancel button label of the RestDayPickerDialog (v1.4j / SYS-124). Matches the cancel pattern on the interval-picker dialog at add_habit.dart:621-660."
+  },
+  "homeSnackbarBudgetUpdated": "Rest-day budget set to {newValue}.",
+  "@homeSnackbarBudgetUpdated": {
+    "description": "Snackbar copy after a successful home tile budget edit tap (v1.4j / SYS-124). The {newValue} placeholder is the picked integer (0..31). Distinct from homeSnackbarDoDeleted (v1.4h) — this is a non-destructive update.",
+    "placeholders": {
+      "newValue": {
+        "type": "int"
+      }
+    }
+  },
+  "homeSnackbarBudgetUpdateFailed": "Could not update budget. Try again.",
+  "@homeSnackbarBudgetUpdateFailed": {
+    "description": "Snackbar copy when the home tile budget edit save throws (e.g. DoInvalidRestDays if validation is bypassed somehow — defensive, the picker clamps inline so this never fires in practice; v1.4j / SYS-124). The tile is NOT removed on failure."
+  },
+  "addHabitRestDaysLabel": "Rest days per month: {value}",
+  "@addHabitRestDaysLabel": {
+    "description": "Form-row label on the AddHabitScreen (v1.4j / SYS-124) showing the current restDaysPerMonth value. The {value} placeholder is the picked integer. The label is the affordance — tapping the row opens the RestDayPickerDialog. Closes the silent-reset bug from v1.0 where the value was hardcoded to 2 in all 5 switch branches of _save() and never exposed as a form input.",
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+
   "homeAddSheetNewDo": "New do",
   "homeAddSheetNewPerson": "New person",
   "homeAddSheetFromTemplate": "From template",

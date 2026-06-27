@@ -1845,3 +1845,48 @@ Surfaces the last 14 days of completion history as an extended sparkline below t
 - SYS-119 (v1.4e — the 7-day baseline; v1.4i extends to 14 days with color + legend)
 - SYS-117 (v1.4c — rest-day rows are the trigger for the `tertiary` color)
 - SYS-116 (v1.4b — manual rows are the trigger for the `primary` color)
+
+## WF-051 — Edit the rest-day budget from the home tile or the edit screen (v1.4j / Phase 37 / SYS-124 / ADR-054)
+
+Surfaces the long-hidden v1.0 affordance of editing the per-do rest-day budget directly from the in-app home tile (`_BudgetCaption` tap) AND from the `AddHabitScreen` form ("Rest days per month: N" row). Closes the 3-part gap: the tile's budget caption is purely informational today; the edit screen has no form field for `restDaysPerMonth` so a user who opens edit and hits Save silently resets the value (the v1.0 silent-reset bug); the budget is reachable only by indirect paths (open the edit screen, scroll past proof-mode + schedule + time, find the field if it existed, save). v1.4j ships a single source of truth — `RestDayPickerDialog` — that both surfaces call.
+
+### Sequence
+
+1. **User taps the budget caption on the home tile.** The `_BudgetCaption` at `lib/screens/home.dart` is wrapped in `Semantics(button: true, label: captionText, child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: onTap, child: Padding(...)))`. Tapping fires `_HabitTileState._onBudgetCaptionTapped()` (new private method), which captures `messenger = ScaffoldMessenger.of(context)` BEFORE the async gap, then `await showRestDayPicker(context, initial: widget.habit.restDaysPerMonth)`.
+
+2. **`RestDayPickerDialog` opens.** The dialog (`lib/screens/rest_day_picker_dialog.dart`) renders an `AlertDialog` with title `l.homeTileBudgetEditTitle` ("Rest days per month"), description `l.homeTileBudgetEditDescription` ("How many rest days you can take each month. Resets on the 1st."), a live integer label above a `Slider(min: 0, max: 31, divisions: 31, value: _value, label: '$_value', onChanged: ...)` that snaps to whole numbers, and Save (`l.homeTileBudgetEditOk`) + Cancel (`l.homeTileBudgetEditCancel`) actions. The initial value is clamped to `[0, 31]` on construction so a stale DB row from a future schema migration cannot crash the slider.
+
+3. **User drags the slider to the new budget.** The `Slider`'s `onChanged` fires `setState(() => _value = v.round())`, the live integer label above the slider updates (`Theme.of(context).textTheme.displaySmall`), and the slider thumb's `Tooltip` shows the value on drag. The user drags from N=2 to N=5; the label reads "5".
+
+4. **User taps Save.** The FilledButton's `onPressed` fires `Navigator.of(context).pop(_value)` (returns `5`). The `_onBudgetCaptionTapped` handler receives the non-null result and awaits `DoRepository.instance.save(widget.habit.copyWith(restDaysPerMonth: 5))`. The existing `DoRepository.save(...)` call chain (`lib/services/do_repository.dart:46-58`) runs `d.validate()` first, which throws `DoInvalidRestDays(5)` if the value is out of `[0, 31]` (the picker clamps inline so this never fires in practice; `validate()` is the defensive second line per ADR-054 §6). On success the handler calls `widget.onDoChanged?.call()` to trigger the v1.4h `_refresh()` cascade: parent's `FutureBuilder<List<Do>>` re-fires → tile re-mounts with the new `restDaysPerMonth` → `_BudgetCaption` rebuilds with `l.homeTileBudgetRemaining(5, 5)` ("5/5 rest days left") AND the `_SkipButton` appears (was hidden when `restDaysPerMonth == 0`). The handler then shows `messenger.showSnackBar(SnackBar(content: Text(l.homeSnackbarBudgetUpdated(5))))` ("Rest-day budget set to 5.").
+
+5. **User taps Cancel (or back-presses the dialog).** The TextButton's `onPressed` fires `Navigator.of(context).pop()` (returns `null`). The `_onBudgetCaptionTapped` handler returns early — no save, no SnackBar, no refresh. The tile stays at its prior value.
+
+6. **User opens the edit screen instead.** Tapping the v1.4h `_EditButton` (`IconButton(Icons.edit_outlined)` with `homeTileEdit` tooltip) pushes `AddHabitScreen(habitId: widget.habit.id)` per the v1.4h `_onEditPressed` contract (mirrors `_HomeScreenState._onTileTap` at `lib/screens/home.dart:120`). The screen loads the existing `Do` via `_loadExisting()`, which populates `_restDaysPerMonth = _original.restDaysPerMonth` (e.g. 3 — fixes the silent-reset bug, see ADR-054 §5).
+
+7. **The edit screen renders the new "Rest days per month: N" row.** Below the proof-mode row in the form body, a `ListTile` (or equivalent outlined control) renders `l.addHabitRestDaysLabel(_restDaysPerMonth)` ("Rest days per month: 3") with a trailing `Icon(Icons.tune)`. Tapping the row fires `_pickRestDaysPerMonth()`, which `await showRestDayPicker(context, initial: _restDaysPerMonth)` and `setState(() => _restDaysPerMonth = picked)` on a non-null result. The row's text updates immediately ("Rest days per month: 5").
+
+8. **User taps Save on the edit screen.** `_save()` (`lib/screens/add_habit.dart`) runs the 5-branch switch (now with `restDaysPerMonth: _restDaysPerMonth` instead of the hardcoded 2), persists via `DoRepository.save(...)`, and pops the route with `true`. The home screen reads the `true` and calls `_refresh()`. The tile re-mounts with the new value. The pre-v1.4j silent-reset bug is closed: a user who opens edit on a 3/month do and hits Save WITHOUT touching the budget row now preserves the 3 (because `_restDaysPerMonth` was loaded from `_original.restDaysPerMonth` in `_loadExisting()`).
+
+9. **User has TalkBack enabled.** Tapping the tile with TalkBack announces the caption `Semantics(button: true, label: "5/5 rest days left")` as a button. Swiping right through the `Slider` reads out each integer value as it changes (TalkBack's standard `Slider` accessibility). Tapping the "Rest days per month: 5" form row on the edit screen announces "Rest days per month: 5, button".
+
+### Failure paths
+
+- **`showRestDayPicker` returns `null` (Cancel / back-press).** The tile handler returns early — no save, no SnackBar, no refresh. The form-row handler is symmetric (early return). No state change.
+- **`DoRepository.save` throws `DoInvalidRestDays(32)`** (the new upper-bound rule). In practice the picker clamps inline to `[0, 31]`, so this only fires if a stale DB row from a future schema migration is loaded into the picker. The tile handler catches the throw, shows `messenger.showSnackBar(SnackBar(content: Text(l.homeSnackbarBudgetUpdateFailed)))` ("Could not update budget. Try again."), and leaves the tile intact (the caption stays at the prior value, no refresh). The form-row handler is symmetric.
+- **`DoRepository.save` throws a generic drift exception** (e.g. DB locked, FK constraint). Same as `DoInvalidRestDays`: tile handler shows the failure SnackBar, no tile removal. Form-row handler shows an error snackbar inline.
+- **The user navigates away from the tile while the dialog is open** (e.g. taps a notification). The `messenger` capture-before-async-gap pattern means the post-save SnackBar is shown on whatever ScaffoldMessenger is current when the future resolves; if the route is gone, `messenger.showSnackBar` is a no-op. The dialog is dismissed by the route pop (Flutter standard behavior).
+- **The widget is unmounted mid-FutureBuilder** (e.g. the user navigates away before the save resolves). `DoRepository.save` writes to the singleton, the write succeeds, but the refresh callback (`widget.onDoChanged?.call()`) may fire on a disposed tile. The `_refresh()` callback is bound to the home screen state, not the tile state, so a disposed tile is safe — the home screen's `FutureBuilder` re-fires and the new tile mounts with the new value.
+- **The slider thumb is dragged to a fractional value** (e.g. 4.7). The `Slider`'s `divisions: 31` constraint snaps to whole numbers; `v.round()` in `onChanged` ensures the stored value is always an integer. The live integer label above the slider is always a whole number.
+- **The slider thumb is dragged to the boundary** (0 or 31). The `Slider(min: 0, max: 31)` clamps the value; the user cannot drag below 0 or above 31. The `Slider`'s `divisions: 31` gives exactly 32 stops (0, 1, ..., 31). The defensive clamp in `initState` handles a stale-DB-row start value.
+
+### Requirements covered
+
+- SYS-124 (this cycle's primary requirement — rest-day budget edit affordance on the home tile + the v1.0 silent-reset bug fix in `AddHabitScreen._save()`)
+- ADR-054 (this cycle's primary architectural decision — caption-as-affordance + shared picker dialog + validation upper bound)
+- ADR-053 (v1.4i / SYS-123 — the `_BudgetCaption` is the v1.4i-inherited surface that v1.4j turns into an affordance)
+- ADR-052 (v1.4h / SYS-122 — the v1.4h `onDoChanged` prop + `_refresh()` cascade is re-used for the post-edit refresh)
+- ADR-047 (v1.4c / SYS-117 — the `_SkipButton` is gated on `restDaysPerMonth > 0`; v1.4j's affordance lets the user change the gating value from the same tile)
+- SYS-123 (v1.4i — the inline sparkline + legend visualizes the rest-day rows the user can now produce by editing the budget up from 0)
+- SYS-122 (v1.4h — the `onDoChanged` + `_refresh()` cascade is re-used)
+- SYS-117 (v1.4c — the rest-day rows visible in the v1.4i sparkline are now user-configurable via the v1.4j caption affordance)
