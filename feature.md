@@ -319,9 +319,9 @@ These items are deferred beyond v1.4 but are explicitly **v1
 work** (no v2.0 jump). They are tracked here so they don't get
 lost between the v1.4 closeout and the next milestone kickoff.
 
-| ADRs | `docs/v_model/decision_record.md` | up to ADR-058 (9 v1.2 ADRs appended in the closeout PR — ADR-033..ADR-041 covering SYS-098..SYS-110; v1.3 sub-entries appended ADR-042..ADR-044 covering SYS-112..SYS-114; v1.4 sub-entries appended ADR-045..ADR-048 covering SYS-115..SYS-118; v1.4f sub-entry appended ADR-050 covering SYS-120 — widget-side Skip + Undo; v1.4g sub-entry appended ADR-051 covering SYS-121 — widget-action round-trip Kotlin → Dart via the inbound `doit/widget` MethodChannel; v1.4h sub-entry appended ADR-052 covering SYS-122 — per-tile Edit + Delete IconButtons on the in-app home tile; v1.4i sub-entry appended ADR-053 covering SYS-123 — rest-day history visualization on the in-app home tile; v1.4j sub-entry appended ADR-054 covering SYS-124 — rest-day budget edit affordance on the home tile + v1.0 silent-reset bug fix in `AddHabitScreen._save()`; v1.4k sub-entry appended ADR-055 covering SYS-125 — per-instance home widget configuration via Android AppWidget configuration activity + body-tap deep-link; v1.4l sub-entry appended ADR-056 covering SYS-126 — soft-delete tombstone column on `Habits` restoring streak by construction on Undo; v1.4m sub-entry appended ADR-058 covering SYS-127 — CI coverage for the v1.4l soft-delete home-screen flow + the `listDeleted` / `purgeDeletedOlderThan` API surface stabilization before the v1.4n UI consumes it); v1.2c/d/e/f/h/i/j/l/m earned ADRs; v1.2g/k did not (doc-only closeout / routine UI affordance respectively) |
-| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 sub-entries appended SYS-111..SYS-114 (4 IDs); v1.4 sub-entries appended SYS-115..SYS-118 (4 IDs — home widget, tile streak+Done, tile Skip+budget, tile Undo); v1.4e appended SYS-119 (tile 7-day sparkline); v1.4f appended SYS-120 (widget-side Skip + Undo); v1.4g appended SYS-121 (widget-action round-trip — bidirectional `doit/widget` MethodChannel); v1.4h appended SYS-122 (per-tile Edit + Delete IconButtons on the in-app home tile); v1.4i appended SYS-123 (rest-day history visualization on the in-app home tile — 14-day window + source-aware color + inline legend); v1.4j appended SYS-124 (rest-day budget edit affordance on the home tile + v1.0 silent-reset bug fix in `AddHabitScreen._save()`); v1.4k appended SYS-125 (per-instance home widget configuration via Android AppWidget configuration activity + body-tap deep-link via `MainActivity.getInitialRoute()`); v1.4l appended SYS-126 (soft-delete tombstone column on `Habits` — Undo restores streak by construction); v1.4m appended SYS-127 (CI coverage for the v1.4l soft-delete home-screen flow + `listDeleted` / `purgeDeletedOlderThan` API surface stabilization). v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
-| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 sub-entries added WF-040, WF-041; v1.4 sub-entries added WF-042..WF-046; v1.4f added WF-047 (widget-side Skip + Undo from the home widget); v1.4g added WF-048 (widget action button taps round-trip to Dart's `WidgetService`); v1.4h added WF-049 (Edit or delete a do from the in-app home tile); v1.4i added WF-050 (View rest-day history on the home tile); v1.4j added WF-051 (Edit the rest-day budget from the home tile or the edit screen — shared `RestDayPickerDialog` + `_BudgetCaption.onTap` + `AddHabitScreen._pickRestDaysPerMonth`); v1.4k added WF-052 (Bind the home widget to a specific do — Android AppWidget configuration activity + body-tap deep-link); v1.4l added WF-053 (Delete a do and undo within the SnackBar window — true restore via the soft-delete tombstone column); v1.4m added WF-055 (CI exercises the v1.4l soft-delete home-screen flow end-to-end — 4 widget tests + 4 `listDeleted` tests + 4 `purgeDeletedOlderThan` tests + 1 persistence-across-restart test). Cross-check the rest are in `traceability_matrix.md` |
+| ADRs | `docs/v_model/decision_record.md` | up to ADR-059 (9 v1.2 ADRs appended in the closeout PR — ADR-033..ADR-041 covering SYS-098..SYS-110; v1.3 sub-entries appended ADR-042..ADR-044 covering SYS-112..SYS-114; v1.4 sub-entries appended ADR-045..ADR-048 covering SYS-115..SYS-118; v1.4f sub-entry appended ADR-050 covering SYS-120 — widget-side Skip + Undo; v1.4g sub-entry appended ADR-051 covering SYS-121 — widget-action round-trip Kotlin → Dart via the inbound `doit/widget` MethodChannel; v1.4h sub-entry appended ADR-052 covering SYS-122 — per-tile Edit + Delete IconButtons on the in-app home tile; v1.4i sub-entry appended ADR-053 covering SYS-123 — rest-day history visualization on the in-app home tile; v1.4j sub-entry appended ADR-054 covering SYS-124 — rest-day budget edit affordance on the home tile + v1.0 silent-reset bug fix in `AddHabitScreen._save()`; v1.4k sub-entry appended ADR-055 covering SYS-125 — per-instance home widget configuration via Android AppWidget configuration activity + body-tap deep-link; v1.4l sub-entry appended ADR-056 covering SYS-126 — soft-delete tombstone column on `Habits` restoring streak by construction on Undo; v1.4m sub-entry appended ADR-058 covering SYS-127 — CI coverage for the v1.4l soft-delete home-screen flow + the `listDeleted` / `purgeDeletedOlderThan` API surface stabilization before the v1.4n UI consumes it; v1.4-stab-A sub-entry appended ADR-059 covering SYS-128 — pivot from feature work to a 3-month stabilization campaign with 11 sequenced cycles + the audit deliverable); v1.2c/d/e/f/h/i/j/l/m earned ADRs; v1.2g/k did not (doc-only closeout / routine UI affordance respectively) |
+| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 sub-entries appended SYS-111..SYS-114 (4 IDs); v1.4 sub-entries appended SYS-115..SYS-118 (4 IDs — home widget, tile streak+Done, tile Skip+budget, tile Undo); v1.4e appended SYS-119 (tile 7-day sparkline); v1.4f appended SYS-120 (widget-side Skip + Undo); v1.4g appended SYS-121 (widget-action round-trip — bidirectional `doit/widget` MethodChannel); v1.4h appended SYS-122 (per-tile Edit + Delete IconButtons on the in-app home tile); v1.4i appended SYS-123 (rest-day history visualization on the in-app home tile — 14-day window + source-aware color + inline legend); v1.4j appended SYS-124 (rest-day budget edit affordance on the home tile + v1.0 silent-reset bug fix in `AddHabitScreen._save()`); v1.4k appended SYS-125 (per-instance home widget configuration via Android AppWidget configuration activity + body-tap deep-link via `MainActivity.getInitialRoute()`); v1.4l appended SYS-126 (soft-delete tombstone column on `Habits` — Undo restores streak by construction); v1.4m appended SYS-127 (CI coverage for the v1.4l soft-delete home-screen flow + `listDeleted` / `purgeDeletedOlderThan` API surface stabilization); v1.4-stab-A appended SYS-128 (coverage audit + stabilization roadmap — the foundational first cycle of the 3-month stabilization campaign). v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
+| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 sub-entries added WF-040, WF-041; v1.4 sub-entries added WF-042..WF-046; v1.4f added WF-047 (widget-side Skip + Undo from the home widget); v1.4g added WF-048 (widget action button taps round-trip to Dart's `WidgetService`); v1.4h added WF-049 (Edit or delete a do from the in-app home tile); v1.4i added WF-050 (View rest-day history on the home tile); v1.4j added WF-051 (Edit the rest-day budget from the home tile or the edit screen — shared `RestDayPickerDialog` + `_BudgetCaption.onTap` + `AddHabitScreen._pickRestDaysPerMonth`); v1.4k added WF-052 (Bind the home widget to a specific do — Android AppWidget configuration activity + body-tap deep-link); v1.4l added WF-053 (Delete a do and undo within the SnackBar window — true restore via the soft-delete tombstone column); v1.4m added WF-055 (CI exercises the v1.4l soft-delete home-screen flow end-to-end — 4 widget tests + 4 `listDeleted` tests + 4 `purgeDeletedOlderThan` tests + 1 persistence-across-restart test); v1.4-stab-A added WF-056 (Coverage audit + stabilization roadmap — the 8-step audit flow: run `flutter test --coverage` → parse `lcov.info` via Python → inventory bugs → sequence cycles → write roadmap → append V-Model artifacts → run 3-gate → commit + PR + CI + squash-merge). Cross-check the rest are in `traceability_matrix.md` |
 
 **v1.4i+ follow-up** — Tile + widget surface gaps after
   the v1.4a widget + v1.4b tile streak + v1.4c tile skip
@@ -336,18 +336,19 @@ lost between the v1.4 closeout and the next milestone kickoff.
   coverage for the v1.4l soft-delete home-screen flow + the
   `listDeleted` / `purgeDeletedOlderThan` API surface
   stabilization (SYS-127 / ADR-058 / WF-055) ship:
-  widget small / large variants, widget list (scrolling);
-  a "Recently deleted" surface for tombstoned habits so the
-  user can restore after the SnackBar window closes (the
-  v1.4l soft-delete data model + inline Undo flow + v1.4m
-  API stabilization ship in this cycle; the broader
-  restore surface is the v1.4n follow-up that ADR-058 §"References"
-  names — `listDeleted` + `purgeDeletedOlderThan` are
-  pinned + tested in v1.4m, ready for the v1.4n UI to
+  widget small / large variants, widget list (scrolling).
+  The "Recently deleted" UI surface for tombstoned habits
+  has been moved INSIDE the 3-month stabilization campaign
+  as Cycle H — the v1.4l soft-delete data model + inline Undo
+  flow + v1.4m API stabilization all ship; the broader
+  restore surface is sequenced as Cycle H of stabilization
+  per ADR-059 §"Decisions" decision 4 (the API surface is
+  pinned + tested in v1.4m, ready for the Cycle H UI to
   consume without API churn).
   See `docs/v_model/plan.md`
   Milestone 12+ for the candidate list (Milestone 11 v1.4
-  is shipping in this cycle).
+  is shipped; Milestone 12 is the 3-month stabilization
+  campaign).
 
 ---
 
@@ -401,24 +402,40 @@ shape (SYS-127 / ADR-058 / WF-055). The cycle is a pure test
 + API surface expansion — no production behavior change outside
 the `KeyedSubtree` test seam on the `_DoStreakBadge` call site.
 
-After the v1.4m PR lands, the user's hands-on step is the
-`release(v1.4m)` debug-signed APK commit: `flutter build apk
---debug` (no signing-config touch), record the SHA1 + size in
-the commit message (mirrors the v1.1i pattern at `222f860`).
-Then optionally tag `v1.4m`, then optionally
-`flutter build appbundle --release` + on-device install.
+The v1.4-stab-A sub-entry (`feat/v1.4-stab-A-audit-roadmap`,
+this PR) ships the foundational first cycle of the 3-month
+stabilization campaign. Doc-only: `docs/v_model/stabilization_roadmap.md`
+(NEW, the single source of truth) + `coverage/lcov.info` (NEW,
+the 64.61% baseline measurement) + `coverage/html/index.html`
+(NEW, the inspectable view). No `lib/` / `test/` changes — the
+cycle's "test artifact" is the coverage report itself. The
+roadmap doc inventories 20 latent bugs (BUG-001..BUG-020) with
+priorities + target cycles, sequences 11 stabilization cycles
+(Cycles B..L) with rationale, and defines 10 success criteria
+for the 3-month campaign (≥90% line coverage on every file in
+`lib/`, 100% on the pure-Dart model layer, E2E tests for 10
+critical user flows, accessibility + i18n audits, etc.) —
+SYS-128 / ADR-059 / WF-056. v1.4n "Recently deleted" UI moves
+INSIDE the stabilization window as Cycle H per ADR-059 §"Decisions"
+decision 4 (the API surface is pinned + tested in v1.4m, so
+the Cycle H UI is purely UI — small scope, sequenced after
+the data layer + permission hardening cycles land).
 
-The v1.4m+ parking lot at `feature.md` §4 has fresh candidates
-ready for the next cycle: widget small / large variants, widget
-list (scrolling); a "Recently deleted" UI surface for tombstoned
-habits (the v1.4l soft-delete data model + inline Undo flow +
-v1.4m API stabilization + tests all ship; the broader restore
-surface is the v1.4n follow-up — `listDeleted` +
-`purgeDeletedOlderThan` are pinned + tested in v1.4m, ready for
-the v1.4n UI to consume without API churn). The
-`_toRow`-missing-`automations_json` + `_toRow`-missing-`pausedUntil`
-mapping bugs remain v1.4m+ candidates now that the soft-delete
-trade-off is closed AND the CI coverage is in place to catch
-regressions during the mapping fix.
-See `docs/v_model/plan.md` Milestone 12+ for the candidate
-list.
+After the v1.4-stab-A PR lands, the user's hands-on step is
+the `release(v1.4-stab-A)` debug-signed APK commit (mirrors
+the v1.1i pattern at `222f860` — even though Cycle A makes no
+code changes, the APK is the user's hands-on artifact for the
+cycle). Then optionally tag `v1.4-stab-A`. No `flutter build
+appbundle --release` for this cycle — Cycle A is docs-only, the
+release APK pattern is unchanged.
+
+Cycle B (`feat/v1.4-stab-B-to-row-automations-pausedUntil`)
+is the immediate next cycle and will be planned in its own
+plan-mode session. The plan for Cycle B will reference the audit
+findings in `docs/v_model/stabilization_roadmap.md` §2
+(latent bugs BUG-001 + BUG-002) to confirm the priority
+sequencing — the `_toRow`-missing-`automations_json` +
+`_toRow`-missing-`pausedUntil` mapping bugs that lose user
+data on every Save click are P0 and the first priority in
+the stabilization campaign. See `docs/v_model/plan.md`
+Milestone 12 for the full 3-month sequence.

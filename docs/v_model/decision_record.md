@@ -5382,3 +5382,54 @@ The motivation is the **"tests first, then UI" inversion**: rather than coupling
 - ADR-052 §8 (v1.4h — the "Undo does NOT restore the completion-log rows" trade-off that v1.4l closes; v1.4m's persistence-across-restart test pins the closure)
 - WF-053 (v1.4l — the new Delete + Undo user flow; v1.4m's widget tests are the CI guard for this flow)
 - WF-055 (v1.4m — the API surface + CI coverage contract this ADR documents)
+
+---
+
+## ADR-059 — Pivot from feature work to a 3-month stabilization campaign (v1.4-stab-A / Phase 41 / SYS-128 / WF-056)
+
+After shipping v1.4a..v1.4m in rapid succession (12 cycles of net-new surface, 26 PRs, ~900 tests added), the user stated "we have 3 month to stabilise the app and have exhaustive test". This is a deliberate pivot from feature work to hardening. v1.4-stab-A (Cycle A) is the foundational cycle: it produces a coverage audit + a 3-month roadmap, with no code changes. Cycles B..L are sequenced by priority and each ships in its own plan-mode session.
+
+### Decisions
+
+1. **Pivot from feature work to stabilization for ~3 months (≈13 weeks).** The 3-month window is calendar time, not effort time — if real-world events (illness, vacation, urgent user-reported bugs) eat into the window, lower-priority cycles get trimmed first (Cycle L's fuzz testing, Cycle J's accessibility polish). The 11 cycles are sequenced by user-impact × testability: critical (latent data-loss bugs + reliability hardening) first, polish (i18n + accessibility + E2E + perf) last.
+
+2. **Cycle A ships NO code changes, NO new tests — it is a pure doc + coverage report cycle.** The cycle's deliverable is `docs/v_model/stabilization_roadmap.md` (NEW) — a single-source-of-truth doc with 6 sections: §1 current coverage state (per-file table from `flutter test --coverage`), §2 latent bugs inventory (BUG-001..BUG-020 with priorities + target cycles), §3 cycle-by-cycle roadmap (Cycles B..L with priorities + scopes + tests counts), §4 success criteria for the 3-month campaign, §5 open questions for the user, §6 Cycle A retrospective. The "test" deliverable is the coverage report (`coverage/lcov.info` + the per-file table in §1). Pure-doc cycles are an established pattern in this project — they ship the contract before the code, so the subsequent implementation cycles have a clear target.
+
+3. **Cycle sequencing: B → C → D → E → F → G → H → I → J → K → L.** The sequencing is provisional — Cycle A's findings may shift priorities. The current ordering is:
+   - **B** — fix the 2 known latent `_toRow` data-loss bugs (BUG-001 + BUG-002). Pure-Dart. 2-line fix in `_toRow` + save-invariant tests.
+   - **C** — full-screen launch hardening for Android 14+ (BUG-003). Adds `USE_FULL_SCREEN_INTENT` permission; cross-check against `docs/v_model/architecture_options.md §"Permission baseline"`.
+   - **D** — permission flow audit (BUG-005, BUG-011, BUG-012, BUG-020). Per-`PermissionKind` tests covering grant / deny / rationale / settings-deeplink.
+   - **E** — reliability detection coverage. Every `Reliability` enum path exercised in tests; exact-alarm denied → WorkManager fallback path verified.
+   - **F** — backup round-trip exhaustive. Every backup payload version × every table × every field round-trip losslessly.
+   - **G** — DoAnchor "Target paused" badge (BUG-004). UI for the v1.4l data layer.
+   - **H** — Restore / delete-forever UI for tombstoned habits (the deferred v1.4n "Recently deleted" surface). Pure UI; data layer + tests shipped in v1.4m.
+   - **I** — i18n test exhaustive. Every ARB key tested in both locales.
+   - **J** — accessibility audit. TalkBack labels + contrast + font-scale.
+   - **K** — E2E integration tests. 10 critical user flows.
+   - **L** — performance audit + fuzz + benchmark. Widget rebuild + SQL query + APK size.
+
+4. **The v1.4n "Recently deleted" UI moves into the stabilization window as Cycle H.** The cycle is sequenced INSIDE the stabilization window (not post-stab parking lot) because: (a) the v1.4m API surface (`listDeleted` + `purgeDeletedOlderThan`) is already pinned + tested — the cycle is purely UI; (b) without the UI, the v1.4l soft-delete feature is incomplete (the user can soft-delete but cannot restore after the SnackBar window closes); (c) Cycle H's scope is small (~12 widget tests + 1 new screen + 2 ARB keys). Cycle H is the LAST UI surface in the v1.4 series and completes the v1.4l feature.
+
+5. **Coverage targets: ≥90% line coverage on every file in `lib/`, 100% coverage on the pure-Dart model layer.** The current rule ("≥80% on changed files") is necessary but not sufficient — untouched files in the model layer may have low coverage. The campaign raises the bar to ≥90% globally and 100% on the pure-Dart model layer (`lib/do/`, `lib/people/`, `lib/habits/`, `lib/missions/`, `lib/events/`). The model layer has no Flutter import — there's no excuse for untested branches.
+
+6. **No new `<uses-permission>`, no new pubspec deps, no new Drift tables, no new MethodChannels, no Kotlin changes — Cycle A is docs-only.** The campaign will introduce one new permission (Cycle C's `USE_FULL_SCREEN_INTENT`) and zero new dependencies. Cycle H introduces a new screen + ARB keys but no platform changes. The campaign is foundationally pure-Dart + docs.
+
+7. **The roadmap doc is the single source of truth — every cycle updates it.** Each stabilization cycle's PR appends a "closed (Cycle N)" status to the affected BUG-NNN rows + marks the cycle as "shipped" in the §3 table. This makes the 3-month campaign legible: at any point, a reviewer can read the roadmap doc and see "12 known gaps, N closed, M open, sequenced by priority".
+
+### Alternatives considered
+
+- **"Continue shipping features (v1.4n 'Recently deleted' UI first)".** Rejected: the user explicitly redirected to stabilization. Feature work adds surface; stabilization hardens what exists.
+- **"Ship the audit + the roadmap as separate cycles (audit cycle first, roadmap cycle second)".** Rejected: the audit findings drive the roadmap priorities. Splitting them creates a circular dependency (the audit cycle would have to commit to a roadmap shape before it knows the gaps).
+- **"Use a coverage tool other than `flutter test --coverage` (e.g., `coverage_dart`, `lcov` HTML report)".** Rejected: `flutter test --coverage` is the project standard; the `coverage/lcov.info` output is parseable with a small Python script (no `lcov` package dependency). The HTML report is a nice-to-have for visual inspection; the per-file table in §1 is the actual deliverable.
+- **"Plan all 11 cycles (B..L) in detail now".** Rejected: a 3-month plan with 11 cycles' worth of detail would drift from reality as audit findings reshape priorities. Each cycle gets its own plan-mode session. The roadmap doc carries the high-level sequencing; each cycle's plan carries the implementation detail.
+- **"Skip the audit cycle and start fixing bugs immediately (Cycle B next)".** Rejected: without the audit, the cycle sequencing is guesswork. The audit + roadmap is ~5 days of work; it pays for itself by ensuring Cycles B..L are sequenced correctly. The BUG inventory + the coverage table are the input for every subsequent cycle's plan.
+
+### References
+
+- SYS-128 (v1.4-stab-A — the stabilization campaign kickoff + the audit + roadmap cycle this ADR documents)
+- `docs/v_model/stabilization_roadmap.md` (NEW — the single source of truth for the 3-month campaign)
+- WF-056 (v1.4-stab-A — the audit cycle's flow: run coverage, parse `lcov.info`, identify gaps, document findings)
+- ADR-058 (v1.4m — the "tests first, then UI" inversion that justifies Cycle H's positioning inside the window)
+- ADR-056 (v1.4l — the soft-delete data layer that Cycle H's UI consumes)
+- SYS-126, SYS-127 (v1.4l, v1.4m — the data-layer + CI-coverage prerequisites for Cycle H)
+- BUG-001..BUG-020 (the latent bugs inventoried in `stabilization_roadmap.md §2` — every stabilization cycle closes one or more)
