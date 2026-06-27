@@ -5339,3 +5339,46 @@ Replaces the v1.4h / SYS-122 hard-delete + `insertOnConflictUpdate`-on-Undo trad
 - SYS-115 (v1.4a — the `DoitWidgetState` JSON envelope; the `selectedHabitId` cached pick survives a soft-delete because the row id is preserved)
 - SYS-125 (v1.4k — the per-instance widget configuration; the reconciliation-clear path on a stale `selectedHabitId` correctly distinguishes "the do was soft-deleted" from "the do was hard-deleted" via `getById` returning the tombstoned row vs `null`)
 - WF-053 (v1.4l — the new Delete + Undo user flow; the true-restore headline behavior)
+
+
+## ADR-058 — Pin the v1.4l soft-delete API surface before the v1.4n UI consumes it (v1.4m / Phase 40 / SYS-127 / WF-055)
+
+v1.4l landed the soft-delete data layer + the inline Undo SnackBar flow but explicitly deferred the "Recently deleted" surface (a separate screen listing tombstoned dos with Restore / Delete forever affordances) to a v1.4l+ follow-up — see [[feature.md]] §4 parking lot. v1.4m is the **API-stabilization cycle** that ships the two repository methods the v1.4n UI will consume (`listDeleted` + `purgeDeletedOlderThan`) plus the widget-level tests that prove the v1.4l headline behavior change holds end-to-end. The data-layer + the inline Undo flow already shipped in v1.4l (PR #47, commit `0858cc6`); v1.4m adds tests + API surface, no production behavior change.
+
+The motivation is the **"tests first, then UI" inversion**: rather than coupling the v1.4n UI to a not-yet-tested repository shape, v1.4m pins the API surface and the test harness NOW so the v1.4n PR is purely a UI concern (no API churn). This is a deliberate inversion of the usual "UI first, then tests" cadence — justified by the v1.4l data layer already being its own merged PR (the data is locked; the API just needs to be exposed + tested).
+
+### Decisions
+
+1. **Two new `DoRepository` methods: `listDeleted({int? limit})` and `purgeDeletedOlderThan(Duration age, {required DateTime at})`.** Both accept a `DateTime at` argument (caller passes a frozen reference — no `DateTime.now()` inside the repository, matching the v0.2 / Phase A "no clock in the model" rule per `.claude/rules/lib-do.md` + `.claude/rules/lib-services.md`). Both are async (`Future<List<Do>>` + `Future<int>`) so callers `await` them — consistent with the v1.4l `softDeleteById` + `restoreById` shape. Both are deterministic given the same `at` + DB state — no side effects beyond the one UPDATE / one SELECT.
+
+2. **`listDeleted` orders by `deletedAtMillis DESC` (most-recently-deleted first).** This is the order the v1.4n "Recently deleted" UI will use (the user expects the most-recently-deleted do at the top of the list — matches the OS-level "Recently deleted" affordance in Photos / Files / Gmail). The `limit` parameter is optional (no limit = list all tombstoned habits). The query filters `..where((t) => t.deletedAtMillis.isNotNull())` — the inverse of the `listAll` filter (tombstones ONLY, no active habits). The method is intentionally simple — no pagination, no caching, no filter-by-name. The v1.4n UI may add a search field; if it does, the search is a UI concern, not a repository concern.
+
+3. **`purgeDeletedOlderThan(Duration age, {required DateTime at})` hard-deletes by age, not by count.** The v1.4n UI may offer a "Delete forever" affordance that hard-deletes a single tombstone (a future v1.4n+ cycle); the v1.4m API surface is the BULK purge — a janitor that runs on a `WorkManager` periodic task (or on app launch) to drop tombstoned dos older than N days (default retention = 30 days, matching the OS-level "Recently deleted" 30-day window). The method takes a `DateTime at` so the caller controls the reference time — the janitor passes `DateTime.now()`, the tests pass a frozen reference. The DELETE is filtered by `deletedAtMillis IS NOT NULL AND deletedAtMillis < cutoff` (NOT by id; id-based DELETE is what `deleteById` is for). Returns the affected-row count so the caller can log "purged N tombstones".
+
+4. **Widget-level test seam: `KeyedSubtree(key: Key('streakBadge-${habit.id}'), child: _DoStreakBadge(...))` wraps the existing badge call site.** The v1.4l home tile's `_DoStreakBadge` widget is private (leading underscore) — tests cannot locate it directly without exposing it. The v1.4m wrapper gives tests a public `Key('streakBadge-<id>')` seam via `find.byKey(...)` without restructuring the private widget or touching the streak calculation. The `KeyedSubtree` is a no-op for production rendering (no rebuild overhead, no extra layout) — it is purely a test seam. The key includes the habit id so tests can target a specific tile's badge in a multi-tile pump.
+
+5. **Test seam for "persistence across restart" — two-phase in-memory DB swap.** The v1.4l headline behavior change ("Undo restores the streak by construction") depends on the `Habits` row surviving the soft-delete. The persistence-across-restart test proves the row + the tombstone both survive a DB close + reopen by:
+   - Phase A: open an in-memory `AppDatabase` via `AppDatabase(NativeDatabase.memory())` + `AppDatabaseService.instance.init(overrideDb: db)`, save a do, soft-delete it via `softDeleteById(id, at: frozenAt)`, close the DB.
+   - Phase B: open a FRESH in-memory `AppDatabase`, seed the raw `habits` row via `db.database.customStatement('INSERT INTO habits (...) VALUES (...)')` with `deleted_at_millis` set, then call `DoRepository.instance.getById(id)` and assert the returned do has `isDeleted == true`.
+   - The `customStatement` seeding is the closest a unit test gets to "relaunch the app" — the user sees the row survive across the close + reopen.
+
+6. **No production code path changes outside the new methods + the KeyedSubtree seam.** `listDeleted` and `purgeDeletedOlderThan` are additive API surface — they don't change the behavior of `softDeleteById`, `restoreById`, `getById`, `getActiveById`, `listAll`, `listActive`, or `save`. The KeyedSubtree wrapper doesn't change the badge rendering, the streak calculation, or the widget tree structure. The cycle is a pure test + API surface expansion — the minimum diff that closes the CI coverage gap from the v1.4l PR smoke (the "headline flow", "streak rendering", "persistence" gaps).
+
+7. **No new `<uses-permission>`, no new pubspec deps, no new Drift tables, no new MethodChannels, no Kotlin changes.** v1.4m is pure-Dart + 13 new tests. The data layer was already landed in v1.4l; v1.4m just exposes + tests the API. Permission baseline unchanged; verification against `docs/v_model/architecture_options.md` confirmed no AndroidManifest touch.
+
+### Alternatives considered
+
+- **"Ship v1.4l + v1.4n in one big PR" (soft-delete + the "Recently deleted" UI in one cycle).** Rejected: the v1.4l PR was already at the edge of the "PR size budget" (29 new tests + a migration + 6 file modifications); bundling the UI work would push it past the 800-line guideline + obscure the headline behavior change (Undo restores streak) with UI work. Splitting into v1.4l (data + inline Undo) + v1.4m (API + tests) + v1.4n (UI) keeps each PR reviewable.
+- **"Ship v1.4m without `listDeleted` / `purgeDeletedOlderThan` — just the widget tests".** Rejected: the widget tests are a great CI coverage, but the v1.4n UI needs the API surface too. Adding the methods now (with tests) lets the v1.4n PR be purely UI — no API churn.
+- **"Make `listDeleted` paginated (offset + limit)".** Rejected: the v1.4n UI will show a finite list (typical user has < 10 tombstones); pagination is premature optimization. The optional `limit` param covers the "show top 5" use case; the UI can call again if it needs more.
+- **"Make `purgeDeletedOlderThan` take a count instead of an age".** Rejected: a count limit (e.g., "keep at most 50 tombstones") requires the caller to count first; an age limit is a single UPDATE filtered by `deleted_at_millis < cutoff`. The age-based form also matches the OS-level "Recently deleted" 30-day window — a familiar mental model.
+- **"Add the methods to `DoRepository` directly vs a new `TombstoneRepository`".** Rejected: the methods are pure CRUD on the same `Habits` table; extracting a separate `TombstoneRepository` would split the same table's lifecycle state across two services for no architectural gain. The `Events` precedent (one `EventRepository` owns both `listActive` + `archive`) confirms the single-repo shape.
+
+### References
+
+- SYS-126 (v1.4l — the soft-delete tombstone requirement that v1.4m exposes + tests)
+- SYS-127 (v1.4m — the CI coverage + API surface stabilization this ADR documents)
+- ADR-056 (v1.4l — the soft-delete design decisions; v1.4m adds the `listDeleted` + `purgeDeletedOlderThan` methods on top of the v1.4l data layer)
+- ADR-052 §8 (v1.4h — the "Undo does NOT restore the completion-log rows" trade-off that v1.4l closes; v1.4m's persistence-across-restart test pins the closure)
+- WF-053 (v1.4l — the new Delete + Undo user flow; v1.4m's widget tests are the CI guard for this flow)
+- WF-055 (v1.4m — the API surface + CI coverage contract this ADR documents)

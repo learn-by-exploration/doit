@@ -200,6 +200,63 @@ class DoRepository {
     await (_db.delete(_db.habits)..where((t) => t.id.equals(id))).go();
   }
 
+  /// List tombstoned dos, newest-deleted first. Used by the
+  /// v1.4m (SYS-127) "Recently deleted" surface and the
+  /// v1.4m `purgeDeletedOlderThan` auto-purge. The order is
+  /// `deletedAtMillis DESC` so the UI shows the most
+  /// recently deleted at the top.
+  ///
+  /// Tombstones are a transient undo affordance (v1.4l /
+  /// ADR-056); the surface should auto-purge after a TTL
+  /// (default 30 days) to bound the table. The `limit`
+  /// parameter caps the result set so the surface stays
+  /// O(1)-render regardless of how many tombstones
+  /// accumulate between purges.
+  Future<List<domain.Do>> listDeleted({int? limit}) async {
+    await _ready;
+    final query = _db.select(_db.habits)
+      ..where((t) => t.deletedAtMillis.isNotNull())
+      ..orderBy([(t) => OrderingTerm.desc(t.deletedAtMillis)]);
+    if (limit != null) {
+      query.limit(limit);
+    }
+    final rows = await query.get();
+    return rows.map(_fromRow).toList(growable: false);
+  }
+
+  /// Hard-delete tombstones older than `age` relative to
+  /// `at`. Returns the count of rows removed. v1.4m
+  /// (SYS-127) — the `RecentlyDeletedPurgeService` (planned
+  /// v1.4n+) calls this on a periodic background task with
+  /// `age = Duration(days: 30)` to bound the tombstone
+  /// table.
+  ///
+  /// Completion-log and rest-day-budget rows for a purged
+  /// do are NOT touched (no FK declared). The orphaned rows
+  /// are inert — no UI surface queries by `habitId` against
+  /// a hard-deleted habit — but they remain in the DB until
+  /// a future migration cycle explicitly cleans them. The
+  /// 30-day TTL is deliberately chosen so a "force-purge"
+  /// never surprises a user mid-restore; the inline Undo
+  /// SnackBar in v1.4l is a 4-second window, but the user
+  /// might come back days later via the (planned)
+  /// "Recently deleted" surface.
+  Future<int> purgeDeletedOlderThan(
+    Duration age, {
+    required DateTime at,
+  }) async {
+    await _ready;
+    final cutoffMillis = at.subtract(age).millisecondsSinceEpoch;
+    final affected =
+        await (_db.delete(_db.habits)..where(
+              (t) =>
+                  t.deletedAtMillis.isNotNull() &
+                  t.deletedAtMillis.isSmallerThanValue(cutoffMillis),
+            ))
+            .go();
+    return affected;
+  }
+
   // --- mapping ----------------------------------------------------
 
   HabitRow _toRow(domain.Do d) {
