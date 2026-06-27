@@ -6,12 +6,46 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 
 class MainActivity : FlutterActivity() {
+    /**
+     * v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052.
+     * The widget body-tap PendingIntent
+     * (`WidgetRenderer.openAppIntent`) sets this extra
+     * to the cached `selectedHabitId` (the picked do
+     * for this widget instance). The activity reads it
+     * in [getInitialRoute] and encodes the route as
+     * `/habit?habitId=...` for the Dart
+     * `MaterialApp.onGenerateRoute` to resolve.
+     *
+     * Key namespace is distinct from
+     * [DoitWidgetProvider.EXTRA_HABIT_ID]
+     * (`com.doit.EXTRA_HABIT_ID`): the provider
+     * receives the action-broadcast extras (markDone /
+     * skip / undo); the activity receives the body-tap
+     * extras. Different key prevents a stale action
+     * broadcast from being misread as a body-tap deep
+     * link.
+     */
+    override fun getInitialRoute(): String? {
+        val intent = intent ?: return null
+        val habitId = intent.getStringExtra(EXTRA_HABIT_ID).orEmpty()
+        // Clear the extra so a config change (rotation)
+        // does not re-route to the widget's picked do
+        // after the user has navigated away. The deep
+        // link is a one-shot — once the activity lands
+        // on `/habit?habitId=...` and the user pops back
+        // to HomeScreen, the route should not re-fire.
+        intent.removeExtra(EXTRA_HABIT_ID)
+        if (habitId.isEmpty()) return null
+        return "/habit?habitId=${Uri.encode(habitId)}"
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         ReminderChannelProxy.setAppContext(applicationContext)
@@ -110,6 +144,17 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         const val NOTIFICATION_CHANNEL_ID = "doit.reminders"
+
+        /**
+         * v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052.
+         * Body-tap extra set by [WidgetRenderer.openAppIntent]
+         * when the cached `selectedHabitId` is non-empty.
+         * Read by [getInitialRoute] to encode
+         * `/habit?habitId=...`. Distinct from
+         * [DoitWidgetProvider.EXTRA_HABIT_ID] (which
+         * carries the action-broadcast target id).
+         */
+        const val EXTRA_HABIT_ID = "com.doit.EXTRA_HABIT_ID_FROM_WIDGET"
 
         /**
          * Idempotently register the `doit.reminders` channel

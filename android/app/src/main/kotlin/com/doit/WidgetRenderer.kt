@@ -29,8 +29,9 @@ import org.json.JSONObject
  * Touch targets (per `.claude/rules/lib-screens.md`):
  *   - The body tap target (`R.id.widget_root`) opens
  *     `MainActivity` (single-top) so the user lands on the
- *     home screen. v1.4a does not deep-link to a specific
- *     do.
+ *     home screen. v1.4k deep-links to a specific do via
+ *     `EXTRA_HABIT_ID` when the cached `selectedHabitId`
+ *     is non-empty.
  *   - The "Done" button (`R.id.done`) round-trips to Dart
  *     via [WidgetChannel.markDone]. The Kotlin side posts
  *     an explicit broadcast to itself (`DoitWidgetProvider`)
@@ -38,6 +39,12 @@ import org.json.JSONObject
  *     the Dart side updates the cache.
  *
  * v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042.
+ * v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052: body
+ * tap PendingIntent carries `MainActivity.EXTRA_HABIT_ID`
+ * from the cached `selectedHabitId` JSON field; the
+ * `MainActivity` reads it in `getInitialRoute()` and
+ * encodes the route as `/habit?habitId=...` for the
+ * Dart `MaterialApp.onGenerateRoute` to resolve.
  */
 object WidgetRenderer {
     fun render(
@@ -66,7 +73,21 @@ object WidgetRenderer {
             R.id.reliability_badge,
             reliabilityIcon(reliability),
         )
-        views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(ctx, id))
+        // v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052.
+        // The body-tap PendingIntent now carries
+        // `EXTRA_HABIT_ID` set from the cached
+        // `selectedHabitId` field (v1.4k's "picked do"
+        // for this widget instance). When the field is
+        // empty (no pick yet, or the picked do was
+        // deleted and the cache was reconciled to
+        // `null`), the body tap falls back to the
+        // v1.4a behavior: open MainActivity with no
+        // extras, which routes to HomeScreen.
+        val selectedHabitId = state.optString("selectedHabitId", "")
+        views.setOnClickPendingIntent(
+            R.id.widget_root,
+            openAppIntent(ctx, id, selectedHabitId),
+        )
         // v1.4g / Phase 34 / SYS-121 / ADR-051 / WF-048:
         // the action PendingIntents now carry `EXTRA_HABIT_ID`
         // so the provider's `onReceive` can route the call
@@ -103,7 +124,10 @@ object WidgetRenderer {
         views.setTextViewText(R.id.habit_name, ctx.getString(R.string.widget_empty_state))
         views.setTextViewText(R.id.streak_number, "—")
         views.setImageViewResource(R.id.reliability_badge, R.drawable.ic_widget_unknown)
-        views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(ctx, id))
+        // v1.4k: empty-state has no selected habit; body
+        // tap falls through to the v1.4a no-extra open
+        // path.
+        views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(ctx, id, ""))
         // No Done / Skip / Undo — there is nothing to act
         // on. v1.4f: all three fall back to opening the
         // app, matching the v1.4a "open app" shape.
@@ -128,7 +152,7 @@ object WidgetRenderer {
         views.setTextViewText(R.id.habit_name, "do it")
         views.setTextViewText(R.id.streak_number, "?")
         views.setImageViewResource(R.id.reliability_badge, R.drawable.ic_widget_unknown)
-        views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(ctx, id))
+        views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(ctx, id, ""))
         views.setOnClickPendingIntent(R.id.done, openAppIntent(ctx, id))
         views.setOnClickPendingIntent(R.id.skip, openAppIntent(ctx, id))
         views.setOnClickPendingIntent(R.id.undo, openAppIntent(ctx, id))
@@ -143,9 +167,26 @@ object WidgetRenderer {
         else -> R.drawable.ic_widget_unknown
     }
 
-    private fun openAppIntent(ctx: Context, id: Int): PendingIntent {
+    private fun openAppIntent(
+        ctx: Context,
+        id: Int,
+        selectedHabitId: String,
+    ): PendingIntent {
+        // v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052.
+        // Body-tap PendingIntent carries
+        // `MainActivity.EXTRA_HABIT_ID` from the cached
+        // `selectedHabitId` so `MainActivity.getInitialRoute()`
+        // can encode the route as `/habit?habitId=...`
+        // for the Dart `MaterialApp.onGenerateRoute` to
+        // resolve. When `selectedHabitId` is empty (no
+        // pick yet, or the picked do was reconciled to
+        // `null`), the body tap falls through to the
+        // v1.4a no-extra open path.
         val intent = Intent(ctx, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            if (selectedHabitId.isNotEmpty()) {
+                putExtra(MainActivity.EXTRA_HABIT_ID, selectedHabitId)
+            }
         }
         return PendingIntent.getActivity(
             ctx, id, intent,

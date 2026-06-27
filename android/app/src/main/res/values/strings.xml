@@ -19,4 +19,16 @@
     <string name="widget_streak_subtitle">day streak</string>
     <string name="widget_empty_state">Add a do in do it</string>
     <string name="widget_reliability_badge">Reliability</string>
+
+    <!-- v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052:
+         the Android AppWidget configuration activity
+         label (shown by the launcher in the widget
+         picker and in the system Settings → Apps
+         → do it → AppWidget list). The actual UX is
+         rendered by the Flutter `WidgetConfigScreen`
+         (lib/widget/widget_config_screen.dart); this
+         string is a fallback for the system surfaces
+         that show the activity's label before the
+         Flutter side has rendered. -->
+    <string name="widget_configure_label">Choose a do for do it</string>
 </resources>

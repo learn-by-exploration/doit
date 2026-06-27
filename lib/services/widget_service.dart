@@ -30,6 +30,14 @@
 // skip(habitId) + undo(habitId) to bring the widget to
 // feature-parity with the in-app tile (mirrors v1.4c +
 // v1.4d at the widget surface).
+// v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052:
+// handleRefreshRequest consults the cached
+// `selectedHabitId` (v1.4f `restDaysPerMonth`
+// precedent) and falls back to `firstActiveDo` when the
+// selection is empty or the do no longer exists.
+// `setSelectedHabitId(...)` is the entry point for the
+// Kotlin `DoitWidgetConfigureActivity` to write a fresh
+// selection.
 
 // ignore_for_file: prefer_initializing_formals
 
@@ -169,13 +177,25 @@ class WidgetService {
   /// [markDone] (after the completion write), and from
   /// any external trigger that wants to force a refresh.
   ///
+  /// v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052:
+  /// consults the cached `selectedHabitId` (the
+  /// user-picked do for this widget instance) and falls
+  /// back to [firstActiveDo] when the selection is empty
+  /// (v1.4a behavior) or the do no longer exists (e.g.,
+  /// the user deleted it while the widget was bound). On
+  /// the fallback path the next cached state has
+  /// `selectedHabitId = null` so a future re-bind starts
+  /// fresh — the user is shown the empty-state copy
+  /// (or `firstActiveDo` once they add a new do) without
+  /// a stale selection hanging around in the JSON.
+  ///
   /// Best-effort: a platform-side failure (cache write or
   /// refresh request) is swallowed per ADR-013; the
   /// next legitimate event triggers a re-derive.
   Future<void> handleRefreshRequest() async {
     if (_disposed) return;
     try {
-      final activeDo = await firstActiveDo(repository: _doRepository);
+      final activeDo = await _resolveActiveDo();
       final completions = activeDo == null
           ? const <CompletionLogEntry>[]
           : await _completionLogEntriesFor(activeDo);
@@ -185,12 +205,28 @@ class WidgetService {
         doId: activeDo?.id ?? '',
         monthlyLimit: activeDo?.restDaysPerMonth ?? 0,
       );
+      // v1.4k / SYS-125 / ADR-055 / WF-052. Reconciliation:
+      // when `_resolveActiveDo` fell back to `firstActiveDo`
+      // because the cached pick no longer maps to a do
+      // (e.g., the user deleted the picked do while the
+      // widget was bound), the pick must be cleared to
+      // `null` for the next pass so a re-bind starts from
+      // `firstActiveDo`. The clear is idempotent and runs
+      // only on the rare stale-pick path.
+      final cachedPick = _cache.cached?.selectedHabitId;
+      final pickIsStale =
+          cachedPick != null &&
+          cachedPick.isNotEmpty &&
+          activeDo != null &&
+          activeDo.id != cachedPick;
+      final pick = pickIsStale ? null : cachedPick;
       final state = buildWidgetState(
         activeDo: activeDo,
         completions: completions,
         reliability: reliability,
         asOf: asOf,
         skipBudget: skipBudget,
+        selectedHabitId: pick,
       );
       _lastComputed = state;
       await _cache.save(state);
@@ -201,6 +237,64 @@ class WidgetService {
         debugPrint('WidgetService.handleRefreshRequest: $e\n$st');
       }
     }
+  }
+
+  /// v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052. Pure
+  /// resolve: the cached `selectedHabitId` is preferred
+  /// over `firstActiveDo` when it is non-null AND
+  /// `_doRepository.getById` returns non-null. Returns
+  /// `null` for an empty selection OR for a selection
+  /// that no longer maps to a do (the latter triggers
+  /// the reconciliation clear in [handleRefreshRequest]).
+  Future<Do?> _resolveActiveDo() async {
+    final cached = _cache.cached;
+    final pick = cached?.selectedHabitId;
+    if (pick != null && pick.isNotEmpty) {
+      final picked = await _doRepository.getById(pick);
+      if (picked != null) return picked;
+    }
+    return firstActiveDo(repository: _doRepository);
+  }
+
+  /// v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052. Set
+  /// the user-picked habit id for this widget instance.
+  /// Called by the Kotlin `DoitWidgetConfigureActivity`
+  /// via the `doit/widget` MethodChannel (or, in tests,
+  /// directly). Writes a fresh [DoitWidgetState] to the
+  /// cache so the next `WidgetRenderer.render` paints
+  /// the picked do, and asks the platform to repaint.
+  /// `null` clears the selection (reverts to
+  /// `firstActiveDo` on the next refresh).
+  ///
+  /// Returns `true` on a clean write; `false` when the
+  /// service is disposed.
+  Future<bool> setSelectedHabitId(String? habitId) async {
+    if (_disposed) return false;
+    final activeDo = habitId == null || habitId.isEmpty
+        ? await firstActiveDo(repository: _doRepository)
+        : await _doRepository.getById(habitId);
+    final completions = activeDo == null
+        ? const <CompletionLogEntry>[]
+        : await _completionLogEntriesFor(activeDo);
+    final reliability = _reliabilityService.value;
+    final asOf = DateTime.now();
+    final skipBudget = SkipBudget(
+      doId: activeDo?.id ?? '',
+      monthlyLimit: activeDo?.restDaysPerMonth ?? 0,
+    );
+    final state = buildWidgetState(
+      activeDo: activeDo,
+      completions: completions,
+      reliability: reliability,
+      asOf: asOf,
+      skipBudget: skipBudget,
+      selectedHabitId: habitId,
+    );
+    _lastComputed = state;
+    await _cache.save(state);
+    await _bridge.cacheSnapshot(state);
+    await _bridge.requestRefresh();
+    return true;
   }
 
   /// Append a completion for [habitId] via
