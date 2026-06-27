@@ -102,6 +102,22 @@ void main() {
       expect(h.validate, throwsA(isA<DoInvalidRestDays>()));
     });
 
+    test('restDaysPerMonth above 31 throws DoInvalidRestDays '
+        '(v1.4j / SYS-124 upper bound)', () {
+      final h = _fixed().copyWith(restDaysPerMonth: 32);
+      expect(h.validate, throwsA(isA<DoInvalidRestDays>()));
+    });
+
+    test('restDaysPerMonth at the boundary 0 validates (v1.4j / SYS-124)', () {
+      final h = _fixed().copyWith(restDaysPerMonth: 0);
+      expect(h.validate, returnsNormally);
+    });
+
+    test('restDaysPerMonth at the boundary 31 validates (v1.4j / SYS-124)', () {
+      final h = _fixed().copyWith(restDaysPerMonth: 31);
+      expect(h.validate, returnsNormally);
+    });
+
     test('empty weekday set throws DoNoWeekdaysSelected', () {
       final h = _fixed().copyWith(weekdays: <Weekday>{});
       expect(h.validate, throwsA(isA<DoNoWeekdaysSelected>()));

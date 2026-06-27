@@ -117,7 +117,8 @@ final class DoInvalidWeekday extends DoValidationException {
 }
 
 final class DoInvalidRestDays extends DoValidationException {
-  const DoInvalidRestDays(this.value) : super('restDaysPerMonth must be >= 0.');
+  const DoInvalidRestDays(this.value)
+    : super('restDaysPerMonth must be in 0..31.');
   final int value;
 }
 
@@ -281,7 +282,7 @@ sealed class Do {
     if (name.trim().isEmpty) {
       throw const DoNameEmpty();
     }
-    if (restDaysPerMonth < 0) {
+    if (restDaysPerMonth < 0 || restDaysPerMonth > 31) {
       throw DoInvalidRestDays(restDaysPerMonth);
     }
     if (colorSeed < 0 || colorSeed > 7) {

@@ -326,6 +326,54 @@ abstract class AppLocalizations {
   /// **'Could not delete. Try again.'**
   String get homeSnackbarDoDeleteFailed;
 
+  /// Caption under the streak badge on the home tile when restDaysPerMonth == 0 (v1.4j / SYS-124). The caption is the affordance — tapping it opens the RestDayPickerDialog so the user can set a non-zero budget. Previously this state was hidden entirely (the caption early-returned); v1.4j surfaces it so users learn the budget exists.
+  ///
+  /// In en, this message translates to:
+  /// **'No rest days configured'**
+  String get homeTileBudgetZeroCaption;
+
+  /// Title of the RestDayPickerDialog (v1.4j / SYS-124). Shown from both the home tile (tap the budget caption) and the AddHabitScreen (tap the form row). Title is the same on both surfaces — single source of truth via the shared picker helper.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest days per month'**
+  String get homeTileBudgetEditTitle;
+
+  /// Body copy of the RestDayPickerDialog (v1.4j / SYS-124). Explains the scope ('each month') and the roll-over behavior ('resets on the 1st') so the user can set a number with the right mental model. Mirrors the design docs on SkipBudget (v1.4c / SYS-117).
+  ///
+  /// In en, this message translates to:
+  /// **'How many rest days you can take each month. Resets on the 1st.'**
+  String get homeTileBudgetEditDescription;
+
+  /// Save button label of the RestDayPickerDialog (v1.4j / SYS-124). 'Save' matches the AddHabitScreen save pattern; 'OK' was rejected to avoid overloading the term (we already use 'OK' on the interval-picker dialog at add_habit.dart:621-660).
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get homeTileBudgetEditOk;
+
+  /// Cancel button label of the RestDayPickerDialog (v1.4j / SYS-124). Matches the cancel pattern on the interval-picker dialog at add_habit.dart:621-660.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get homeTileBudgetEditCancel;
+
+  /// Snackbar copy after a successful home tile budget edit tap (v1.4j / SYS-124). The {newValue} placeholder is the picked integer (0..31). Distinct from homeSnackbarDoDeleted (v1.4h) — this is a non-destructive update.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest-day budget set to {newValue}.'**
+  String homeSnackbarBudgetUpdated(int newValue);
+
+  /// Snackbar copy when the home tile budget edit save throws (e.g. DoInvalidRestDays if validation is bypassed somehow — defensive, the picker clamps inline so this never fires in practice; v1.4j / SYS-124). The tile is NOT removed on failure.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update budget. Try again.'**
+  String get homeSnackbarBudgetUpdateFailed;
+
+  /// Form-row label on the AddHabitScreen (v1.4j / SYS-124) showing the current restDaysPerMonth value. The {value} placeholder is the picked integer. The label is the affordance — tapping the row opens the RestDayPickerDialog. Closes the silent-reset bug from v1.0 where the value was hardcoded to 2 in all 5 switch branches of _save() and never exposed as a form input.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest days per month: {value}'**
+  String addHabitRestDaysLabel(int value);
+
   /// No description provided for @homeAddSheetNewDo.
   ///
   /// In en, this message translates to:

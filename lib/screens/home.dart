@@ -35,6 +35,7 @@ import 'package:doit/screens/home_tile_completion.dart';
 import 'package:doit/screens/home_tile_delete.dart';
 import 'package:doit/screens/home_tile_skip.dart';
 import 'package:doit/screens/home_tile_sparkline.dart';
+import 'package:doit/screens/rest_day_picker_dialog.dart';
 import 'package:doit/screens/home_tile_streak.dart';
 import 'package:doit/screens/home_tile_undo.dart';
 import 'package:doit/screens/mission_launcher.dart';
@@ -642,6 +643,43 @@ class _HabitTileState extends State<_HabitTile> {
     );
   }
 
+  /// v1.4j (SYS-124): tap handler for the budget caption
+  /// under the streak badge. Opens the shared
+  /// `RestDayPickerDialog` (single source of truth for the
+  /// picker UI; the AddHabitScreen form row uses the same
+  /// helper) and writes the picked value to
+  /// `DoRepository.save(habit.copyWith(restDaysPerMonth: N))`.
+  ///
+  /// The `_busy` flag is NOT used — the save is fast enough
+  /// that a spinner would flicker, and the dialog itself is
+  /// the in-flight indicator. On a save throw (defensive —
+  /// the picker clamps inline so `Do.validate()`'s upper
+  /// bound never fires in practice), the tile stays in
+  /// place and the failure snackbar is shown.
+  Future<void> _onBudgetCaptionTapped() async {
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final picked = await showRestDayPicker(
+      context,
+      initial: widget.habit.restDaysPerMonth,
+    );
+    if (picked == null) return;
+    if (!mounted) return;
+    try {
+      await DoRepository.instance.save(
+        widget.habit.copyWith(restDaysPerMonth: picked),
+      );
+      widget.onDoChanged?.call();
+      messenger.showSnackBar(
+        SnackBar(content: Text(l.homeSnackbarBudgetUpdated(picked))),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l.homeSnackbarBudgetUpdateFailed)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final habit = widget.habit;
@@ -724,6 +762,7 @@ class _HabitTileState extends State<_HabitTile> {
                             completions: completions,
                             activeDo: habit,
                             asOf: asOf,
+                            onBudgetCaptionTapped: _onBudgetCaptionTapped,
                             budget: budgetRemainingForDo(
                               activeDo: habit,
                               asOf: asOf,
@@ -817,11 +856,20 @@ class _DoStreakBadge extends StatelessWidget {
     required this.activeDo,
     required this.asOf,
     required this.budget,
+    required this.onBudgetCaptionTapped,
   });
   final Future<List<CompletionRow>> completions;
   final Do activeDo;
   final DateTime asOf;
   final Future<BudgetRemaining> budget;
+
+  /// v1.4j (SYS-124): forwarded to the `_BudgetCaption`'s
+  /// `onTap` so the caption itself is the affordance for
+  /// editing `restDaysPerMonth`. Owner is the parent
+  /// `_HabitTileState` — the badge is a stateless
+  /// presentation widget that has no side effects of its
+  /// own.
+  final VoidCallback onBudgetCaptionTapped;
 
   @override
   Widget build(BuildContext context) {
@@ -879,6 +927,8 @@ class _DoStreakBadge extends StatelessWidget {
                     return _BudgetCaption(
                       budget: b,
                       isExhausted: b.isExhausted,
+                      onTap: onBudgetCaptionTapped,
+                      zeroCaption: l.homeTileBudgetZeroCaption,
                     );
                   },
                 ),
@@ -1425,38 +1475,84 @@ class _UndoButton extends StatelessWidget {
   }
 }
 
-/// v1.4c / SYS-117 — small caption rendered under the
-/// streak badge showing "X / Y rest days left this
-/// month". Hidden when:
-///   - the do has no rest-day budget configured
-///   - the budget hasn't been touched yet (used == 0)
-///   - all budget units are still available (the caption
-///     would only say "2/2 rest days left", which is
-///     noise — the user hasn't engaged with the feature
-///     yet)
-/// Shows the "no rest days left" caption when the budget
-/// is exhausted.
+/// v1.4c / SYS-117 / v1.4j / SYS-124 — small caption
+/// rendered under the streak badge showing "X / Y rest days
+/// left this month". Also serves as the affordance for
+/// editing `restDaysPerMonth` — tapping the caption opens
+/// the shared `RestDayPickerDialog` (see
+/// `lib/screens/rest_day_picker_dialog.dart`).
+///
+/// v1.4j drops the two early-returns that previously hid
+/// the caption when:
+///   - the do has no rest-day budget configured (`limit <= 0`)
+///   - the budget hasn't been touched yet (`used == 0`)
+///
+/// Hiding the affordance in those states was the v1.4c
+/// design, but the v1.4i sprint review surfaced the gap:
+/// users with no budget (or no rest days used yet) had no
+/// way to discover that the budget feature existed at all.
+/// v1.4j surfaces `homeTileBudgetZeroCaption`
+/// ("No rest days configured") in the `limit <= 0` case so
+/// the affordance is always visible.
 class _BudgetCaption extends StatelessWidget {
-  const _BudgetCaption({required this.budget, required this.isExhausted});
+  const _BudgetCaption({
+    required this.budget,
+    required this.isExhausted,
+    required this.onTap,
+    required this.zeroCaption,
+  });
   final BudgetRemaining budget;
   final bool isExhausted;
+
+  /// v1.4j (SYS-124): tap handler that opens the
+  /// `RestDayPickerDialog` and writes the picked value via
+  /// `DoRepository.save(...)`. Captured by `_HabitTileState`
+  /// so the dialog's async gap cannot leak a stale
+  /// `BuildContext` into the SnackBar call.
+  final VoidCallback onTap;
+
+  /// Localized "No rest days configured" string. Becomes
+  /// the Semantics label for the tap target when the budget
+  /// is zero so TalkBack announces a discoverable button.
+  final String zeroCaption;
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    if (budget.limit <= 0) return const SizedBox.shrink();
-    if (isExhausted) {
-      return Text(
-        l.homeTileBudgetNoRemaining,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: Theme.of(context).colorScheme.error,
-        ),
+    final String text;
+    final TextStyle? style;
+    if (budget.limit <= 0) {
+      // Surface the affordance to users who haven't
+      // configured a budget yet — the previous
+      // SizedBox.shrink() hid the feature entirely.
+      text = zeroCaption;
+      style = Theme.of(context).textTheme.bodySmall;
+    } else if (isExhausted) {
+      text = l.homeTileBudgetNoRemaining;
+      style = Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: Theme.of(context).colorScheme.error,
       );
+    } else {
+      text = l.homeTileBudgetRemaining(budget.remaining, budget.limit);
+      style = Theme.of(context).textTheme.bodySmall;
     }
-    if (budget.used == 0) return const SizedBox.shrink();
-    return Text(
-      l.homeTileBudgetRemaining(budget.remaining, budget.limit),
-      style: Theme.of(context).textTheme.bodySmall,
+    // v1.4j: wrap the caption in a tap target + Semantics
+    // button so TalkBack announces "No rest days configured,
+    // button" / "2/3 rest days left, button". The
+    // GestureDetector is INSIDE the tile body, so the tile's
+    // outer InkWell.onLongPress (select mode, v1.4b) is
+    // unaffected — tap and long-press are different gestures.
+    return Semantics(
+      button: true,
+      label: text,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Text(text, style: style),
+        ),
+      ),
     );
   }
 }

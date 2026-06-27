@@ -20,8 +20,10 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/localized_app.dart';
+
 Widget _wrap() {
-  return const MaterialApp(home: TemplatesScreen());
+  return localizedApp(home: const TemplatesScreen());
 }
 
 Future<void> _setupDb(WidgetTester tester) async {

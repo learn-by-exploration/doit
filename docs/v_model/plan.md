@@ -916,3 +916,59 @@ the v1.1i pattern at `222f860`).
   re-uses the existing `_HomeScreenState._refresh()`
   setState cascade — no `ChangeNotifier` / `Stream`
   is added.
+
+- **v1.4j / Phase 37 / SYS-124 / ADR-054 / WF-051** —
+  In-app rest-day budget edit affordance on the home tile
+  + v1.0 silent-reset bug fix in `AddHabitScreen._save()`.
+  Adds a shared `RestDayPickerDialog` (`lib/screens/rest_day_picker_dialog.dart`,
+  NEW) with a `Slider(min: 0, max: 31, divisions: 31, ...)`
+  that both the tile affordance and the `AddHabitScreen`
+  form-row trigger call — single source of truth for the
+  UI shape. `_BudgetCaption` (`lib/screens/home.dart`)
+  grows `onTap: VoidCallback` + `zeroCaption: String`
+  constructor params and DROPS the two pre-existing
+  early-returns (`limit <= 0` + `used == 0`) so the caption
+  renders in all 3 budget states (zero budget / partial
+  use / exhausted). The caption is wrapped in
+  `Semantics(button: true, label: captionText)` +
+  `GestureDetector(onTap: onTap)` so TalkBack reads the
+  caption as a button. `_HabitTileState._onBudgetCaptionTapped()`
+  captures `messenger = ScaffoldMessenger.of(context)`
+  BEFORE the async gap, awaits `showRestDayPicker(...)`,
+  on non-null awaits `DoRepository.instance.save(widget.habit.copyWith(restDaysPerMonth: picked))`,
+  on success shows `messenger.showSnackBar(...)` +
+  `widget.onDoChanged?.call()` to trigger the v1.4h
+  `_refresh()` cascade; on throw shows
+  `homeSnackbarBudgetUpdateFailed` SnackBar WITHOUT
+  removing the tile. `AddHabitScreen` (`lib/screens/add_habit.dart`)
+  grows `int _restDaysPerMonth = 2` state field, loaded
+  in `_loadExisting()` from `_original.restDaysPerMonth`
+  (preserving the original value in edit mode — fixes
+  the v1.0 silent-reset bug), replaces all 5 hardcoded
+  `restDaysPerMonth: 2` literals in `_save()` at
+  `:911, :926, :945, :960, :981` with
+  `restDaysPerMonth: _restDaysPerMonth`, and grows
+  `_pickRestDaysPerMonth()` which calls `showRestDayPicker(...)`
+  + `setState`. The form body grows a new "Rest days per
+  month: N" `ListTile` near the proof-mode row that
+  opens the same picker. `Do.validate()`
+  (`lib/do/do.dart`) adds the upper-bound check
+  `if (restDaysPerMonth < 0 || restDaysPerMonth > 31) throw DoInvalidRestDays(...)`
+  so `DoInvalidRestDays` is the single source of truth
+  for the invariant (the picker clamps inline, `validate()`
+  is the defensive second line). 7 new ARB keys
+  (`homeTileBudgetZeroCaption`, `homeTileBudgetEditTitle`,
+  `homeTileBudgetEditDescription`, `homeTileBudgetEditOk`,
+  `homeTileBudgetEditCancel`, `homeSnackbarBudgetUpdated(value)`,
+  `homeSnackbarBudgetUpdateFailed`, `addHabitRestDaysLabel(value)`)
+  added in lockstep across `app_en.arb` + `app_es.arb`.
+  Pure-Dart — no new `<uses-permission>`, no new pubspec
+  deps, no new Drift tables, no new MethodChannels, no
+  Kotlin changes. Test count 1252 → 1271 (+19: 8
+  picker + 3 do_model `Do.validate` boundaries + 1
+  add_habit widget row + 1 grep regression `restDaysPerMonth: 2`
+  + 5 home `BudgetCaption` + 1 add_habit localization
+  wrapper switched to `localizedApp` — 3 add_habit
+  localizations mirrored to 3 sibling test files:
+  `add_habit_delete_test.dart` + `add_habit_save_as_template_test.dart`
+  + `templates_test.dart`).
