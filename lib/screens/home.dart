@@ -544,30 +544,37 @@ class _HabitTileState extends State<_HabitTile> {
     }
   }
 
-  /// v1.4h / SYS-122 — per-tile "Delete" handler. Opens
-  /// an `AlertDialog` (gated on the user tapping "Delete"
-  /// in the dialog) → calls the pure-Dart `deleteDo`
+  /// v1.4l / Phase 39 / SYS-126 / ADR-056 / WF-053 — per-
+  /// tile "Delete" handler with true Undo. Opens an
+  /// `AlertDialog` (gated on the user tapping "Delete" in
+  /// the dialog) → calls the pure-Dart `softDeleteDo`
   /// helper → on `true` shows a SnackBar with an "Undo"
-  /// action that re-saves the captured `Do` reference.
+  /// action that calls `restoreById` on the captured `Do`
+  /// id.
   ///
-  /// The undo path does NOT restore the completion-log
-  /// rows that were cascade-deleted with the do (the
-  /// `_db.delete(_db.habits)` FK pragma removes the
-  /// linked `completions` rows). Re-save only restores
-  /// the do row — the streak counter will start from 0
-  /// on the restored do. This is the v1.4h trade-off:
-  /// snapshotting the completion log for a true undo
-  /// would be a v1.4h+ follow-up (a soft-delete column
-  /// on the `habits` table).
+  /// v1.4l replaces the v1.4h hard-delete + Undo-re-save
+  /// path with soft-delete + Undo-restore. The motivation:
+  /// the Drift schema declares NO FK constraints (see
+  /// `lib/services/db/tables.dart`), so a hard-delete
+  /// leaves orphan `Completions` + `RestDayBudgets` rows
+  /// in the DB. The v1.4h re-save path on Undo re-inserted
+  /// the `Habits` row but the streak counter still started
+  /// from 0 (the `insertOnConflictUpdate` semantics + a
+  /// latent `_toRow` bug that drops `automationsJson` — see
+  /// ADR-056 §"Risks"). v1.4l's soft-delete keeps the
+  /// `Habits` row + completion-log rows in the table so
+  /// `ConsecutiveCounter.compute` can rebuild the streak
+  /// from the log on restore.
   ///
   /// Flow: tap → open `AlertDialog` (gated on
   /// confirm) → capture `messenger = ScaffoldMessenger.of(context)`
   /// BEFORE the async gap → `setState(_busy = true)` →
-  /// `deleteDo(...)` → on `true` clear `_busy` + flip
-  /// `onDoChanged` → show SnackBar with Undo action →
-  /// on `false` (helper returned false) clear `_busy`
-  /// and show failure snackbar WITHOUT removing the
-  /// tile.
+  /// `softDeleteDo(...)` → on `true` clear `_busy` + flip
+  /// `onDoChanged` → show SnackBar with Undo action → on
+  /// Undo tap, `restoreDo(...)` flips the parent's
+  /// `onDoChanged` again → on `false` (helper returned
+  /// false) clear `_busy` and show failure snackbar WITHOUT
+  /// removing the tile.
   Future<void> _onDeletePressed() async {
     if (_busy) return;
     final l = AppLocalizations.of(context);
@@ -602,8 +609,9 @@ class _HabitTileState extends State<_HabitTile> {
     // rebuild removes the tile).
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _busy = true);
-    final ok = await deleteDo(
+    final ok = await softDeleteDo(
       activeDo: habit,
+      at: DateTime.now(),
       repository: DoRepository.instance,
     );
     if (!mounted) return;
@@ -614,11 +622,12 @@ class _HabitTileState extends State<_HabitTile> {
       );
       return;
     }
-    // Happy path: the do is gone from the DB. The
-    // captured `habit` reference is still valid in
-    // memory — we re-save it on Undo. The parent's
-    // `_refresh()` re-fetches the list so the tile
-    // disappears immediately.
+    // Happy path: the do is tombstoned (`deletedAtMillis`
+    // set, row stays in the table). The captured `habit`
+    // reference is still valid in memory — we pass its id
+    // to `restoreDo` on Undo. The parent's `_refresh()`
+    // re-fetches the list so the tile disappears immediately
+    // (the `listAll` filter excludes tombstoned rows).
     widget.onDoChanged?.call();
     messenger.showSnackBar(
       SnackBar(
@@ -626,17 +635,17 @@ class _HabitTileState extends State<_HabitTile> {
         action: SnackBarAction(
           label: l.homeSnackbarDoDeletedUndo,
           onPressed: () async {
-            try {
-              await DoRepository.instance.save(habit);
+            final restored = await restoreDo(
+              tombstonedDo: habit,
+              repository: DoRepository.instance,
+            );
+            if (restored) {
               widget.onDoChanged?.call();
-            } catch (_) {
-              // Defensive: if the re-save fails (e.g., the
-              // user created a new do with the same name in
-              // the gap), the SnackBar stays the success
-              // state — the user can add the do back
-              // manually via the FAB. The DB is the source
-              // of truth, not the in-memory `habit`.
             }
+            // If `restored` is false (the row was already
+            // active — e.g., the user double-tapped Undo),
+            // the SnackBar stays in its success state; the
+            // DB is the source of truth.
           },
         ),
       ),

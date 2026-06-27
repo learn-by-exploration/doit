@@ -1,54 +1,88 @@
-// Per-tile delete helper for the in-app home screen
-// (v1.4h / Phase 35 / SYS-122 / ADR-052 / WF-049).
+// Per-tile delete + restore helpers for the in-app home
+// screen (v1.4l / Phase 39 / SYS-126 / ADR-056 / WF-053).
 //
-// The home tile today has Skip / Undo / Done IconButtons
-// (v1.4c / v1.4d / v1.4b respectively) but NO edit /
-// delete affordance — the user has to long-press the tile
-// to enter select-mode then tap the trash icon in the app
-// bar, which is undiscoverable. v1.4h adds a per-tile
-// trash IconButton that opens a confirm dialog + calls
-// `DoRepository.deleteById` + shows a SnackBar with an
-// Undo action that re-saves the captured do.
+// The home tile has Skip / Undo / Done IconButtons (v1.4c /
+// v1.4d / v1.4b respectively) plus the per-tile Edit +
+// Delete IconButtons from v1.4h. v1.4l replaces v1.4h's
+// hard-delete path with a soft-delete + restore path so the
+// Undo SnackBar is a true restore (the streak reconstructs
+// from the intact completion log; see ADR-056 §"Tombstone =
+// invisible to UI, visible to restore + backup-restore").
 //
-// This helper is the pure-Dart seam between the tile's
-// `_DeleteButton` onPressed callback and the `DoRepository`
-// singleton. The helper:
+// The helpers here are the pure-Dart seams between the
+// tile's UI callbacks and the `DoRepository` singleton.
 //
-//   1. Captures the do as the function argument (the
-//      caller passes a reference before calling `delete`).
-//   2. Calls `repository.deleteById(do.id)`.
-//   3. Returns `true` on the happy path so the caller
-//      can refresh the home list (the deleted tile
-//      disappears immediately).
-//   4. Catches any throwable (DB locked, constraint
-//      violation, etc.) and returns `false` so the caller
-//      can show an error SnackBar WITHOUT removing the
-//      tile.
+//   1. [softDeleteDo] — sets `deletedAtMillis = at` on the
+//      do's row. The `Habits` row + `Completions` +
+//      `RestDayBudgets` rows stay in the DB (no FK declared,
+//      no cascade). The do disappears from `listAll` /
+//      `listActive` until [restoreDo] is called.
+//   2. [restoreDo] — sets `deletedAtMillis = NULL` on the
+//      matching row. Idempotent on an active row.
 //
-// The undo path is handled by the caller — `_DeleteButton`
-// captures the do reference in a closure, then if the
-// SnackBar's "Undo" action fires, the closure re-saves
-// the do via `DoRepository.save`. The undo path is NOT in
-// this helper because it needs the `BuildContext` for the
-// SnackBar (Material SnackBars can't be shown from a pure
-// helper without a context).
+// Both helpers catch any throwable (DB locked, constraint
+// violation, etc.) and return a `bool` so the tile's UI
+// layer can branch without `try/catch` blocks. The Undo
+// path is the caller's responsibility (it needs the
+// `BuildContext` for the SnackBar — Material SnackBars
+// can't be shown from a pure helper without a context).
 
 import 'package:doit/do/do.dart';
 import 'package:doit/services/do_repository.dart';
 
-/// Delete the do from the repository. Returns `true` on
-/// the happy path (caller should refresh the home list);
-/// `false` on any throwable (caller should show an error
-/// SnackBar and leave the tile in place).
+/// Soft-delete the do from the repository. Returns `true`
+/// on the happy path (caller should refresh the home list
+/// so the tile disappears immediately); `false` on any
+/// throwable (caller should show an error SnackBar and
+/// leave the tile in place) or if no matching active row
+/// existed.
 ///
-/// Pure-Dart, no Flutter import, no `DateTime.now()`.
-Future<bool> deleteDo({
+/// v1.4l (SYS-126) supersedes the v1.4h `deleteDo` helper,
+/// which hard-deleted the row (and silently broke streak
+/// restoration on Undo — see ADR-056). The new path is
+/// idempotent on a tombstoned do (the SQL UPDATE filters
+/// `deletedAtMillis IS NULL` so re-soft-deleting returns
+/// `false` rather than bumping the tombstone timestamp).
+///
+/// Pure-Dart, no Flutter import, no `DateTime.now()`
+/// inside (the caller passes the reference time).
+Future<bool> softDeleteDo({
   required Do activeDo,
+  required DateTime at,
   required DoRepository repository,
 }) async {
   try {
-    await repository.deleteById(activeDo.id);
-    return true;
+    return await repository.softDeleteById(activeDo.id, at: at);
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Restore a tombstoned do. Returns `true` on the happy
+/// path (the do is back in `listAll`); `false` on any
+/// throwable or if the row was not tombstoned (idempotent
+/// on an active row — the SQL UPDATE filters
+/// `deletedAtMillis IS NOT NULL` so re-restoring returns
+/// `false`).
+///
+/// v1.4l (SYS-126) supersedes the v1.4h Undo path, which
+/// called `DoRepository.save(habit)` and re-inserted the
+/// row via `insertOnConflictUpdate`. The v1.4h path
+/// triggered `DuplicateDoName` if the user had created a
+/// new do with the same name in the SnackBar window, and
+/// the row recreation lost the user's `automations` (a
+/// separate latent bug — the `_toRow` mapping does not
+/// write `automationsJson`, tracked for a v1.4l+ follow-up).
+/// The v1.4l restore path is a single UPDATE so neither
+/// failure mode applies.
+///
+/// Pure-Dart, no Flutter import.
+Future<bool> restoreDo({
+  required Do tombstonedDo,
+  required DoRepository repository,
+}) async {
+  try {
+    return await repository.restoreById(tombstonedDo.id);
   } catch (_) {
     return false;
   }

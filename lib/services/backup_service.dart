@@ -128,7 +128,21 @@ class BackupService {
   ///   `Reliability` enum value at export time. Old v1
   ///   payloads stay importable: every new field is optional
   ///   on read.
-  static const int kBackupPayloadSchemaVersion = 2;
+  /// - 3 (v1.4l / SYS-126 / ADR-056 / WF-053): adds the
+  ///   soft-delete tombstone column (`deletedAtMillis`,
+  ///   nullable int) on habits. Tombstoned habits are
+  ///   filtered out of the export (see ADR-056 §"Backup
+  ///   filter") so the backup envelope is the user's
+  ///   "truth at export time", tombstones are an undo
+  ///   affordance. Restoring from a v3 backup brings back
+  ///   only the active dos at export time; orphan
+  ///   rest-day-budget rows for tombstoned habits are also
+  ///   filtered out. The `deletedAtMillis` field IS
+  ///   written into the envelope (nullable int) so a
+  ///   backup round-trip is lossless — future schema
+  ///   changes that decide tombstones ARE user data
+  ///   restore them on read.
+  static const int kBackupPayloadSchemaVersion = 3;
 
   /// The v0.4c.1 inner payload schema version. Read-only on
   /// v1.4a+; the import path still accepts it.
@@ -258,10 +272,35 @@ class BackupService {
   }
 
   Future<Map<String, Object?>> _readAllTables({String? reliability}) async {
-    final habits = await _db.select(_db.habits).get();
+    // v1.4l / SYS-126 / ADR-056 §"Backup filter": the export
+    // skips tombstoned habits (`deletedAtMillis IS NOT NULL`).
+    // The backup envelope is the user's "truth at export
+    // time"; tombstones are an undo affordance, not user
+    // data. We also drop `restDayBudgets` rows whose
+    // `habitId` is tombstoned (a tombstoned habit's budget
+    // is irrelevant until the user restores the habit).
+    // `completions` for tombstoned habits STAY in the export
+    // so a future restore preserves the streak history if
+    // the user decides to restore via a "Recently deleted"
+    // surface (a v1.4l+ candidate — see ADR-056). For now,
+    // on import those orphan rows re-attach to whatever
+    // active habit shares the id; if no such habit exists
+    // (the v1.4l default), they sit in `completions` as
+    // inert (no UI surface queries them).
+    final habits = await (_db.select(
+      _db.habits,
+    )..where((t) => t.deletedAtMillis.isNull())).get();
+    final activeHabitIds = habits.map((h) => h.id).toSet();
     final people = await _db.select(_db.people).get();
     final completions = await _db.select(_db.completions).get();
-    final budgets = await _db.select(_db.restDayBudgets).get();
+    // v1.4l / SYS-126 / ADR-056: drop rest-day budgets whose
+    // habit is tombstoned. The Drift `isIn` lowers to a SQL
+    // `IN (...)` clause (or `1 = 1` if the set is empty, so
+    // a fully-tombstoned export still produces a valid
+    // empty budget list).
+    final budgets = await (_db.select(
+      _db.restDayBudgets,
+    )..where((t) => t.habitId.isIn(activeHabitIds))).get();
     final settings = await _db.select(_db.settings).get();
     final events = await _db.select(_db.eventLogs).get();
     return {
@@ -367,6 +406,14 @@ class BackupService {
     'pausedUntilMillis': r.pausedUntilMillis,
     // v1.0: non-default automation rules (RoutineConfig).
     'automationsJson': r.automationsJson,
+    // v1.4l / SYS-126: soft-delete tombstone. NULL on
+    // export (we filter tombstoned rows out of the
+    // envelope — see `_readAllTables`). The field IS
+    // written into the JSON so a future schema change
+    // that decides tombstones ARE user data restores
+    // them on read; today the field is always NULL
+    // because the export query excludes tombstoned rows.
+    'deletedAtMillis': r.deletedAtMillis,
   };
 
   HabitsCompanion _habitFromJson(Map<String, Object?> j) => HabitsCompanion(
@@ -396,6 +443,13 @@ class BackupService {
     iconName: Value(j['iconName'] as String?),
     pausedUntilMillis: Value((j['pausedUntilMillis'] as num?)?.toInt()),
     automationsJson: Value(j['automationsJson'] as String?),
+    // v1.4l / SYS-126: tombstone. Nullable on read; v1 / v2
+    // payloads and writes by a v1.4l build (tombstones
+    // are stripped from exports) both leave the field NULL
+    // on read. A future build that decides tombstones ARE
+    // user data would write the field on export and
+    // restore the tombstone here.
+    deletedAtMillis: Value((j['deletedAtMillis'] as num?)?.toInt()),
   );
 
   // --- PersonRow <-> JSON ----------------------------------------

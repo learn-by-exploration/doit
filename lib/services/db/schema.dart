@@ -35,12 +35,27 @@
 //       migration means "no non-default automations" (the
 //       default `ActionNotify` is synthesized at dispatch
 //       time, not stored).
+//   5 — v1.4l (Phase 39 / SYS-126 / ADR-056 / WF-053):
+//       + habits.deleted_at_millis (INTEGER nullable) —
+//       the soft-delete tombstone column. NULL = active,
+//       non-null = tombstoned at this epoch millisecond.
+//       The migration is in `migrations/v4_to_v5.dart`.
+//       Replaces the brittle v1.4h "delete +
+//       insertOnConflictUpdate on Undo" path with a true
+//       restore (Undelete = `UPDATE … SET deleted_at_millis
+//       = NULL WHERE id = ?`). The `Habits` row + its
+//       completion-log rows stay in the DB across the
+//       delete / Undo cycle, so `ConsecutiveCounter.compute`
+//       can rebuild the streak from the log on restore. See
+//       ADR-056 for the design rationale (the v1.4h trade-
+//       off that motivated v1.4l).
 
 import 'package:drift/drift.dart';
 
 import 'package:doit/services/db/migrations/v1_to_v2.dart';
 import 'package:doit/services/db/migrations/v2_to_v3.dart';
 import 'package:doit/services/db/migrations/v3_to_v4.dart';
+import 'package:doit/services/db/migrations/v4_to_v5.dart';
 import 'package:doit/services/db/tables.dart';
 
 part 'schema.g.dart';
@@ -49,7 +64,7 @@ part 'schema.g.dart';
 /// change. The matching migration file MUST land in
 /// `lib/services/db/migrations/vN_to_vM.dart` and be referenced from
 /// [migrations] below.
-const int kCurrentSchemaVersion = 4;
+const int kCurrentSchemaVersion = 5;
 
 @DriftDatabase(
   tables: [
@@ -91,6 +106,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 4) {
         await migrateV3ToV4(m, this);
+      }
+      if (from < 5) {
+        await migrateV4ToV5(m, this);
       }
     },
     beforeOpen: (details) async {

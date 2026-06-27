@@ -43,6 +43,17 @@ class DoRepository {
   /// repository delegates input validation to the model
   /// (`do.validate()`), which throws [DoValidationException]
   /// subclasses on bad input.
+  ///
+  /// v1.4l (SYS-126 / ADR-056): `save` is **content-only** —
+  /// it does NOT touch the tombstone column (`deletedAtMillis`).
+  /// The [_toRow] mapping omits `deletedAtMillis` so Drift's
+  /// `insertOnConflictUpdate` semantics leave the existing
+  /// column value alone (per the Drift docs: "on conflict,
+  /// the values you specified override the existing row's
+  /// values for those columns; unspecified columns keep the
+  /// existing row's value"). This is the invariant that
+  /// keeps a tombstone alive across Save clicks — only
+  /// [restoreById] can resurrect a tombstoned do.
   Future<void> save(domain.Do d) async {
     await _ready;
     d.validate();
@@ -58,6 +69,12 @@ class DoRepository {
   }
 
   /// Fetch a do by id. Returns `null` if not present.
+  /// **Tombstones are returned** — callers that should never
+  /// see tombstoned dos must use [getActiveById] or filter
+  /// with [Do.isDeleted]. `getById` is used by the restore
+  /// path to fetch a tombstoned row and the by-id widget
+  /// deep-link (the widget deep-link clears the cache if the
+  /// picked habit is tombstoned — see v1.4k / SYS-125).
   Future<domain.Do?> getById(String id) async {
     await _ready;
     final row = await (_db.select(
@@ -66,36 +83,118 @@ class DoRepository {
     return row == null ? null : _fromRow(row);
   }
 
+  /// Fetch an active (non-tombstoned) do by id. Returns `null`
+  /// if not present OR tombstoned. UI listings that should
+  /// never see tombstones use this. v1.4l (SYS-126 / ADR-056).
+  Future<domain.Do?> getActiveById(String id) async {
+    final d = await getById(id);
+    if (d == null) return null;
+    return d.isDeleted ? null : d;
+  }
+
   /// List all dos, oldest-first. Order is the natural
   /// `createdAtMillis` ascending so the home screen renders in
   /// creation order.
+  ///
+  /// v1.4l (SYS-126 / ADR-056): tombstoned dos are filtered
+  /// out at the SQL level (`deletedAtMillis IS NULL`). UI
+  /// listings never see tombstones; the restore path uses
+  /// [getById] to fetch a specific tombstoned row by id.
   Future<List<domain.Do>> listAll() async {
     await _ready;
-    final rows = await (_db.select(
-      _db.habits,
-    )..orderBy([(t) => OrderingTerm.asc(t.createdAtMillis)])).get();
+    final rows =
+        await (_db.select(_db.habits)
+              ..where((t) => t.deletedAtMillis.isNull())
+              ..orderBy([(t) => OrderingTerm.asc(t.createdAtMillis)]))
+            .get();
     return rows.map(_fromRow).toList(growable: false);
   }
 
   /// List dos that are NOT currently paused (pausedUntil is
-  /// null OR in the past). v0.2 (SYS-047). The scheduler uses
-  /// this to skip paused dos when computing the "next
-  /// occurrence" across all active dos.
+  /// null OR in the past) AND NOT tombstoned. v0.2 (SYS-047)
+  /// for the pause filter; v1.4l (SYS-126) for the tombstone
+  /// filter. The scheduler uses this to skip paused +
+  /// tombstoned dos when computing the "next occurrence"
+  /// across all active dos.
   Future<List<domain.Do>> listActive(DateTime now) async {
     await _ready;
-    final rows = await (_db.select(
-      _db.habits,
-    )..orderBy([(t) => OrderingTerm.asc(t.createdAtMillis)])).get();
+    final rows =
+        await (_db.select(_db.habits)
+              ..where((t) => t.deletedAtMillis.isNull())
+              ..orderBy([(t) => OrderingTerm.asc(t.createdAtMillis)]))
+            .get();
     return rows
         .map(_fromRow)
         .where((d) => !d.isPausedAt(now))
         .toList(growable: false);
   }
 
-  /// Delete a do by id. The completion log and skip-day budget
-  /// rows are cascade-deleted via the foreign-key pragma in
-  /// `schema.dart` (the model itself doesn't enforce this; the
-  /// service layer does).
+  /// Soft-delete a do. Sets `deletedAtMillis = at` on the
+  /// matching row. The `Habits` row + `Completions` +
+  /// `RestDayBudgets` rows stay in the table (no FK
+  /// declared, no cascade); the do is filtered out of
+  /// [listAll] / [listActive] / [getActiveById] until
+  /// [restoreById] is called.
+  ///
+  /// This is the default delete path for the home tile
+  /// (v1.4l / SYS-126). The tile's Undo SnackBar calls
+  /// [restoreById] with the same id.
+  ///
+  /// Returns `true` if a row was updated, `false` if no
+  /// matching row exists (or was already tombstoned). The
+  /// home tile treats `false` as "the helper should not
+  /// remove the tile from the UI list" — the user gets the
+  /// error snackbar.
+  Future<bool> softDeleteById(String id, {required DateTime at}) async {
+    await _ready;
+    final affected =
+        await (_db.update(
+          _db.habits,
+        )..where((t) => t.id.equals(id) & t.deletedAtMillis.isNull())).write(
+          HabitsCompanion(deletedAtMillis: Value(at.millisecondsSinceEpoch)),
+        );
+    return affected > 0;
+  }
+
+  /// Restore a tombstoned do. Sets `deletedAtMillis = NULL`
+  /// on the matching row (idempotent — calling on an active
+  /// row is a no-op). The `Completions` + `RestDayBudgets`
+  /// rows stay attached through the tombstone (no FK
+  /// declared, no cascade), so [ConsecutiveCounter.compute]
+  /// can rebuild the streak from the log on restore.
+  ///
+  /// This is the Undo path for the home tile (v1.4l /
+  /// SYS-126). v1.4h's Undo path called [save] which
+  /// re-inserted via `insertOnConflictUpdate` — that worked
+  /// for the row but lost the user's automations (separate
+  /// bug, tracked for a v1.4l+ follow-up). v1.4l's
+  /// `restoreById` is a single UPDATE so it cannot collide
+  /// with `DuplicateDoName`.
+  ///
+  /// Returns `true` if a row was updated (was tombstoned),
+  /// `false` if no matching tombstoned row exists.
+  Future<bool> restoreById(String id) async {
+    await _ready;
+    final affected =
+        await (_db.update(_db.habits)
+              ..where((t) => t.id.equals(id) & t.deletedAtMillis.isNotNull()))
+            .write(const HabitsCompanion(deletedAtMillis: Value(null)));
+    return affected > 0;
+  }
+
+  /// Force-delete a do by id. Reserved for the
+  /// `BackupService.importFrom` wipe path (and any future
+  /// admin / debug tools). The completion-log and rest-day
+  /// budget rows for a force-deleted do are NOT touched —
+  /// the Drift schema declares no FK constraints
+  /// (`lib/services/db/tables.dart`), so a force-delete
+  /// leaves orphan rows in `Completions` and
+  /// `RestDayBudgets` (they are inert; no UI surface
+  /// queries by `habitId` against a hard-deleted habit).
+  ///
+  /// The home tile does NOT call this — it goes through
+  /// [softDeleteById] so Undo is a true restore (see
+  /// ADR-056 §"Alternatives considered").
   Future<void> deleteById(String id) async {
     await _ready;
     await (_db.delete(_db.habits)..where((t) => t.id.equals(id))).go();
@@ -104,6 +203,16 @@ class DoRepository {
   // --- mapping ----------------------------------------------------
 
   HabitRow _toRow(domain.Do d) {
+    // v1.4l / SYS-126 / ADR-056 §"save doesn't touch
+    // tombstones": the `deletedAtMillis` column is INTENTIONALLY
+    // omitted from the returned `HabitRow`. Drift's
+    // `insertOnConflictUpdate` semantics preserve the existing
+    // column value when the new row doesn't specify it, so a
+    // Save click on a tombstoned do leaves the tombstone
+    // intact. Restoration goes through [restoreById]. If a
+    // future change adds `deletedAtMillis: d.deletedAt?.…`
+    // here, the invariant breaks — pin in
+    // `test/services/do_repository_test.dart`.
     return HabitRow(
       id: d.id,
       name: d.name.trim(),
@@ -135,6 +244,12 @@ class DoRepository {
 
   domain.Do _fromRow(HabitRow r) {
     final proofMode = _parseProofMode(r.proofMode, r.missionChainJson);
+    // v1.4l / SYS-126: read the tombstone column once and
+    // thread it through every subclass constructor. NULL =
+    // active; non-null = tombstoned at this epoch millisecond.
+    final deletedAt = r.deletedAtMillis == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(r.deletedAtMillis!);
     final base = (
       id: r.id,
       name: r.name,
@@ -162,6 +277,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          deletedAt: deletedAt,
         );
       case 'interval':
         return domain.DoInterval(
@@ -178,6 +294,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          deletedAt: deletedAt,
         );
       case 'anchor':
         return domain.DoAnchor(
@@ -194,6 +311,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          deletedAt: deletedAt,
         );
       case 'dayOfX':
         return domain.DoDayOfX(
@@ -210,6 +328,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          deletedAt: deletedAt,
         );
       case 'timeWindow':
         return domain.DoTimeWindow(
@@ -226,6 +345,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          deletedAt: deletedAt,
         );
       default:
         throw StateError('Unknown scheduleType: ${r.scheduleType}');

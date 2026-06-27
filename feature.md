@@ -330,11 +330,15 @@ lost between the v1.4 closeout and the next milestone kickoff.
   Edit + Delete + v1.4i rest-day history + v1.4j rest-day
   budget edit + v1.4k per-instance widget configuration
   (Android AppWidget configuration activity + body-tap
-  deep-link to `/habit?habitId=...`) ship:
+  deep-link to `/habit?habitId=...`) + v1.4l soft-delete
+  column on `habits` (Undo now restores streak by construction,
+  closing the v1.4h trade-off at ADR-052 §8) ship:
   widget small / large variants, widget list (scrolling);
-  soft-delete column on
-  `habits` so the v1.4h Delete-Undo path can restore streak
-  history (v1.4h documented trade-off, per ADR-052 §8).
+  a "Recently deleted" surface for tombstoned habits so the
+  user can restore after the SnackBar window closes (the
+  v1.4l soft-delete data model + inline Undo flow ships
+  in this cycle; the broader restore surface is the v1.4l+
+  follow-up that ADR-056 §"Out of scope" notes).
   See `docs/v_model/plan.md`
   Milestone 12+ for the candidate list (Milestone 11 v1.4
   is shipping in this cycle).
@@ -348,9 +352,9 @@ lost between the v1.4 closeout and the next milestone kickoff.
 | v1.0 / v1.1 / v1.2a..m + v1.3 + v1.4a..j implementation | `docs/v_model/implementation_status.md` | v1.0..v1.4 fully logged (v1.4a..v1.4j shipped on `main`; v1.4j sub-entry in flight on `feat/v1.4j-tile-budget-edit`) |
 | v1.0 / v1.1 / v1.2 deferred items | `docs/v_model/plan.md` (Milestone 7-11 sections) | Milestones 7 (v1.0), 8 (v1.1), 9 (v1.2), 10 (v1.3), 11 (v1.4) flipped to `shipped` in the v1.4 sign-off PR |
 | 30-phase roadmap | scattered across `CHANGELOG.md` v1.2 sub-entries | needs `v1_2_30_phase_roadmap.md` (see §3.2) |
-| ADRs | `docs/v_model/decision_record.md` | up to ADR-055 (4 v1.3 ADRs appended — ADR-042..ADR-044 covering SYS-112..SYS-114 + 11 v1.4 ADRs appended — ADR-045 covering SYS-115 + ADR-046 covering SYS-116 + ADR-047 covering SYS-117 + ADR-048 covering SYS-118 + ADR-049 covering SYS-119 + ADR-050 covering SYS-120 + ADR-051 covering SYS-121 + ADR-052 covering SYS-122 + ADR-053 covering SYS-123 + ADR-054 covering SYS-124 + ADR-055 covering SYS-125) |
-| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 appended SYS-111..SYS-114 (4 IDs); v1.4 appended SYS-115..SYS-125 (11 IDs — home widget, tile streak+Done, tile Skip+budget, tile Undo, tile sparkline, widget-side Skip+Undo, widget-action round-trip, per-tile Edit+Delete, rest-day history visualization, rest-day budget edit affordance on the home tile + v1.0 silent-reset bug fix, per-instance home widget configuration). v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
-| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 added WF-040, WF-041; v1.4 added WF-042, WF-043, WF-044, WF-045, WF-046, WF-047, WF-048, WF-049, WF-050, WF-051, WF-052. Cross-check the rest are in `traceability_matrix.md` |
+| ADRs | `docs/v_model/decision_record.md` | up to ADR-056 (4 v1.3 ADRs appended — ADR-042..ADR-044 covering SYS-112..SYS-114 + 12 v1.4 ADRs appended — ADR-045 covering SYS-115 + ADR-046 covering SYS-116 + ADR-047 covering SYS-117 + ADR-048 covering SYS-118 + ADR-049 covering SYS-119 + ADR-050 covering SYS-120 + ADR-051 covering SYS-121 + ADR-052 covering SYS-122 + ADR-053 covering SYS-123 + ADR-054 covering SYS-124 + ADR-055 covering SYS-125 + ADR-056 covering SYS-126) |
+| SYS- IDs | `docs/v_model/requirements.md` | v1.2 sub-entries appended SYS-098..SYS-110 (13 IDs); v1.3 appended SYS-111..SYS-114 (4 IDs); v1.4 appended SYS-115..SYS-126 (12 IDs — home widget, tile streak+Done, tile Skip+budget, tile Undo, tile sparkline, widget-side Skip+Undo, widget-action round-trip, per-tile Edit+Delete, rest-day history visualization, rest-day budget edit affordance on the home tile + v1.0 silent-reset bug fix, per-instance home widget configuration, soft-delete column on `habits`). v1.2a + v1.2b are doc-only baseline stubs with no SYS- ID (the value classes are consumed by the v1.2f leaves, not asserted as requirements themselves) |
+| WF- IDs | `docs/v_model/workflows.md` | v1.2 sub-entries added WF-022, WF-025, WF-030; v1.3 added WF-040, WF-041; v1.4 added WF-042, WF-043, WF-044, WF-045, WF-046, WF-047, WF-048, WF-049, WF-050, WF-051, WF-052, WF-053. Cross-check the rest are in `traceability_matrix.md` |
 | Open questions | `docs/v_model/open_questions.md` | all 21 closed (last closure: v0.5e-fix ADR-017) |
 | Spanish translation | `lib/l10n/app_es.arb` + `CHANGELOG.md` v1.1h block | smoke-test only; see §2.4 |
 | On-device hands-on | `docs/v_model/v1_4_release_checklist.md` + v0/v1.0/v1.1/v1.2/v1.3 equivalents | `v1_4_release_checklist.md` mirrors the v1.2 / v1.3 shape; user-runs step is §1.4 (release(v1.4) APK commit) |
@@ -366,31 +370,33 @@ pin updates, `CHANGELOG.md` `## [1.4.0]` block,
 `implementation_status.md` sign-off row,
 `v1_4_release_baseline.md` + `v1_4_release_checklist.md` new
 docs, `plan.md` Milestone 11 flipped to `shipped`). The
-v1.4j sub-entry (`feat/v1.4j-tile-budget-edit`) extends the
-v1.4i sparkline with an in-app rest-day budget edit affordance
-on the home tile's `_BudgetCaption` AND adds a "Rest days per
-month: N" row on `AddHabitScreen` (SYS-124 / ADR-054 / WF-051)
-AND fixes the v1.0 silent-reset bug in `AddHabitScreen._save()`
-(5 hardcoded `restDaysPerMonth: 2` literals replaced with
-`_restDaysPerMonth`). The shared `RestDayPickerDialog` is the
-single source of truth for the picker UI — both the tile
-affordance and the form-row trigger call it. In flight on its
-own PR cycle.
+v1.4l sub-entry (`feat/v1.4l-soft-delete-habits`) replaces the
+v1.4h hard-delete + `insertOnConflictUpdate`-on-Undo trade-off
+with a soft-delete tombstone column on `Habits`. The Undo path
+now restores the streak by construction — the completion log,
+the rest-day budget, the routine-executor registry, and the
+widget cached id all survive because the row is preserved
+(SYS-126 / ADR-056 / WF-053). The new `DoRepository.softDeleteById`
++ `restoreById` + `getActiveById` surface, plus the backup
+envelope's tombstone filter, are the load-bearing changes.
+In flight on its own PR cycle.
 
-After the sign-off PR lands, the user's hands-on step is the
-`release(v1.4)` debug-signed APK commit: `flutter build apk
+After the v1.4l PR lands, the user's hands-on step is the
+`release(v1.4l)` debug-signed APK commit: `flutter build apk
 --debug` (no signing-config touch), record the SHA1 + size in
 the commit message (mirrors the v1.1i pattern at `222f860`).
-Then optionally tag `v1.4.0`, then optionally
+Then optionally tag `v1.4l`, then optionally
 `flutter build appbundle --release` + on-device install.
 
-The v1.4j+ parking lot at `feature.md` §4 has fresh candidates
+The v1.4l+ parking lot at `feature.md` §4 has fresh candidates
 ready for the next cycle: widget small / large variants, widget
-config activity, widget list (scrolling), widget deep-link to a
-specific do; soft-delete column on `habits` so the v1.4h
-Delete-Undo path can restore streak history (v1.4h documented
-trade-off, per ADR-052 §8). (The v1.4j in-app rest-day budget
-edit affordance closure closed the v1.4j+ "in-app tile
-rest-day budget edit" item.)
+list (scrolling); "Recently deleted" surface for tombstoned
+habits so the user can restore after the SnackBar window
+closes (the v1.4l soft-delete data model + inline Undo flow
+ships in this cycle; a broader restore surface is the
+v1.4l+ follow-up ADR-056 §"Out of scope" notes). The
+`_toRow`-missing-`automations_json` + `_toRow`-missing-`pausedUntil`
+mapping bugs are v1.4l+ candidates now that the soft-delete
+trade-off is closed.
 See `docs/v_model/plan.md` Milestone 12+ for the candidate
 list.

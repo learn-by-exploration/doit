@@ -972,3 +972,130 @@ the v1.1i pattern at `222f860`).
   localizations mirrored to 3 sibling test files:
   `add_habit_delete_test.dart` + `add_habit_save_as_template_test.dart`
   + `templates_test.dart`).
+
+- **v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052** —
+  Per-instance home widget configuration via Android
+  AppWidget configuration activity (`DoitWidgetConfigureActivity.kt`)
+  + body-tap deep-link via `MainActivity.getInitialRoute()`:
+  _PR #46, commit `8bef793`_. Closes the long-standing
+  v1.4a gap where every widget instance showed the same
+  fallback do and body taps just opened the home screen.
+  `DoitWidgetState.selectedHabitId` is the new optional
+  JSON envelope field (mirrors the v1.4f `restDaysPerMonth`
+  precedent); `WidgetService.setSelectedHabitId(widgetId, habitId)`
+  + `handleRefreshRequest` consults the cached pick first,
+  falls back to `firstActiveDo`, and **reconciliation-clears
+  to null** when the picked do is deleted (next refresh
+  observes the cached pick doesn't match the active do and
+  clears it). `WidgetServiceProxy` indirection seam (mirrors
+  the v1.4h `home_tile_delete.dart` callback-handler pattern)
+  for testability. `WidgetConfigScreen`
+  (`lib/widget/widget_config_screen.dart`, NEW) is the
+  list-picker UI bound to the AppWidget config activity.
+  `DoitWidgetConfigureActivity.kt` (NEW) is a thin
+  `FlutterActivity` shell that reads
+  `AppWidgetManager.EXTRA_APPWIDGET_ID` (NOT
+  `Intent.EXTRA_APPWIDGET_ID` — that one doesn't exist)
+  and sets initial route `/widget-config?widgetId=N` on the
+  Flutter engine. `MainActivity.getInitialRoute()` reads
+  `EXTRA_HABIT_ID_FROM_WIDGET` (distinct namespace from
+  `DoitWidgetProvider.EXTRA_HABIT_ID`) and returns
+  `/habit?habitId=...` when present. `WidgetRenderer.openAppIntent`
+  adds `EXTRA_HABIT_ID_FROM_WIDGET` on body tap when
+  `selectedHabitId` is non-empty — signature is
+  `(ctx, id, selectedHabitId: String)`; all 6 call sites
+  (incl. `renderEmpty`/`renderError` done/skip/undo) must
+  pass the empty-string arg, NOT omit it (Kotlin treats a
+  missing arg as a compile error, not a default). `lib/app_router.dart`
+  (NEW) extracts `buildHabitRoute(...)`, `buildWidgetConfigRoute(...)`,
+  `buildAppRoute(...)` from `lib/main.dart` — the route
+  builders + screen constructors are tested in isolation by
+  inspecting `MaterialPageRoute.builder` directly (NOT by
+  pushing onto a Navigator; AddHabitScreen / HomeScreen /
+  WidgetConfigScreen all have `FutureBuilder`s reading
+  `DoRepository.instance.listAll()` which causes 10-min
+  timeouts in widget tests when unseeded). 3 new ARB keys
+  in lockstep across `app_en.arb` + `app_es.arb`
+  (`widgetConfigureTitle`, `widgetConfigureSubtitle`,
+  `widgetConfigureBackToHome`). AndroidManifest declares
+  `DoitWidgetConfigureActivity` with
+  `android:configure="@xml/doit_widget_info"` and
+  `android:exported="false"`. **Zero new
+  `<uses-permission>`** — permission baseline verified
+  against `docs/v_model/architecture_options.md`. 21 new
+  tests (1292 total, +21 from v1.4j's 1271). 0 new pubspec
+  deps, 0 new Drift tables, 0 new MethodChannels. Test
+  count now 1292/1292.
+
+- **v1.4l / Phase 39 / SYS-126 / ADR-056 / WF-053** —
+  Soft-delete tombstone column on `Habits` so the v1.4h
+  home-tile Delete + Undo SnackBar restores the streak by
+  construction: _this PR_. Closes the v1.4h trade-off
+  documented in `ADR-052 §8` + `home.dart:553-561` (the
+  original KDoc was wrong about the FK cascade — there
+  are no declared FKs in the Drift schema; the streak
+  really should have survived via the orphan `Completions`
+  rows, but the brittle `insertOnConflictUpdate` on Undo
+  was a latent footgun). Replaces the "hard-delete +
+  `insertOnConflictUpdate` on Undo" pattern with a single
+  nullable `deleted_at_millis INTEGER` column on `Habits`
+  (mirrors the `Events.archivedAtMillis` precedent at
+  `lib/services/db/tables.dart:153`). New Drift migration
+  `v4_to_v5` (NEW, single `addColumn` call). Domain model
+  gains `final DateTime? deletedAt;` on base `Do` + a
+  `bool get isDeleted => deletedAt != null;` helper;
+  `copyWith` gains the explicit `clearDeletedAt: bool`
+  flag (mirrors `Event.copyWith(clearArchived: bool)`
+  at `lib/events/event.dart:118`). `DoRepository._toRow`
+  writes `deletedAtMillis: d.deletedAt?.millisecondsSinceEpoch`
+  for content updates; `_fromRow` reads it back. `listAll`
+  + `listActive` add `..where((t) => t.deletedAtMillis.isNull())`
+  filter (mirrors `EventRepository.listActive` at
+  `event_repository.dart:48`). `getById` keeps its current
+  "return whatever is there" semantics (a tombstoned row is
+  still returned — needed for restore); new `getActiveById(id)`
+  helper filters tombstones for UI callers. **The
+  load-bearing invariant:** `save(d)` does NOT touch
+  `deleted_at_millis` — Drift's `insertOnConflictUpdate`
+  preserves the existing column value when the new row
+  doesn't specify it (and `_toRow` deliberately omits
+  `deletedAtMillis` from the save-path's `HabitsCompanion`
+  for tombstoned rows). Restoration goes through a new
+  `restoreById(id)` method (single `UPDATE` SQL statement;
+  idempotent on already-active rows). `deleteById(id)` is
+  KEPT (not removed) — reserved for `BackupService.importFrom`'s
+  "wipe everything before import" path. New `softDeleteById(id, at)`
+  is the new tile path. `DoAnchor.targetDoId` referencing a
+  tombstoned habit: **pause, don't break** (the next
+  occurrence calculation observes the target is no longer
+  in `listAll()` and degrades gracefully — `from + Duration(days: 1)`
+  fallback per the `anchor.dart` "graceful degrade" rule).
+  `lib/services/backup_service.dart` export query gains
+  the same `deletedAtMillis.isNull()` filter so a backup
+  round-trip does not resurrect tombstones (tombstones are
+  an undo affordance, not user data — the envelope's
+  `deleted_at_millis` field IS written so a future change
+  can decide tombstone IS user data without a schema bump).
+  `lib/services/db/migrations/v4_to_v5.dart` (NEW). KDoc
+  at `lib/screens/home.dart:553-561` rewritten to drop the
+  wrong FK-cascade claim and accurately describe the
+  soft-delete + `restoreById` flow. `lib/screens/home_tile_delete.dart`
+  adds `softDeleteDo` + `restoreDo` pure-Dart helpers
+  (parallels the existing `deleteDo`). Test count 1292 →
+  1321 (+29: 8 `migration_v4_to_v5` round-trip + 9
+  `do_repository` soft-delete/restore/save-invariant +
+  6 home_tile_delete `softDeleteDo`/`restoreDo` migration +
+  6 home_test delete-assert updates to `getActiveById`).
+  Pure-Dart — no new `<uses-permission>`, no new pubspec
+  deps, no new Drift tables (only a column add), no new
+  MethodChannels, no Kotlin changes. Permission baseline
+  unchanged; verification against
+  `docs/v_model/architecture_options.md` confirmed no
+  AndroidManifest touch. The v1.4h trade-off bullet is
+  REMOVED from `feature.md` §4 parking lot; v1.4l+ parking
+  lot gets the "Recently deleted" surface (a separate
+  screen listing tombstoned dos with Restore / Delete
+  forever) as a follow-up candidate, plus the
+  `_toRow`-missing-`automations_json` +
+  `_toRow`-missing-`pausedUntil` mapping bugs now that the
+  soft-delete trade-off is closed.
