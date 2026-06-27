@@ -1890,3 +1890,61 @@ Surfaces the long-hidden v1.0 affordance of editing the per-do rest-day budget d
 - SYS-123 (v1.4i — the inline sparkline + legend visualizes the rest-day rows the user can now produce by editing the budget up from 0)
 - SYS-122 (v1.4h — the `onDoChanged` + `_refresh()` cascade is re-used)
 - SYS-117 (v1.4c — the rest-day rows visible in the v1.4i sparkline are now user-configurable via the v1.4j caption affordance)
+
+## WF-052 — Bind the home widget to a specific do (per-instance configuration, v1.4k / Phase 38 / SYS-125 / ADR-055)
+
+Closes the v1.4a gap where every widget instance on the home screen showed the same `firstActiveDo`. v1.4k adds the standard Android `AppWidget` configuration flow so the user can pick which do a given widget instance shows at bind time, AND routes the widget body-tap deep-link to the picked do's edit screen. Configuration is one-time per widget instance; the pick is sticky across `onUpdate` cycles (until the picked do is deleted, which triggers the reconciliation clear).
+
+### Happy path
+
+1. **User long-presses the home screen.** The launcher's widget chooser opens. The user finds the do it widget in the picker (the `android:label="@string/widget_label"` resource string).
+
+2. **User drags the widget to a home cell.** The launcher fires `APPWIDGET_CONFIGURE` on `DoitWidgetConfigureActivity` BEFORE the first `onUpdate` — this is the standard launcher contract for any `<appwidget-provider android:configure="...">`. The activity launches with `Intent.EXTRA_APPWIDGET_ID` set to the launcher-assigned widget id.
+
+3. **`DoitWidgetConfigureActivity.getInitialRoute()` returns `/widget-config?widgetId=$widgetId`.** The `FlutterActivity` thin-shell pattern (mirrors v1.3d `FullScreenActivity.getInitialRoute()` for the mission launcher). The activity does NOT attach any Kotlin channels — the Flutter side talks to `WidgetService.instance` directly via `WidgetServiceProxy`. `configureFlutterEngine` is intentionally NOT used.
+
+4. **`DoItApp` mounts with the initial route.** `MaterialApp.onGenerateRoute: buildAppRoute` dispatches on `settings.name == '/widget-config'` to `buildWidgetConfigRoute`, which returns a `MaterialPageRoute<String?>` whose builder produces `WidgetConfigScreen(widgetId: widgetId)`.
+
+5. **`WidgetConfigScreen` reads the do list.** `FutureBuilder<List<Do>>` calls `DoRepository.instance.listAll()` (the existing singleton — same path the home screen uses, so the picker always sees the same data as the home tile list). The screen renders a `ListView.separated` of `_PickerRow` `ListTile`s — one per do, with a chevron + the do name.
+
+6. **User taps a row.** `_PickerRow.onTap` fires `_onPicked(habitId)` which `await`s `widget.proxy.setSelectedHabitId(habitId)` (writes the pick to `WidgetService.instance` via the proxy indirection) then `Navigator.of(context).pop<String>(habitId)`. The popped value is the picked habitId.
+
+7. **`DoitWidgetConfigureActivity.setResult(RESULT_OK)` + finish.** The Kotlin activity sets `RESULT_OK` with the picked `habitId` in the result extras and finishes. The launcher then calls `DoitWidgetProvider.onUpdate` for the first time on the widget instance, with the picked `habitId` available to `WidgetRenderer.render(...)` via `WidgetStateCache.cachedFromPrefs(ctx)` (the cache was written by `WidgetService.setSelectedHabitId` BEFORE the activity finished, so the cold-start fallback has the picked state).
+
+8. **Widget renders the picked do.** `WidgetRenderer.render(ctx, state)` reads `state.habitId == pickedId`, fetches the streak via the existing `ConsecutiveCounter` path, and paints the streak badge + reliability icon + completion-row buttons. The widget surfaces the picked do on the first frame.
+
+9. **User taps the widget body.** The body's `PendingIntent` fires — `WidgetRenderer.openAppIntent(ctx, widgetId, state.optString("selectedHabitId", ""))` builds the Intent with `MainActivity.EXTRA_HABIT_ID_FROM_WIDGET = pickedId` as an extra. The Intent launches MainActivity (single-top).
+
+10. **`MainActivity.getInitialRoute()` reads the extra.** The new `override fun getInitialRoute(): String?` reads `intent.getStringExtra(EXTRA_HABIT_ID_FROM_WIDGET)`. On a non-null + non-empty value it clears the extra (one-shot — `intent.removeExtra(...)`) and returns `"/habit?habitId=${Uri.encode(pickedId)}"`; on a null / empty value it returns `null` (the normal launch path — no reroute).
+
+11. **Flutter embedding routes to `AddHabitScreen`.** The embedding passes the initial route to `MaterialApp.onGenerateRoute` on the first frame. `buildAppRoute` dispatches `/habit` → `buildHabitRoute` → `AddHabitScreen(habitId: pickedId)`. The user lands on the picked do's edit screen.
+
+12. **User backs out.** Android back closes the edit screen → returns to the launcher. The widget stays pinned with the picked do.
+
+13. **User binds a second widget instance.** Steps 1-12 repeat with a new `AppWidgetId` and a second picked do. Each widget's `DoitWidgetState` is keyed by the picked id (the SharedPreferences key `doit.widget.cached_v1` is shared — the JSON envelope carries both `habitId` AND `selectedHabitId` so the widget surface can distinguish which do it represents on a re-render). Both widgets render side-by-side, each showing a different do.
+
+14. **User deletes the picked do from the in-app home screen.** The v1.4h `_DeleteButton` deletes the do from `DoRepository` and calls `widget.onDoChanged?.call()` to trigger `_refresh()`. The next `WidgetService.handleRefreshRequest` (triggered by the next `ReliabilityService` change OR the next widget `onUpdate`) calls `_resolveActiveDo()` → `getById(pickedId) == null` → falls back to `firstActiveDo`. The new state has `selectedHabitId = null` (the reconciliation clear). The widget surfaces `firstActiveDo` on the next render (the user's other dos, or the empty-state if there are none).
+
+15. **User taps the widget body after the picked do was deleted.** `MainActivity.getInitialRoute()` reads `EXTRA_HABIT_ID_FROM_WIDGET` — but the cached `selectedHabitId` is `null` so the Kotlin `WidgetRenderer.openAppIntent` did NOT add the extra → `getInitialRoute()` returns `null` → normal launch. Alternatively, if the user re-bound the widget via the launcher (step 1-12 again) and picked a new do, the new pick is in the cache. The widget body-tap always reflects the current cached pick.
+
+### Failure paths
+
+- **`DoRepository.instance.listAll()` returns empty.** `WidgetConfigScreen._EmptyState` renders a `Icons.add_task` glyph + the localized `widgetConfigureEmptyState` copy ("Add a do in do it to use the home widget.") + a "Back to do it" `FilledButton` (label `widgetConfigureBackToHome`). Tapping the button pops `Navigator.of(context).pop()` (returns `null`). `DoitWidgetConfigureActivity.setResult(RESULT_CANCELED)` + finish. The launcher treats the cancel as a no-op — the widget is not bound, the cell stays empty. This is the launcher's documented contract for a cancelled configuration.
+- **User back-presses the configuration activity.** Same as cancel — `setResult(RESULT_CANCELED)` + finish. The widget is not bound. The cell stays empty. (Note: `excludeFromRecents="true"` in the manifest means the activity does not appear in the Recents tray even if the user navigated into MainActivity via a separate path.)
+- **`DoitWidgetConfigureActivity` is launched without `EXTRA_APPWIDGET_ID`.** The Kotlin `getInitialRoute()` reads `intent.getIntExtra(EXTRA_APPWIDGET_ID, 0)` and returns `"/widget-config?widgetId=$widgetId"` with the default `0`. The Flutter screen mounts with `widgetId: 0` (display-only — the AppBar shows the id). The pick is still written correctly because the widget's `DoitWidgetState` is keyed by the picked `habitId`, not by the AppWidget id (the cold-start fallback is a single SharedPreferences key, shared across all widget instances — the `selectedHabitId` field distinguishes them).
+- **`WidgetService.setSelectedHabitId` returns `false` (service is disposed — unlikely in production, possible in test).** `_onPicked` does not check the return value — the `Navigator.pop<String>(habitId)` always fires. The picked id is in the result Intent regardless. The widget's first `onUpdate` re-derives via `WidgetService.handleRefreshRequest()` which is idempotent — even if the service was disposed, the next cold-start primes it via `WidgetService.init()`. The user sees the picked do on the second `onUpdate`.
+- **`MainActivity` is killed between the body-tap and the route resolution.** Android standard behavior — the system re-launches MainActivity with the saved Intent. `getInitialRoute()` reads the extra on the fresh launch. The route resolves normally.
+- **User toggles device language (locale change) while the configuration activity is on screen.** `AppLocalizations` re-loads via the `LocalizationsDelegate` on the next rebuild (mirrors the v1.1h / ADR-031 / SYS-087 i18n contract). The screen re-mounts with the new locale. The do list re-fetches via `FutureBuilder`.
+- **The picked do is in a paused state.** `_resolveActiveDo()` returns the paused do (the `Do.effectiveScheduleConfig` predicate is independent of paused-state — matches the v1.4a `firstActiveDo` behavior). The widget surfaces the paused do with the streak + the reliability badge. The user can tap the body to navigate to the edit screen and un-pause.
+
+### Requirements covered
+
+- SYS-125 (this cycle's primary requirement — per-instance widget configuration + body-tap deep-link to the picked do)
+- ADR-045 (v1.4a / SYS-115 — the `firstActiveDo` fallback is the default path; the v1.4a `WidgetStateCache.kt` Kotlin mirror is the cold-start fallback extended with the new `selectedHabitId` field)
+- ADR-044 (v1.3d / SYS-114 — the Kotlin `getInitialRoute()` route-handoff is the same pattern; the `app_router.dart` extraction mirrors the v1.3d dispatch shape)
+- ADR-051 (v1.4g / SYS-121 — the `doit/widget` MethodChannel namespace gains the `setSelectedHabitId` arm)
+- ADR-050 (v1.4f / SYS-120 — the v1.4f `restDaysPerMonth` JSON envelope precedent is the model for `selectedHabitId`)
+- ADR-052 (v1.4h / SYS-122 — the `WidgetServiceProxy` indirection layer is the v1.4h callback-handler seam pattern)
+- SYS-115 (v1.4a — `WidgetStateCache.kt` mirror + `WidgetBridge.cacheSnapshot` round-trip)
+- SYS-114 (v1.3d — `FlutterActivity` thin-shell + `getInitialRoute()` handoff)
+- SYS-121 (v1.4g — `WidgetActionInvoker.attach()` dispatch table)

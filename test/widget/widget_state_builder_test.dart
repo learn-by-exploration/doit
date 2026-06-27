@@ -179,4 +179,36 @@ void main() {
     );
     expect(state.streakNumber, 0);
   });
+
+  // ─── v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052 ─────────────
+
+  test('selectedHabitId threads into the returned state (v1.4k / SYS-125)', () {
+    final state = buildWidgetState(
+      activeDo: _fixed('h1', 'Read'),
+      completions: const <CompletionLogEntry>[],
+      reliability: Reliability.optimal,
+      asOf: asOf,
+      skipBudget: _budget('h1'),
+      selectedHabitId: 'h1',
+    );
+    expect(state.selectedHabitId, 'h1');
+  });
+
+  test('selectedHabitId is preserved when activeDo is null '
+      '(v1.4k / SYS-125)', () {
+    // The user picked a do; it is currently missing
+    // (deleted) but the selection is preserved so the
+    // reconciliation path in WidgetService can clear
+    // it on the next pass.
+    final state = buildWidgetState(
+      activeDo: null,
+      completions: const <CompletionLogEntry>[],
+      reliability: Reliability.optimal,
+      asOf: asOf,
+      skipBudget: SkipBudget(doId: '', monthlyLimit: 0),
+      selectedHabitId: 'h-pick',
+    );
+    expect(state.selectedHabitId, 'h-pick');
+    expect(state.habitId, '');
+  });
 }

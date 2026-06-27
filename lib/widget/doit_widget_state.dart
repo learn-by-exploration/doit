@@ -21,6 +21,11 @@
 //     can compare snapshots without inspecting JSON.
 //
 // v1.4a / Phase 28 / SYS-115 / ADR-045 / WF-042.
+// v1.4f / Phase 33 / SYS-120 / ADR-050 / WF-047: restDaysPerMonth.
+// v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052: selectedHabitId —
+// the user-picked do for this widget instance. Persisted in the
+// same DoitWidgetState JSON envelope; surviving cold-start
+// fallback via the Kotlin `WidgetStateCache` SharedPreferences.
 
 import 'package:meta/meta.dart';
 
@@ -80,6 +85,7 @@ class DoitWidgetState {
     required this.reliability,
     required this.asOf,
     this.restDaysPerMonth = 0,
+    this.selectedHabitId,
   });
 
   /// The active do's id. Used by the widget's "Done" button
@@ -128,10 +134,44 @@ class DoitWidgetState {
   /// missing field is treated as 0).
   final int restDaysPerMonth;
 
+  /// v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052. The
+  /// user-picked habit id for this widget instance. When
+  /// non-null, `WidgetService.handleRefreshRequest`
+  /// resolves the active do via `_doRepository.getById`
+  /// (falling back to `firstActiveDo` if the id is empty
+  /// or no longer maps to a do). When `null`, the
+  /// v1.4a-first-active behavior is preserved.
+  ///
+  /// Distinct from [habitId] (which is always the
+  /// currently-displayed do on the widget face). The
+  /// widget shows the selected do after every
+  /// handleRefreshRequest; the selection survives a
+  /// cold-start fallback because the Kotlin
+  /// `WidgetStateCache.cachedFromPrefs` JSON shape grows
+  /// by one optional key. `fromJson` reads it
+  /// defensively — a missing field is treated as `null`
+  /// for backwards compatibility with v1.4a..v1.4j caches.
+  final String? selectedHabitId;
+
   /// Returns a copy with selected fields replaced. Used by
   /// tests + the `WidgetService` to derive small variations
   /// (e.g., after a single completion write) without
   /// re-running the full builder.
+  ///
+  /// v1.4k / SYS-125 / ADR-055 / WF-052: `selectedHabitId`
+  /// is opt-in. `copyWith` with no `selectedHabitId` arg
+  /// preserves the prior value (matching the v1.4f
+  /// `restDaysPerMonth` precedent). Tests that want to
+  /// CLEAR the selection pass `selectedHabitId: null`
+  /// explicitly — `copyWith` cannot distinguish "not
+  /// passed" from "passed null" without a sentinel, so
+  /// the canonical clear path is
+  /// `state.copyWith(habitId: ...).copyWith(habitName: ...)`
+  /// followed by an explicit `DoitWidgetState(...)`
+  /// construction. For test brevity, callers that need to
+  /// clear the selection should construct a fresh
+  /// [DoitWidgetState] with `selectedHabitId: null` rather
+  /// than routing through `copyWith`.
   DoitWidgetState copyWith({
     String? habitId,
     String? habitName,
@@ -140,6 +180,7 @@ class DoitWidgetState {
     DoitWidgetReliability? reliability,
     DateTime? asOf,
     int? restDaysPerMonth,
+    String? selectedHabitId,
   }) {
     return DoitWidgetState(
       habitId: habitId ?? this.habitId,
@@ -149,6 +190,7 @@ class DoitWidgetState {
       reliability: reliability ?? this.reliability,
       asOf: asOf ?? this.asOf,
       restDaysPerMonth: restDaysPerMonth ?? this.restDaysPerMonth,
+      selectedHabitId: selectedHabitId ?? this.selectedHabitId,
     );
   }
 
@@ -164,6 +206,7 @@ class DoitWidgetState {
       'reliability': reliability.toJsonTag(),
       'asOfIso': asOf.toIso8601String(),
       'restDaysPerMonth': restDaysPerMonth,
+      'selectedHabitId': selectedHabitId,
     };
   }
 
@@ -185,6 +228,17 @@ class DoitWidgetState {
       ),
       asOf: asOf,
       restDaysPerMonth: (json['restDaysPerMonth'] as num?)?.toInt() ?? 0,
+      // v1.4k / SYS-125 / ADR-055 / WF-052. Defensive
+      // read: a missing key (downgrade from a v1.4a..v1.4j
+      // cache) is `null`, which preserves the v1.4a
+      // "first-active do" behavior. An empty string is
+      // ALSO treated as `null` because the Kotlin
+      // `WidgetRenderer` uses `optString(..., "")` and
+      // would otherwise carry a bogus empty selection
+      // through to `WidgetService.handleRefreshRequest`.
+      selectedHabitId: (json['selectedHabitId'] as String?)?.isEmpty == true
+          ? null
+          : json['selectedHabitId'] as String?,
     );
   }
 
@@ -198,7 +252,8 @@ class DoitWidgetState {
         other.isCompletedToday == isCompletedToday &&
         other.reliability == reliability &&
         other.asOf == asOf &&
-        other.restDaysPerMonth == restDaysPerMonth;
+        other.restDaysPerMonth == restDaysPerMonth &&
+        other.selectedHabitId == selectedHabitId;
   }
 
   @override
@@ -210,6 +265,7 @@ class DoitWidgetState {
     reliability,
     asOf,
     restDaysPerMonth,
+    selectedHabitId,
   );
 
   @override
@@ -217,5 +273,6 @@ class DoitWidgetState {
       'DoitWidgetState(habitId: $habitId, habitName: $habitName, '
       'streakNumber: $streakNumber, isCompletedToday: $isCompletedToday, '
       'reliability: ${reliability.toJsonTag()}, '
-      'restDaysPerMonth: $restDaysPerMonth, asOf: $asOf)';
+      'restDaysPerMonth: $restDaysPerMonth, '
+      'selectedHabitId: $selectedHabitId, asOf: $asOf)';
 }

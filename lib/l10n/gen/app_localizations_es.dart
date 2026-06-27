@@ -430,4 +430,14 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get onboardingOpenAndroidSettingsCta => 'Abrir ajustes de Android';
+
+  @override
+  String get widgetConfigureTitle => 'Elige una tarea para do it';
+
+  @override
+  String get widgetConfigureEmptyState =>
+      'Añade una tarea en do it para usar el widget de inicio.';
+
+  @override
+  String get widgetConfigureBackToHome => 'Volver a do it';
 }

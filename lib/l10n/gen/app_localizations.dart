@@ -817,6 +817,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open Android settings'**
   String get onboardingOpenAndroidSettingsCta;
+
+  /// v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052. AppBar title of the Android AppWidget configuration activity — shown to the user when they bind the do it home widget from the launcher. Mirrors the launcher 'Pick a do' prompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a do for do it'**
+  String get widgetConfigureTitle;
+
+  /// v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052. Empty-state copy shown inside the widget configuration activity when the user has zero dos. Tapping the 'Add a do' button on the same screen pops the user back to MainActivity so the first-run flow can take over.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a do in do it to use the home widget.'**
+  String get widgetConfigureEmptyState;
+
+  /// v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052. CTA label on the widget-configuration empty-state. Pops the configuration activity so the launcher can show the home widget at its default state (or the user can return to MainActivity to add a do).
+  ///
+  /// In en, this message translates to:
+  /// **'Back to do it'**
+  String get widgetConfigureBackToHome;
 }
 
 class _AppLocalizationsDelegate
