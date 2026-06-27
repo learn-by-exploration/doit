@@ -162,6 +162,51 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052:
+             the Android AppWidget configuration activity.
+             Mirrors the v1.3d `FullScreenActivity`
+             thin-Flutter shell pattern but with
+             `exported="true"` + the standard
+             `ACTION_APPWIDGET_CONFIGURE` intent-filter
+             so the Android widget host (launcher) can
+             resolve the activity on widget bind. The
+             activity is `excludeFromRecents="true"` so
+             a pending configuration does not show up in
+             the app-switcher.
+
+             `taskAffinity=""` keeps the configuration
+             launch out of `MainActivity`'s back-stack —
+             when the user confirms, they return to the
+             home screen (or wherever the launcher
+             routed them from), not to a `MainActivity`
+             re-entry they did not ask for.
+
+             The activity is NOT a keyguard-bypass
+             surface (no `showOnLockScreen` / etc.) —
+             the user binds the widget from the launcher
+             while the device is unlocked, and the
+             keyguard contract is owned by
+             `FullScreenActivity` (SYS-114) for strong-
+             mode habit alarms.
+
+             No new `<uses-permission>` is required for
+             the configuration activity. -->
+        <activity
+            android:name=".DoitWidgetConfigureActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:theme="@style/LaunchTheme"
+            android:label="@string/widget_configure_label"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <!-- Boot survival (SYS-016). Receives BOOT_COMPLETED,
              LOCKED_BOOT_COMPLETED, MY_PACKAGE_REPLACED, and
              TIMEZONE_CHANGED. Re-arms every pending alarm.

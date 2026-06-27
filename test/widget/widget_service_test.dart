@@ -9,6 +9,13 @@
 //   - reliability change triggers a re-derive
 //   - MissingPluginException from the bridge does NOT crash
 //     the service (ADR-013)
+//   - v1.4k / SYS-125: handleRefreshRequest consults
+//     cached `selectedHabitId` and falls back to
+//     firstActiveDo
+//   - v1.4k / SYS-125: setSelectedHabitId writes a fresh
+//     state to the cache with the new id
+//   - v1.4k / SYS-125: stale `selectedHabitId` (do deleted)
+//     is reconciled to firstActiveDo + null on next refresh
 //
 // Tests use hand-rolled fakes (no mockito codegen) per the
 // project's convention (see ReminderBridge tests).
@@ -518,4 +525,124 @@ void main() {
       messenger.setMockMethodCallHandler(channel, null);
     },
   );
+
+  // ─── v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052 ─────────────
+  // handleRefreshRequest consults the cached
+  // `selectedHabitId`; setSelectedHabitId writes a fresh
+  // state to the cache. Stale `selectedHabitId` (the picked
+  // do was deleted) reconciles to firstActiveDo + null on
+  // the next refresh.
+
+  test('handleRefreshRequest computes state from cached selectedHabitId '
+      '(v1.4k / SYS-125)', () async {
+    final bridge = FakeWidgetBridge();
+    final repo = _FakeDoRepo(<Do>[
+      _fixed('h1', 'Read'),
+      _fixed('h2', 'Stretch'),
+    ]);
+    final log = _FakeCompletionLog();
+    final rel = _FakeReliabilityService();
+    await WidgetService.init(
+      bridge: bridge,
+      doRepository: repo,
+      completionLog: log,
+      reliabilityService: rel,
+    );
+    await WidgetService.ready;
+    // First prime: v1.4a first-active behavior — the
+    // h1 ("Read") do is oldest, so the widget shows it.
+    await WidgetService.instance.handleRefreshRequest();
+    expect(WidgetService.instance.lastComputed!.habitId, 'h1');
+    // Now the user picks h2 via the configurator.
+    final ok = await WidgetService.instance.setSelectedHabitId('h2');
+    expect(ok, isTrue);
+    expect(WidgetService.instance.lastComputed!.habitId, 'h2');
+    expect(WidgetService.instance.lastComputed!.selectedHabitId, 'h2');
+    // A subsequent reliability-driven refresh must
+    // keep the picked do.
+    await WidgetService.instance.handleRefreshRequest();
+    expect(WidgetService.instance.lastComputed!.habitId, 'h2');
+    expect(WidgetService.instance.lastComputed!.selectedHabitId, 'h2');
+  });
+
+  test('setSelectedHabitId falls back to firstActiveDo when id is null '
+      '(v1.4k / SYS-125)', () async {
+    final bridge = FakeWidgetBridge();
+    final repo = _FakeDoRepo(<Do>[_fixed('h1', 'Read')]);
+    final log = _FakeCompletionLog();
+    final rel = _FakeReliabilityService();
+    await WidgetService.init(
+      bridge: bridge,
+      doRepository: repo,
+      completionLog: log,
+      reliabilityService: rel,
+    );
+    await WidgetService.ready;
+    // Pre-set a selection, then clear it.
+    await WidgetService.instance.setSelectedHabitId('h1');
+    expect(WidgetService.instance.lastComputed!.selectedHabitId, 'h1');
+    final ok = await WidgetService.instance.setSelectedHabitId(null);
+    expect(ok, isTrue);
+    expect(WidgetService.instance.lastComputed!.selectedHabitId, isNull);
+    expect(WidgetService.instance.lastComputed!.habitId, 'h1');
+  });
+
+  test('stale selectedHabitId (picked do deleted) reconciles to '
+      'firstActiveDo + null (v1.4k / SYS-125)', () async {
+    final repo = _FakeDoRepo(<Do>[
+      _fixed('h1', 'Read'),
+      _fixed('h2', 'Stretch'),
+    ]);
+    final bridge = FakeWidgetBridge();
+    final log = _FakeCompletionLog();
+    final rel = _FakeReliabilityService();
+    await WidgetService.init(
+      bridge: bridge,
+      doRepository: repo,
+      completionLog: log,
+      reliabilityService: rel,
+    );
+    await WidgetService.ready;
+    // Pick h2.
+    await WidgetService.instance.setSelectedHabitId('h2');
+    expect(WidgetService.instance.lastComputed!.habitId, 'h2');
+    // Now h2 is deleted from the repo (e.g., the user
+    // tapped Delete on the in-app tile). The next
+    // handleRefreshRequest must reconcile.
+    repo.dos.removeWhere((d) => d.id == 'h2');
+    await WidgetService.instance.handleRefreshRequest();
+    // Falls back to firstActiveDo (h1) AND clears the
+    // selectedHabitId in the next state.
+    expect(WidgetService.instance.lastComputed!.habitId, 'h1');
+    expect(WidgetService.instance.lastComputed!.selectedHabitId, isNull);
+  });
+
+  test('reliability change re-derives against the picked selectedHabitId '
+      '(v1.4k / SYS-125)', () async {
+    final bridge = FakeWidgetBridge();
+    final repo = _FakeDoRepo(<Do>[
+      _fixed('h1', 'Read'),
+      _fixed('h2', 'Stretch'),
+    ]);
+    final log = _FakeCompletionLog();
+    final rel = _FakeReliabilityService();
+    await WidgetService.init(
+      bridge: bridge,
+      doRepository: repo,
+      completionLog: log,
+      reliabilityService: rel,
+    );
+    await WidgetService.ready;
+    await WidgetService.instance.setSelectedHabitId('h2');
+    // The reliability stream listener must preserve
+    // the pick across re-derives.
+    rel.value = Reliability.degraded;
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(WidgetService.instance.lastComputed!.habitId, 'h2');
+    expect(WidgetService.instance.lastComputed!.selectedHabitId, 'h2');
+    expect(
+      WidgetService.instance.lastComputed!.reliability,
+      DoitWidgetReliability.degraded,
+    );
+  });
 }

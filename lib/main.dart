@@ -10,13 +10,12 @@
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter/material.dart';
 
+import 'package:doit/app_router.dart';
 import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
 import 'package:doit/screens/home.dart';
-import 'package:doit/screens/mission_launcher.dart';
 import 'package:doit/screens/onboarding.dart';
-import 'package:doit/screens/routine_overlay_screen.dart';
 import 'package:doit/services/backup_scheduler.dart';
 import 'package:doit/services/backup_service.dart';
 import 'package:doit/services/call_interceptor.dart';
@@ -261,6 +260,19 @@ class DoItApp extends StatelessWidget {
             // through to `onUnknownRoute` so the app
             // does not crash on a malformed query.
             //
+            // v1.4k / Phase 38 / SYS-125 / ADR-055 /
+            // WF-052: the widget body-tap path and the
+            // widget configurator's initial route share
+            // the same router. `_buildHabitRoute`
+            // resolves `/habit?habitId=...` (set by
+            // `MainActivity.getInitialRoute()` once the
+            // body-tap PendingIntent's `EXTRA_HABIT_ID`
+            // is read into the embedding — see
+            // `MainActivity.kt` for the kotlin-side
+            // wiring). `_buildWidgetConfigRoute`
+            // resolves `/widget-config?widgetId=...`
+            // (set by `DoitWidgetConfigureActivity`).
+            //
             // The `home:` switch below is unchanged —
             // this router is additive and is only
             // consulted when the Kotlin-side
@@ -268,7 +280,7 @@ class DoItApp extends StatelessWidget {
             // initial route (the embedding routes that
             // through `onGenerateRoute` on the first
             // frame).
-            onGenerateRoute: _buildMissionRoute,
+            onGenerateRoute: buildAppRoute,
             onUnknownRoute: _unknownMissionRoute,
             home: (firstLaunchOverride ?? !firstLaunchDone)
                 ? OnboardingScreen(
@@ -285,35 +297,6 @@ class DoItApp extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-/// v1.3d / Phase 15 / SYS-114 / ADR-044. Resolves the
-/// `/mission` route. Returns `null` for non-`/mission`
-/// routes so `MaterialApp` falls back to the `home:`
-/// switch above.
-Route<dynamic>? _buildMissionRoute(RouteSettings settings) {
-  if (settings.name != '/mission') return null;
-  final args =
-      (settings.arguments as Map<String, Object?>?) ??
-      const <String, Object?>{};
-  final mode = (args['mode'] as String?) ?? 'habit';
-  switch (mode) {
-    case 'overlay':
-      return MaterialPageRoute<void>(
-        settings: settings,
-        builder: (_) => RoutineOverlayScreen(
-          title: args['title'] as String?,
-          body: args['body'] as String?,
-        ),
-      );
-    case 'habit':
-    default:
-      final habitId = (args['habitId'] as String?) ?? '';
-      return MaterialPageRoute<bool?>(
-        settings: settings,
-        builder: (_) => MissionLauncherScreen(habitId: habitId),
-      );
   }
 }
 

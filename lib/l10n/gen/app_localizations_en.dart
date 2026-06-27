@@ -421,4 +421,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onboardingOpenAndroidSettingsCta => 'Open Android settings';
+
+  @override
+  String get widgetConfigureTitle => 'Choose a do for do it';
+
+  @override
+  String get widgetConfigureEmptyState =>
+      'Add a do in do it to use the home widget.';
+
+  @override
+  String get widgetConfigureBackToHome => 'Back to do it';
 }

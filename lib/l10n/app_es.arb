@@ -125,5 +125,9 @@
   "onboardingStepCallScreeningBody": "Opcional: permite que do it filtre llamadas entrantes para que la rutina Japón pueda hacer sonar contactos específicos en modo silencio. Android te pedirá que confirmes.",
   "onboardingStepCallScreeningCta": "Conceder",
   "onboardingSkipCta": "Omitir",
-  "onboardingOpenAndroidSettingsCta": "Abrir ajustes de Android"
+  "onboardingOpenAndroidSettingsCta": "Abrir ajustes de Android",
+
+  "widgetConfigureTitle": "Elige una tarea para do it",
+  "widgetConfigureEmptyState": "Añade una tarea en do it para usar el widget de inicio.",
+  "widgetConfigureBackToHome": "Volver a do it"
 }
