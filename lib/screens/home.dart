@@ -767,15 +767,31 @@ class _HabitTileState extends State<_HabitTile> {
                           // also takes a budget future to
                           // render the rest-day caption
                           // underneath.
-                          _DoStreakBadge(
-                            completions: completions,
-                            activeDo: habit,
-                            asOf: asOf,
-                            onBudgetCaptionTapped: _onBudgetCaptionTapped,
-                            budget: budgetRemainingForDo(
+                          //
+                          // v1.4m (SYS-127): wrap in
+                          // `KeyedSubtree` with a
+                          // `streakBadge-<habitId>` key so
+                          // widget tests can find the
+                          // rendered streak number without
+                          // inspecting the private
+                          // `_DoStreakBadge` widget tree.
+                          // The key MUST stay stable for a
+                          // given `habit.id` — the tile
+                          // rebuild path uses the same id
+                          // (the `Do` instance is keyed by
+                          // id in `_HomeScreenState._buildTiles`).
+                          KeyedSubtree(
+                            key: Key('streakBadge-${habit.id}'),
+                            child: _DoStreakBadge(
+                              completions: completions,
                               activeDo: habit,
                               asOf: asOf,
-                              completionLog: CompletionLogService.instance,
+                              onBudgetCaptionTapped: _onBudgetCaptionTapped,
+                              budget: budgetRemainingForDo(
+                                activeDo: habit,
+                                asOf: asOf,
+                                completionLog: CompletionLogService.instance,
+                              ),
                             ),
                           ),
                           if (isPaused)

@@ -1993,3 +1993,48 @@ Closes the v1.4a gap where every widget instance on the home screen showed the s
 - ADR-056 (v1.4l — the soft-delete design decisions, especially the "save is content-only" invariant and the `restoreById` path)
 - WF-049 (v1.4h — the prior Delete + Undo flow that v1.4l replaces)
 - WF-051 (v1.4j — the rest-day-budget edit affordance, the parallel "in-place mutation + Undo-style fallback" pattern)
+
+
+## WF-055 — CI exercises the v1.4l soft-delete home-screen flow end-to-end (v1.4m / Phase 40 / SYS-127 / ADR-058)
+
+**User goal.** The v1.4l / WF-053 soft-delete home-screen flow (Delete + Undo within the SnackBar window → streak restores by construction) is a load-bearing user-visible behavior change. Without CI coverage, regressions in `DoRepository._toRow`'s "save is content-only" invariant or in the `_DoStreakBadge` widget's `Completions.habitId` lookup would silently break the streak-on-Undo behavior — the user would not see the regression until they re-installed the APK and tested manually. v1.4m ships the CI guard so the v1.4l PR's 6-step on-device smoke can be replaced by `flutter test` in CI.
+
+**Trigger.** The CI pipeline runs on every PR (the existing GitHub Actions workflow at `.github/workflows/ci.yml`).
+
+**Flow.**
+
+1. `flutter test test/services/do_repository_test.dart` runs the v1.4m `listDeleted` group (4 tests):
+   - `listDeleted` excludes active habits — seeds 2 habits (`h-active`, `h-deleted`), soft-deletes `h-deleted`, asserts `listDeleted()` returns `[h-deleted]` (not both).
+   - `listDeleted` orders by `deletedAtMillis DESC` — seeds 2 habits, soft-deletes `h-old` at `DateTime(2026, 6, 1)` and `h-recent` at `DateTime(2026, 6, 27)`, asserts `listDeleted()` returns `[h-recent, h-old]` (most-recently-deleted first).
+   - `listDeleted({int? limit})` honors the `limit` param — seeds 3 tombstoned habits, asserts `listDeleted(limit: 2)` returns the 2 most-recently-deleted.
+   - `listDeleted` returns an empty list when no habits are tombstoned — seeds 1 active habit, asserts `listDeleted()` returns `[]`.
+2. `flutter test test/services/do_repository_test.dart` runs the v1.4m `purgeDeletedOlderThan` group (4 tests):
+   - purges tombstoned habits older than the cutoff — seeds 2 tombstoned habits (`h-old` at 2026-05-01, `h-recent` at 2026-06-15), calls `purgeDeletedOlderThan(Duration(days: 30), at: DateTime(2026, 6, 27))`, asserts `h-old` is gone AND `h-recent` is still tombstoned.
+   - leaves young tombstoned habits untouched — seeds 1 tombstoned habit at `DateTime.now() - Duration(days: 1)`, calls `purgeDeletedOlderThan(Duration(days: 30), at: now)`, asserts the habit is still tombstoned.
+   - never touches active habits — seeds 1 active habit, calls `purgeDeletedOlderThan(Duration(days: 0), at: now)`, asserts the active habit is still there.
+   - is idempotent on a second call — calls `purgeDeletedOlderThan` twice with the same args, asserts the second call returns `0`.
+3. `flutter test test/services/do_repository_test.dart` runs the v1.4m `persistence-across-restart` group (1 test):
+   - Phase A: opens an in-memory DB, saves a do (`h1`), soft-deletes it at a frozen `at`, closes the DB.
+   - Phase B: opens a FRESH in-memory DB, seeds the raw `habits` row via `customStatement('INSERT INTO habits ...')` with `deleted_at_millis` set, asserts `getById('h1')` returns the tombstoned do with `isDeleted == true`.
+   - This proves the column survives what the user sees as "close + reopen the app" — the v1.4l headline behavior change (Undo restores streak by construction) depends on this persistence.
+4. `flutter test test/screens/home_test.dart` runs the v1.4m widget group (4 tests):
+   - `Undo restores the streak badge to the original value by construction` — seeds a do + 3 consecutive completions (yesterday, day before, 3 days ago), pumps the home screen, asserts the streak badge renders `Text('3')` (the "before" state). Taps the Delete IconButton, confirms the dialog, waits for the SnackBar. Taps the SnackBar's `SnackBarAction` (Undo), re-pumps, asserts the streak badge's `KeyedSubtree(key: 'streakBadge-<id>')` finds a `Text('3')` widget (the "after" state — streak survived because `Completions.habitId` references the same id that survived the soft-delete).
+   - `streak badge renders the streak number with the correct tabular formatting` — seeds a do + 3 completions, asserts the badge's `KeyedSubtree` finds BOTH a `Text('3')` (the streak number) AND a `Text('day streak')` (the subtitle).
+   - `cancelled delete (Cancel on confirm dialog) does NOT tombstone the do and the streak badge remains rendered` — seeds a do + 3 completions, pumps, taps Delete IconButton, taps the Cancel button on the confirm dialog, asserts the do is STILL in the listing AND the streak badge STILL renders `Text('3')` (Cancel must not partially-tombstone — the row is unchanged).
+   - `soft-delete persists across a HomeScreen rebuild (close + reopen the in-memory DB)` — seeds a do + 3 completions, pumps, taps Delete, confirms, asserts the do is gone. Calls `_resetDb(tester)` to swap in a fresh in-memory DB, re-pumps the widget, asserts the do is STILL gone (the tombstone survives the DB swap — same persistence guarantee as the persistence-across-restart repository test, but at the widget level).
+
+**Failure paths.**
+
+- *A future contributor accidentally adds `deletedAtMillis: d.deletedAt?.millisecondsSinceEpoch` to `DoRepository._toRow`'s save-path `HabitsCompanion`.* The v1.4m `persistence-across-restart` test would fail (the tombstone would be overwritten with `null` on the second `save` call — but in this test the row is seeded via raw SQL so the path that matters is the `save` after a `restoreById`; the test asserts the restore-by-id path works). The headline widget test (`Undo restores the streak badge`) would also fail because the soft-delete → save-on-Undo chain would silently resurrect the tombstone via the `save` → `insertOnConflictUpdate` path. Both tests guard the invariant from different angles.
+- *A future contributor refactors `_DoStreakBadge` and breaks the `KeyedSubtree` seam.* The `find.byKey(Key('streakBadge-<id>'))` lookup would fail. The test gives a precise error message ("No widget with key 'streakBadge-h1' found") — easier to diagnose than "streak badge does not render after Undo".
+- *A future contributor changes `listDeleted`'s order from `DESC` to `ASC`.* The "orders by `deletedAtMillis DESC`" test would fail. The fix is a one-line `..orderBy(...)` change — but the failure surfaces immediately in CI rather than at on-device smoke time.
+
+**Coverage.** 13 new tests (4 listDeleted + 4 purgeDeletedOlderThan + 1 persistence-across-restart + 4 widget). Total test count: 1321 → 1334. Coverage: ≥80% on every changed file (`do_repository.dart`, `home.dart`, `home_test.dart`, `do_repository_test.dart`).
+
+**Cross-references.**
+
+- SYS-127 (v1.4m — the CI coverage + API surface stabilization this WF documents)
+- SYS-126 (v1.4l — the soft-delete tombstone requirement that v1.4m exposes + tests)
+- ADR-058 (v1.4m — the design decisions for the API surface + the test seams)
+- ADR-056 (v1.4l — the soft-delete design decisions; v1.4m's `listDeleted` + `purgeDeletedOlderThan` ride on the v1.4l data layer)
+- WF-053 (v1.4l — the Delete + Undo user flow that v1.4m's widget tests guard against regression)

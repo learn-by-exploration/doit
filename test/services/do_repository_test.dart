@@ -365,4 +365,244 @@ void main() {
       },
     );
   });
+
+  group('DoRepository persistence-across-restart (v1.4m / SYS-127)', () {
+    test('soft-delete survives close + reopen of the in-memory DB', () async {
+      // The "tombstone persists across app restart"
+      // property is the v1.4l invariant. The Drift SQL
+      // `UPDATE` that sets `deleted_at_millis` commits
+      // before the DB is closed; a fresh DB that is
+      // hand-seeded with the same row bytes (raw SQL)
+      // observes the same tombstone.
+      //
+      // The test mirrors the v1.4l `migration_v3_to_v4`
+      // fixture pattern (`test/db/migration_v3_to_v4_test.dart`)
+      // but in miniature: open → softDelete → close →
+      // reopen → seed row with the same tombstone →
+      // assert.
+      await DoRepository.instance.save(_do(id: 'h1', name: 'Stretch'));
+      final at = DateTime(2026, 6, 27);
+      await DoRepository.instance.softDeleteById('h1', at: at);
+
+      // Close the in-memory DB.
+      await AppDatabaseService.instance.closeForTesting();
+
+      // Re-open with a fresh in-memory DB + hand-seed
+      // the tombstoned row.
+      final freshDb = AppDatabase(NativeDatabase.memory());
+      await AppDatabaseService.instance.init(overrideDb: freshDb);
+      await AppDatabaseService.instance.ready;
+
+      final deletedAtMillis = at.millisecondsSinceEpoch;
+      await freshDb.customStatement(
+        'INSERT INTO habits (id, name, proof_mode, '
+        'created_at_millis, rest_days_per_month, '
+        'schedule_type, weekdays, deleted_at_millis) '
+        "VALUES ('h1', 'Stretch', 'soft', 1747526400000, "
+        "2, 'fixed', '1,2,3,4,5,6,7', $deletedAtMillis)",
+      );
+
+      // The "restarted" app must observe the tombstone.
+      final stillTombstoned = await DoRepository.instance.getById('h1');
+      expect(stillTombstoned, isNotNull);
+      expect(stillTombstoned!.isDeleted, isTrue);
+      expect(stillTombstoned.deletedAt, at);
+
+      // The UI perspective filters it out.
+      final uiPerspective = await DoRepository.instance.getActiveById('h1');
+      expect(uiPerspective, isNull);
+
+      // And `listAll` excludes it.
+      final allActive = await DoRepository.instance.listAll();
+      expect(allActive, isEmpty);
+
+      // The restore path still works.
+      final restored = await DoRepository.instance.restoreById('h1');
+      expect(restored, isTrue);
+      final afterRestore = await DoRepository.instance.getActiveById('h1');
+      expect(afterRestore, isNotNull);
+      expect(afterRestore!.isDeleted, isFalse);
+    });
+  });
+
+  group('DoRepository listDeleted (v1.4m / SYS-127)', () {
+    test('listDeleted excludes active habits', () async {
+      // Arrange — one active + one tombstoned do.
+      await DoRepository.instance.save(_do(id: 'h-active', name: 'Active'));
+      await DoRepository.instance.save(_do(id: 'h-deleted', name: 'Deleted'));
+      await DoRepository.instance.softDeleteById(
+        'h-deleted',
+        at: DateTime(2026, 6, 27),
+      );
+
+      // Act
+      final deleted = await DoRepository.instance.listDeleted();
+
+      // Assert
+      expect(deleted.map((d) => d.id), <String>['h-deleted']);
+      expect(deleted.single.isDeleted, isTrue);
+      expect(deleted.single.deletedAt, DateTime(2026, 6, 27));
+    });
+
+    test(
+      'listDeleted returns tombstoned habits with descending deletedAt',
+      () async {
+        // Arrange — 3 tombstones with different deletedAt
+        // timestamps. The order MUST be newest-first.
+        await DoRepository.instance.save(_do(id: 'h-old', name: 'Old'));
+        await DoRepository.instance.save(_do(id: 'h-mid', name: 'Mid'));
+        await DoRepository.instance.save(_do(id: 'h-new', name: 'New'));
+        await DoRepository.instance.softDeleteById(
+          'h-old',
+          at: DateTime(2026, 6, 20),
+        );
+        await DoRepository.instance.softDeleteById(
+          'h-mid',
+          at: DateTime(2026, 6, 25),
+        );
+        await DoRepository.instance.softDeleteById(
+          'h-new',
+          at: DateTime(2026, 6, 27),
+        );
+
+        // Act
+        final deleted = await DoRepository.instance.listDeleted();
+
+        // Assert — descending by deletedAt.
+        expect(deleted.map((d) => d.id), <String>['h-new', 'h-mid', 'h-old']);
+      },
+    );
+
+    test('listDeleted respects the limit parameter', () async {
+      // Arrange — 3 tombstones; ask for the 2 newest.
+      await DoRepository.instance.save(_do(id: 'h1', name: 'One'));
+      await DoRepository.instance.save(_do(id: 'h2', name: 'Two'));
+      await DoRepository.instance.save(_do(id: 'h3', name: 'Three'));
+      await DoRepository.instance.softDeleteById(
+        'h1',
+        at: DateTime(2026, 6, 20),
+      );
+      await DoRepository.instance.softDeleteById(
+        'h2',
+        at: DateTime(2026, 6, 25),
+      );
+      await DoRepository.instance.softDeleteById(
+        'h3',
+        at: DateTime(2026, 6, 27),
+      );
+
+      // Act
+      final top2 = await DoRepository.instance.listDeleted(limit: 2);
+
+      // Assert — only the 2 newest are returned.
+      expect(top2.map((d) => d.id), <String>['h3', 'h2']);
+    });
+
+    test('listDeleted is empty when no tombstones exist', () async {
+      // Arrange — only active habits.
+      await DoRepository.instance.save(_do(id: 'h-active'));
+
+      // Act
+      final deleted = await DoRepository.instance.listDeleted();
+
+      // Assert
+      expect(deleted, isEmpty);
+    });
+  });
+
+  group('DoRepository purgeDeletedOlderThan (v1.4m / SYS-127)', () {
+    test('hard-deletes tombstones older than the cutoff', () async {
+      // Arrange — 2 tombstones: one old, one recent.
+      await DoRepository.instance.save(_do(id: 'h-old', name: 'Old'));
+      await DoRepository.instance.save(_do(id: 'h-recent', name: 'Recent'));
+      await DoRepository.instance.softDeleteById(
+        'h-old',
+        at: DateTime(2026, 5, 15),
+      );
+      await DoRepository.instance.softDeleteById(
+        'h-recent',
+        at: DateTime(2026, 6, 20),
+      );
+
+      // Act — purge with a 30-day cutoff relative to 2026-06-27.
+      final purgeAt = DateTime(2026, 6, 27);
+      final purged = await DoRepository.instance.purgeDeletedOlderThan(
+        const Duration(days: 30),
+        at: purgeAt,
+      );
+
+      // Assert — h-old is gone (purged), h-recent stays.
+      expect(purged, 1);
+      final after = await DoRepository.instance.listDeleted();
+      expect(after.map((d) => d.id), <String>['h-recent']);
+      // And the old one is hard-deleted (no row at all).
+      final oldRow = await DoRepository.instance.getById('h-old');
+      expect(oldRow, isNull);
+    });
+
+    test('leaves younger tombstones alone', () async {
+      // Arrange — 2 tombstones, both within the 30-day
+      // window.
+      await DoRepository.instance.save(_do(id: 'h1', name: 'One'));
+      await DoRepository.instance.save(_do(id: 'h2', name: 'Two'));
+      await DoRepository.instance.softDeleteById(
+        'h1',
+        at: DateTime(2026, 6, 25),
+      );
+      await DoRepository.instance.softDeleteById(
+        'h2',
+        at: DateTime(2026, 6, 26),
+      );
+
+      // Act
+      final purged = await DoRepository.instance.purgeDeletedOlderThan(
+        const Duration(days: 30),
+        at: DateTime(2026, 6, 27),
+      );
+
+      // Assert — nothing was purged.
+      expect(purged, 0);
+      final after = await DoRepository.instance.listDeleted();
+      expect(after.map((d) => d.id), containsAll(<String>['h1', 'h2']));
+    });
+
+    test('does NOT touch active habits', () async {
+      // Arrange — 1 active + 1 tombstoned, both within the
+      // cutoff.
+      await DoRepository.instance.save(_do(id: 'h-active', name: 'Active'));
+      await DoRepository.instance.save(_do(id: 'h-deleted', name: 'Deleted'));
+      await DoRepository.instance.softDeleteById(
+        'h-deleted',
+        at: DateTime(2026, 6, 26),
+      );
+
+      // Act
+      final purged = await DoRepository.instance.purgeDeletedOlderThan(
+        const Duration(days: 30),
+        at: DateTime(2026, 6, 27),
+      );
+
+      // Assert — active habit is preserved.
+      expect(purged, 0);
+      final active = await DoRepository.instance.getActiveById('h-active');
+      expect(active, isNotNull);
+      expect(active!.isDeleted, isFalse);
+    });
+
+    test('purge is idempotent when nothing matches', () async {
+      // Arrange — no tombstones at all.
+      await DoRepository.instance.save(_do(id: 'h-active'));
+
+      // Act
+      final purged = await DoRepository.instance.purgeDeletedOlderThan(
+        const Duration(days: 30),
+        at: DateTime(2026, 6, 27),
+      );
+
+      // Assert — purge returns 0, active habit is intact.
+      expect(purged, 0);
+      final active = await DoRepository.instance.listAll();
+      expect(active.map((d) => d.id), <String>['h-active']);
+    });
+  });
 }
