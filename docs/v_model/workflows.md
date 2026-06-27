@@ -2038,3 +2038,53 @@ Closes the v1.4a gap where every widget instance on the home screen showed the s
 - ADR-058 (v1.4m — the design decisions for the API surface + the test seams)
 - ADR-056 (v1.4l — the soft-delete design decisions; v1.4m's `listDeleted` + `purgeDeletedOlderThan` ride on the v1.4l data layer)
 - WF-053 (v1.4l — the Delete + Undo user flow that v1.4m's widget tests guard against regression)
+
+---
+
+## WF-056 — Kick off the 3-month stabilization campaign: coverage audit + roadmap (v1.4-stab-A / Phase 41 / SYS-128 / ADR-059)
+
+**User goal.** After v1.4a..v1.4m shipped 12 cycles of net-new surface (1130 → 1334 tests, 26 PRs, ~900 tests added), the user redirected from feature work to hardening: "we have 3 month to stabilise the app and have exhaustive test". The user needs a clear, sequenced plan for the 3 months — what's broken, what gets fixed when, and how we'll know we're done. Cycle A produces that plan.
+
+**Trigger.** The CI pipeline runs `flutter test --coverage` (the existing GitHub Actions workflow at `.github/workflows/ci.yml`). Cycle A reads the report + produces the roadmap doc.
+
+**Flow.**
+
+1. **Run `flutter test --coverage`** — produces `coverage/lcov.info`. The 1334 existing tests all pass (verified by the 3-gate). The coverage report is the input for the audit.
+2. **Parse `coverage/lcov.info` per-file.** Use a small Python parser (the `lcov` package is not installed in this dev environment; Python's standard library suffices to extract `SF` / `LF` / `LH` markers). Compute per-file coverage % and bucket: Priority 1 (< 80%), Priority 2 (80-90%), Priority 3 (≥ 90%). 33 files fall in Priority 1, 31 in Priority 2, 59 in Priority 3.
+3. **Inventory latent bugs.** Read `feature.md §4` + `v1.4l ADR-056 §6` + `v1.1f ADR-031` + every BUG-tracking doc. Catalog BUG-001..BUG-006 as known. Audit adds BUG-007..BUG-020 from the coverage findings (low coverage on the pure-Dart model layer is itself a defect — the model layer should hit 100%).
+4. **Sequence Cycles B..L.** 11 cycles, sequenced by priority:
+   - **B** — fix `_toRow` automations + pausedUntil data-loss bugs (P0).
+   - **C** — full-screen launch hardening (P1, Android 14+).
+   - **D** — permission flow audit (P2).
+   - **E** — reliability detection coverage (P1).
+   - **F** — backup round-trip exhaustive (P1).
+   - **G** — DoAnchor "Target paused" badge (P2, completes v1.4l UI).
+   - **H** — Restore / delete-forever UI (the deferred v1.4n; completes v1.4l feature).
+   - **I** — i18n test exhaustive (P2).
+   - **J** — accessibility audit (P2).
+   - **K** — E2E integration tests (P2, 10 critical flows).
+   - **L** — performance audit + fuzz + benchmark (P3).
+5. **Write `docs/v_model/stabilization_roadmap.md`.** 6 sections (§1 coverage state, §2 latent bugs, §3 cycle-by-cycle roadmap, §4 success criteria, §5 open questions, §6 Cycle A retrospective). Single source of truth for the 3-month campaign — every subsequent cycle updates it.
+6. **Append V-Model artifacts.** SYS-128 to `docs/v_model/requirements.md`. ADR-059 to `docs/v_model/decision_record.md` (the pivot + sequencing decisions). WF-056 (this entry) to `docs/v_model/workflows.md`. Traceability row to `docs/v_model/traceability_matrix.md`. Implementation-status row to `docs/v_model/implementation_status.md`. CHANGELOG v1.4-stab-A block. `feature.md` §4 / §5 / §6 updates (move v1.4n parking-lot bullet; update §5 quick-index; update §6 next-step). `plan.md` Milestone 12 entry + v1.4-stab-A sub-entry.
+7. **Run 3-gate.** `dart format --output=none --set-exit-if-changed .` (0 changed — no Dart code modified) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1334/1334 pass — no test changes). The 3-gate is a regression check: Cycle A's doc-only changes must not break the existing test suite.
+8. **Commit + push + open PR + poll CI + squash-merge.** The PR is a doc-only change (the `coverage/lcov.info` artifact is auto-generated and may be gitignored — check `.gitignore` and include or exclude accordingly). Cycle A is the smallest possible PR — the diff is the new roadmap doc + V-Model artifacts.
+
+**Failure paths.**
+
+- *The audit finds more gaps than the 11 cycles can close.* The roadmap doc captures every gap; the success criteria define what's "done enough" (≥90% line coverage, 100% on model layer, 0 known bugs). If audit findings exceed that, lower-priority cycles (L's fuzz testing, J's polish) get trimmed or pushed to v2.0.
+- *Cycle B's fix breaks a v1.4l save invariant.* Cycle B's tests pin the `_toRow` "save is content-only" invariant for `automationsJson` + `pausedUntilMillis` (parallel to v1.4m's `deletedAtMillis` pin). The save-invariant test group catches regressions.
+- *The user disagrees with cycle sequencing.* The roadmap doc's §3 ordering is provisional. The user can reorder via this doc's next cycle. The roadmap doc is the authoritative source — re-plan the next cycle in plan mode and update §3.
+- *The 3-month window slides (illness, vacation, urgent user-reported bugs).* Lower-priority cycles (L, J) are trimmed first. The success criteria are aspirational; the priority is closing the latent bugs + hardening the reliability paths, not hitting 100% coverage on every screen.
+
+**Coverage.** Cycle A ships 0 new tests. The "test" deliverable is the coverage report (`coverage/lcov.info` + the per-file table in `docs/v_model/stabilization_roadmap.md §1`). Total test count unchanged: 1334/1334 pass. Coverage on `lib/`: 8812/13638 lines (64.61%) — the BASELINE for the 3-month campaign.
+
+**Cross-references.**
+
+- SYS-128 (v1.4-stab-A — the stabilization campaign kickoff + audit + roadmap cycle this WF documents)
+- ADR-059 (v1.4-stab-A — the pivot from feature work to stabilization + the cycle sequencing decisions)
+- `docs/v_model/stabilization_roadmap.md` (NEW — the single source of truth for the 3-month campaign; sections §1-§6 cover coverage state, latent bugs, cycle roadmap, success criteria, open questions, retrospective)
+- ADR-058 (v1.4m — the "tests first, then UI" inversion that justifies Cycle H's positioning inside the window)
+- ADR-056 (v1.4l — the soft-delete data layer that Cycle H's UI consumes + the "Target paused" semantics that Cycle G's UI ships)
+- BUG-001..BUG-020 (the latent bugs inventoried in `stabilization_roadmap.md §2`; the campaign's success criterion #4 is "0 known latent bugs" — every BUG-NNN closed by some cycle)
+- WF-053 (v1.4l — the Delete + Undo user flow that Cycle H's restore-after-window completes)
+- WF-055 (v1.4m — the API surface stabilization that Cycle H consumes)
