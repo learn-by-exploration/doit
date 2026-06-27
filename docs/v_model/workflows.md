@@ -1948,3 +1948,48 @@ Closes the v1.4a gap where every widget instance on the home screen showed the s
 - SYS-115 (v1.4a — `WidgetStateCache.kt` mirror + `WidgetBridge.cacheSnapshot` round-trip)
 - SYS-114 (v1.3d — `FlutterActivity` thin-shell + `getInitialRoute()` handoff)
 - SYS-121 (v1.4g — `WidgetActionInvoker.attach()` dispatch table)
+
+
+## WF-053 — Delete a do and undo within the SnackBar window (true restore, v1.4l / Phase 39 / SYS-126 / ADR-056)
+
+**User goal.** The user wants to remove a do from the home screen, with confidence that the action is reversible within a short window (because they might tap Delete by mistake, or because they change their mind). v1.4l closes the v1.4h / SYS-122 trade-off where Undo re-saved the do via `insertOnConflictUpdate` but lost the completion-log rows (the Drift schema declares no FKs so cascade never fired) and the user's automations (the `_toRow` mapping bug, tracked separately).
+
+**Trigger.** The user opens the home screen and taps the per-tile **Delete** IconButton on a `_HabitTile` (v1.4h / SYS-122).
+
+**Flow.**
+
+1. The `_HabitTile._DeleteButton.onPressed` opens an `AlertDialog` with the title `homeTileDeleteConfirm(habit.name)` ("Delete \"X\"?") and body `homeTileDeleteConfirmBody` ("This will remove the do from your home screen. You can undo for a few seconds after.").
+2. On confirm (the dialog's "Delete" `TextButton`), the tile:
+   - captures `messenger = ScaffoldMessenger.of(context)` BEFORE the async gap,
+   - sets `_busy = true`,
+   - calls `softDeleteDo(activeDo: widget.habit, at: DateTime.now(), repository: DoRepository.instance)` (the v1.4l helper at `lib/screens/home_tile_delete.dart`),
+   - the helper calls `repository.softDeleteById(activeDo.id, at: at)` which runs `UPDATE habits SET deleted_at_millis = ? WHERE id = ? AND deleted_at_millis IS NULL`,
+   - returns `true` on a clean update, `false` on a missing or already-tombstoned row.
+3. On `true` the tile:
+   - calls `widget.onDoChanged?.call()` → `_HomeScreenState._refresh()` → the parent's `FutureBuilder<List<Do>>` re-fires → `listAll()` returns one fewer do (the tombstoned row is filtered at the SQL level by `..where((t) => t.deletedAtMillis.isNull())`) → the tile disappears from the home screen.
+   - shows a SnackBar `homeSnackbarDoDeleted(habit.name)` ("Deleted \"X\".") with a `SnackBarAction` labeled `homeSnackbarDoDeletedUndo` ("Undo") whose `onPressed` captures the original `widget.habit` reference (immutable per `lib/do/do.dart`) and calls `restoreDo(tombstonedDo: capturedHabit, repository: DoRepository.instance)`.
+   - `restoreDo` calls `repository.restoreById(tombstonedDo.id)` which runs `UPDATE habits SET deleted_at_millis = NULL WHERE id = ? AND deleted_at_millis IS NOT NULL` — a single UPDATE, idempotent.
+   - On the Undo callback's success, the parent's `_refresh()` re-fires (via the `messenger.showSnackBar`'s callback path), `listAll()` returns the do (the tombstone is cleared), and the tile reappears with the SAME row id → same completion log → same streak counter (the headline behavior change of v1.4l — streak survives because `Completions.habitId` references the same id that survived the soft-delete).
+
+   The Undo path is `restoreById`, NOT `save(d)`, because `save(d)` would invoke Drift's `insertOnConflictUpdate` which on the tombstoned row preserves the `deleted_at_millis` (per the v1.4l "save is content-only" invariant — `DoRepository._toRow` does NOT write `deletedAtMillis`, so the existing column value persists across a Save click). `restoreById` is the only API that can clear the tombstone.
+4. On `false` (helper returned false — DB locked, drift exception, already-tombstoned row) the tile:
+   - does NOT call `widget.onDoChanged` (the row is still in the listing),
+   - shows `homeSnackbarDoDeleteFailed` ("Could not delete. Try again.").
+5. After ~4 s the SnackBar dismisses; the do is gone from the listing. The tombstone is persistent across app restarts (it's a column in the local DB) but the UI never surfaces tombstoned rows. A v1.4l+ "Recently deleted" surface would offer an off-SnackBar restore path — out of scope for v1.4l.
+
+**Failure paths.**
+
+- *DB write fails.* The helper returns `false`; the tile stays; the user sees the failure snackbar. The user's streak is untouched.
+- *The user creates a new do with the same name in the gap.* The Undo's `restoreById` is a single UPDATE on `id` (not `name`) — it cannot collide with `DuplicateDoName`. The Undo always succeeds; both dos coexist (the restored one with its old id + completion log, the new one with its new id).
+- *The user soft-deletes the do, doesn't Undo, then relaunches the app.* The tombstone is persistent in the local DB. `listAll()` and `listActive()` filter it out. The home screen never shows it. A future "Recently deleted" surface would surface it; out of scope for v1.4l.
+- *A widget instance was bound to the deleted do (v1.4k / SYS-125 picked `selectedHabitId = deleted.id`).* `WidgetService.handleRefreshRequest` calls `_doRepository.getById(pick)` — the tombstoned row is still returned (semantics preserved); the reconciliation path distinguishes "the do was soft-deleted" (the row has `deletedAt != null` → the picker is stale, the widget falls back to `firstActiveDo`) from "the do was hard-deleted" (the row is `null` → the picker is gone, the widget falls back to `firstActiveDo`). Both paths clear `selectedHabitId` to `null` so a future re-bind starts fresh.
+
+**Coverage.** `test/screens/home_tile_delete_test.dart` (14 tests) + `test/screens/home_test.dart` (+2 existing v1.4h tests updated to assert via `getActiveById` since `getById` returns the tombstoned row post-v1.4l) + `test/services/do_repository_test.dart` (14 tests across the soft-delete / restore / save-invariant / hard-delete groups) + `test/db/migration_v4_to_v5_test.dart` (4 tests).
+
+**Cross-references.**
+
+- SYS-122 (v1.4h — the per-tile Edit + Delete IconButtons; the prior hard-delete + re-insert Undo trade-off)
+- SYS-126 (v1.4l — the soft-delete tombstone requirement)
+- ADR-056 (v1.4l — the soft-delete design decisions, especially the "save is content-only" invariant and the `restoreById` path)
+- WF-049 (v1.4h — the prior Delete + Undo flow that v1.4l replaces)
+- WF-051 (v1.4j — the rest-day-budget edit affordance, the parallel "in-place mutation + Undo-style fallback" pattern)

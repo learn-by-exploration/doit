@@ -25,9 +25,9 @@ void main() {
       await AppDatabaseService.instance.closeForTesting();
     });
 
-    test('schemaVersion is 4 (Phase C PR 1 pin)', () {
-      expect(db.schemaVersion, 4);
-      expect(kCurrentSchemaVersion, 4);
+    test('schemaVersion is 5 (Phase C PR 1 / v1.4l pin)', () {
+      expect(db.schemaVersion, 5);
+      expect(kCurrentSchemaVersion, 5);
     });
 
     test('habits / people / events have automations_json column', () async {

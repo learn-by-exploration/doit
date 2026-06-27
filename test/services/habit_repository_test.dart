@@ -258,5 +258,43 @@ void main() {
       );
       expect(() => DoRepository.instance.save(h), throwsA(isA<DoNameEmpty>()));
     });
+
+    test('round-trips deletedAt via softDeleteById + restoreById '
+        '(v1.4l / SYS-126)', () async {
+      final h = DoFixed(
+        id: 'h-tomb',
+        name: 'Tombstoned',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026),
+        restDaysPerMonth: 2,
+        weekdays: const {1},
+        time: const DoTime(8, 0),
+      );
+      await DoRepository.instance.save(h);
+
+      // Active by default — deletedAt is null.
+      final active = await DoRepository.instance.getById('h-tomb');
+      expect(active!.deletedAt, isNull);
+      expect(active.isDeleted, isFalse);
+
+      // Soft-delete writes the timestamp.
+      final at = DateTime(2026, 6, 27, 10);
+      await DoRepository.instance.softDeleteById('h-tomb', at: at);
+      final tombstoned = await DoRepository.instance.getById('h-tomb');
+      expect(tombstoned!.deletedAt, at);
+      expect(tombstoned.isDeleted, isTrue);
+
+      // listAll filters the tombstone out.
+      final list = await DoRepository.instance.listAll();
+      expect(list, isEmpty);
+
+      // Restore clears the tombstone.
+      await DoRepository.instance.restoreById('h-tomb');
+      final restored = await DoRepository.instance.getById('h-tomb');
+      expect(restored!.deletedAt, isNull);
+      expect(restored.isDeleted, isFalse);
+      final listAfter = await DoRepository.instance.listAll();
+      expect(listAfter.map((d) => d.id), <String>['h-tomb']);
+    });
   });
 }

@@ -283,6 +283,17 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _deletedAtMillisMeta = const VerificationMeta(
+    'deletedAtMillis',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMillis = GeneratedColumn<int>(
+    'deleted_at_millis',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -311,6 +322,7 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
     iconName,
     pausedUntilMillis,
     automationsJson,
+    deletedAtMillis,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -523,6 +535,15 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
         ),
       );
     }
+    if (data.containsKey('deleted_at_millis')) {
+      context.handle(
+        _deletedAtMillisMeta,
+        deletedAtMillis.isAcceptableOrUnknown(
+          data['deleted_at_millis']!,
+          _deletedAtMillisMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -636,6 +657,10 @@ class $HabitsTable extends Habits with TableInfo<$HabitsTable, HabitRow> {
         DriftSqlType.string,
         data['${effectivePrefix}automations_json'],
       ),
+      deletedAtMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_millis'],
+      ),
     );
   }
 
@@ -672,6 +697,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
   final String? iconName;
   final int? pausedUntilMillis;
   final String? automationsJson;
+  final int? deletedAtMillis;
   const HabitRow({
     required this.id,
     required this.name,
@@ -699,6 +725,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     this.iconName,
     this.pausedUntilMillis,
     this.automationsJson,
+    this.deletedAtMillis,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -765,6 +792,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     if (!nullToAbsent || automationsJson != null) {
       map['automations_json'] = Variable<String>(automationsJson);
     }
+    if (!nullToAbsent || deletedAtMillis != null) {
+      map['deleted_at_millis'] = Variable<int>(deletedAtMillis);
+    }
     return map;
   }
 
@@ -828,6 +858,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       automationsJson: automationsJson == null && nullToAbsent
           ? const Value.absent()
           : Value(automationsJson),
+      deletedAtMillis: deletedAtMillis == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAtMillis),
     );
   }
 
@@ -867,6 +900,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       iconName: serializer.fromJson<String?>(json['iconName']),
       pausedUntilMillis: serializer.fromJson<int?>(json['pausedUntilMillis']),
       automationsJson: serializer.fromJson<String?>(json['automationsJson']),
+      deletedAtMillis: serializer.fromJson<int?>(json['deletedAtMillis']),
     );
   }
   @override
@@ -899,6 +933,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       'iconName': serializer.toJson<String?>(iconName),
       'pausedUntilMillis': serializer.toJson<int?>(pausedUntilMillis),
       'automationsJson': serializer.toJson<String?>(automationsJson),
+      'deletedAtMillis': serializer.toJson<int?>(deletedAtMillis),
     };
   }
 
@@ -929,6 +964,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     Value<String?> iconName = const Value.absent(),
     Value<int?> pausedUntilMillis = const Value.absent(),
     Value<String?> automationsJson = const Value.absent(),
+    Value<int?> deletedAtMillis = const Value.absent(),
   }) => HabitRow(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -970,6 +1006,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     automationsJson: automationsJson.present
         ? automationsJson.value
         : this.automationsJson,
+    deletedAtMillis: deletedAtMillis.present
+        ? deletedAtMillis.value
+        : this.deletedAtMillis,
   );
   HabitRow copyWithCompanion(HabitsCompanion data) {
     return HabitRow(
@@ -1023,6 +1062,9 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
       automationsJson: data.automationsJson.present
           ? data.automationsJson.value
           : this.automationsJson,
+      deletedAtMillis: data.deletedAtMillis.present
+          ? data.deletedAtMillis.value
+          : this.deletedAtMillis,
     );
   }
 
@@ -1054,7 +1096,8 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
           ..write('colorSeed: $colorSeed, ')
           ..write('iconName: $iconName, ')
           ..write('pausedUntilMillis: $pausedUntilMillis, ')
-          ..write('automationsJson: $automationsJson')
+          ..write('automationsJson: $automationsJson, ')
+          ..write('deletedAtMillis: $deletedAtMillis')
           ..write(')'))
         .toString();
   }
@@ -1087,6 +1130,7 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
     iconName,
     pausedUntilMillis,
     automationsJson,
+    deletedAtMillis,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -1117,7 +1161,8 @@ class HabitRow extends DataClass implements Insertable<HabitRow> {
           other.colorSeed == this.colorSeed &&
           other.iconName == this.iconName &&
           other.pausedUntilMillis == this.pausedUntilMillis &&
-          other.automationsJson == this.automationsJson);
+          other.automationsJson == this.automationsJson &&
+          other.deletedAtMillis == this.deletedAtMillis);
 }
 
 class HabitsCompanion extends UpdateCompanion<HabitRow> {
@@ -1147,6 +1192,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
   final Value<String?> iconName;
   final Value<int?> pausedUntilMillis;
   final Value<String?> automationsJson;
+  final Value<int?> deletedAtMillis;
   final Value<int> rowid;
   const HabitsCompanion({
     this.id = const Value.absent(),
@@ -1175,6 +1221,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     this.iconName = const Value.absent(),
     this.pausedUntilMillis = const Value.absent(),
     this.automationsJson = const Value.absent(),
+    this.deletedAtMillis = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   HabitsCompanion.insert({
@@ -1204,6 +1251,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     this.iconName = const Value.absent(),
     this.pausedUntilMillis = const Value.absent(),
     this.automationsJson = const Value.absent(),
+    this.deletedAtMillis = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -1237,6 +1285,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     Expression<String>? iconName,
     Expression<int>? pausedUntilMillis,
     Expression<String>? automationsJson,
+    Expression<int>? deletedAtMillis,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1268,6 +1317,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
       if (iconName != null) 'icon_name': iconName,
       if (pausedUntilMillis != null) 'paused_until_millis': pausedUntilMillis,
       if (automationsJson != null) 'automations_json': automationsJson,
+      if (deletedAtMillis != null) 'deleted_at_millis': deletedAtMillis,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1299,6 +1349,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     Value<String?>? iconName,
     Value<int?>? pausedUntilMillis,
     Value<String?>? automationsJson,
+    Value<int?>? deletedAtMillis,
     Value<int>? rowid,
   }) {
     return HabitsCompanion(
@@ -1328,6 +1379,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
       iconName: iconName ?? this.iconName,
       pausedUntilMillis: pausedUntilMillis ?? this.pausedUntilMillis,
       automationsJson: automationsJson ?? this.automationsJson,
+      deletedAtMillis: deletedAtMillis ?? this.deletedAtMillis,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1413,6 +1465,9 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
     if (automationsJson.present) {
       map['automations_json'] = Variable<String>(automationsJson.value);
     }
+    if (deletedAtMillis.present) {
+      map['deleted_at_millis'] = Variable<int>(deletedAtMillis.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1448,6 +1503,7 @@ class HabitsCompanion extends UpdateCompanion<HabitRow> {
           ..write('iconName: $iconName, ')
           ..write('pausedUntilMillis: $pausedUntilMillis, ')
           ..write('automationsJson: $automationsJson, ')
+          ..write('deletedAtMillis: $deletedAtMillis, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5922,6 +5978,7 @@ typedef $$HabitsTableCreateCompanionBuilder =
       Value<String?> iconName,
       Value<int?> pausedUntilMillis,
       Value<String?> automationsJson,
+      Value<int?> deletedAtMillis,
       Value<int> rowid,
     });
 typedef $$HabitsTableUpdateCompanionBuilder =
@@ -5952,6 +6009,7 @@ typedef $$HabitsTableUpdateCompanionBuilder =
       Value<String?> iconName,
       Value<int?> pausedUntilMillis,
       Value<String?> automationsJson,
+      Value<int?> deletedAtMillis,
       Value<int> rowid,
     });
 
@@ -6091,6 +6149,11 @@ class $$HabitsTableFilterComposer
 
   ColumnFilters<String> get automationsJson => $composableBuilder(
     column: $table.automationsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMillis => $composableBuilder(
+    column: $table.deletedAtMillis,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6233,6 +6296,11 @@ class $$HabitsTableOrderingComposer
     column: $table.automationsJson,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get deletedAtMillis => $composableBuilder(
+    column: $table.deletedAtMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$HabitsTableAnnotationComposer
@@ -6345,6 +6413,11 @@ class $$HabitsTableAnnotationComposer
     column: $table.automationsJson,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get deletedAtMillis => $composableBuilder(
+    column: $table.deletedAtMillis,
+    builder: (column) => column,
+  );
 }
 
 class $$HabitsTableTableManager
@@ -6401,6 +6474,7 @@ class $$HabitsTableTableManager
                 Value<String?> iconName = const Value.absent(),
                 Value<int?> pausedUntilMillis = const Value.absent(),
                 Value<String?> automationsJson = const Value.absent(),
+                Value<int?> deletedAtMillis = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HabitsCompanion(
                 id: id,
@@ -6429,6 +6503,7 @@ class $$HabitsTableTableManager
                 iconName: iconName,
                 pausedUntilMillis: pausedUntilMillis,
                 automationsJson: automationsJson,
+                deletedAtMillis: deletedAtMillis,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6459,6 +6534,7 @@ class $$HabitsTableTableManager
                 Value<String?> iconName = const Value.absent(),
                 Value<int?> pausedUntilMillis = const Value.absent(),
                 Value<String?> automationsJson = const Value.absent(),
+                Value<int?> deletedAtMillis = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HabitsCompanion.insert(
                 id: id,
@@ -6487,6 +6563,7 @@ class $$HabitsTableTableManager
                 iconName: iconName,
                 pausedUntilMillis: pausedUntilMillis,
                 automationsJson: automationsJson,
+                deletedAtMillis: deletedAtMillis,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

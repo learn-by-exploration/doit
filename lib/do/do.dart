@@ -172,6 +172,7 @@ sealed class Do {
     this.pausedUntil,
     this.automations = const <Automation>[],
     this.graceWindowOverride,
+    this.deletedAt,
   });
 
   final DoId id;
@@ -213,6 +214,18 @@ sealed class Do {
   /// Honored by [Do.effectiveStreakConfig].
   final Duration? graceWindowOverride;
 
+  /// v1.4l (Phase 39 / SYS-126 / ADR-056 / WF-053): soft-
+  /// delete tombstone. `null` = active; non-null = the
+  /// epoch-millis the user tapped Delete. The `Habits` row
+  /// + the `Completions` / `RestDayBudgets` rows for this
+  /// do stay in the table across the tombstone so the
+  /// streak can be reconstructed from the log on restore
+  /// (see ADR-056 §"Schema column name + type"). Restoration
+  /// goes through [DoRepository.restoreById] — NOT through
+  /// [DoRepository.save], which preserves the tombstone via
+  /// Drift's `insertOnConflictUpdate` semantics.
+  final DateTime? deletedAt;
+
   /// Mission chain — non-empty for Strong, empty for Soft /
   /// Auto. Always reflectable: derived from [proofMode].
   MissionChain get missionChain {
@@ -228,6 +241,14 @@ sealed class Do {
     final p = pausedUntil;
     return p != null && p.isAfter(now);
   }
+
+  /// True iff the do is tombstoned (v1.4l). Tombstoned dos
+  /// are invisible to UI listings (see
+  /// [DoRepository.listAll] / [DoRepository.listActive]) but
+  /// their `Habits` row + `Completions` + `RestDayBudgets`
+  /// rows stay in the table until [DoRepository.restoreById]
+  /// brings them back. See ADR-056.
+  bool get isDeleted => deletedAt != null;
 
   /// Returns a copy with selected fields replaced. Subclasses
   /// override to add their schedule-specific fields, but the
@@ -246,6 +267,8 @@ sealed class Do {
     List<Automation>? automations,
     Duration? graceWindowOverride,
     bool clearGraceWindowOverride = false,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
   });
 
   /// Pure: same input → same output. Returns the next
@@ -384,6 +407,7 @@ final class DoFixed extends Do {
     super.pausedUntil,
     super.automations,
     super.graceWindowOverride,
+    super.deletedAt,
   });
 
   /// Set of 1..7 (1 = Monday .. 7 = Sunday). Must be non-empty.
@@ -405,6 +429,8 @@ final class DoFixed extends Do {
     List<Automation>? automations,
     Duration? graceWindowOverride,
     bool clearGraceWindowOverride = false,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
   }) {
     return DoFixed(
       id: id,
@@ -422,6 +448,7 @@ final class DoFixed extends Do {
       graceWindowOverride: clearGraceWindowOverride
           ? null
           : (graceWindowOverride ?? this.graceWindowOverride),
+      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
     );
   }
 
@@ -474,6 +501,7 @@ final class DoInterval extends Do {
     super.pausedUntil,
     super.automations,
     super.graceWindowOverride,
+    super.deletedAt,
   });
 
   final int nDays;
@@ -494,6 +522,8 @@ final class DoInterval extends Do {
     List<Automation>? automations,
     Duration? graceWindowOverride,
     bool clearGraceWindowOverride = false,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
   }) {
     return DoInterval(
       id: id,
@@ -511,6 +541,7 @@ final class DoInterval extends Do {
       graceWindowOverride: clearGraceWindowOverride
           ? null
           : (graceWindowOverride ?? this.graceWindowOverride),
+      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
     );
   }
 
@@ -562,6 +593,7 @@ final class DoAnchor extends Do {
     super.pausedUntil,
     super.automations,
     super.graceWindowOverride,
+    super.deletedAt,
   });
 
   final DoId targetDoId;
@@ -583,6 +615,8 @@ final class DoAnchor extends Do {
     List<Automation>? automations,
     Duration? graceWindowOverride,
     bool clearGraceWindowOverride = false,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
   }) {
     return DoAnchor(
       id: id,
@@ -600,6 +634,7 @@ final class DoAnchor extends Do {
       graceWindowOverride: clearGraceWindowOverride
           ? null
           : (graceWindowOverride ?? this.graceWindowOverride),
+      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
     );
   }
 
@@ -653,6 +688,7 @@ final class DoDayOfX extends Do {
     super.pausedUntil,
     super.automations,
     super.graceWindowOverride,
+    super.deletedAt,
   }) : assert(
          dayOfMonth != null || nth != null,
          'Specify either dayOfMonth or (nth, weekday).',
@@ -680,6 +716,8 @@ final class DoDayOfX extends Do {
     List<Automation>? automations,
     Duration? graceWindowOverride,
     bool clearGraceWindowOverride = false,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
   }) {
     return DoDayOfX(
       id: id,
@@ -699,6 +737,7 @@ final class DoDayOfX extends Do {
       graceWindowOverride: clearGraceWindowOverride
           ? null
           : (graceWindowOverride ?? this.graceWindowOverride),
+      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
     );
   }
 
@@ -793,6 +832,7 @@ final class DoTimeWindow extends Do {
     super.pausedUntil,
     super.automations,
     super.graceWindowOverride,
+    super.deletedAt,
   });
 
   /// Set of 1..7 (1 = Monday .. 7 = Sunday). Must be non-empty.
@@ -822,6 +862,8 @@ final class DoTimeWindow extends Do {
     List<Automation>? automations,
     Duration? graceWindowOverride,
     bool clearGraceWindowOverride = false,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
   }) {
     return DoTimeWindow(
       id: id,
@@ -841,6 +883,7 @@ final class DoTimeWindow extends Do {
       graceWindowOverride: clearGraceWindowOverride
           ? null
           : (graceWindowOverride ?? this.graceWindowOverride),
+      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
     );
   }
 

@@ -1274,8 +1274,12 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 200));
     });
     await tester.pumpAndSettle();
-    // The do is gone from the DB.
-    final remaining = await DoRepository.instance.getById('h1');
+    // The do is gone from the active listing. v1.4l (SYS-126)
+    // uses soft-delete, so the row is still present in the DB
+    // (tombstoned). Use `getActiveById` to assert the UI
+    // perspective (the row is filtered out of `listAll` /
+    // `listActive` once tombstoned).
+    final remaining = await DoRepository.instance.getActiveById('h1');
     expect(remaining, isNull);
     // The SnackBar reads the deleted name and offers an Undo.
     expect(find.text('Deleted "Stretch".'), findsOneWidget);
@@ -1339,7 +1343,11 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 200));
     });
     await tester.pumpAndSettle();
-    expect(await DoRepository.instance.getById('h1'), isNull);
+    // v1.4l (SYS-126): the do is tombstoned (soft-delete),
+    // so `getActiveById` returns null (UI perspective). The
+    // row is still present in the DB but filtered out of
+    // the active listing until `restoreById` is called.
+    expect(await DoRepository.instance.getActiveById('h1'), isNull);
     // Tap the Undo action.
     await tester.tap(find.text('Undo'));
     await tester.pumpAndSettle();
@@ -1347,8 +1355,8 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 200));
     });
     await tester.pumpAndSettle();
-    // The do is back in the DB.
-    final restored = await DoRepository.instance.getById('h1');
+    // The do is back in the active listing.
+    final restored = await DoRepository.instance.getActiveById('h1');
     expect(restored, isNotNull);
     expect(restored!.name, 'Stretch');
   });

@@ -35,6 +35,12 @@
 //   - events.automations_json (TEXT nullable)
 //   The envelope is `{"k":1,"automations":[...]}` and is
 //   decoded by `lib/triggers/automation_codec.dart`.
+//
+// v1.4l soft-delete column (added in migration v4→v5, Phase 39):
+//   - habits.deleted_at_millis (INTEGER nullable)
+//   The tombstone column. NULL = active; non-null = soft-
+//   deleted. See ADR-056 §"Schema column name + type" for
+//   the rationale and the `Events.archivedAtMillis` precedent.
 
 import 'package:drift/drift.dart';
 
@@ -95,6 +101,18 @@ class Habits extends Table {
   // "no non-default automations" (the default `ActionNotify`
   // is synthesized at dispatch time, not stored).
   TextColumn get automationsJson => text().nullable()();
+  // v1.4l (Phase 39 / SYS-126 / ADR-056 / WF-053): soft-
+  // delete tombstone. NULL = active; non-null = soft-deleted
+  // at this epoch millisecond. The `Habits` row stays in
+  // the table after a soft-delete so `Completions.habitId`
+  // and `RestDayBudgets.habitId` (no FKs declared) remain
+  // intact — `ConsecutiveCounter.compute` can rebuild the
+  // streak from the log on restore. Restoration is the
+  // `DoRepository.restoreById` method, NOT
+  // `DoRepository.save` (the `save` path's
+  // `insertOnConflictUpdate` leaves the tombstone intact
+  // by Drift semantics).
+  IntColumn get deletedAtMillis => integer().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
