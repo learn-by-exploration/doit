@@ -25,6 +25,8 @@ import 'package:doit/do/proof_mode.dart';
 import 'package:doit/do/proof_mode_tag.dart';
 import 'package:doit/missions/chain.dart';
 import 'package:doit/missions/mission.dart';
+import 'package:doit/routines/routine.dart'
+    show decodeAutomationList, encodeAutomationList;
 import 'package:drift/drift.dart';
 
 import 'package:doit/services/db.dart';
@@ -54,6 +56,16 @@ class DoRepository {
   /// existing row's value"). This is the invariant that
   /// keeps a tombstone alive across Save clicks — only
   /// [restoreById] can resurrect a tombstoned do.
+  ///
+  /// Cycle B (SYS-129 / ADR-060): `save` is also
+  /// **pause-preserving** — the `pausedUntilMillis` column
+  /// is omitted from [_toRow] for the same reason. A Save
+  /// click that doesn't explicitly pause/resume must not
+  /// silently resume a paused habit. Pause and resume go
+  /// through [PauseService.pauseHabit] /
+  /// [PauseService.resumeHabit], which use direct
+  /// `HabitsCompanion` UPDATEs that explicitly set or clear
+  /// the column.
   Future<void> save(domain.Do d) async {
     await _ready;
     d.validate();
@@ -270,6 +282,31 @@ class DoRepository {
     // future change adds `deletedAtMillis: d.deletedAt?.…`
     // here, the invariant breaks — pin in
     // `test/services/do_repository_test.dart`.
+    //
+    // Cycle B / SYS-129 / ADR-060 §"BUG-002 fix": the
+    // `pausedUntilMillis` column is INTENTIONALLY omitted for
+    // the same reason. The AddHabitScreen Save path
+    // reconstructs the `Do` from form fields (which have no
+    // pause picker), so writing `pausedUntilMillis: null` on
+    // every Save would silently resume a paused habit. The
+    // omission preserves the existing column value across
+    // Save clicks. Pause and resume go through
+    // [PauseService.pauseHabit] / [PauseService.resumeHabit],
+    // which use direct `HabitsCompanion` UPDATEs to set /
+    // clear the column explicitly (see `pause_service.dart`).
+    // If a future change adds `pausedUntilMillis:
+    // d.pausedUntil?.…` here, BUG-002 resurfaces — pin in
+    // `test/services/do_repository_test.dart` (Cycle B group).
+    //
+    // Cycle B / SYS-129 / ADR-060 §"BUG-001 fix": the
+    // `automationsJson` column IS written here (the inverse
+    // of the omission pattern above). Automations are part of
+    // the do's content — every Save should overwrite them
+    // with the user's latest edits. The empty-list case maps
+    // to SQL NULL (matches the [EventRepository] /
+    // [PersonRepository] convention). The read path
+    // [_fromRow] decodes the column back into
+    // `d.automations` for every `Do` subclass.
     return HabitRow(
       id: d.id,
       name: d.name.trim(),
@@ -295,7 +332,9 @@ class DoRepository {
       category: d.category.tag,
       colorSeed: d.colorSeed,
       iconName: d.iconName,
-      pausedUntilMillis: d.pausedUntil?.millisecondsSinceEpoch,
+      automationsJson: d.automations.isEmpty
+          ? null
+          : encodeAutomationList(d.automations),
     );
   }
 
@@ -307,6 +346,14 @@ class DoRepository {
     final deletedAt = r.deletedAtMillis == null
         ? null
         : DateTime.fromMillisecondsSinceEpoch(r.deletedAtMillis!);
+    // Cycle B / SYS-129 / ADR-060 §"BUG-001 fix": decode the
+    // `automationsJson` column once and thread the resulting
+    // list through every subclass constructor. NULL/empty
+    // JSON maps to `const <Automation>[]` (the default
+    // "no non-default automations" state — the
+    // `ActionNotify` is synthesized at dispatch time, not
+    // stored).
+    final automations = decodeAutomationList(r.automationsJson);
     final base = (
       id: r.id,
       name: r.name,
@@ -319,6 +366,7 @@ class DoRepository {
       pausedUntil: r.pausedUntilMillis == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(r.pausedUntilMillis!),
+      automations: automations,
     );
     switch (r.scheduleType) {
       case 'fixed':
@@ -334,6 +382,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          automations: base.automations,
           deletedAt: deletedAt,
         );
       case 'interval':
@@ -351,6 +400,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          automations: base.automations,
           deletedAt: deletedAt,
         );
       case 'anchor':
@@ -368,6 +418,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          automations: base.automations,
           deletedAt: deletedAt,
         );
       case 'dayOfX':
@@ -385,6 +436,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          automations: base.automations,
           deletedAt: deletedAt,
         );
       case 'timeWindow':
@@ -402,6 +454,7 @@ class DoRepository {
           colorSeed: base.colorSeed,
           iconName: base.iconName,
           pausedUntil: base.pausedUntil,
+          automations: base.automations,
           deletedAt: deletedAt,
         );
       default:

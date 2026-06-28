@@ -29,9 +29,13 @@
 
 import 'package:doit/do/do.dart';
 import 'package:doit/do/proof_mode.dart';
+import 'package:doit/routines/routine.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/db/schema.dart';
 import 'package:doit/services/do_repository.dart';
+import 'package:doit/triggers/action.dart';
+import 'package:doit/triggers/trigger.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -45,7 +49,13 @@ Future<void> _init() async {
 
 Future<void> _tearDown() => AppDatabaseService.instance.closeForTesting();
 
-Do _do({required String id, String name = 'Drink water', DateTime? createdAt}) {
+Do _do({
+  required String id,
+  String name = 'Drink water',
+  DateTime? createdAt,
+  List<Automation>? automations,
+  DateTime? pausedUntil,
+}) {
   return DoFixed(
     id: id,
     name: name,
@@ -54,8 +64,29 @@ Do _do({required String id, String name = 'Drink water', DateTime? createdAt}) {
     restDaysPerMonth: 2,
     weekdays: const <int>{1, 2, 3, 4, 5, 6, 7},
     time: const DoTime(9, 0),
+    automations: automations ?? const <Automation>[],
+    pausedUntil: pausedUntil,
   );
 }
+
+/// Two Automation fixtures for the Cycle B round-trip test.
+/// They use different trigger shapes (batteryLow + timeOfDay)
+/// so the round-trip exercise the codec's discriminator
+/// handling for at least two Trigger leaves. Each gets a
+/// unique stable id so the [Automation.==] comparison across
+/// the round-trip is unambiguous.
+List<Automation> _twoAutomations() => <Automation>[
+  Automation(
+    id: 'auto-battery',
+    trigger: const TriggerBatteryLow(20),
+    action: const ActionNotify(title: 'Battery low', body: 'Plug in'),
+  ),
+  Automation(
+    id: 'auto-tod',
+    trigger: const TriggerTimeOfDay(hour: 7, minute: 30),
+    action: const ActionNotify(title: 'Morning', body: 'Drink water'),
+  ),
+];
 
 void main() {
   setUp(_init);
@@ -319,6 +350,95 @@ void main() {
       expect(ok, isTrue);
       expect(list.map((d) => d.id), <String>['h1']);
       expect(list.single.name, 'New name');
+    });
+  });
+
+  group('DoRepository save invariant (Cycle B / BUG-001 + BUG-002)', () {
+    test('automations round-trip through save + getById', () async {
+      // Arrange — two automations on the in-memory do.
+      // BUG-001 (SYS-129 / ADR-060): the column was missing
+      // from `_toRow` AND `_fromRow`, so the user-saved
+      // automations were silently lost on every Save and
+      // even if the column had been written, the read path
+      // would have returned an empty list. This test pins
+      // BOTH directions: the round-trip yields the same
+      // list back.
+      final seed = _twoAutomations();
+
+      // Act
+      await DoRepository.instance.save(_do(id: 'h1', automations: seed));
+      final loaded = await DoRepository.instance.getById('h1');
+
+      // Assert — full round-trip equality (Automation's
+      // own `==` covers id + trigger + condition + action +
+      // enabled).
+      expect(loaded, isNotNull);
+      expect(loaded!.automations, equals(seed));
+    });
+
+    test(
+      'pausedUntil round-trips via direct companion UPDATE + getById',
+      () async {
+        // Arrange — seed the `pausedUntilMillis` column via
+        // a direct `HabitsCompanion` UPDATE. This mirrors the
+        // shape `PauseService.pauseHabit` uses (Cycle B
+        // refactor: pause/resume bypass `save()`).
+        final pauseAt = DateTime(2026, 7, 2);
+        await DoRepository.instance.save(_do(id: 'h1'));
+        final db = AppDatabaseService.instance.db;
+        await (db.update(db.habits)..where((t) => t.id.equals('h1'))).write(
+          HabitsCompanion(
+            pausedUntilMillis: Value(pauseAt.millisecondsSinceEpoch),
+          ),
+        );
+
+        // Act
+        final loaded = await DoRepository.instance.getById('h1');
+
+        // Assert — `_fromRow` decodes the column back into
+        // `Do.pausedUntil`.
+        expect(loaded, isNotNull);
+        expect(loaded!.pausedUntil, equals(pauseAt));
+      },
+    );
+
+    test('save(d) does NOT clobber an existing pausedUntilMillis', () async {
+      // Arrange — seed via direct `HabitsCompanion` UPDATE
+      // (simulates a `PauseService.pauseHabit` call). Then
+      // save a fresh in-memory `Do` with no pausedUntil
+      // (simulates the AddHabitScreen Save path, which
+      // reconstructs the `Do` from form fields that have
+      // no pause picker). BUG-002 (SYS-129 / ADR-060): the
+      // column was always being written as `null` whenever
+      // the in-memory copy had `pausedUntil: null`, which
+      // silently resumed a paused habit on every Save.
+      // After the Cycle B fix, `_toRow` omits the column,
+      // so the existing timestamp survives.
+      final pauseAt = DateTime(2026, 7, 2);
+      await DoRepository.instance.save(_do(id: 'h1', name: 'Old name'));
+      final db = AppDatabaseService.instance.db;
+      await (db.update(db.habits)..where((t) => t.id.equals('h1'))).write(
+        HabitsCompanion(
+          pausedUntilMillis: Value(pauseAt.millisecondsSinceEpoch),
+        ),
+      );
+
+      // Act — save a fresh Do with a NEW name and no
+      // pausedUntil in the in-memory copy (this is what
+      // AddHabitScreen does after a form edit).
+      await DoRepository.instance.save(_do(id: 'h1', name: 'New name'));
+
+      // Assert — content update landed AND pause preserved.
+      final row = await (db.select(
+        db.habits,
+      )..where((t) => t.id.equals('h1'))).getSingle();
+      expect(row.name, 'New name');
+      expect(row.pausedUntilMillis, equals(pauseAt.millisecondsSinceEpoch));
+
+      // And the in-memory copy sees the same value.
+      final loaded = await DoRepository.instance.getById('h1');
+      expect(loaded, isNotNull);
+      expect(loaded!.pausedUntil, equals(pauseAt));
     });
   });
 
