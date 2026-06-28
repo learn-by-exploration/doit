@@ -2088,3 +2088,90 @@ Closes the v1.4a gap where every widget instance on the home screen showed the s
 - BUG-001..BUG-020 (the latent bugs inventoried in `stabilization_roadmap.md §2`; the campaign's success criterion #4 is "0 known latent bugs" — every BUG-NNN closed by some cycle)
 - WF-053 (v1.4l — the Delete + Undo user flow that Cycle H's restore-after-window completes)
 - WF-055 (v1.4m — the API surface stabilization that Cycle H consumes)
+
+---
+
+## WF-057 — Fix `_toRow` automations + pausedUntil data-loss bugs (v1.4-stab-B / Phase 42 / SYS-129 / ADR-060)
+
+Cycle B of the 3-month stabilization campaign (per `docs/v_model/stabilization_roadmap.md §3`). Closes BUG-001 + BUG-002 (both P0 data-loss bugs that silently lose user state on Save). The cycle is pure-Dart + 3 new tests — no Drift migration, no new permissions, no new dependencies, no Kotlin changes.
+
+### Steps
+
+1. **Read the current state of the affected files.** `lib/services/do_repository.dart` (the `_toRow` / `_fromRow` mapping at lines 273-462 + the `save()` KDoc at lines 42-80). `lib/services/pause_service.dart` (the `pauseHabit` / `resumeHabit` methods at lines 73-81). `test/services/do_repository_test.dart` (the existing v1.4l save-invariant test group at lines 263-323 to mirror). `lib/services/db/schema.dart` (the `Habits` table definition — confirm `automationsJson` + `pausedUntilMillis` columns exist so no Drift migration is needed).
+
+2. **Add the import to `do_repository.dart`.** At the top with the other `package:doit/...` imports, add `import 'package:doit/routines/routine.dart' show decodeAutomationList, encodeAutomationList;`. This pulls in the codec from `lib/routines/routine.dart` (the `encodeAutomationList` + `decodeAutomationList` functions at lines 488-505).
+
+3. **Update `_toRow` to add `automationsJson`.** Insert `automationsJson: d.automations.isEmpty ? null : encodeAutomationList(d.automations),` into the `HabitRow(...)` constructor (position before the (now-removed) `pausedUntilMillis` line). The empty-list → NULL mapping matches the `EventRepository` / `PersonRepository` convention.
+
+4. **Update `_toRow` to remove `pausedUntilMillis`.** Delete the `pausedUntilMillis: d.pausedUntil?.millisecondsSinceEpoch,` line. This is the v1.4l `deletedAtMillis` omission pattern (ADR-056) applied to the pause column. Drift's `insertOnConflictUpdate` semantics preserve the existing column value when the new row doesn't specify it, so a Save click that doesn't explicitly pause/resume must not clobber the existing pause state.
+
+5. **Update `_toRow`'s KDoc.** Add a new comment block mirroring the v1.4l `deletedAtMillis` comment shape, explaining that `pausedUntilMillis` is INTENTIONALLY omitted for the same reason. Cross-reference `pause_service.dart` and ADR-060. Also add a comment block explaining that `automationsJson` IS written (the inverse pattern — automations are part of the do's content).
+
+6. **Update `_fromRow` to decode `automationsJson`.** In the base record (the tuple around lines 355-369), decode `r.automationsJson` via `decodeAutomationList(r.automationsJson)` and add `automations: automations,` to the base record. Then thread `automations: base.automations,` through every subclass constructor's `super.automations` parameter (5 arms: `DoFixed`, `DoInterval`, `DoAnchor`, `DoDayOfX`, `DoTimeWindow`).
+
+7. **Update `save()`'s KDoc.** Document the dual invariant: "v1.4l (SYS-126): `save` is **content-only** — it does NOT touch the tombstone column" AND "Cycle B (SYS-129): `save` is also **pause-preserving** — it does NOT touch the `pausedUntilMillis` column". Cross-reference `PauseService.pauseHabit` / `resumeHabit` as the explicit writers.
+
+8. **Refactor `PauseService.pauseHabit`.** Replace the body with a direct `HabitsCompanion` UPDATE:
+   ```dart
+   Future<void> pauseHabit(Do habit, DateTime until) async {
+     await _ready;
+     final db = AppDatabaseService.instance.db;
+     await (db.update(db.habits)..where((t) => t.id.equals(habit.id)))
+       .write(HabitsCompanion(pausedUntilMillis: Value(until.millisecondsSinceEpoch)));
+   }
+   ```
+   Update the KDoc to explain the bypass: pause/resume bypass `save()` because `save()` is content-only + pause-preserving.
+
+9. **Refactor `PauseService.resumeHabit`.** Replace the body with a direct `HabitsCompanion` UPDATE:
+   ```dart
+   Future<void> resumeHabit(Do habit) async {
+     await _ready;
+     final db = AppDatabaseService.instance.db;
+     await (db.update(db.habits)..where((t) => t.id.equals(habit.id)))
+       .write(const HabitsCompanion(pausedUntilMillis: Value(null)));
+   }
+   ```
+   KDoc mirrors the `pauseHabit` rationale.
+
+10. **Add the imports to `pause_service.dart`.** Add `import 'package:doit/services/db.dart';` (for `AppDatabaseService`), `import 'package:doit/services/db/schema.dart';` (for `HabitsCompanion`), and `import 'package:drift/drift.dart' show Value;`. The existing imports cover `Do`, `Person`, `DoRepository`, `PersonRepository`.
+
+11. **Extend the `_do(...)` test helper.** Add 2 optional named parameters to `_do` in `test/services/do_repository_test.dart`: `List<Automation>? automations` (default `null`) and `DateTime? pausedUntil` (default `null`). Forward them through to the `DoFixed` constructor's `automations:` and `pausedUntil:` parameters.
+
+12. **Add the `_twoAutomations()` test helper.** A function that returns 2 `Automation` fixtures with stable ids and different `Trigger` leaves (e.g., `TriggerBatteryLow(20)` + `TriggerTimeOfDay(7, 30)`) so the round-trip test exercises the codec's discriminator handling for 2 distinct Trigger shapes.
+
+13. **Add 3 new tests in a `DoRepository save invariant (Cycle B / BUG-001 + BUG-002)` group.** Place it after the existing v1.4l save-invariant group (line 323) and before the hard-delete group:
+    - `automations round-trip through save + getById` — seed 2 automations, save, getById, assert list round-trips (BUG-001 round-trip).
+    - `pausedUntil round-trips via direct companion UPDATE + getById` — seed `pausedUntilMillis` via a `HabitsCompanion` UPDATE, getById, assert `Do.pausedUntil` matches (BUG-002 read path).
+    - `save(d) does NOT clobber an existing pausedUntilMillis` — seed via companion UPDATE, save a fresh `Do` with no in-memory `pausedUntil`, assert the raw column's `pausedUntilMillis` STILL equals the seeded timestamp AND the in-memory copy sees the same value (BUG-002 save-invariant — the headline test).
+
+14. **Append V-Model artifacts.** SYS-129 to `docs/v_model/requirements.md` (table row mirroring the SYS-126 / SYS-127 / SYS-128 shape). ADR-060 to `docs/v_model/decision_record.md` (the omission-pattern rationale + the `PauseService` refactor rationale + the read-modify-write alternative rejection + the pure-Dart scope). WF-057 (this entry) to `docs/v_model/workflows.md`. Traceability row to `docs/v_model/traceability_matrix.md` (linking SYS-129 to the 3 new tests in `do_repository_test.dart` Cycle B group). Implementation-status row to `docs/v_model/implementation_status.md`. CHANGELOG v1.4-stab-B block. `feature.md` §4 (remove BUG-001 + BUG-002 parking lot bullets), §5 (update quick-index to ADR-060 / SYS-129 / WF-057), §6 (update next-step to Cycle C). `plan.md` Milestone 12 `### v1.4-stab-B` sub-entry.
+
+15. **Run 3-gate.** `dart format --output=none --set-exit-if-changed .` (264 + ~4 files, 0 changed) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1334 + 3 = 1337/1337 pass). Targeted runs per `CLAUDE.md`: `flutter test test/services/do_repository_test.dart` (+3 new tests) + `flutter test test/services/pause_service_test.dart` (regression — readiness gate unchanged).
+
+16. **Commit + push + open PR + poll CI + squash-merge.** Branch name: `feat/v1.4-stab-B-to-row-automations-pausedUntil`. Conventional commit message: `fix(v1.4-stab-B): _toRow round-trip for automations + pausedUntil (BUG-001 + BUG-002)`. Squash-merge. CI run number + duration recorded in the memory file.
+
+**Failure paths.**
+
+- *A Drift migration is needed.* Not expected — both `automationsJson` + `pausedUntilMillis` columns already exist on `Habits` (added in v3→v4). If `flutter analyze` flags a schema mismatch, abort and re-plan the migration as its own PR per `CLAUDE.md §"Pre-approved commands"` (a migration is its own PR).
+
+- *The `_fromRow` threading misses a subclass arm.* The round-trip test uses 2 `Automation` fixtures; if a subclass forgets to thread `automations`, `Automation.==` will fail on the loaded list. Run the targeted test early to catch.
+
+- *The `PauseService` refactor regresses existing behavior.* The readiness-gate tests in `test/services/pause_service_test.dart` don't exercise column writes — run `test/services/do_repository_test.dart`'s 3 new tests to verify the column reads via `getById` after a `HabitsCompanion` UPDATE.
+
+- *A future contributor re-adds `pausedUntilMillis: d.pausedUntil?.…` to `_toRow`.* The Cycle B save-invariant test pins the behavior; the `_toRow` KDoc explains why the column is omitted. The pin survives `_toRow` edits.
+
+- *The user disagrees with the omission pattern (wants read-modify-write instead).* Re-plan in plan mode; the read-modify-write alternative is documented in ADR-060 §"Why the omission pattern" and can be revisited if the user prefers it.
+
+**Coverage.** Cycle B adds 3 new unit tests (test count 1334 → 1337). The 3 new tests are in `test/services/do_repository_test.dart` under a new group `'DoRepository save invariant (Cycle B / BUG-001 + BUG-002)'`. Coverage on changed files (`do_repository.dart`, `pause_service.dart`, `do_repository_test.dart`) stays ≥80%. Cycle B is a bug-fix cycle, not a coverage cycle — the 3-month campaign's coverage gains come from Cycles C..L.
+
+**Cross-references.**
+
+- SYS-129 (v1.4-stab-B — the `_toRow` round-trip + save-invariant requirement)
+- ADR-060 (v1.4-stab-B — the omission-pattern rationale + the `PauseService` refactor + the read-modify-write alternative rejection + the pure-Dart scope)
+- ADR-056 (v1.4l — the `deletedAtMillis` omission precedent; Cycle B mirrors this pattern for `pausedUntilMillis`)
+- ADR-058 (v1.4m — the "tests first, then UI" inversion)
+- ADR-059 (v1.4-stab-A — the audit + roadmap cycle that inventoried BUG-001 + BUG-002 at P0 and assigned them to Cycle B)
+- `docs/v_model/stabilization_roadmap.md §2` (BUG-001 + BUG-002 inventory; mark both as "closed (Cycle B)" in the §2 table when this cycle ships)
+- WF-056 (v1.4-stab-A — the audit cycle's flow)
+- WF-053 (v1.4l — the Delete + Undo user flow; the `save` KDoc dual invariant covers both tombstones and pause state)
+- `lib/services/event_repository.dart:97-99` + `lib/services/person_repository.dart:70-72` (the established `automationsJson` write pattern that `_toRow` now mirrors)

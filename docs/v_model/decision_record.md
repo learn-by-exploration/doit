@@ -5433,3 +5433,98 @@ After shipping v1.4a..v1.4m in rapid succession (12 cycles of net-new surface, 2
 - ADR-056 (v1.4l — the soft-delete data layer that Cycle H's UI consumes)
 - SYS-126, SYS-127 (v1.4l, v1.4m — the data-layer + CI-coverage prerequisites for Cycle H)
 - BUG-001..BUG-020 (the latent bugs inventoried in `stabilization_roadmap.md §2` — every stabilization cycle closes one or more)
+
+---
+
+## ADR-060 — Fix `_toRow` automations + pausedUntil data-loss bugs via the v1.4l omission pattern (v1.4-stab-B / Phase 42 / SYS-129 / WF-057)
+
+### Context
+
+The Cycle A coverage audit (v1.4-stab-A, commit `155657b`, `docs/v_model/stabilization_roadmap.md` §2) inventoried BUG-001 + BUG-002 as the two P0 latent bugs. Both manifest in `DoRepository._toRow` (the row-mapping layer between the Drift `Habits` row and the in-memory `Do` model). Both are silent data-loss bugs — the user edits a do, taps Save, and one of two pieces of state disappears with no error.
+
+### The two bugs
+
+- **BUG-001 — `_toRow` does NOT write `automations_json`.** The column `Habits.automationsJson` was added in the v3→v4 migration (`lib/services/db/migrations/v3_to_v4.dart`). It is correctly written by the sister repositories `EventRepository` (`lib/services/event_repository.dart:97-99`) and `PersonRepository` (`lib/services/person_repository.dart:70-72`), but `DoRepository._toRow` omits it. The read path `_fromRow` also fails to decode the column, so even if it were written, the loaded `Do` would have `automations: const <Automation>[]` (silently empty). User impact: every Save click wipes the user's custom automation rules (e.g., `TriggerBatteryLow → ActionNotify "Plug in"`); only the default synthesized `ActionNotify` survives.
+
+- **BUG-002 — `_toRow` silently CLOBBERS `paused_until_millis` on Save.** The audit's description in `stabilization_roadmap.md §2` reads "does NOT write `paused_until_millis`" but the actual symptom is the inverse: the column IS written (`pausedUntilMillis: d.pausedUntil?.millisecondsSinceEpoch` at `lib/services/do_repository.dart:298`), but it is written as `null` whenever the in-memory `Do` has `pausedUntil: null` — which is the common case for the `AddHabitScreen.Save` path (`lib/screens/add_habit.dart:1047`), because the form reconstructs the `Do` from form fields and the form has no pause picker. So a Save click on a paused habit silently **resumes** the pause — the user sees their pause state disappear. User impact: any user who pauses a habit then later edits another field (name, schedule, color) loses the pause on Save.
+
+### Decision
+
+Cycle B closes both bugs in one PR via two complementary fixes that mirror the v1.4l `deletedAtMillis` precedent (ADR-056):
+
+1. **BUG-001 — write + read via `_toRow` / `_fromRow`.** Add `automationsJson: d.automations.isEmpty ? null : encodeAutomationList(d.automations),` to `_toRow`. In `_fromRow`, decode the column once into a base record's `automations` field and thread it through every subclass constructor (`DoFixed`, `DoInterval`, `DoAnchor`, `DoDayOfX`, `DoTimeWindow`). The empty-list → SQL NULL mapping matches the `EventRepository` / `PersonRepository` convention (saves bytes; the read path treats NULL and `[]` identically).
+
+2. **BUG-002 — write via the v1.4l omission pattern.** Remove `pausedUntilMillis: d.pausedUntil?.millisecondsSinceEpoch` from `_toRow`. Mirror the v1.4l `deletedAtMillis` comment in `_toRow` — the column is INTENTIONALLY omitted because Drift's `insertOnConflictUpdate` semantics preserve the existing column value when the new row doesn't specify it. The `_toRow` KDoc grows the new omission rationale. The read path `_fromRow` continues to decode `pausedUntilMillis` (the omission is on the write path only).
+
+3. **`DoRepository.save` becomes content-only + pause-preserving.** The KDoc on `save` is updated to document the dual invariant (joining the v1.4l tombstone-preserving invariant). No public method signature changes.
+
+4. **`PauseService` is refactored.** `pauseHabit(habit, until)` and `resumeHabit(habit)` no longer go through `DoRepository.save` (which is now content-only + pause-preserving). They write the `pausedUntilMillis` column directly via a `HabitsCompanion` UPDATE:
+   ```dart
+   (db.update(db.habits)..where((t) => t.id.equals(habit.id)))
+     .write(HabitsCompanion(pausedUntilMillis: Value(until.millisecondsSinceEpoch)))
+   ```
+   This mirrors the v1.4l `restoreById` shape (`HabitsCompanion(deletedAtMillis: Value(...))`) and is the explicit writer of the column. `PauseService.resumeHabit` and `pausePerson` are unaffected (people are stored differently — see ADR-055 §"Pause for people").
+
+5. **3 new tests in `test/services/do_repository_test.dart`** mirror the v1.4l save-invariant test group exactly: `automations round-trip through save + getById` (catches BUG-001's write + read); `pausedUntil round-trips via direct companion UPDATE + getById` (catches BUG-002's read path without going through `save`); `save(d) does NOT clobber an existing pausedUntilMillis` (catches BUG-002's save-invariant — seed via companion UPDATE, save a fresh `Do` with no in-memory `pausedUntil`, assert the raw column's `pausedUntilMillis` STILL equals the seeded timestamp).
+
+### Why the omission pattern (vs. the alternative)
+
+The alternative for BUG-002 is "make `_toRow` preserve `pausedUntil` via a read-modify-write round-trip":
+1. SELECT the existing row.
+2. Merge the existing `pausedUntilMillis` into the in-memory `Do` (only if `d.pausedUntil == null`).
+3. Call `_toRow(d)` with the merged value.
+
+This was rejected because: (a) it introduces a SELECT round-trip inside `save` (performance regression — `save` is on the user-visible hot path for the AddHabitScreen Save click); (b) it changes `save` from "content-only" to "content-only-but-blend-in-paused-state", which is a fragile semantic that future contributors will trip over; (c) it does NOT generalize — the same logic would have to be added for every other column that's omitted (e.g., a future "lastCompletedAt" column would need the same treatment); (d) the omission pattern is the established v1.4l precedent for "do NOT touch columns that other writers own" (tombstone), so we have one shape that handles all such cases. The cost — `PauseService` is now an explicit writer of the column — is a one-time refactor of ~10 lines (2 methods × ~5 lines each).
+
+### Why a direct `HabitsCompanion` UPDATE in `PauseService` (vs. a new repository method)
+
+The alternative is to add `DoRepository.setPausedUntil(habitId, until)` / `DoRepository.clearPausedUntil(habitId)` as public methods on the repository, and have `PauseService` call them. This was rejected because: (a) it adds API surface that is only used by `PauseService` (YAGNI — the only consumer is the pause service itself); (b) the direct `HabitsCompanion` UPDATE is a one-line method body that's clearer than an indirection through a public API; (c) `PauseService` is already a "thin facade over the repositories" per `.claude/rules/lib-services.md` — having it directly own the column write keeps that facade shape consistent.
+
+### Risks
+
+1. **The `_toRow` KDoc update must clearly document the omission.** Without a comment mirroring the v1.4l shape, a future contributor could re-add `pausedUntilMillis: d.pausedUntil?.millisecondsSinceEpoch` thinking it's missing — and reintroduce BUG-002. Mitigation: the Cycle B save-invariant test pins the behavior; the KDoc explains why the column is omitted.
+
+2. **The `_fromRow` threading of `automations` to 5 subclass arms.** Easy to miss one subclass (e.g., `DoTimeWindow` has the most fields). Mitigation: write the round-trip test against a `DoTimeWindow` so all 5 arms are exercised; the test fails if any subclass forgets to thread `automations`.
+
+3. **The `PauseService` refactor changes the call surface.** `pauseHabit` + `resumeHabit` no longer go through `save()`, so any existing `pause_service_test.dart` assertions need updating. Mitigation: read the existing `test/services/pause_service_test.dart` before refactoring; update assertions if they assert `DoRepository.save` was called. (Inspection: the existing tests only cover the readiness-gate shape, NOT the column-write — no updates needed.)
+
+4. **The `backup_service.dart` round-trip is unchanged** because it already reads + writes the `automationsJson` + `pausedUntilMillis` columns correctly (`backup_service.dart:408, 445, 474, 492`). The live-mapping fix automatically extends to backups on next export — no backup changes needed.
+
+### Alternatives considered
+
+- **"Re-introduce `pausedUntilMillis` writing in `_toRow` but read-merge from the row first"** (the read-modify-write alternative). Rejected — performance regression + fragile semantics; see "Why the omission pattern" above.
+
+- **"Add `DoRepository.setPausedUntil(habitId, until)` public methods"** (the alternative for `PauseService` shape). Rejected — YAGNI; the direct `HabitsCompanion` UPDATE is clearer.
+
+- **"Write a separate `DoAutomation` aggregate table + foreign-key it to habits"** (the alternative for the automations shape). Rejected — the column was already added in v3→v4 and is the established pattern (used by `EventRepository` + `PersonRepository`); a new table would diverge from the existing storage shape.
+
+- **"Defer BUG-002 to a future cycle and only fix BUG-001"** (the alternative for scope). Rejected — both bugs are P0; fixing one without the other leaves the user-facing symptom half-fixed. The combined fix is ~10 lines and 3 tests; splitting them doubles the PR count for ~the same total work.
+
+- **"Move `_toRow`'s omission to a Drift `companion` instead of a `HabitRow`"** (a Drift-side alternative). Rejected — the v1.4l precedent uses `HabitRow`, and the omission semantics are identical with both shapes. Sticking to `HabitRow` minimizes churn.
+
+### Coverage impact
+
+Cycle B does not target coverage directly — it targets data-loss bugs. The 3 new tests raise `do_repository_test.dart` from 25 to 28 tests; `do_repository.dart` coverage stays at its v1.4l level (well above 80%). The `PauseService` refactor maintains the existing readiness-gate coverage. Cycle B is a bug-fix cycle, not a coverage cycle — the 3-month campaign's coverage gains come from Cycles C..L.
+
+### Pure-Dart
+
+- No new `<uses-permission>` — the AndroidManifest baseline is unchanged; `docs/v_model/architecture_options.md §"Permission baseline"` is not touched.
+- No new pubspec deps.
+- No Drift migration — both columns (`automationsJson`, `pausedUntilMillis`) already exist on the `Habits` table (`kCurrentSchemaVersion` stays at 5).
+- No new Drift tables.
+- No new MethodChannels.
+- No Kotlin changes — the reminder layer (`AlarmScheduler`) reads `pausedUntil` from the row via `Do.isPausedAt(now)`, which is unaffected.
+
+Cycle B is pure-Dart + 3 new tests + V-Model doc updates.
+
+### References
+
+- SYS-129 (v1.4-stab-B — the `_toRow` round-trip + save-invariant requirement)
+- WF-057 (v1.4-stab-B — the Cycle B implementation flow)
+- ADR-056 (v1.4l — the `deletedAtMillis` omission precedent; Cycle B mirrors this pattern for `pausedUntilMillis`)
+- ADR-058 (v1.4m — the "tests first, then UI" inversion that pinned the soft-delete API surface)
+- ADR-059 (v1.4-stab-A — the audit + roadmap cycle that inventoried BUG-001 + BUG-002 at P0 and assigned them to Cycle B)
+- `docs/v_model/stabilization_roadmap.md §2` (BUG-001 + BUG-002 priority + target cycle; mark both as "closed (Cycle B)" in the §2 table when this cycle ships)
+- WF-053 (v1.4l — the Delete + Undo user flow; the `save` KDoc dual invariant covers both tombstones and pause state)
+- `lib/services/db/migrations/v3_to_v4.dart` (the migration that added the `automations_json` column; the column was always meant to be persisted — `_toRow` was simply incomplete)
+- `lib/services/event_repository.dart:97-99` + `lib/services/person_repository.dart:70-72` (the established `automationsJson` write pattern that `_toRow` now mirrors)

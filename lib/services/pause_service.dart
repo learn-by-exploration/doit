@@ -32,8 +32,11 @@ import 'dart:async';
 
 import 'package:doit/do/do.dart';
 import 'package:doit/people/person.dart';
+import 'package:doit/services/db.dart';
+import 'package:doit/services/db/schema.dart';
 import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/person_repository.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:meta/meta.dart';
 
 class PauseService {
@@ -62,23 +65,40 @@ class PauseService {
   /// Pause a habit until [until] (inclusive). A null
   /// [until] is rejected; call [resume] to clear.
   ///
-  /// Re-saves the habit through [DoRepository] (so the
-  /// v0.1 `insertOnConflictUpdate` path is used). The
-  /// reminder layer reads `pausedUntil` directly from the
-  /// row, so the new state is effective on the next
-  /// `listActive` / `scheduleHabit` call.
+  /// Cycle B (SYS-129 / ADR-060): this method bypasses
+  /// [DoRepository.save] and writes the `pausedUntilMillis`
+  /// column directly via a `HabitsCompanion` UPDATE. The
+  /// `save` path is content-only (the v1.4l tombstone
+  /// precedent + the Cycle B pause-preservation fix omit
+  /// `pausedUntilMillis` from `_toRow` so Save clicks
+  /// don't clobber the pause state); pause / resume are
+  /// the explicit writers of this column. The reminder
+  /// layer reads `pausedUntil` directly from the row, so
+  /// the new state is effective on the next `listActive` /
+  /// `scheduleHabit` call.
   Future<void> pauseHabit(Do habit, DateTime until) async {
     await _ready;
-    final updated = habit.copyWith(pausedUntil: until);
-    await DoRepository.instance.save(updated);
+    final db = AppDatabaseService.instance.db;
+    await (db.update(db.habits)..where((t) => t.id.equals(habit.id))).write(
+      HabitsCompanion(pausedUntilMillis: Value(until.millisecondsSinceEpoch)),
+    );
   }
 
   /// Clear the pause state on a habit. The next call to
   /// `nextOccurrence` will fire reminders as usual.
+  ///
+  /// Cycle B (SYS-129 / ADR-060): bypasses
+  /// [DoRepository.save] for the same reason as [pauseHabit]
+  /// — the `save` path is content-only and omits
+  /// `pausedUntilMillis` from `_toRow`. Resume is the
+  /// explicit writer that clears the column via a direct
+  /// `HabitsCompanion` UPDATE.
   Future<void> resumeHabit(Do habit) async {
     await _ready;
-    final updated = habit.copyWith(clearPausedUntil: true);
-    await DoRepository.instance.save(updated);
+    final db = AppDatabaseService.instance.db;
+    await (db.update(db.habits)..where((t) => t.id.equals(habit.id))).write(
+      const HabitsCompanion(pausedUntilMillis: Value(null)),
+    );
   }
 
   /// Pause a person (cadence habit) until [until]. The cadence
