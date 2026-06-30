@@ -493,7 +493,7 @@ the team wants per-mission wake-lock control.
 
 **No new `<uses-permission>`.** The v1.3c
 `USE_FULL_SCREEN_INTENT` baseline (SYS-113) covers the
-launch path. On API 14+ the OS no longer suppresses the
+launch path. On API 34+ the OS no longer suppresses the
 full-screen intent because (a) the app holds
 `USE_FULL_SCREEN_INTENT` (v1.3c manifest) and (b) the
 notification uses `setFullScreenIntent` so the OS

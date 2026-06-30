@@ -4,9 +4,13 @@
 // On a strong-mode habit, the notification's
 // `AndroidNotificationDetails.fullScreenIntent` flag is set so
 // the OS launches the app's `FullScreenActivity` (a thin Kotlin
-// shell) which hosts the mission UI. The activity holds a
-// `wakelock_plus` lock while the mission is on screen; the
-// lock is released on close.
+// shell) which hosts the mission UI. The wake-lock is held
+// at the Android Window level via `FLAG_KEEP_SCREEN_ON` on
+// the activity (`android/app/src/main/kotlin/com/doit/
+// FullScreenActivity.kt`); the flag is released automatically
+// when the activity is destroyed. NO `wakelock_plus` package
+// is in `pubspec.yaml` — this matches the v1.2e precedent
+// (`docs/v_model/notification_reliability.md` §5).
 //
 // v1.2f / Phase 6: added [showRoutineOverlay] so the routine
 // engine's `ActionFullscreen` arm has a typed seam. The
