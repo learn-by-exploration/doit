@@ -324,4 +324,38 @@ void main() {
           'ReliabilityService is not init.',
     );
   });
+
+  // v1.4-stab-D / Phase 44 / SYS-131: the observer MUST
+  // ignore non-`resumed` lifecycle events (paused,
+  // inactive, hidden, detached). The early-return at
+  // `permission_lifecycle_observer.dart:69` is the gate;
+  // a `paused` event must NOT touch
+  // `PermissionService.refresh()`.
+  test('paused / inactive / hidden lifecycle events do NOT trigger '
+      'a permission refresh (SYS-131)', () async {
+    final observer = PermissionLifecycleReProbe();
+    await PermissionService.instance.init();
+    // Consume the cold-start resumed so subsequent state
+    // changes are eligible to refresh.
+    observer.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await _drain();
+    final before = _fireCountSinceStart;
+
+    for (final state in const [
+      AppLifecycleState.inactive,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.detached,
+    ]) {
+      observer.didChangeAppLifecycleState(state);
+    }
+    await _drain();
+    expect(
+      _fireCountSinceStart,
+      before,
+      reason:
+          'Non-resumed lifecycle events must NOT trigger a refresh '
+          '(early-return at observer line 69).',
+    );
+  });
 }

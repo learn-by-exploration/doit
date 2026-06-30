@@ -5573,3 +5573,31 @@ channel-surface gap. Six design choices:
 - `CHANGELOG.md` v1.4-stab-C block
 - `feature.md` §4 (BUG-003 parking lot bullet removed) + §5 (quick-index updated to ADR-061 / SYS-130 / WF-058) + §6 (next-step updated to Cycle D)
 - `package:meta` (the `@visibleForTesting` annotation source for `MethodChannelFullScreenIntentSource` + `ScriptedFullScreenIntentSource` + the `FullScreenIntentService.debugInstance` factory)
+
+### v1.4-stab-D — Permission flow coverage: per-kind exhaustive tests + lifecycle edge cases (Phase 44 / SYS-131 / ADR-062 / WF-059)
+
+The fourth stabilization cycle of the 3-month campaign. Pure-Dart test-only cycle — no production code changes, no new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes. The Cycle A audit identified 4 Priority-1 files below 80% coverage on the permission flow: `permission_result.dart` (18.9%), `permission_service.dart` (93.4%), `permission_lifecycle_observer.dart` (78.6%), and `person.dart` (54.5%). Cycle D's contribution is **direct unit tests** that lift each file to the target coverage by exercising every sealed subclass + every `PermissionStatus` mapping + the lifecycle observer's early-return gate + the pause semantics on `ContactPerson`.
+
+**Six design choices (documented for the ADR audit log):**
+
+1. **No production code changes — test-only cycle.** The audit identified "missing tests" as the gap, not "missing production behavior." The Cycle C precedent (`doc typo fix + stale header + KDoc clarity` was an acceptable docs-only cycle) extends to Cycle D as `direct test coverage`. Any code change would inflate the diff and complicate the V-Model audit without lifting coverage.
+
+2. **`PermissionResult` exhaustive `switch` test as a sealed-class regression protector.** The new `permission_result_test.dart` includes a test that runs `switch (r) { PermissionResultGranted() => 'granted', PermissionResultDenied(:final canOpenSettings) => ..., PermissionResultPermanentlyDenied() => 'permanent', }` over all 3 subclasses. If a future contributor adds a 4th subclass without updating this test, the analyzer raises a non-exhaustive switch error (compile-time, not runtime) — the regression protector is a compile error.
+
+3. **`PermissionStatus.limited` → `PermissionResultDenied(canOpenSettings: true)`.** iOS's `limited` status is partial access; the user can be re-asked for full. The mapping follows the v0.5 / ADR-016 contract at `lib/services/permission_result.dart:14-19`.
+
+4. **`PermissionStatus.restricted` → `PermissionResultDenied(canOpenSettings: false)`.** iOS's `restricted` status is parental-controls / MDM — the deep-link would not help. The widget layer hides the "Go to Settings" affordance per the existing `PermissionResultDenied` contract.
+
+5. **`PermissionStatus.provisional` → `PermissionResultGranted` (not `Denied`).** iOS's `provisional` notification authorization is the system's "let the user decide later" state; do it's notification usage is compatible with provisional authorization, so it counts as full grant (mirrors the v0.5 / SYS-064 precedent).
+
+6. **Lifecycle observer early-return coverage via the `_fireCountSinceStart` delta pattern.** The observer's `_coldStartSeen` gate + non-`resumed` early-return at `permission_lifecycle_observer.dart:69` are exercised via the existing `_fireCountSinceStart` delta pattern from v1.3b. The new test drives `inactive`, `paused`, `hidden`, `detached` in sequence and asserts the delta is 0 — pinning that no platform-channel call fires on non-`resumed` transitions.
+
+**Closes:** BUG-005 (callScreening probe), BUG-011 (PermissionResult direct tests), BUG-012 (partial — person.dart at ≥80%; Cycle K brings to 100%), BUG-020 (lifecycle observer edge cases).
+
+**Pure-Dart + new tests + docs only** — no new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes. Test count: 1348 → 1363 (+15 net: 13 new test bodies + 2 from new test-file loader counts).
+
+**Refs:**
+- SYS-131 (v1.4-stab-D — the permission-flow coverage requirement)
+- WF-059 (v1.4-stab-D — the 14-step Cycle D implementation flow with per-file test wiring)
+- ADR-016 (the v0.5 `PermissionResult` sealed-hierarchy contract that Cycle D pins with direct tests)
+- ADR-013 (the "missing plugin must not crash the app" precedent — extended to the lifecycle observer's StateError swallow)

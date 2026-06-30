@@ -2230,3 +2230,45 @@ Cycle C of the 3-month stabilization campaign implements the FSI reliability wir
 - `CHANGELOG.md` v1.4-stab-C block
 - `feature.md` §4 (BUG-003 parking lot bullet removed) + §5 (quick-index updated to ADR-061 / SYS-130 / WF-058) + §6 (next-step updated to Cycle D)
 - Targeted runs per `CLAUDE.md`: `flutter test test/reminders/full_screen_intent_test.dart` (passes; +5 tests) + `flutter test test/services/full_screen_intent_service_test.dart` (passes; +3 tests) + `flutter test test/reminders/reminder_bridge_fsi_channel_test.dart` (passes; +2 tests).
+
+### WF-059 — Permission flow coverage: per-kind exhaustive tests + lifecycle edge cases (v1.4-stab-D / Phase 44)
+
+The 14-step test-first implementation flow for Cycle D (SYS-131 / ADR-062). Pure-Dart + new tests + docs only; no production code changes.
+
+**Step 1.** Read `lib/services/permission_result.dart` (166 lines) — confirm every sealed subclass is at the surface (no private constructors) so direct tests can `const`-construct them.
+
+**Step 2.** Read `lib/services/permission_service.dart:267-379` (`init()`), `:677-744` (`refresh()`), `:75-149` (`PermissionKind` enum) — identify the `PermissionStatus` → `PermissionResult` mapping at line 385-466 (`_mapStatus`) so the new service tests can target the 4 unmapped statuses (`limited`, `restricted`, `provisional`, plus a `permanentlyDenied` sanity test).
+
+**Step 3.** Read `lib/services/permission_lifecycle_observer.dart:1-14` (file header) + `:69` (early-return for non-`resumed`) + `:103-107` (`ReliabilityService` StateError catch) — confirm the existing v1.3b tests cover the StateError swallow (they do, at `test/services/permission_lifecycle_observer_test.dart:302-326`); the new test covers the early-return gate.
+
+**Step 4.** Read `lib/people/person.dart:1-229` — identify `isPausedAt(now)` (line ~156) + `copyWith(clearPausedUntil:)` (line ~175) as the test targets; confirm the existing `person_model_test.dart` does NOT cover these (it focuses on channel equality + identity-bound copyWith).
+
+**Step 5.** Write `test/services/permission_result_test.dart` (NEW) — 6 tests across 2 groups (`PermissionResult sealed hierarchy (SYS-131)` + `BackupFolderResult sealed hierarchy (SYS-131)`); includes the exhaustive `switch` regression protector at test #4.
+
+**Step 6.** Write `test/people/person_test.dart` (NEW) — 3 tests in the `ContactPerson pause semantics (SYS-131)` group covering `isPausedAt` future/expired/null branches + `copyWith(clearPausedUntil: true)` drop-pause path.
+
+**Step 7.** Extend `test/services/permission_lifecycle_observer_test.dart` — append the `paused / inactive / hidden lifecycle events do NOT trigger a permission refresh (SYS-131)` test at the end of `main()` (after the existing StateError swallow test).
+
+**Step 8.** Extend `test/services/permission_service_test.dart` — append the `v1.4-stab-D / Phase 44 / SYS-131` block at the end of `main()` with 4 new tests targeting the 4 `PermissionStatus` mappings not yet covered by the v1.3c + v1.5b tests.
+
+**Step 9.** Run the 4 targeted test files in isolation: `flutter test test/services/permission_result_test.dart test/services/permission_service_test.dart test/services/permission_lifecycle_observer_test.dart test/people/person_test.dart` — verify the 13 new tests pass.
+
+**Step 10.** Run `dart format .` to auto-fix any formatting the new files introduced — then re-verify with `dart format --output=none --set-exit-if-changed .` (must report 0 changed).
+
+**Step 11.** Run `flutter analyze --fatal-infos lib test` — must report 0 issues. Watch for `--fatal-infos` hits on unused imports in the new files (e.g., `unnecessary_import`); auto-format usually fixes these on the first pass.
+
+**Step 12.** Run `flutter test` (full suite) — must report 1363/1363 pass. No regression on the existing 1348 tests.
+
+**Step 13.** Append V-Model artifacts: SYS-131 row to `docs/v_model/requirements.md`; ADR-062 section to `docs/v_model/decision_record.md`; this WF-059 to `docs/v_model/workflows.md`; WF-059 row to `docs/v_model/traceability_matrix.md`; `### v1.4-stab-D` row to `docs/v_model/implementation_status.md`; `### v1.4-stab-D` sub-entry to `docs/v_model/plan.md` Milestone 12 (after the v1.4-stab-C sub-entry); `## v1.4-stab-D` block to `CHANGELOG.md`; `feature.md` §4 BUG-005/011/012/020 parking lot bullets removed + §5 quick-index updated (ADR-062 / SYS-131 / WF-059) + §6 next-step updated to Cycle E (`feat/v1.4-stab-E-reliability-detection`). **Verification:** `grep -n "SYS-131\|ADR-062\|WF-059\|v1.4-stab-D" docs/v_model/*.md` returns the expected count of matches.
+
+**Step 14.** Commit, push, PR, squash-merge, build APK/AAB per the release-apk-pattern memory + the Cycle C precedent (`4b3c20d`).
+
+**Verification:** 3-gate: `dart format --output=none --set-exit-if-changed .` (268 files, 0 changed) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1363/1363 pass). Targeted runs per `CLAUDE.md`: `flutter test test/services/permission_result_test.dart` (passes; +6 tests) + `flutter test test/services/permission_service_test.dart` (passes; +4 tests) + `flutter test test/services/permission_lifecycle_observer_test.dart` (passes; +1 test) + `flutter test test/people/person_test.dart` (passes; +3 tests).
+
+**Refs:**
+- SYS-131 (v1.4-stab-D — the permission-flow coverage requirement)
+- ADR-062 (v1.4-stab-D — the 6 design choices)
+- ADR-016 (the v0.5 `PermissionResult` sealed-hierarchy contract)
+- ADR-013 (the v0.4b-release-fix "missing plugin must not crash the app" precedent)
+- `~/.claude/projects/-home-shyam-common-games-doit/memory/v1-4-stab-C-cycle-shipped.md` (Cycle C precedent — pure-Dart + docs + new tests pattern)
+- `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md` (the canonical Cycle D scope decision)

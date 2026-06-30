@@ -881,4 +881,106 @@ void main() {
       isA<PermissionResultDenied>(),
     );
   });
+
+  // ── v1.4-stab-D / Phase 44 / SYS-131 ─────────────────────
+  // Coverage cycle: direct unit tests for the per-kind
+  // happy-path + permission-policy edge cases.
+
+  test('requestContacts maps PermissionStatus.limited to '
+      'PermissionResultDenied(canOpenSettings: true) (SYS-131)', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(permissionsChannel, (call) async {
+          if (call.method == 'checkPermissionStatus') {
+            return PermissionStatus.limited.value;
+          }
+          if (call.method == 'requestPermissions') {
+            final perms = (call.arguments as List).cast<int>();
+            return {for (final p in perms) p: PermissionStatus.limited.value};
+          }
+          return null;
+        });
+    await PermissionService.instance.init();
+    final result = await PermissionService.instance.requestContacts();
+    expect(result, isA<PermissionResultDenied>());
+    expect((result as PermissionResultDenied).canOpenSettings, isTrue);
+  });
+
+  test('requestExactAlarm maps PermissionStatus.restricted to '
+      'PermissionResultDenied(canOpenSettings: false) (SYS-131)', () async {
+    // iOS restricted case: the user can NEVER grant via
+    // runtime request; the deep-link would not help either.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(permissionsChannel, (call) async {
+          if (call.method == 'checkPermissionStatus') {
+            return PermissionStatus.restricted.value;
+          }
+          if (call.method == 'requestPermissions') {
+            final perms = (call.arguments as List).cast<int>();
+            return {
+              for (final p in perms) p: PermissionStatus.restricted.value,
+            };
+          }
+          return null;
+        });
+    await PermissionService.instance.init();
+    final result = await PermissionService.instance.requestExactAlarm();
+    expect(result, isA<PermissionResultDenied>());
+    expect(
+      (result as PermissionResultDenied).canOpenSettings,
+      isFalse,
+      reason: 'restricted → no settings affordance',
+    );
+  });
+
+  test('requestLocation maps PermissionStatus.provisional to '
+      'PermissionResultGranted (iOS provisional notifications '
+      'precedent — SYS-131)', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(permissionsChannel, (call) async {
+          if (call.method == 'checkPermissionStatus') {
+            return PermissionStatus.provisional.value;
+          }
+          if (call.method == 'requestPermissions') {
+            final perms = (call.arguments as List).cast<int>();
+            return {
+              for (final p in perms) p: PermissionStatus.provisional.value,
+            };
+          }
+          return null;
+        });
+    await PermissionService.instance.init();
+    final result = await PermissionService.instance.requestLocation();
+    expect(
+      result,
+      isA<PermissionResultGranted>(),
+      reason: 'provisional is treated as full grant',
+    );
+  });
+
+  test('requestCalendar returns PermissionResultPermanentlyDenied when '
+      'the user has selected "Don\'t ask again" (SYS-131)', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(permissionsChannel, (call) async {
+          if (call.method == 'checkPermissionStatus') {
+            return PermissionStatus.permanentlyDenied.value;
+          }
+          if (call.method == 'requestPermissions') {
+            final perms = (call.arguments as List).cast<int>();
+            return {
+              for (final p in perms)
+                p: PermissionStatus.permanentlyDenied.value,
+            };
+          }
+          return null;
+        });
+    await PermissionService.instance.init();
+    final result = await PermissionService.instance.requestCalendar();
+    expect(
+      result,
+      isA<PermissionResultPermanentlyDenied>(),
+      reason:
+          'permanentlyDenied is its own sealed subclass, '
+          'NOT a denied-with-canOpenSettings flag',
+    );
+  });
 }
