@@ -36,7 +36,7 @@ import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
 
 /// Abstract source the [FullScreenIntentService] reads from.
-/// Production wires [_MethodChannelFullScreenIntentSource];
+/// Production wires [MethodChannelFullScreenIntentSource];
 /// tests wire [ScriptedFullScreenIntentSource].
 abstract class FullScreenIntentSource {
   /// Returns true if `USE_FULL_SCREEN_INTENT` is currently
@@ -60,8 +60,31 @@ abstract class FullScreenIntentSource {
 /// `openFullScreenIntentSettings` methods. The API-32 vs
 /// API-34 asymmetry is resolved on the Kotlin side so the
 /// Dart source is platform-agnostic.
-class _MethodChannelFullScreenIntentSource implements FullScreenIntentSource {
-  _MethodChannelFullScreenIntentSource({MethodChannel? channel})
+///
+/// **Defense-in-depth swallow (v1.4-stab-C / ADR-061 /
+/// SYS-130 / WF-058).** Both [isGranted] and [openSettings]
+/// wrap the `invokeMethod` call in `try`/`catch` and treat
+/// ANY error — `MissingPluginException` (no Kotlin arm)
+/// or `PlatformException` (channel-level failure, e.g., a
+/// device whose `NotificationManager` throws on the
+/// `canUseFullScreenIntent` query) — as `false`. This is
+/// **intentional** per ADR-013: the v0.4b-release-fix lesson
+/// was that a missing plugin MUST NOT crash the app; the
+/// v1.4-stab-C audit extended this posture to all channel
+/// errors because the home-screen reliability banner and
+/// the Settings-tile deep-link both degrade gracefully to
+/// `false`. The `ReliabilityService._safeProbe` wrapper at
+/// `lib/services/reliability_service.dart` makes the same
+/// choice; the patterns are deliberately identical.
+///
+/// A reader who is tempted to "fix" this by removing the
+/// catches should first read ADR-013 + ADR-061 and then
+/// audit every caller of [isGranted] and [openSettings] for
+/// `null`-safety (the contract is `Future<bool>`, not
+/// `Future<bool?>` — there is no error path).
+@visibleForTesting
+class MethodChannelFullScreenIntentSource implements FullScreenIntentSource {
+  MethodChannelFullScreenIntentSource({MethodChannel? channel})
     : _channel = channel ?? const MethodChannel('doit/full_screen');
 
   final MethodChannel _channel;
@@ -74,9 +97,18 @@ class _MethodChannelFullScreenIntentSource implements FullScreenIntentSource {
       );
       return result ?? false;
     } on MissingPluginException catch (e) {
+      // Defense-in-depth per ADR-013 / ADR-061: a missing
+      // Kotlin arm MUST NOT crash the app. Returns false so
+      // the reliability banner + Settings tile degrade
+      // gracefully. See class-level KDoc above.
       if (kDebugMode) debugPrint('FullScreenIntentSource.isGranted: $e');
       return false;
     } on PlatformException catch (e) {
+      // Defense-in-depth per ADR-013 / ADR-061: any
+      // channel-level error (device-specific quirks in
+      // NotificationManager.canUseFullScreenIntent, etc.)
+      // is treated as "not granted" so the user can still
+      // reach Settings via the openSettings() path.
       if (kDebugMode) debugPrint('FullScreenIntentSource.isGranted: $e');
       return false;
     }
@@ -90,9 +122,18 @@ class _MethodChannelFullScreenIntentSource implements FullScreenIntentSource {
       );
       return result ?? false;
     } on MissingPluginException catch (e) {
+      // Defense-in-depth per ADR-013 / ADR-061: a missing
+      // Kotlin arm MUST NOT crash the app. Returns false so
+      // the caller can fall back to a generic Settings
+      // entry-point.
       if (kDebugMode) debugPrint('FullScreenIntentSource.openSettings: $e');
       return false;
     } on PlatformException catch (e) {
+      // Defense-in-depth per ADR-013 / ADR-061: any
+      // channel-level error (e.g., ACTION_MANAGE_APP_USE_
+      // FULL_SCREEN_INTENT is not present on this device's
+      // OEM Android version) is treated as "did not
+      // resolve" so the caller can offer an alternative.
       if (kDebugMode) debugPrint('FullScreenIntentSource.openSettings: $e');
       return false;
     }
@@ -141,7 +182,7 @@ class ScriptedFullScreenIntentSource implements FullScreenIntentSource {
 /// shape as the other services in `lib/services/`.
 class FullScreenIntentService {
   FullScreenIntentService._({FullScreenIntentSource? source})
-    : _source = source ?? _MethodChannelFullScreenIntentSource();
+    : _source = source ?? MethodChannelFullScreenIntentSource();
 
   /// The single global instance. Tests reach for the
   /// `@visibleForTesting` [debugInstance] factory + the
@@ -182,7 +223,7 @@ class FullScreenIntentService {
   /// Returns true if `USE_FULL_SCREEN_INTENT` is currently
   /// granted. Returns false on any platform error (see the
   /// `MissingPluginException` / `PlatformException` catches
-  /// in `_MethodChannelFullScreenIntentSource`).
+  /// in `MethodChannelFullScreenIntentSource`).
   Future<bool> isGranted() async {
     await ready;
     return _source.isGranted();
@@ -200,7 +241,7 @@ class FullScreenIntentService {
   /// gate. Call before [init] in the test's `setUp`.
   @visibleForTesting
   void resetForTesting({FullScreenIntentSource? source}) {
-    _source = source ?? _MethodChannelFullScreenIntentSource();
+    _source = source ?? MethodChannelFullScreenIntentSource();
     _ready = Completer<void>();
   }
 }
