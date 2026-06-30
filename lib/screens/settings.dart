@@ -29,6 +29,7 @@ import 'package:doit/build_info.dart';
 import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/anchor_detector.dart';
+import 'package:doit/screens/recently_deleted_screen.dart';
 import 'package:doit/screens/settings_restore.dart';
 import 'package:doit/screens/stats.dart';
 import 'package:doit/services/call_interceptor.dart';
@@ -128,6 +129,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const SettingsRestoreScreen(),
+                  ),
+                );
+              },
+            ),
+            // v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 /
+            // WF-063. Settings tile that pushes the
+            // top-level /recently-deleted screen. The tile
+            // sits in the Backup section because the
+            // tombstone is a transient affordance
+            // (ADR-056) and the user reaches for it when
+            // they realize they deleted the wrong do.
+            ListTile(
+              key: const ValueKey('settings.recently_deleted'),
+              leading: const Icon(Icons.delete_outline),
+              title: Text(l.recentlyDeletedSettingsTitle),
+              subtitle: Text(l.recentlyDeletedSettingsSubtitle),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const RecentlyDeletedScreen(),
                   ),
                 );
               },

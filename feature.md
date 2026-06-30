@@ -560,4 +560,45 @@ Future readers who see "stream emits Reliability.optimal"
 should know it means "on a distinct value transition", not
 "on subscribe".
 
+Cycle G (`feat/v1.4-stab-G-doanchor-paused-badge`) shipped the
+v1.4l-deferred UI surface: a "Target paused" badge widget on
+the home tile when a `DoAnchor` points at a tombstoned habit,
+plus a one-line sparkline edge-case pin for BUG-019. 6 new
+tests across 3 files (`do_anchor_paused_badge_test.dart` NEW
++4, `home_test.dart` extended +1, `home_tile_sparkline_test.dart`
+extended +1). +2 ARB keys in both en + es. Test count: 1379 →
+1388 (+9 net; +6 +3 new bootstrap). Pure-Dart + new widget +
+home.dart diff + docs only — BUG-004 + BUG-019 closure,
+SYS-134 / ADR-065 / WF-062. **Drift:** no Drift this cycle —
+the `KeyedSubtree` seam + the WCAG 4.5:1 contrast assertion
+landed cleanly on the first design pass.
+
+Cycle H (`feat/v1.4-stab-H-recently-deleted-screen`) shipped
+the v1.4l-deferred UI surface: a top-level "Recently
+deleted" screen at the `/recently-deleted` route, reachable
+via a Settings tile (the only nav entry — keeps the bottom
+nav uncluttered for transient surfaces). The screen wraps
+the v1.4l `DoRepository.listDeleted` /
+`restoreById` / `deleteById` API in a `FutureBuilder` +
+`ListView` and gates the destructive path behind an
+`AlertDialog` confirm that repeats the verb in title + body
++ CTA. 12 new tests across 1 file
+(`recently_deleted_screen_test.dart` NEW +12). +15 ARB keys
+in both en + es. Test count: 1388 → 1401 (+13 net; +12 +1
+existing a11y file). 3-gate passes (analyze 0 issues,
+1401/1401 pass). New widget surface, new route, settings
+diff, docs only — SYS-135 / ADR-066 / WF-063. **Drift:** the
+a11y static check (`test/a11y/semantics_labels_test.dart`)
+uses a 10-line lookahead window — the new Settings
+`ListTile` initially hid its `title:` line behind a comment
+block; restructured so the comment lives BEFORE the
+`ListTile(` call. The Drift `_ready` Completer pattern
+makes a true "DB throws" unit test impractical — the
+failure-path tests were reworked to assert-the-absence in
+the happy path (e.g., the Retry key is NOT rendered when
+the load succeeds). Production code is unchanged from the
+v1.4l tombstone API contract.
+
+The immediate next cycle is **Cycle I** (`feat/v1.4-stab-I-i18n-tests`) — every ARB key tested in both `en` and `es` locales; ARB parity + key-shape assertions in `test/l10n/app_localizations_test.dart` NEW (+12) + every locale renders every screen in `test/l10n/locale_render_test.dart` NEW (+8). Closes none of §2 BUG-NNNs (I is the i18n coverage of the v1.4g widget cycle forward). 20 new tests across 2 files. SYS-136 / ADR-067 / WF-064.
+
 The immediate next cycle is **Cycle G** (`feat/v1.4-stab-G-doanchor-paused-badge`) — ship the v1.4l-deferred UI: a small "Target paused" badge widget on the home tile when a `DoAnchor` points at a tombstoned habit, plus a one-line sparkline edge-case pin for BUG-019. 6 new tests across 3 files (4 in `test/widgets/do_anchor_paused_badge_test.dart` NEW + 1 in `test/screens/home_test.dart` extended + 1 in `test/screens/home_tile_sparkline_test.dart` extended). Closes BUG-004 + BUG-019. Pure-Dart + new widget + 2 ARB keys (`doAnchorTargetPaused` + `doAnchorTargetPausedHelp`) + ~30-line `home.dart` edit. SYS-134 / ADR-065 / WF-062.

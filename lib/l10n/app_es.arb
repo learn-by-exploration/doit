@@ -132,4 +132,21 @@
   "widgetConfigureBackToHome": "Volver a do it",
 
   "doAnchorTargetPaused": "Objetivo en pausa",
-  "doAnchorTargetPausedHelp": "La tarea que este anclaje seguía ha sido pausada o eliminada. Restáurala desde Ajustes para reanudar este anclaje."}
+  "doAnchorTargetPausedHelp": "La tarea que este anclaje seguía ha sido pausada o eliminada. Restáurala desde Ajustes para reanudar este anclaje.",
+
+  "recentlyDeletedTitle": "Eliminados recientemente",
+  "recentlyDeletedEmpty": "Nada aquí — las tareas eliminadas permanecen 30 días antes de purgarse.",
+  "recentlyDeletedRestoreAction": "Restaurar",
+  "recentlyDeletedDeleteForeverAction": "Eliminar para siempre",
+  "recentlyDeletedDeleteForeverConfirm": "¿Eliminar esta tarea para siempre?",
+  "recentlyDeletedDeleteForeverConfirmBody": "La tarea, su historial de finalización y su presupuesto de descanso se eliminarán de forma permanente. Esta acción no se puede deshacer.",
+  "recentlyDeletedDeleteForeverConfirmCta": "Eliminar para siempre",
+  "recentlyDeletedDeleteForeverCancel": "Cancelar",
+  "recentlyDeletedRestoreSuccess": "Restaurada.",
+  "recentlyDeletedRestoreFailed": "No se pudo restaurar. Inténtalo de nuevo.",
+  "recentlyDeletedDeleteForeverFailed": "No se pudo eliminar. Inténtalo de nuevo.",
+  "recentlyDeletedRetry": "Reintentar",
+  "recentlyDeletedSubtitle": "{name} · eliminado {when}",
+  "recentlyDeletedSettingsTitle": "Eliminados recientemente",
+  "recentlyDeletedSettingsSubtitle": "Restaura o elimina permanentemente las tareas que quitaste en los últimos 30 días."
+}

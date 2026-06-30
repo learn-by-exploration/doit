@@ -5672,3 +5672,43 @@ The badge needs to render precisely when the target IS tombstoned. `getActiveByI
 - WF-062 (v1.4-stab-G — the 12-step Cycle G flow)
 - ADR-056 (the v1.4l `deletedAtMillis` data-layer precedent that this cycle's UI surfaces)
 - ADR-059 §4 (the parking-lot deferral that Cycle G retires)
+
+## ADR-066 — Ship the "Recently deleted" top-level screen that v1.4l's tombstone made possible (v1.4-stab-H / Phase 48 / SYS-135 / WF-063)
+
+### Context
+
+v1.4l shipped the data-layer tombstone column (`Habits.deletedAtMillis`, ADR-056). v1.4m shipped the `DoRepository.listDeleted` / `purgeDeletedOlderThan` API surface (SYS-127, ADR-058). v1.4l intentionally deferred the top-level UI surface — the home tile's 4-second Undo SnackBar is the primary recovery path, and a deeper "Recently deleted" list felt out of scope for a stabilization cycle. The v1.4-stab-A coverage audit (SYS-128) listed the screen as a Cycle H deliverable.
+
+The user pre-authorized the workflow permissions for all 10 cycles (C..L) on 2026-06-30 (per the `v1-4-stab-10-cycle-preauth` memory). The scope is locked at the plan: top-level `Recently deleted` screen at `/recently-deleted`, accessed via a Settings tile (not a bottom-nav entry — the screen is transient per ADR-056).
+
+### Decision
+
+1. **Top-level route, not a modal sheet.** The screen lives at `/recently-deleted` in `lib/app_router.dart` (added to the existing 3-route switch). A modal sheet would have forced a `showModalBottomSheet` call from the Settings tile, which would conflict with the v1.4k "Settings tile is the nav entry point for transient surfaces" precedent (`SettingsRestoreScreen` also pushes via `MaterialPageRoute` from the Backup section).
+
+2. **Settings tile, not a bottom-nav entry.** The bottom nav stays at Home / Settings / Stats. The Recently deleted surface is a transient affordance (ADR-056) and adding it to the nav would mean it appears on every home screen load even when empty. The Settings tile is consistent with the existing `SettingsRestoreScreen` tile in the Backup section (mirrors the "I deleted the wrong do, I need to recover it" recovery flow).
+
+3. **Two-action row shape.** Each row offers both Restore (`Icons.restore`) and Delete-forever (`Icons.delete_forever`) inline as `IconButton`s in the `ListTile.trailing` slot. The Restore action is the inverse of the v1.4l soft-delete and the user expects to find it on the same row. The Delete-forever action is the force-purge path that the v1.4m `purgeDeletedOlderThan` auto-purges use; exposing it as a user action is a follow-up to the v1.4m API.
+
+4. **Confirm dialog for delete-forever.** The destructive verb ("Delete forever") is repeated in the row's `IconButton` tooltip AND in the `AlertDialog` title AND in the `FilledButton` CTA. Three touches of the destructive verb before the row is hard-deleted. The `FilledButton` uses `colorScheme.error` background so the destructive action is visually distinct from the Cancel `TextButton`.
+
+5. **`FutureBuilder` for the list query.** A failed list query (e.g., DB closed mid-load) surfaces a `Retry` button via the `_ErrorState` widget. The screen never throws into the route's build cycle — the `FutureBuilder.builder` is total over the `ConnectionState` + `hasError` + `data.isEmpty` partition. The Retry button re-runs the `listDeleted` future via `_reload()`.
+
+6. **Snackbar feedback for every mutation.** Restore success / Restore failed / Delete-forever success / Delete-forever failed — each is a `SnackBar` with a localized string. The success copy for restore and delete-forever is the same ("Restored.") because the user's mental model is "the row is gone from this list"; the failed copy is distinct per action so the user can tell which operation failed.
+
+7. **ARB parity in `app_en.arb` + `app_es.arb`.** 15 new keys total: 13 on the screen (including the `recentlyDeletedSubtitle` placeholder pair `name` + `when`) + 2 on the Settings tile. The Cycle I ARB-parity guard test will fail if any key is missing from either locale.
+
+8. **Pure-Dart + tests only.** No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes. The screen consumes the v1.4l + v1.4m API surface as-is.
+
+### Alternatives considered
+
+- **Bottom-nav entry** — rejected: the surface is transient and would clutter the nav on every load.
+- **Modal sheet** — rejected: `SettingsRestoreScreen` is a pushed route, not a sheet; consistency wins.
+- **Swipe-to-delete + swipe-to-restore** — rejected: the v1.4l Undo SnackBar is a swipe-free 4-second affordance; mixing gestures here is a discoverability regression.
+- **Inline delete-forever (no confirm)** — rejected: the v1.4l + v1.4m pattern is "confirm destructive actions"; an inline delete would be a one-tap data-loss regression.
+
+### Consequences
+
+- The v1.4l-deferred UI surface ships.
+- The home tile's Undo SnackBar (4-second window) is the primary recovery; the `Recently deleted` screen is the secondary recovery for the "I forgot to tap Undo" case.
+- 12 new widget tests, 15 new ARB keys, 1 new screen, 1 new route, 1 new settings tile, +12 net test count.
+- Test count: 1388 → 1400. Cumulative coverage: `recently_deleted_screen.dart` 0% → 100%, `app_router.dart` 85.7% → 100%, `settings.dart` 85% → ≥90%.

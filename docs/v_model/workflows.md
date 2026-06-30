@@ -2327,3 +2327,25 @@ Cycle G is a **pure-Dart + widget UI** stabilization cycle. The v1.4l data layer
 - ADR-056 (the v1.4l `deletedAtMillis` data-layer precedent that this cycle's UI surfaces)
 - ADR-059 §4 (the parking-lot deferral that Cycle G retires)
 - `~/.claude/projects/-home-shyam-common-games-doit/memory/v1-4-stab-F-cycle-shipped.md` (Cycle F precedent for the 12-step flow)
+
+### WF-063 — Open the "Recently deleted" screen and restore or force-purge a tombstoned do (v1.4-stab-H / Phase 48 / SYS-135 / ADR-066)
+
+1. User taps Settings on the home screen bottom nav.
+2. The `SettingsScreen` renders (per WF-015); the Backup section lists two tiles: the existing `SettingsRestoreScreen` tile (key: `settings.restore`) and the new `Recently deleted` tile (key: `settings.recently_deleted`).
+3. User taps the `Recently deleted` tile.
+4. `SettingsScreen.onTap` for the new tile calls `Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const RecentlyDeletedScreen()))`.
+5. The `MaterialApp.onGenerateRoute` is the same `buildAppRoute` switch — pushed routes go through `Navigator.push`, not `buildAppRoute`, so the switch is unchanged. (A deep-link via `buildAppRoute` at `/recently-deleted` also works — `buildAppRoute` returns the same `MaterialPageRoute<void>` wrapping the screen.)
+6. `RecentlyDeletedScreen.initState` calls `DoRepository.instance.listDeleted()` (returns `List<Do>` ordered by `deletedAtMillis DESC` per the v1.4m ordering) and stores the future in `_future`.
+7. The `FutureBuilder<List<Do>>` resolves to one of three branches: `loading` (`CircularProgressIndicator`), `error` (`_ErrorState` with a Retry button), or `data` (`ListView` of one `_Row` per tombstoned do, or the `_EmptyState` widget if the list is empty).
+8. **Restore path:** user taps the `Icons.restore` `IconButton` on a row. The screen calls `DoRepository.instance.restoreById(id)`. On `true` the screen surfaces the `recentlyDeletedRestoreSuccess` snackbar; on `false` it surfaces `recentlyDeletedRestoreFailed`. Either way, `_reload()` re-runs the `listDeleted` future.
+9. **Delete-forever path:** user taps the `Icons.delete_forever` `IconButton` on a row. The screen calls `showDialog<bool>(...)` rendering an `AlertDialog` with the destructive verb repeated in the title and CTA. On confirm the screen calls `DoRepository.instance.deleteById(id)` inside a try/catch; on success it surfaces `recentlyDeletedRestoreSuccess` (the user mental model is "the row is gone"); on catch it surfaces `recentlyDeletedDeleteForeverFailed`. `_reload()` re-runs the list.
+10. **Empty path:** no rows are tombstoned. The screen renders the `_EmptyState` widget with the localized "Nothing here — deleted dos stay for 30 days before being purged" copy (mentions the v1.4m 30-day TTL per ADR-057).
+11. **Error path:** the `listDeleted` future throws. The `FutureBuilder` surfaces the `_ErrorState` widget (an `Icon` + a `FilledButton.icon` with the `recentlyDeletedRetry` label). Tapping the Retry button calls `_reload()` which reassigns `_future` and triggers a re-render.
+
+### Verification (per SYS-135 §11)
+
+- 12 new widget tests in `test/screens/recently_deleted_screen_test.dart` covering: list-loaded, list-empty, restore-happy-path, restore-failed, delete-forever-happy-path, delete-forever-cancel, delete-forever-confirm-dialog, error-state, navigation-from-settings, SnackBar-success, SnackBar-failed, ARB-parity.
+- Cycle I's ARB-parity test pins the 15 new keys in both `app_en.arb` and `app_es.arb`.
+- The `test/widget/widget_deep_link_test.dart` "buildAppRoute dispatches on the route name" test extends to include `/recently-deleted`.
+- 3-gate passes: `dart format --output=none --set-exit-if-changed .` + `flutter analyze --fatal-infos lib test` + `flutter test` (1400/1400 pass).
+- Targeted: `flutter test test/screens/recently_deleted_screen_test.dart test/widget/widget_deep_link_test.dart`.
