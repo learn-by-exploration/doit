@@ -4017,3 +4017,28 @@ Closes BUG-004 (the v1.4l-deferred UI affordance) + BUG-019 (sparkline single-po
 **On-device smoke deferred to user** (no `adb` binary in this harness environment). Release APK to be rebuilt on this branch (Cycle H has production code; SHA1 may differ from v1.4-stab-G's `37cb73304ecce736160ca0df8136ec775e549dbe`).
 
 **Refs:** SYS-135, ADR-066, WF-063.
+
+## v1.4-stab-I — i18n exhaustive test coverage (Phase 49 / SYS-136 / ADR-067 / WF-064)
+
+**Closes BUG-006 test-coverage half** (Spanish ARB native-speaker review remains queued for v2.0 per `docs/v_model/spanish_translation_review.md:207`). **NO production code changes** — pure-test + docs cycle.
+
+**Files (2 changed test files, 0 production files):**
+
+- `test/l10n/app_localizations_test.dart` (extended, +12 tests in a new group `AppLocalizations per-key + locale tests (v1.4-stab-I / SYS-136)`) — pins the ARB-catalog resolver sweep. Tests: `every ARB key resolves in locale=en`, mirror in `locale=es`, verbatim copy pins for v1.4-stab-G + H keys (en + es), placeholder interpolation for 6 keys × 2 locales (verbatim assertions: `homeTileBudgetRemaining(2, 5)`, `homeSnackbarBudgetUpdated(3)`, `addHabitRestDaysLabel(2)`, `settingsAboutAppVersion('1.4.0')`, `permissionBackupFolderSet('/storage/emulated/0/backup')`, `recentlyDeletedSubtitle('Stretch', '2026-06-15')`), en `homeSelectionAppBarTitle` plural pin (counts 0/1/5), regex-pin on `@<key>` metadata block for every placeholder-bearing ARB key (pins gen-l10n's drop-on-missing-metadata behavior).
+- `test/l10n/locale_render_test.dart` (NEW, +8 tests) — pins the locale render contract. Tests: HomeScreen + RecentlyDeletedScreen render in both locales (empty state copy assertion), Settings section headers resolve verbatim (7 strings × 2 locales) via the delegate (NOT mounting SettingsScreen — service singletons out of scope), no RenderFlex overflow at `TextScaler.linear(1.0)` for HomeScreen en + RecentlyDeletedScreen es.
+
+**ARB parity:** 140 keys in `app_en.arb`, 140 in `app_es.arb`, 0 missing/extra (parity is held by the pre-existing "every non-template ARB has the same key set as the template" test). The new per-key tests complement this with value-level coverage.
+
+**Closes:** BUG-006 test coverage (native-speaker review remains for v2.0).
+
+**No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes** — Cycle I is pure-test + docs only.
+
+**3-gate**: format 0 changed; analyze 0 issues; 1422/1422 tests pass.
+
+**Coverage:** `app_localizations_es.dart` from 7.0% to ≥70% (was severely under-covered because most prior tests resolved via the en delegate); `app_localizations_en.dart` stays ≥80%.
+
+**Targeted runs:** `flutter test test/l10n/app_localizations_test.dart` (+12) + `flutter test test/l10n/locale_render_test.dart` (+8 NEW).
+
+**No release APK rebuild** — Cycle I has no production code (the 17 spot-checks cover existing ARB keys; the locale render tests are within the existing test surface); APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`.
+
+**Refs:** SYS-136, ADR-067, WF-064.

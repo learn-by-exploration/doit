@@ -2349,3 +2349,37 @@ Cycle G is a **pure-Dart + widget UI** stabilization cycle. The v1.4l data layer
 - The `test/widget/widget_deep_link_test.dart` "buildAppRoute dispatches on the route name" test extends to include `/recently-deleted`.
 - 3-gate passes: `dart format --output=none --set-exit-if-changed .` + `flutter analyze --fatal-infos lib test` + `flutter test` (1400/1400 pass).
 - Targeted: `flutter test test/screens/recently_deleted_screen_test.dart test/widget/widget_deep_link_test.dart`.
+
+### WF-064 — Verify the ARB catalog + screen render in both locales (v1.4-stab-I / Phase 49 / SYS-136 / ADR-067)
+
+#### Goal
+
+Pin that every ARB key, every placeholder shape, and the top-level screens consume the catalog correctly under both `en` and `es` locales. The test is the regression guard against "key added to en.arb but not yet translated to es.arb" and "screen layout overflows at the Spanish locale's longer copy" classes of bugs.
+
+#### Steps
+
+1. **Per-key resolver sweep (en + es).** For every non-metadata key in `app_en.arb`, `testWidgets` asserts that `AppLocalizations.delegate.load(Locale('en'))` returns a non-empty string. The mirror test asserts the same for `Locale('es')`. A regression where the gen-l10n output drops a key surfaces as an empty string.
+
+2. **Verbatim-copy pin for v1.4-stab-G + v1.4-stab-H keys.** `doAnchorTargetPaused`, `recentlyDeletedTitle`, `recentlyDeletedDeleteForeverConfirm`, `recentlyDeletedRestoreSuccess`, `recentlyDeletedSettingsTitle` are pinned verbatim in BOTH locales — a copy change goes through a translator, not a code churn.
+
+3. **Placeholder interpolation pins (6 keys × 2 locales).** `homeTileBudgetRemaining(remaining, limit)`, `homeSnackbarBudgetUpdated(newValue)`, `addHabitRestDaysLabel(value)`, `settingsAboutAppVersion(version)`, `permissionBackupFolderSet(path)`, `recentlyDeletedSubtitle(name, when)` are each interpolated verbatim in both locales — a fallback to the wrong-locale template surfaces here.
+
+4. **Plural branches (en) pin.** `homeSelectionAppBarTitle(count)` resolves at counts 0/1/5 with non-empty output (mirror of the pre-existing es ICU pin).
+
+5. **Placeholder-bearing-key metadata regression guard.** For every ARB key whose value matches `\{[a-zA-Z][a-zA-Z0-9_]*\}`, the test asserts the paired `@<key>` metadata block is present. A regression where the metadata is silently removed is caught here at test time, complementing the build-time gen-l10n error.
+
+6. **Locale render sweep.** `HomeScreen`, `RecentlyDeletedScreen` (NEW for v1.4-stab-H), and the Settings section headers (resolved via the delegate, NOT mounted — SettingsScreen pulls in service singletons) are tested under both locales. Two `RenderFlex`-overflow guards at `TextScaler.linear(1.0)` × {HomeScreen en, RecentlyDeletedScreen es} pin the layout contract at the default font scale. Cycle J extends to 1.3x + 1.6x on the 5 critical screens.
+
+7. **ARB parity guard** (regression of v1.1h / SYS-087). The pre-existing "every non-template ARB has the same key set as the template" test continues to pass — the ARB catalog must be identical key-by-key across locales. The Cycle I per-key tests complement this with value-level guarantees.
+
+8. **Verification:**
+- `dart format --output=none --set-exit-if-changed .` (clean)
+- `flutter analyze --fatal-infos lib test` (0 issues)
+- `flutter test` (1422/1422 pass; was 1401 at start of Cycle I; +21 net)
+- Targeted: `flutter test test/l10n/app_localizations_test.dart test/l10n/locale_render_test.dart`.
+
+#### Notes
+
+- The `arbs` map (which walks `lib/l10n/*.arb` once) is lifted to file scope via an `ensureArbsLoaded()` helper called from both groups' `setUpAll`. The pre-Cycle I implementation scoped the walk to a single group's `setUpAll`, which the new group could not inherit.
+- Bug **BUG-006** (Spanish native-speaker review) is partially closed — the test coverage half is shipped; the reviewer log at `docs/v_model/spanish_translation_review.md:207` remains empty and is queued as a v2.0 follow-up.
+- No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.

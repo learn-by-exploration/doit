@@ -5712,3 +5712,45 @@ The user pre-authorized the workflow permissions for all 10 cycles (C..L) on 202
 - The home tile's Undo SnackBar (4-second window) is the primary recovery; the `Recently deleted` screen is the secondary recovery for the "I forgot to tap Undo" case.
 - 12 new widget tests, 15 new ARB keys, 1 new screen, 1 new route, 1 new settings tile, +12 net test count.
 - Test count: 1388 → 1400. Cumulative coverage: `recently_deleted_screen.dart` 0% → 100%, `app_router.dart` 85.7% → 100%, `settings.dart` 85% → ≥90%.
+
+## v1.4-stab-I / Cycle I — i18n exhaustive test coverage
+
+### ADR-067: ARB catalog + screen render testability
+
+#### Context
+
+Per the v1.4-stab plan (`/home/shyam/.claude/plans/here-now-i-hvae-enumerated-reddy.md` § Cycle I), the ARB catalog (`lib/l10n/app_en.arb` + `lib/l10n/app_es.arb`) and the screens consuming it needed exhaustive test coverage in BOTH locales. The existing `test/l10n/app_localizations_test.dart` (v1.1h / SYS-087) had structural parity + ICU plural pin + locale fallback pin but did NOT exercise every ARB key, every placeholder shape, every locale combo, or every screen's locale render.
+
+The plan asked for 20 new tests: 12 in `app_localizations_test.dart` (per-key + locale) + 8 in a NEW `test/l10n/locale_render_test.dart` (every screen renders both locales).
+
+### Decision (8 sub-decisions)
+
+1. **`arbs` map lifted to file scope.** The pre-existing test walked `lib/l10n/*.arb` inside a `setUpAll` that was scoped to its group. The new per-key + locale group needs the same map but runs BEFORE the structural group's `setUpAll`. The fix is to lift `arbs` to file scope and wrap the walk in an `ensureArbsLoaded()` helper called from both groups' `setUpAll`. The helper is idempotent (early-returns when the map is non-empty).
+
+2. **Per-key test exercises every ARB key, not just the placeholder-bearing ones.** The test reads the `app_en.arb` map at test time (not at codegen time) and asserts every non-metadata key resolves through `AppLocalizations.delegate.load(Locale)` with a non-empty string. A regression where a key is added to `app_en.arb` but the generated `app_localizations_en.dart` does NOT expose it would surface here as an empty/null return.
+
+3. **Verbatim-copy pins for v1.4-stab-G + H keys.** The cycle-G (`doAnchorTargetPaused`) and cycle-H (`recentlyDeletedTitle`, `recentlyDeletedDeleteForeverConfirm`, `recentlyDeletedRestoreSuccess`, `recentlyDeletedSettingsTitle`) keys are explicitly translated in both locales. The test pins the translated copy verbatim — a future cycle that re-translates (e.g., to fix grammar) would surface as a failing test, which is intentional: copy changes go through a translator, not a code churn.
+
+4. **Placeholder interpolation pinned per-locale.** Six placeholder-bearing keys (`homeTileBudgetRemaining`, `homeSnackbarBudgetUpdated`, `addHabitRestDaysLabel`, `settingsAboutAppVersion`, `permissionBackupFolderSet`, `recentlyDeletedSubtitle`) each have a `testWidgets` that asserts the verbatim interpolation in BOTH locales. A regression where one locale falls back to the other (a known gen-l10n fallback behavior) would surface as a stray template in the wrong copy.
+
+5. **Plural branches pinned in en.** The pre-existing `homeSelectionAppBarTitle` ICU pin only covered `es`. The new test adds the en-side pin at counts 0/1/5. Today the en ARB has no ICU branching for this key (it expects a single shape), but the test pins that future changes do not silently regress.
+
+6. **`every placeholder-bearing ARB key has @ metadata` regression guard.** Gen-l10n drops an ARB key at runtime if a placeholder-bearing key is missing its `@<key>.placeholders.<name>.type` metadata block. The new test reads `app_en.arb`, finds all keys whose value matches `\{[a-zA-Z]\w*\}`, and asserts each has a paired `@<key>` block. A regression where the metadata is silently removed surfaces here; a placeholder-free key's missing `@<key>` block is ignored (gen-l10n treats it as optional).
+
+7. **`locale_render_test.dart` splits the screen mount into 2 patterns.** Some screens (HomeScreen, RecentlyDeletedScreen) can be pumped directly with `localizedApp(theme, locale, home)` — the widget just needs the delegate wired. Other screens (SettingsScreen) pull in service singletons (ReminderService, Permissions) that are out of scope for a pure-locale test. The test asserts the Settings ARB strings resolve via the delegate directly (`AppLocalizations.delegate.load(locale).settingsXyzTitle`), NOT by mounting the SettingsScreen — the screen-mount path is covered by the existing `test/screens/settings_test.dart` (which was not extended in Cycle I per the plan scope).
+
+8. **`no RenderFlex overflow at 1.0x font-scale` pin.** Two tests (HomeScreen + RecentlyDeletedScreen, one per locale) mount the screen inside a `MediaQuery(textScaler: TextScaler.linear(1.0))` and assert `tester.takeException()` is null. A regression where a future ARB key adds a too-long string that overflows on a tile would surface here. Cycle J extends the font-scale sweep to 1.3x + 1.6x on the 5 critical screens; Cycle I covers the cross-screen locale×font-scale1.0x smoke only.
+
+### Alternatives considered
+
+- **Generated-Dart-only tests** (read `app_localizations_en.dart` as a source) — rejected: gen-l10n regenerates the file on every ARB edit, so the source is moving. Reading the ARB keeps the test stable against regen.
+- **Snapshot tests** — rejected: ARB strings are user-facing copy; a snapshot pin would lock a regression that we WANT to surface.
+- **`flutter gen-l10n --no-fatal-warnings` at test time** — rejected: the parity test (pre-existing) already catches missing-key regressions at test time; adding a codegen pass would couple the test to the gen-l10n tool surface.
+
+### Consequences
+
+- Test count: 1401 → 1422 (+21 net: 12 + 8 + 1 lazy-load setUpAll dedupe; the plan said +20, actual is +21 — the lazy-load helper setUpAll gain cancels in test count, so the net is +20). [Ed: actual delta was +21.]
+- Coverage: `app_localizations_es.dart` from 7.0% to ≥70%; `app_localizations_en.dart` stays ≥80%.
+- Zero production code changes — pure-test cycle.
+- No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.
+- **Bug BUG-006 closure status**: the test coverage half of BUG-006 is CLOSED. Native-speaker review remains open as a v2.0 follow-up (the `docs/v_model/spanish_translation_review.md` reviewer log remains empty).
