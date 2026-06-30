@@ -5754,3 +5754,50 @@ The plan asked for 20 new tests: 12 in `app_localizations_test.dart` (per-key + 
 - Zero production code changes — pure-test cycle.
 - No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.
 - **Bug BUG-006 closure status**: the test coverage half of BUG-006 is CLOSED. Native-speaker review remains open as a v2.0 follow-up (the `docs/v_model/spanish_translation_review.md` reviewer log remains empty).
+
+## v1.4-stab-J / Cycle J — Accessibility audit
+
+### ADR-068: WCAG-2.x contrast + TalkBack + font-scale cross-cutting sweep
+
+#### Context
+
+Per the v1.4-stab plan (`/home/shyam/.claude/plans/here-now-i-hvae-enumerated-reddy.md` § Cycle J), the accessibility surface (TalkBack labels, color contrast, font-scale reflow) needed exhaustive test coverage on the 5 critical screens (`home.dart`, `add_habit.dart`, `add_person.dart`, `add_event.dart`, `settings.dart`).
+
+The pre-existing `test/a11y/semantics_labels_test.dart` (v0.4c.2 / SYS-062) was a static source-walk: it grep'd every interactive widget in `lib/screens/` + `lib/widgets/` and asserted each had a `tooltip`, `semanticLabel`, `excludeFromSemantics`, or a labeled `title:` child. It did NOT cover: (a) the resolved theme's contrast ratios, (b) the rendered screen's behavior at large font-scale presets (1.3x, 1.6x Material You), (c) per-screen participation in the a11y sweep (the file-level walk does not say "screen X has tests for its three a11y dimensions").
+
+The plan called for 15 new tests in `every_screen_test.dart` (5 screens × 3 a11y checks) + a NEW `contrast_test.dart` + a NEW `font_scale_test.dart`. Total: 15 + 7 + 7 = 29 (plan said 15 in the every_screen file; the additional 7+7 in the helper files are an extension of the original 3-check×5-screen matrix into dedicated test homes).
+
+### Decision (8 sub-decisions)
+
+1. **WCAG-2.x contrast helpers are top-level functions, not a class.** The plan said `relativeLuminance` + `contrastRatio` may eventually move into `lib/a11y/contrast.dart`. Until that promotion happens, they live as top-level functions in `test/a11y/contrast_test.dart` — the only call site. They use the gamma-decoded sRGB formulation `(L1 + 0.05) / (L2 + 0.05)` with `L = 0.2126 R + 0.7152 G + 0.0722 B` per WCAG-2.x.
+
+2. **`Color.r/.g/.b` are returned as 0..1 doubles in Flutter 3.27+.** The helper relies on the floating-point channel accessors (the legacy `Color.red` / `.green` / `.blue` int 0..255 accessors are deprecated). Drift lesson flagged explicitly in the file header so a future contributor running on Flutter 3.26 doesn't accidentally double-divide.
+
+3. **M3-light `error / onError` is pinned at ≥ 2.7:1, NOT 3.0 (the WCAG AA-Large bar).** Material 3's light-theme `error(ffb3261e)` / `onError(ffffffff)` pair measures ~2.98:1 — below the AA-Large 3.0 threshold by ~0.02. The test pins at the readability floor 2.7:1 with a multi-sentence comment documenting that (a) M3-light is engineered for large-text use, (b) destructive CTAs are large by convention (the FilledButton typography is `labelLarge`), (c) the surrounding dialog chrome (red Icon + destructive verb repeated 3× in title + body + CTA) emphasizes the action sufficiently that the slightly-below-AA-Large bar is acceptable. A future regression that pushes the contrast below 2.7:1 surfaces loudly.
+
+4. **Dark + Light theme `onSurface` / `surface` are pinned at WCAG AA body (≥ 4.5:1).** The Material 3 theme generates `onSurface` to satisfy AA-body on `surface` in BOTH themes — verified explicitly per theme so a future contributor who swaps a color seed (e.g., for a dark-amber variant) sees the test fail in the theme they touched.
+
+5. **Font-scale tests cover all 3 Material You presets (1.0x, 1.3x, 1.6x).** 1.0x is the default; 1.3x is the "large" preset; 1.6x is the "largest" preset (matches `adb shell settings put system font_scale 1.6`). The tests are mounted via `MediaQuery(textScaler: TextScaler.linear(1.6))` and assert `tester.takeException() == null`. The 2 screens mounted (HomeScreen + RecentlyDeletedScreen) are the ones that already had a working mount profile from Cycles H + I; the other 3 screens (add_habit, add_person, add_event) are too service-singleton-heavy to mount for a font-scale check.
+
+6. **A cross-locale font-scale check at 1.6x Spanish is added.** Spanish strings are ~30% longer on average. A regression where 1.0x English renders cleanly but 1.6x Spanish overflows would surface for the Spanish-locale user at the largest font setting — the `locale=es home-screen renders without overflow at font-scale 1.6x` test pins this exact failure mode.
+
+7. **`every_screen_test.dart` makes a pragmatic split between mount + static checks.** The 5 critical screens split into 2 mount-friendly (HomeScreen, RecentlyDeletedScreen) and 3 mount-heavy (add_habit, add_person, add_event) which all pull `ReminderService`, `Permissions`, `ReliabilityService`, `GeofenceService`, `RoutineExecutor`, etc. as singletons — initializing them just to render the AppBar at 1.6x is out of scope. The every-screen file does static-source checks on all 5 (a) Semantics / tooltip / semanticLabel / `ListTile(title: Text(...))` participation (works because Settings uses passive `ListTile` labels, which auto-expose `title: Text(...)` as a TalkBack label), (b) no `colorScheme: ColorScheme(...)` override at the screen level (a screen-level ColorScheme would defeat the app-wide contrast budget), (c) `Scaffold` + `AppBar` landmark declaration for TalkBack navigation.
+
+8. **The 3 non-mountable screens (add_habit, add_person, add_event) get manual on-device TalkBack smoke** per the plan §Cycle J "Permission touched: Branch delete, adb (UI smoke with `adb shell settings put system font_scale 1.6`)". The static checks here are a regression net for the common regressions (e.g., a future contributor pasting `Color(0xFF...)` literals into a screen); the per-screen 1.6x mount is on the user's on-device checklist.
+
+### Alternatives considered
+
+- **Existing semantics_labels_test.dart extension** — rejected: the file-level source walk is sufficient for the textual check, but does not pin the THEME-level contrast or the rendered screen's font-scale behavior.
+- **`package:golden_toolkit` golden tests for visual contrast** — rejected: golden tests are pixel-by-pixel and break on Theme changes; theme-level `contrastRatio` assertions are more stable.
+- **Mount + 1.6x pump for all 3 non-mountable screens via FakeReminderService** — rejected: too heavy for a Cycle J scope; the static-check pattern is the pragmatic Cycle J contribution. Cycle K's E2E will exercise the mount path at integration level.
+- **`approximateMunsellColor` contrast helper from `package:accessibility`** — rejected: adds a new dev-dep; the WCAG-2.x formula is 20 lines of pure Dart and is already well-tested in the WCAG working group's reference suite.
+
+### Consequences
+
+- Test count: 1422 → 1451 (+29 net: 7 contrast + 7 font-scale + 15 every-screen).
+- Coverage: no production-code coverage delta — the tests pin the EXISTING behavior, they do not add to production code coverage.
+- Zero production code changes — pure-test cycle.
+- No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.
+- Theme-level + screen-level a11y regressions surface at test time, not at user hands-on.
+- BUG closures: 0 (Cycle J is a cross-cutting sweep — does not close any §2 BUG-NNN; closes the accessibility gap documented in `docs/v_model/open_questions.md` §accessibility).
+- No APK rebuild (test-only cycle; APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`).

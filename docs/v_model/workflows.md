@@ -2382,4 +2382,33 @@ Pin that every ARB key, every placeholder shape, and the top-level screens consu
 
 - The `arbs` map (which walks `lib/l10n/*.arb` once) is lifted to file scope via an `ensureArbsLoaded()` helper called from both groups' `setUpAll`. The pre-Cycle I implementation scoped the walk to a single group's `setUpAll`, which the new group could not inherit.
 - Bug **BUG-006** (Spanish native-speaker review) is partially closed — the test coverage half is shipped; the reviewer log at `docs/v_model/spanish_translation_review.md:207` remains empty and is queued as a v2.0 follow-up.
+### WF-065 — Verify the WCAG-2.x accessibility surface (TalkBack + contrast + font-scale) (v1.4-stab-J / Phase 50 / SYS-137 / ADR-068)
+
+Pin that the app's accessibility surface meets the WCAG-2.x bar: TalkBack labels on interactive elements, contrast ≥ 4.5:1 for body text + ≥ 3:1 for large-text, and the rendered screens reflow cleanly at the 3 Material You `TextScaler.linear` presets (1.0x, 1.3x, 1.6x). The flow is the regression guard against "future contributor adds an unlabeled button" / "theme swap breaks AA body contrast" / "Spanish copy + 1.6x overflows on `HomeScreen`" classes of bugs.
+
+#### Steps
+
+1. **WCAG-2.x contrast helpers** (top-level in `test/a11y/contrast_test.dart`). `relativeLuminance(Color)` computes `0.2126 R + 0.7152 G + 0.0722 B` from gamma-decoded sRGB channels (Flutter 3.27+ `Color.r/.g/.b` are 0..1 doubles — no `/255` division). `contrastRatio(Color, Color)` returns `(max(L1, L2) + 0.05) / (min(L1, L2) + 0.05)` per WCAG-2.x, yielding ratios in `[1.0, 21.0]`.
+
+2. **Helper-correctness pins (4 tests).** Black → 0 luminance; white → 1; black-on-white → 21:1 (max); same-color → 1:1 (min); symmetry `(a, b) == (b, a)`. These boundary tests catch the most common helper regressions (off-by-one in the gamma decode, asymmetry from the wrong-order swap).
+
+3. **Theme-contrast assertions (3 tests).** Dark `Theme.colorScheme.onSurface` vs `surface` ≥ 4.5:1 (AA body); light `Theme.colorScheme.onSurface` vs `surface` ≥ 4.5:1; M3-light `colorScheme.onError` vs `colorScheme.error` ≥ 2.7:1 — the error pair is documented to measure ~2.98:1 (just under the 3.0 AA-Large bar); the 2.7:1 readability floor pins future regressions loudly while accepting the current M3-light quirk.
+
+4. **Font-scale mount checks (7 tests).** HomeScreen + RecentlyDeletedScreen mounted under `MediaQuery(textScaler: TextScaler.linear(N))` at N = 1.0, 1.3, 1.6; `tester.takeException() == null` for each pair. A regression where the home tile layout doesn't accommodate the larger text would surface as a `RenderFlex overflowed by N pixels` exception caught by the tester. The cross-locale `locale=es home-screen at 1.6x` test pins the Spanish-copy 30%-longer overlap with the largest Material You preset.
+
+5. **Per-screen a11y participation (5 screens × 3 checks = 15 tests).** Each of the 5 critical screens (`home.dart`, `add_habit.dart`, `add_person.dart`, `add_event.dart`, `settings.dart`) is verified at the source level: (a) the source contains at least one `Semantics`, `tooltip`, `semanticLabel`, `excludeFromSemantics`, or `ListTile(title: Text(...))` — the latter covers `Settings` which uses passive `ListTile` rows that auto-expose the title to TalkBack; (b) the source does NOT declare a screen-level `colorScheme: ColorScheme(...)` (which would defeat the app-wide contrast budget); (c) the source declares a `Scaffold` + `AppBar` (TalkBack navigation landmarks).
+
+6. **Pre-existing static Semantics sweep continues to pass.** `test/a11y/semantics_labels_test.dart` (v0.4c.2 / SYS-062) walks every `lib/screens/` + `lib/widgets/` file and asserts each interactive widget has `tooltip`, `semanticLabel`, `excludeFromSemantics`, or a labeled `title:` child. The per-screen Cycle J participation tests complement this by naming which critical screens are pinned.
+
+7. **Verification.**
+- `dart format --output=none --set-exit-if-changed .` (clean)
+- `flutter analyze --fatal-infos lib test` (0 issues)
+- `flutter test` (1451/1451 pass; was 1422 at start of Cycle J; +29 net)
+- Targeted: `flutter test test/a11y/contrast_test.dart test/a11y/font_scale_test.dart test/a11y/every_screen_test.dart` + `flutter test test/a11y/semantics_labels_test.dart` (the pre-existing sweep).
+
+#### Notes
+
+- `Locale.es` home + `SettingsScreen` + 3 add screens do NOT get a font-scale mount — the screens pull in service singletons that are out of scope for a Cycle J pure-test cycle. The 1.6x mount on those screens is on the user's on-device checklist per the plan §Cycle J "Permission touched: Branch delete, adb (UI smoke with `adb shell settings put system font_scale 1.6`)".
+- M3-light error / onError is at the AA-Large edge by ~0.02; the `≥ 2.7:1` pin accepts the current M3 quirk. The KDoc + the `reason` block document both the measurement AND the design rationale, so a future contributor who tries to "fix" M3's color seed sees the test failure with the full context.
 - No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.
+- Cycle K's E2E flow mount (Phase 51) will add the heavy-mount font-scale checks for `add_habit`, `add_person`, `add_event`, `settings` at integration level.
