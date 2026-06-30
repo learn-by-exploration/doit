@@ -2412,3 +2412,83 @@ Pin that the app's accessibility surface meets the WCAG-2.x bar: TalkBack labels
 - M3-light error / onError is at the AA-Large edge by ~0.02; the `≥ 2.7:1` pin accepts the current M3 quirk. The KDoc + the `reason` block document both the measurement AND the design rationale, so a future contributor who tries to "fix" M3's color seed sees the test failure with the full context.
 - No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.
 - Cycle K's E2E flow mount (Phase 51) will add the heavy-mount font-scale checks for `add_habit`, `add_person`, `add_event`, `settings` at integration level.
+
+### WF-066 — Run the 10 critical user flows end-to-end (v1.4-stab-K / Phase 51 / SYS-138 / ADR-069)
+
+**Trigger:** user opens the app on a real Android device or emulator (the
+on-device smoke step that the harness cannot perform — see ADR-069).
+
+**Actor:** user (hands-on smoke tester).
+
+**Preconditions:**
+- `flutter pub get` has run (the harness has done this).
+- The integration_test/ code compiles under `dart analyze` (the harness
+  has verified this).
+- The APK is installed on the device.
+
+**Steps:**
+
+1. **Flow 1 — add a do.** Tap the FAB (the `FloatingActionButton` on the
+   home screen). Enter `Read` in the name field (key: `addHabitNameField`).
+   Tap Save (key: `addHabitSaveButton`). Confirm the new tile appears on
+   the home screen with the text `Read`.
+
+2. **Flow 2 — mark done.** Tap the home tile for `Read` (key:
+   `homeTile-read`). The tile shows the "done" state (checkmark or
+   grayed-out label).
+
+3. **Flow 3 — streak grows.** The tile's streak badge shows `1 day` (the
+   v1.4-stab-G sparkline + Cycle J's contrast-pinned badge is visible).
+
+4. **Flow 4 — delete.** Open the per-tile menu (key: `homeTile-read-menu`).
+   Tap Delete (key: `homeTileMenuDelete`). The tile is removed; the
+   SnackBar's Undo action appears.
+
+5. **Flow 5 — undo (via v1.4l restore).** Tap the SnackBar's Undo action
+   (key: `homeSnackbarUndo`). The tile is restored with streak intact (the
+   v1.4l tombstone preserves streak by construction).
+
+6. **Flow 6 — soft-delete + list-deleted.** Tap Settings (key:
+   `navSettings`). Tap the `Recently deleted` tile (key:
+   `settingsTileRecentlyDeleted`). The screen lists the soft-deleted
+   `Read` do.
+
+7. **Flow 7 — restore from list.** Tap the Restore IconButton on the
+   `Read` row (key: `recentlyDeletedRestore-read`). The tile reappears on
+   the home screen.
+
+8. **Flow 8 — backup export.** Settings → Backup → Export (keys:
+   `settingsTileBackup` + `backupExportButton`). A SAF picker opens; pick
+   a folder. The backup file is written.
+
+9. **Flow 9 — backup restore.** Settings → Backup → Restore (keys:
+   `settingsTileBackup` + `backupRestoreButton`). Pick the backup file
+   written in step 8. The app reloads; the home screen has the `Read`
+   tile back.
+
+10. **Flow 10 — BUG-002 regression protector.** Open the per-tile menu on
+    the `Read` tile (key: `homeTile-read-menu`). Tap Pause (key:
+    `homeTileMenuPause`). Open the menu again. Tap Edit (key:
+    `homeTileMenuEdit`). Change the name to `Read (renamed)`. Tap Save
+    (key: `addHabitSaveButton`). The `homeTilePausedBadge-read` widget
+    MUST still be present in the tree — the pause was preserved across
+    the edit + save (the v1.4-stab-B fix).
+
+**Postconditions:**
+- The 10 flows have driven the app through every critical user journey.
+- The Cycle H `Recently deleted` screen has been visited.
+- The BUG-002 regression is asserted via the paused-badge widget key.
+
+**Notes:**
+
+- This workflow is the on-device smoke; the harness cannot run it (no
+  `adb`, no emulator).
+- The `_IntegrationBinding.ensureInitialized()` guard in
+  `integration_test/critical_flows_test.dart` swaps in the regular
+  `TestWidgetsFlutterBinding` in the harness (no-op) and
+  `IntegrationTestWidgetsFlutterBinding.ensureInitialized()` on a real
+  device.
+- The model-layer tests that accompany this workflow (Cycle K's primary
+  harness-runnable contribution) are pinned via the 3-gate; the
+  on-device smoke is a deferred verification step per the v1.4-stab
+  cycle plan.

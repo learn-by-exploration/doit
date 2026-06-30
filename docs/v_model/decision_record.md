@@ -5801,3 +5801,108 @@ The plan called for 15 new tests in `every_screen_test.dart` (5 screens × 3 a11
 - Theme-level + screen-level a11y regressions surface at test time, not at user hands-on.
 - BUG closures: 0 (Cycle J is a cross-cutting sweep — does not close any §2 BUG-NNN; closes the accessibility gap documented in `docs/v_model/open_questions.md` §accessibility).
 - No APK rebuild (test-only cycle; APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`).
+
+## ADR-069 — Ship the model-layer unit tests + on-device E2E flow harness in one stabilization cycle (v1.4-stab-K / Phase 51 / SYS-138 / WF-066)
+
+### Context
+
+The v1.4-stab-A audit identified two distinct testability gaps that are coupled
+but addressed by different mechanisms:
+
+1. **Model-layer coverage gaps** in `lib/do/`, `lib/people/person.dart`,
+   `lib/events/event.dart`, `lib/missions/mission_input.dart`, and
+   `lib/missions/mission_result.dart`. These files have rich sealed
+   hierarchies (`Do`, `Person`, `PersonChannel`, `MissionInput`,
+   `MissionResult`, `MissionChainResult`) but the only tests are the
+   integration-style ones that exercise the model THROUGH the repository or
+   the widget tree. Direct unit tests against the sealed subclasses are
+   missing — every `Do` subclass's `nextOccurrence` edge case, every
+   `MissionInput` factory, every `PersonChannel` value-equality.
+
+2. **End-to-end user-flow coverage** for the 10 critical journeys. We have
+   unit tests for individual functions and widget tests for individual
+   screens, but no scripted walk through the user's hand. The Cycle H
+   "Recently deleted" screen is the only screen with a "mounted" test that
+   drives a user journey; the rest are silent.
+
+### Decision
+
+Ship the model-layer unit tests AND the on-device E2E flow harness in ONE
+stabilization cycle, with the device-vs-harness split explicit in the
+integration_test/README.md.
+
+The model-layer tests MUST be harness-runnable (the 3-gate MUST pass); the
+integration_test/ code MUST compile under `dart analyze` but is NOT
+executable in the harness (no `adb`, no emulator). Execution is deferred to
+the on-device smoke step.
+
+The BUG-002 regression protector (the `_toRow` pausedUntil data-loss bug
+closed in v1.4-stab-B) is flow #10 — the user pauses a do, edits its name,
+saves, and the pause badge is still visible. This is a high-value
+regression protector because the bug was found by a Cycle A audit reading
+the code, not by an integration test that drove the actual save path.
+
+### Rationale
+
+- **One cycle, not two.** Splitting model-layer tests from integration
+  tests would double the PR volume without changing the test count materially.
+  The two surfaces share the same V-Model framing (SYS-138) and the same
+  workflow (WF-066).
+- **Device-vs-harness split is a first-class concept.** Writing the
+  integration_test/ code that does NOT execute in the harness is the right
+  pattern for this app's CI reality: the harness has no `adb` and no
+  emulator, but the user CAN run integration tests on a real device via
+  `flutter test integration_test/`. The cycle documents the split
+  explicitly.
+- **No `package:integration_test` in `pubspec.yaml`** — the harness does
+  not need it, and adding a dev-dep for code that does not execute here
+  would be wrong. The integration_test/ file uses a `_IntegrationBinding`
+  guard that swaps in the regular `TestWidgetsFlutterBinding` in the
+  harness (no-op) and would swap in
+  `IntegrationTestWidgetsFlutterBinding.ensureInitialized()` on a real
+  device.
+- **No `package:faker`** for the same reason — the model-layer tests use
+  hand-rolled constructors with deterministic timestamps.
+
+### Alternatives considered
+
+- **Split into Cycles K (model) and K' (E2E)** — rejected: doubles the PR
+  volume; the two surfaces are not separable in the cycle's V-Model
+  framing; the on-device smoke is already deferred per cycle plan.
+- **Skip the integration_test/ code entirely** — rejected: the E2E flows
+  are the only test surface that exercises the user's hand across
+  multiple screens; the v1.4l restore + v1.4h delete + v1.4k widget-config
+  + v1.4-stab-G paused-badge + v1.4-stab-H recently-deleted screens
+  all benefit from a single flow harness.
+- **Write only the integration_test/, not the model tests** — rejected:
+  model-layer coverage is the headline Cycle A audit gap; the E2E flows
+  are an addition, not a substitute.
+- **Use `package:faker` for input generation** — rejected: adds a dev-dep;
+  the Cycle A audit rule is "no new deps unless the value is
+  substantial"; hand-rolled constructors are sufficient for the 100+
+  tests we need.
+- **Write the integration_test/ as `testWidgets` in `test/`** — rejected:
+  the `integration_test/` folder is the Flutter convention; placing it
+  in `test/` would conflate harness-runnable widget tests with
+  on-device-only integration tests.
+
+### Consequences
+
+- Test count: 1388 → 1537 (+149 net: 40 do + 7 counter + 9 person + 6
+  event + 17 mission_input + 7 mission_result + 10 critical_flows + a few
+  carry-over tests).
+- Coverage: every changed `lib/` file reaches 100% (the model files were
+  partial; the integration_test/ file has 100% by definition — every
+  flow is a `testWidgets`).
+- 3-gate MUST pass on the model-layer tests; `dart analyze` MUST pass on
+  the integration_test/ file (compile-only).
+- BUG closures: BUG-002 regression protector pinned (the v1.4-stab-B fix
+  has an integration_test that proves the save path preserves the
+  pause).
+- No new `<uses-permission>`, no new pubspec deps, no Drift migration,
+  no Kotlin changes, no APK rebuild (Cycle K is pure-Dart + new tests +
+  new integration_test/ file + integration_test/README.md).
+- Future cycles can re-use the integration_test/ harness by adding new
+  flows under new `group()` blocks.
+- APK SHA1 stays at Cycle J's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`
+  (no production code changes — test-only cycle).

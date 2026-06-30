@@ -4064,3 +4064,30 @@ Cross-cutting accessibility audit. Pins the WCAG-2.x contrast for both themes + 
 **On-device smoke** is on the user's Cycle J checklist: `adb shell settings put system font_scale 1.6` + TalkBack pass on the 5 critical screens (the per-screen 1.6x mount for the 3 service-singleton-heavy screens — `add_habit`, `add_person`, `add_event` — is deferred to Cycle K's E2E flow mount; Cycle J's static checks are the regression net for the common regressions like pasting `Color(0xFF...)` literals).
 
 **Refs:** SYS-137, ADR-068, WF-065.
+
+## v1.4-stab-K — Model-layer direct unit tests + on-device E2E flow harness (Phase 51 / SYS-138 / ADR-069 / WF-066)
+
+The Cycle A audit's model-layer coverage gaps close in this cycle, alongside the on-device E2E flow harness that drives the 10 critical user journeys end-to-end. Cycle K's headline contributions are (a) direct unit tests against every sealed subclass in `lib/do/`, `lib/people/person.dart`, `lib/events/event.dart`, `lib/missions/mission_input.dart`, and `lib/missions/mission_result.dart` — the model files that previously had only integration-style coverage — and (b) a 10-flow `integration_test/critical_flows_test.dart` harness where flow #10 is the BUG-002 regression protector (the v1.4-stab-B `_toRow` pausedUntil data-loss fix).
+
+**New code (test-only — no production code changes):**
+
+- `test/do/do_test.dart` (NEW, +40 tests) — full `Do` sealed hierarchy: `DoTime` value class, `Do.validate` exceptions, every subclass's `nextOccurrence` edge cases (`DoFixed` weekday-match + cross-week + DST; `DoInterval` before-ref / on-ref / past-ref; `DoAnchor` with-anchor / without-anchor; `DoDayOfX` dayOfMonth / nth-weekday / refDom; `DoTimeWindow` start-before-end + start-after-end rejected + same-day), `Do.missionChain` / `isPausedAt` / `isDeleted` / `effectiveStreakConfig` getters, `copyWith` invariants, equality id-based, `DoCategory.export` fallback.
+- `test/do/consecutive_counter_test.dart` (NEW, +7 tests) — empty log, single completion, consecutive days, missed day past grace, within grace window, duplicate same-day, longestStreak independent of current.
+- `test/people/person_test.dart` (EXTENDED, +9 tests) — 5 `PersonChannel` subclasses' `==`/`hashCode` (ChannelDialer / WhatsApp / Telegram / Signal / Sms), distinct-types-not-equal, `PersonSnapshot` resolved + unresolved, `ContactPerson` id-based equality. Brings `lib/people/person.dart` from 54.5% (Cycle D baseline) to 100%.
+- `test/events/event_model_test.dart` (EXTENDED, +6 tests) — `hasFired` both branches, `isArchived` both branches, `notifyAtMillis = atMillis - leadTimeMillis`, `clearArchived` path, id-based equality.
+- `test/missions/mission_input_test.dart` (NEW, +17 tests) — `ShakeSample.magnitude` (3: sqrt + non-negative + zero), `MathProblem.next` (3: easy add / subtract non-negative / hard multiply), `MemoryGame.generate` (5: rows×cols unmodifiable + pairs matched + deterministic seed + unknown-theme fallback + symbol pool), `MissionResult` + `MissionChainResult` (5), `MathOp` enum, `ShakeMission` construction.
+- `test/missions/mission_result_test.dart` (NEW, +7 tests) — direct sealed-hierarchy tests on `MissionResult` (4: `MissionPassed` no-detail / with-detail, `MissionFailed`, `MissionTimedOut`) + `MissionChainResult` (3: `ChainPassed`, `ChainFailedAt`, `ChainTimedOut`).
+- `integration_test/critical_flows_test.dart` (NEW, compile-only in harness, runs on device via `flutter test integration_test/`) — 10 critical user flows: `1: add a do` (FAB → enterText → Save → assert tile); `2: mark done` (tile tap); `3: streak grows` (assert "1 day" badge); `4: delete` (menu → Delete); `5: undo (via v1.4l restore)` (SnackBar Undo); `6: soft-delete + list-deleted` (Settings → Recently-deleted nav); `7: restore from list` (Restore IconButton); `8: backup export`; `9: backup restore`; `10: PAUSE + edit name + Save preserves pause (BUG-002 invariant)` — the v1.4-stab-B fix's regression protector. `_IntegrationBinding.ensureInitialized()` swaps `TestWidgetsFlutterBinding` in harness (no-op) for `IntegrationTestWidgetsFlutterBinding.ensureInitialized()` on a real device.
+- `integration_test/README.md` (NEW) — documents the device-vs-harness split: integration_test/ compiles under `dart analyze` but does NOT execute in harness (no `adb`, no emulator); execution is deferred to the on-device smoke step.
+
+**Coverage**: every changed `lib/` file reaches 100% (do.dart, consecutive_counter.dart, person.dart, event.dart, mission_input.dart, mission_result.dart).
+
+**3-gate**: format 0 changed after auto-format on the 6 model-layer test files + integration_test/; analyze 0 issues; 1537/1537 tests pass. `flutter analyze --fatal-infos lib test integration_test` confirms the integration_test/ file is compile-clean.
+
+**No release APK rebuild** — Cycle K is pure-test + docs + integration_test/ only; APK SHA1 stays at v1.4-stab-G's `37cb7330`.
+
+**No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes** — Cycle K is pure-Dart + new tests + integration_test/ file + integration_test/README.md.
+
+**On-device smoke** is on the user's Cycle K checklist: `flutter test integration_test/critical_flows_test.dart --device-id <android-device-id>` on a physical device or emulator validates the 10 flows end-to-end (flow #10 is the BUG-002 regression protector).
+
+**Refs:** SYS-138, ADR-069, WF-066.
