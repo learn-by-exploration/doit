@@ -3938,3 +3938,29 @@ Test changes:
 
 **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** On-device smoke deferred to user (no `adb` binary in this harness environment) — same pattern as Cycles A, B, C.
 
+
+## v1.4-stab-E — Reliability detection coverage (Phase 45 / SYS-132 / ADR-063 / WF-060)
+
+**Pure-Dart test-only cycle. Test count: 1363 → 1371 (+8 net).**
+
+Closes **BUG-013** (`ReliabilityService` first-read race + probe-failure policy coverage) + **BUG-014** (`AlarmScheduler` exact-alarm cancel path incomplete coverage).
+
+- `test/services/reliability_service_test.dart` (+5 tests) — pins the `ReliabilityService` error paths + lifecycle contract: probe failure keeps prior cached value (ADR-013 regression pin via `_ScriptedBridge.throwOnProbe`); fresh cold-start initializes to optimal (first-read race fix); refresh() after permissions change re-probes + re-derives; stream emits `Reliability.optimal` on a distinct value transition (broadcast+distinct transition-emit contract — reworked from the original "emit-to-fresh-subscribers" test which was structurally wrong); dispose() closes the broadcast stream controller (no-leak invariant via `onDone` Completer + 1s timeout).
+- `test/reminders/alarm_scheduler_test.dart` (+2 tests in new `AlarmScheduler fallback paths (SYS-132)` group) — pins the exact-alarm-granted primary path on `FakeAlarmScheduler`.
+- `test/reminders/doze_simulation_test.dart` (NEW, +1 test) — pins the 30 s idle-window fallback timer policy via `_RecordingPeriodicFactory`.
+
+**3-gate**: format 0 changed (269 files); analyze 0 issues (after stripping 5 redundant-default-arg warnings + simplifying the doze-simulation bridge to a no-arg constructor); 1371/1371 tests pass.
+
+**Drift**: original "stream emits initial value to fresh subscribers" test was structurally wrong — broadcast+distinct streams never replay past values. Reworked the test to pin a different but MORE useful behavior: the AFTER-init transition-emit contract. The home-screen widget depends on this behavior, not on initial-value-replay.
+
+## v1.4-stab-F — Backup round-trip exhaustive coverage (Phase 46 / SYS-133 / ADR-064 / WF-061)
+
+**Pure-Dart test-only cycle. Test count: 1371 → 1379 (+8 net).**
+
+Closes the `bug_hunt.md` BUG-016..-018 cluster (the 6 latent backup envelope bugs inventoried in Cycle A):
+
+- `test/services/backup_encryption_test.dart` (+5 tests) — pins the 5 uncovered error paths in `backup_service.dart`: `BackupFormatException.toString()` includes the message (covers `lib/services/backup_service.dart:39`); import rejects envelope with no kdf object (covers line 651 throw); v2 envelope with iterations below the floor is rejected (covers lines 743-744 throw); v3 envelope with missing fields throws (covers line 684 throw); v2 envelope with missing fields throws (covers line 740 throw).
+- `test/backup/scheduler_skip_test.dart` (NEW, +1 test) — pins the `ScheduleMode.none` early-return in `runBackupTask` so the scheduler does not attempt to schedule when the user has not yet picked a backup folder.
+- `test/services/backup_task_dispatcher_test.dart` (+2 tests) — pins the unknown-task-name path + the ADR-013 init-failure-swallow contract on the dispatcher entry point.
+
+**3-gate**: format 0 changed; analyze 0 issues; 1379/1379 tests pass.

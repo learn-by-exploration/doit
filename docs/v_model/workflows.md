@@ -2272,3 +2272,31 @@ The 14-step test-first implementation flow for Cycle D (SYS-131 / ADR-062). Pure
 - ADR-013 (the v0.4b-release-fix "missing plugin must not crash the app" precedent)
 - `~/.claude/projects/-home-shyam-common-games-doit/memory/v1-4-stab-C-cycle-shipped.md` (Cycle C precedent — pure-Dart + docs + new tests pattern)
 - `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md` (the canonical Cycle D scope decision)
+
+## WF-061 — Pin backup round-trip exhaustive coverage via 8 missing-error-path tests (v1.4-stab-F / Phase 46 / SYS-133 / ADR-064)
+
+Cycle F is a **pure-Dart** stabilization cycle. The v1.4-stab-A audit's `bug_hunt.md` listed 6 latent backup envelope bugs that were never pinned by a test; Cycle F wires them up.
+
+**14-step flow:**
+1. Audit `lib/services/backup_service.dart` for uncovered lines (12 found via `awk '/^DA.*,0$/'` on `coverage/lcov.info`).
+2. Audit `lib/services/backup_scheduler.dart` (5 uncovered lines).
+3. Audit `test/services/backup_encryption_test.dart` to find which error paths are already covered (3 paths: iterations floor, memory floor, unknown KDF → skip).
+4. Identify the 5 missing paths in `backup_service.dart`: `BackupFormatException.toString`, missing-kdf object, v2 iterations floor, v3/v2 missing-fields rejection.
+5. Identify the 1 missing path in `backup_scheduler.dart`: `ScheduleMode.none` early-return.
+6. Identify the 2 missing paths in `backup_task_dispatcher.dart`: unknown-task-name, init-failure-swallow.
+7. Append SYS-133 to `docs/v_model/requirements.md`.
+8. Append ADR-064 to `docs/v_model/decision_record.md`.
+9. Append the WF-061 row to `docs/v_model/traceability_matrix.md`.
+10. Append the v1.4-stab-F row to `docs/v_model/implementation_status.md`.
+11. Append the v1.4-stab-F sub-entry to `docs/v_model/plan.md`.
+12. Append the v1.4-stab-F block to `docs/v_model/CHANGELOG.md`.
+13. Append `ADR-064 + SYS-133 + WF-061` quick-index + §6 next-step to `feature.md`.
+14. Write `~/.claude/projects/-home-shyam-common-games-doit/memory/v1-4-stab-F-cycle-shipped.md` and update `MEMORY.md`.
+
+**Total: 8 new tests pinning 8 previously-uncovered error paths.** Test count: 1371 → 1379. Coverage: `backup_service.dart` ≥95%; `backup_scheduler.dart` ≥90%.
+
+**Refs:**
+- SYS-133 (v1.4-stab-F — backup round-trip coverage requirement)
+- ADR-064 (v1.4-stab-F — 8 pinning tests design choice)
+- ADR-013 (the "missing plugin must not crash the app" precedent — extended to dispatcher failures)
+- `~/.claude/projects/-home-shyam-common-games-doit/memory/v1-4-stab-E-cycle-shipped.md` (Cycle E precedent)

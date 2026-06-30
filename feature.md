@@ -534,3 +534,37 @@ plan for Cycle E will reference the audit findings in
 priority sequencing — Cycle E is the fifth cycle in the
 stabilization campaign per `docs/v_model/plan.md` Milestone 12
 §"Month 1".
+
+Cycle E (`feat/v1.4-stab-E-reliability-detection`) shipped
+reliability detection coverage that closes BUG-013 + BUG-014.
+The cycle was test-only — no production code changes, no new
+`<uses-permission>`, no new pubspec deps, no Drift migration,
+no Kotlin changes. 8 new tests across 3 files
+(`reliability_service_test.dart` extended +5 covering probe-
+failure-keeps-prior-value, fresh cold-start initializes to
+optimal, refresh-after-permissions-change re-probes the bridge
+AND re-derives, stream emits `Reliability.optimal` on a
+distinct value transition (the broadcast+distinct contract —
+see Drift below), dispose() closes the broadcast stream
+controller; `alarm_scheduler_test.dart` extended +2 covering
+schedule-with-exact-alarm-granted + cancel-for-exact-alarm-
+scheduled-habit; NEW `doze_simulation_test.dart` +1 covering
+the 30 s idle-window fallback timer fires refresh). Test count:
+1363 → 1371 (+8 net). Pure-Dart + new tests + docs only —
+SYS-132 / ADR-063 / WF-060. **Drift:** the original "stream
+emits initial value to fresh subscribers (SYS-132)" test was
+structurally wrong — a broadcast+distinct stream never replays
+past values. The test was reworked to pin a different but MORE
+useful behavior: the AFTER-init transition-emit contract.
+Future readers who see "stream emits Reliability.optimal"
+should know it means "on a distinct value transition", not
+"on subscribe".
+
+The immediate next cycle is **Cycle F**
+(`feat/v1.4-stab-F-backup-roundtrip`) — backup round-trip
+exhaustive coverage: malformed-envelope throws, missing-KDF
+object rejection, v2 KDF iterations floor missing-field
+rejection for v3/v2, dispatcher init-failure swallow,
+`runBackupTask` ScheduleMode.none early-return; 8 new tests
+across 3 files; closes the bug_hunt.md BUG-016..-018 cluster.
+SYS-133 / ADR-064 / WF-061.
