@@ -5906,3 +5906,157 @@ the code, not by an integration test that drove the actual save path.
   flows under new `group()` blocks.
 - APK SHA1 stays at Cycle J's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`
   (no production code changes — test-only cycle).
+
+## ADR-070 — Land the first canonical perf + fuzz regression suite as the FINAL v1.4-stab cycle (v1.4-stab-L / Phase 52 / SYS-139 / WF-067)
+
+### Context
+
+After 11 cycles of stabilization (A..K) plus the v1.4l/m data-layer work, the
+project's test coverage sits at ~66% with deep coverage on the model layer,
+services, and per-screen widgets — but it has **zero** performance regression
+guards. The Cycle A audit noted this gap under PRD § "Performance: zero
+tests": before Cycle L, a future contributor could:
+
+1. Add heavy synchronous work to a `build()` method (e.g., a
+   `find.byType(...)` scan, a DB read on the UI thread, a JSON parse in the
+   hot path) without any test catching the regression.
+2. Split `DoRepository.listAll` / `listActive` into per-do reads (e.g., to
+   JOIN related rows or filter in Dart) — the classic N+1 antipattern —
+   silently bumping the SQL query count from 1 to N.
+3. Break the immutability / runtime-type / field-preservation invariants
+   on the pure-Dart model layer (`Do`, `ContactPerson`, `Mission`,
+   `ConsecutiveCounter`) without any test catching the regression.
+
+Without these guards, every future stabilization cycle or feature cycle
+risks silently regressing the perf baseline or the model invariants.
+
+Cycle L is the FINAL cycle in the 3-month stabilization campaign. The
+choice was: land the perf + fuzz guards NOW (so every future cycle
+inherits them), or defer them to v1.5 (after the campaign ends).
+
+### Decision
+
+Ship the perf + fuzz regression suite in a single test-only + docs-only
+cycle (Cycle L), with the following structure:
+
+- **`test/perf/widget_rebuild_test.dart` (NEW, 3 tests)** — measures the
+  per-cycle cost of a Listenable-driven rebuild inside a MaterialApp +
+  Provider tree. The widget tree is built ONCE outside the measurement
+  loop (no `pumpWidget` re-mounts inside the loop — those would include
+  FutureBuilder + DB queries and dominate the signal). The measurement
+  loop pushes a `ValueNotifier.value = i + 1` and measures
+  `await tester.pump()` cost. The budget (cold mount ≤ 750 ms, single-tile
+  rebuild ≤ 5 ms median, 10-tile rebuild ≤ 25 ms median) is generous
+  because real-device release-build perf is 3-5× faster per Flutter's
+  published guidance. The point is regression direction, not absolute
+  perf.
+- **`test/perf/sql_benchmark_test.dart` (NEW, 2 tests)** — pins the
+  N+1 invariant on `DoRepository.listAll` + `listActive` using a Drift
+  `QueryExecutor` proxy (`_CountingExecutor`) that wraps
+  `NativeDatabase.memory()` and increments `selectCount` / `executeCount`
+  on every read / write. The proxy is the standard Drift test seam
+  (delegates every method to the wrapped executor). Asserts exactly 1
+  SELECT for N=10 habits + median ms budget for `listActive` (≤ 10 ms
+  per call on in-memory DB).
+- **`test/fuzz/do_model_fuzz_test.dart` (NEW, 2 tests × 1000 iterations)**
+  — fuzzes the `Do` constructor + `copyWith` invariants across 1000
+  randomized inputs. `Do.validate()` either completes or throws a
+  `DoValidationException` — never any other exception. The fuzz seed is
+  `Random(42)` (deterministic, no `package:faker` per Cycle L pre-auth).
+- **`test/fuzz/person_model_fuzz_test.dart` (NEW, 1 test × 1000 iterations)**
+  — fuzzes `ContactPerson` + `PersonCadence` constructors + `copyWith`
+  invariants. Every `PersonCadence` subclass (`EveryNDays`, `WeeklyOn`,
+  `MonthlyOn`, `YearlyOn`) constructs without throwing across 1000 fuzz
+  cadences.
+- **`test/fuzz/mission_model_fuzz_test.dart` (NEW, 1 test × 1000 iterations)**
+  — fuzzes `MissionChain.from([...])` (length + order preserved) +
+  `Mission.verify(TextInput('hello'))` (returns a `MissionResult` without
+  throwing; returns `MissionFailed` for the obvious input-mismatch on
+  every subclass except `TypeMission`).
+- **`test/fuzz/consecutive_counter_fuzz_test.dart` (NEW, 1 test × 1000 iterations)**
+  — fuzzes the streak calculator. `currentStreak ≥ 0` (never negative);
+  `longestStreak ≥ currentStreak`; deterministic across two calls with
+  the same input log; missing days past the grace window break the streak;
+  rest-day entries within the grace window preserve it; duplicate
+  same-day entries do not double-count.
+- **`docs/v_model/performance_baseline.md` (NEW)** — documents the
+  observed baseline numbers from Cycle L's first run (cold mount ~262 ms,
+  single-tile rebuild ~2 ms median, 10-tile rebuild ~10 ms median,
+  listAll/listActive = 1 SELECT for N=10, listActive median < 1 ms), the
+  regression-direction guard rationale, the N+1 invariant's hard nature,
+  the median-vs-mean rationale, and the `dart:math.Random(seed)` rationale.
+
+### Rationale
+
+- **Land NOW, not in v1.5.** Every cycle after Cycle L inherits the
+  guards. Deferring to v1.5 means a future contributor can land a heavy-
+  sync-work `build()` regression in v1.4..v1.5 without any test catching
+  it. The cost of landing the guards NOW is 10 tests + 1 doc; the cost
+  of landing them LATER is potentially many cycles of cleanup.
+- **Median, not mean.** Single timings swing 5-10× across CI runs due
+  to cold cache, GC pauses, and scheduler jitter. A real regression
+  shifts the median by 2-3×, while CI noise shifts the mean by similar
+  amounts. Reporting the median over 100 iterations is the per-cycle
+  drift lesson from Cycles A..K.
+- **Drift `QueryExecutor` proxy, not instrumentation on the repository.**
+  The Drift proxy is the standard Drift test seam (per the Drift 2.20
+  docs) — it delegates every method to the wrapped executor, so the
+  behavior under test is unchanged. Instrumentation on the repository
+  would require touching production code for a test-only cycle.
+- **`dart:math.Random(seed)`, not `package:faker`.** The Cycle L pre-auth
+  explicitly forbids new pubspec deps (the 19 runtime + 4 dev deps
+  already cover every channel). `package:faker` would expand the
+  dev-deps surface for marginal value. `dart:math.Random(seed)` is the
+  same RNG the production code uses for `MathProblem.next` /
+  `MemoryGame.generate`.
+- **Test-only + docs-only, no APK rebuild.** Cycle L is the FINAL cycle
+  in the campaign; the intent is to land the guards quietly without
+  disturbing the release APK. APK SHA1 stays at Cycle J's
+  `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`.
+- **No release APK rebuild.** The pre-auth explicitly excludes APK
+  rebuild. The 76.1 MB SHA1 stays at `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`
+  — the stabilization campaign closes without a v1.4-stab-L
+  release APK commit.
+
+### Alternatives considered
+
+- **Defer to v1.5** — rejected: every cycle after L inherits the
+  regression risk. The 10 tests + 1 doc are tiny; deferring them is
+  a false economy.
+- **Profile-mode / release-build timings** — rejected for Cycle L:
+  requires `flutter run --profile` traces which need a real device; the
+  harness has no `adb`. The doc's "What Cycle L does NOT cover" section
+  explicitly defers this to the W-13 closeout.
+- **End-to-end scroll perf (100-tile scroll jank test)** — rejected for
+  Cycle L: would need a `flutter drive` device run. Same deferral.
+- **APK size baseline** — rejected for Cycle L: no release APK rebuild.
+  The doc's "What Cycle L does NOT cover" section defers to W-13 closeout
+  for re-measurement.
+- **Use `package:faker`** — rejected: Cycle L pre-auth forbids new
+  pubspec deps; `dart:math.Random(seed)` is sufficient.
+- **Build a custom benchmark harness (e.g., a `FlutterDriver` setup)** —
+  rejected: would add infrastructure for a 10-test cycle. The simple
+  `tester.pumpWidget` + `Stopwatch` pattern matches the existing test
+  patterns in `test/widgets/` and `test/perf/`.
+
+### Consequences
+
+- Test count: 1537 → 1547 (+10 net: 3 widget-rebuild + 2 SQL-benchmark +
+  2 Do-fuzz + 1 person-fuzz + 1 mission-fuzz + 1 counter-fuzz).
+- Coverage: 64.61% (Cycle A baseline) → 66.51% (Cycle L); the per-file
+  coverage rules don't apply to pure-test cycles.
+- 3-gate MUST pass on the new tests + the new doc compiles cleanly.
+- No BUG closures in Cycle L (Cycle L is a regression-guards cycle,
+  not a bug-fix cycle; the 20 latent bugs BUG-001..BUG-020 closed
+  across Cycles B..K).
+- No new `<uses-permission>`, no new pubspec deps, no Drift migration,
+  no Kotlin changes, no APK rebuild (Cycle L is the FINAL cycle in the
+  campaign and is intentionally minimal-touch).
+- Every future stabilization cycle or feature cycle that lands a
+  regression in the perf baseline OR a broken model invariant will trip
+  one of the new tests.
+- The stabilization campaign closes with the project at 1547 tests
+  passing, 66.51% line coverage, and 1.4m's user-visible surface
+  unchanged.
+- APK SHA1 stays at Cycle J's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`
+  — the campaign does NOT ship a v1.4-stab-L release APK.
