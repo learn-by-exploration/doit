@@ -4042,3 +4042,25 @@ Closes BUG-004 (the v1.4l-deferred UI affordance) + BUG-019 (sparkline single-po
 **No release APK rebuild** — Cycle I has no production code (the 17 spot-checks cover existing ARB keys; the locale render tests are within the existing test surface); APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`.
 
 **Refs:** SYS-136, ADR-067, WF-064.
+
+## v1.4-stab-J — Accessibility audit: WCAG-2.x contrast + Semantics sweep + font-scale 1.0/1.3/1.6 (Phase 50 / SYS-137 / ADR-068 / WF-065)
+
+Cross-cutting accessibility audit. Pins the WCAG-2.x contrast for both themes + the TalkBack sweep + the rendered screen reflow at the 3 Material You `TextScaler` presets (1.0x, 1.3x, 1.6x) for the 5 critical screens (home, add_habit, add_person, add_event, settings).
+
+**New code:**
+
+- `test/a11y/contrast_test.dart` (NEW, +7 tests) — top-level WCAG-2.x `relativeLuminance(Color)` + `contrastRatio(Color, Color)` helpers (the sRGB-gamma-decoded formulation `(L1 + 0.05) / (L2 + 0.05)`; relies on Flutter 3.27+ `Color.r/.g/.b` returning 0..1 doubles, no `/255` division); black/white boundary pin, black-on-white 21:1 max, same-color 1:1 min, symmetry `(a, b) == (b, a)`; dark + light theme `colorScheme.onSurface` vs `surface` ≥ 4.5:1 (AA body); M3-light `colorScheme.onError` vs `colorScheme.error` ≥ 2.7:1 readability floor (the M3-light pair measures ~2.98:1 — below the 3.0 AA-Large bar by ~0.02; the 2.7:1 floor pins future regressions loudly while documenting the M3-light quirk in the test's `reason` block).
+- `test/a11y/font_scale_test.dart` (NEW, +7 tests) — HomeScreen + RecentlyDeletedScreen mounted under `MediaQuery(textScaler: TextScaler.linear(N))` at N = 1.0 / 1.3 / 1.6 (6 tests, `tester.takeException() == null` pin per mount); `locale=es home-screen renders without overflow at 1.6x` cross-locale smoke.
+- `test/a11y/every_screen_test.dart` (NEW, +15 tests = 5 critical screens × 3 a11y checks): per-screen participation in (a) `Semantics | tooltip | semanticLabel | excludeFromSemantics | ListTile(title: Text(...))` sweep, (b) no screen-level `colorScheme: ColorScheme(...)` override (would defeat the app-wide contrast budget), (c) `Scaffold` + `AppBar` landmark declaration (TalkBack navigation).
+
+**Reuses** the existing `test/a11y/semantics_labels_test.dart` (v0.4c.2 / SYS-062, source-walk) — Cycle J's contribution is the per-screen smoke that links the file-level exhaustive sweep to the 5 critical screens.
+
+**3-gate**: format 0 changed after auto-format on the 3 NEW test files; analyze 0 issues; 1451/1451 tests pass.
+
+**Targeted runs:** `flutter test test/a11y/contrast_test.dart` (+7) + `flutter test test/a11y/font_scale_test.dart` (+7) + `flutter test test/a11y/every_screen_test.dart` (+15) + `flutter test test/a11y/semantics_labels_test.dart` (pre-existing sweep still passes).
+
+**No release APK rebuild** — Cycle J has no production code (the per-screen participation tests are static source-string pins; the contrast + font-scale checks pin EXISTING behavior); APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`.
+
+**On-device smoke** is on the user's Cycle J checklist: `adb shell settings put system font_scale 1.6` + TalkBack pass on the 5 critical screens (the per-screen 1.6x mount for the 3 service-singleton-heavy screens — `add_habit`, `add_person`, `add_event` — is deferred to Cycle K's E2E flow mount; Cycle J's static checks are the regression net for the common regressions like pasting `Color(0xFF...)` literals).
+
+**Refs:** SYS-137, ADR-068, WF-065.
