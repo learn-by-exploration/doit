@@ -440,4 +440,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get widgetConfigureBackToHome => 'Volver a do it';
+
+  @override
+  String get doAnchorTargetPaused => 'Objetivo en pausa';
+
+  @override
+  String get doAnchorTargetPausedHelp =>
+      'La tarea que este anclaje seguía ha sido pausada o eliminada. Restáurala desde Ajustes para reanudar este anclaje.';
 }

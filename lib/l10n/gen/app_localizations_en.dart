@@ -431,4 +431,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get widgetConfigureBackToHome => 'Back to do it';
+
+  @override
+  String get doAnchorTargetPaused => 'Target paused';
+
+  @override
+  String get doAnchorTargetPausedHelp =>
+      'The habit this anchor was tracking has been paused or deleted. Restore it from Settings to resume this anchor.';
 }

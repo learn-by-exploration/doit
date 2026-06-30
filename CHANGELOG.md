@@ -3964,3 +3964,30 @@ Closes the `bug_hunt.md` BUG-016..-018 cluster (the 6 latent backup envelope bug
 - `test/services/backup_task_dispatcher_test.dart` (+2 tests) — pins the unknown-task-name path + the ADR-013 init-failure-swallow contract on the dispatcher entry point.
 
 **3-gate**: format 0 changed; analyze 0 issues; 1379/1379 tests pass.
+
+## v1.4-stab-G — DoAnchor "Target paused" badge + BUG-019 sparkline pin (Phase 47 / SYS-134 / ADR-065 / WF-062)
+
+**First UI-surface cycle of the stabilization campaign — small widget + ~30 lines of home.dart wiring + 2 ARB keys. Test count: 1379 → 1385 (+6 net).**
+
+Closes BUG-004 (the v1.4l-deferred UI affordance) + BUG-019 (sparkline single-point edge case):
+
+- `lib/widgets/do_anchor_paused_badge.dart` (NEW) — a compact, accessible badge widget (`Semantics(label: l.doAnchorTargetPaused)` + `Tooltip` with `doAnchorTargetPausedHelp` body + `Theme.of(context).colorScheme.tertiary` fill that meets WCAG 4.5:1 against the surface color). Public API: `const DoAnchorTargetPausedBadge({super.key, required this.habitId})`. Pure-presentational — the caller passes the live `Do` instance (the home tile already owns the lookup).
+- `lib/screens/home.dart` (_HabitTileState wiring, ~30 lines added) — adds `Do? _targetHabit` field + cached lookup in `initState` + `didUpdateWidget` via the existing `DoRepository.getById(targetDoId)` API (NOT `getActiveById`, which would filter tombstones out — the BADGE renders precisely because the target IS tombstoned). Renders the badge alongside the existing pause-indicator row at lines 797-806 — no layout shift.
+- `lib/l10n/app_en.arb` + `lib/l10n/app_es.arb` — adds `doAnchorTargetPaused` ("Target paused" / "Objetivo en pausa") + `doAnchorTargetPausedHelp` (long-form body in both locales). The Cycle I ARB parity guard will fail if either key is missing in either locale.
+- `test/widgets/do_anchor_paused_badge_test.dart` (NEW, +4 tests) — `renders the badge label when given a habit id` (smoke); `Semantics label is present (TalkBack)` (asserts `find.bySemanticsLabel(l.doAnchorTargetPaused)`); `the badge uses Theme.of(context).colorScheme.tertiary (not hard-coded)`; `resolved color contrast against Theme.of(context).colorScheme.surface meets 4.5:1 (WCAG AA)`.
+- `test/screens/home_test.dart` (+1 test) — `home tile shows the Target paused badge when the anchor points at a tombstoned habit` — finds the badge via its `KeyedSubtree(key: 'doAnchorTargetPaused-<id>')`.
+- `test/screens/home_tile_sparkline_test.dart` (+1 BUG-019 test) — `sparkline renders empty when only 1 completion exists` — single-point sparkline would otherwise stretch to full chart width (the user sees a misleading single dot at the right edge).
+
+**Closes:** BUG-004 + BUG-019.
+
+**No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes** — Cycle G is pure-Dart + new widget + new tests + new ARB keys.
+
+**3-gate**: format 0 changed; analyze 0 issues; 1385/1385 tests pass.
+
+**Coverage:** `lib/screens/home.dart` 85.7% → ≥90%; `lib/screens/home_tile_sparkline.dart` 78.6% → ≥85%; `lib/widgets/do_anchor_paused_badge.dart` 0% → ≥90%.
+
+**Targeted runs:** `flutter test test/widgets/do_anchor_paused_badge_test.dart` (+4) + `flutter test test/screens/home_test.dart` (+1) + `flutter test test/screens/home_tile_sparkline_test.dart` (+1 BUG-019).
+
+**On-device smoke deferred to user** (no `adb` binary in this harness environment). Release APK rebuilt on this branch (Cycle G has production code; SHA1 may differ from v1.4-stab-F's `155b77243c6c0ab1d340c861e08dd7e5dea73d45`).
+
+**Refs:** SYS-134, ADR-065, WF-062.
