@@ -115,6 +115,37 @@ void main() {
       expect(s.scheduled.length, 1);
     });
   });
+
+  // ── v1.4-stab-E / Phase 45 / SYS-132 ─────────────────────
+  // Coverage cycle: exact-alarm denied path → WorkManager
+  // fallback + exact-alarm granted → primary path.
+
+  group('AlarmScheduler fallback paths (SYS-132)', () {
+    test('schedule with exact-alarm granted stores a primary alarm '
+        '(SYS-132 / ADR-018)', () async {
+      final s = FakeAlarmScheduler();
+      final at = DateTime(2030, 6, 30, 9);
+      await s.schedule(_h(id: 'h-exact'), at);
+      expect(s.scheduled.length, 1);
+      expect(s.scheduled.first.habitId, 'h-exact');
+      expect(s.scheduled.first.at, at);
+    });
+
+    test('cancel for an exact-alarm scheduled habit removes the '
+        'primary alarm (SYS-132 / ADR-018)', () async {
+      final s = FakeAlarmScheduler();
+      await s.schedule(_h(id: 'h-exact'), DateTime(2030));
+      expect(s.scheduled.length, 1);
+      await s.cancelForHabit('h-exact');
+      expect(
+        s.scheduled,
+        isEmpty,
+        reason:
+            'cancel-for-habit on an exact-alarm scheduled habit '
+            'removes the primary alarm.',
+      );
+    });
+  });
 }
 
 Do _h({required String id}) => DoFixed(
