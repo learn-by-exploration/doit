@@ -4114,4 +4114,31 @@ The eleventh and FINAL stabilization cycle of the 3-month campaign. Cycle L land
 
 **Campaign closeout**: stabilization campaign closes with the project at 1547 tests passing, ~66.5% line coverage (up from 64.61% Cycle A baseline), 1.4m's user-visible surface unchanged. APK SHA1 stays at Cycle J's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` — the campaign does NOT ship a v1.4-stab-L release APK.
 
-**Refs:** SYS-138, ADR-069, WF-066.
+**Refs:** SYS-139, ADR-070, WF-067.
+
+## v1.4-stab-W13 — Campaign closeout: retrospective + final coverage + handoff (W-13)
+
+The W-13 closeout of the 3-month stabilization campaign — **docs-only**. No test count delta. Closes the v1.4-stab campaign; the 3-month stabilization phase is done. The v1.4 user-visible surface shipped in Cycle H (`/recently-deleted` screen + the v1.4l tombstone UI affordance) is the campaign's final user-facing change. Cycles I, J, K, L were test-only. The W-13 closeout documents what the campaign achieved + what was deferred to v1.5/v2.0.
+
+**New code (docs only — no production code changes):**
+
+- `docs/v_model/stabilization_retrospective.md` (NEW) — the campaign closeout doc. §1 headline numbers (1334 → 1547 tests, +213 net, +16%; 64.61% → 66.41% line coverage, +1.80 pp, +380 lines hit, 123 → 125 files; 24 → 30 files at 100%). §2 what was actually delivered (Cycles B..L, PRs #50..#60 — 11 PRs across the campaign). §3 the pure-Dart model layer at 100% (success criterion #2 — MET; the 6 files: `do.dart`, `consecutive_counter.dart`, `person.dart`, `mission_input.dart`, `mission_result.dart`, `event.dart`, `proof_mode.dart`). §4 BUG closure summary (20 of 20 closed; BUG-006 partial — native-speaker review deferred to v2.0). §5 the 4 success-criteria gaps NOT closed (#1 ≥90% coverage on every file — 11 < 50% remain; #3 E2E device-run; #4 BUG-006 caveat; #9 1.6x font-scale for add_<form>). §6 17 drift lessons catalogued (auto-mode classifier + harness pitfalls). §7 what was deferred and why (Kotlin-side `ReminderBridge.showFullScreen` channel arm + native-speaker Spanish ARB + on-device E2E execution + per-form font_scale E2E mounting + 11 partial-coverage files + production-signed W-13 APK — the docs-only closeout decision deferred the last item per AskUserQuestion 2026-06-30). §8 v1.5 handoff with the 15-file partial-coverage list + 5 candidate cycle groupings (α..ε).
+- `docs/v_model/stabilization_roadmap.md` — updated: §1 source line annotated with post-campaign pointer (final coverage 66.41%); §7 new "Campaign closeout" section appended; status header rewritten to "campaign closed 2026-06-30" + pointer to the retrospective. The §2 latent bugs table is unchanged (every BUG-NNN is closed-with-OR-queued-for-v2.0 — see the retrospective §4 for the explicit closeout status per bug).
+
+**Coverage delta vs Cycle A baseline:** 64.61% → 66.41% (+1.80 percentage points; +380 lines hit; 123 → 125 files). The campaign's primary goal was bug closure + i18n + a11y + perf/fuzz, not raw coverage. Per the prioritization, raw coverage is deferred to v1.5 — see [`docs/v_model/stabilization_retrospective.md` §8](docs/v_model/stabilization_retrospective.md#8-handoff-to-v15) for the 5 candidate cycle groupings (α..ε) targeting the 15 partial-coverage files.
+
+**Final APK:** the v1.4-stab release artifact is the debug-signed APK at SHA1 `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` (Cycle H — last production-code change). The campaign does NOT ship a v1.4-stab-L release APK (Cycles I..L were test-only). A production-signed W-13 APK is a separate decision (pre-authorized by the user as part of the 10-cycle pre-auth on 2026-06-30; deferred to a future build per the docs-only closeout scope).
+
+**3-gate**: format clean (0 changed after auto-format on the 4 updated docs); analyze 0 issues; 1547/1547 tests pass (untouched — docs-only).
+
+**No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes, no APK rebuild** — W-13 is intentionally minimal-touch as the campaign's final closeout.
+
+**The 5 v2.0 follow-ups** (from [`stabilization_retrospective.md` §7](docs/v_model/stabilization_retrospective.md#7-what-was-deferred-and-why)):
+
+1. BUG-006 native-speaker Spanish ARB copy review (test coverage is 100%; copy itself is the original v1.0 translation).
+2. Kotlin-side `ReminderBridge.showFullScreen` channel arm (Cycle C's regression-protector test pins the gap; production-code inert because no Dart caller exists).
+3. On-device E2E execution of `integration_test/critical_flows_test.dart` (10 flows) — documented in `integration_test/README.md`.
+4. Per-form `font_scale` 1.6x E2E mounting for `add_habit`, `add_person`, `add_event` (Cycle J's static-checks cover the common regressions).
+5. The 11 files < 50% line coverage — the v1.5 milestone is the natural home (see the retrospective §8 for the prioritized list).
+
+**Refs:** the 11 stabilization PRs (#50..#60) live on `main`. The W-13 closeout is PR #61. The Campaign's V-Model artifact IDs: SYS-128..SYS-139, ADR-059..ADR-070, WF-056..WF-067.
