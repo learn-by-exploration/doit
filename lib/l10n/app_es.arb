@@ -129,5 +129,7 @@
 
   "widgetConfigureTitle": "Elige una tarea para do it",
   "widgetConfigureEmptyState": "Añade una tarea en do it para usar el widget de inicio.",
-  "widgetConfigureBackToHome": "Volver a do it"
-}
+  "widgetConfigureBackToHome": "Volver a do it",
+
+  "doAnchorTargetPaused": "Objetivo en pausa",
+  "doAnchorTargetPausedHelp": "La tarea que este anclaje seguía ha sido pausada o eliminada. Restáurala desde Ajustes para reanudar este anclaje."}

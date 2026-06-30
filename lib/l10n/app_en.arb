@@ -329,5 +329,14 @@
   "widgetConfigureBackToHome": "Back to do it",
   "@widgetConfigureBackToHome": {
     "description": "v1.4k / Phase 38 / SYS-125 / ADR-055 / WF-052. CTA label on the widget-configuration empty-state. Pops the configuration activity so the launcher can show the home widget at its default state (or the user can return to MainActivity to add a do)."
+  },
+
+  "doAnchorTargetPaused": "Target paused",
+  "@doAnchorTargetPaused": {
+    "description": "v1.4-stab-G / Phase 47 / SYS-134 / ADR-065 / WF-062. Badge label rendered on the home tile when a DoAnchor do references a tombstoned (soft-deleted) target habit. Mirrors the v1.4l tombstone semantics (ADR-056) at the UI layer."
+  },
+  "doAnchorTargetPausedHelp": "The habit this anchor was tracking has been paused or deleted. Restore it from Settings to resume this anchor.",
+  "@doAnchorTargetPausedHelp": {
+    "description": "v1.4-stab-G / Phase 47 / SYS-134 / ADR-065 / WF-062. Long-form body of the Tooltip that surfaces when the user long-presses the Target paused badge on the home tile."
   }
 }

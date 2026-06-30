@@ -2300,3 +2300,30 @@ Cycle F is a **pure-Dart** stabilization cycle. The v1.4-stab-A audit's `bug_hun
 - ADR-064 (v1.4-stab-F — 8 pinning tests design choice)
 - ADR-013 (the "missing plugin must not crash the app" precedent — extended to dispatcher failures)
 - `~/.claude/projects/-home-shyam-common-games-doit/memory/v1-4-stab-E-cycle-shipped.md` (Cycle E precedent)
+
+### WF-062 — Ship the v1.4l-deferred "Target paused" badge + retire BUG-004 + BUG-019 (v1.4-stab-G / Phase 47 / SYS-134 / ADR-065)
+
+Cycle G is a **pure-Dart + widget UI** stabilization cycle. The v1.4l data layer (ADR-056) makes the UI affordance possible — when a `DoAnchor` points at a tombstoned habit, the badge surfaces that state to the user. ADR-059 §4 parked the UI for a post-v1.4m stabilization cycle; Cycle G retires that parking lot.
+
+**12-step flow:**
+1. Audit `lib/widgets/` for similar small badge widgets (closest analog: `reliability_banner.dart`, `automation_reliability_badge.dart` — same shape: icon + label + Semantics).
+2. Inspect `lib/do/do.dart:581-666` to confirm `DoAnchor` shape + the `isDeleted` flag on the base `Do`.
+3. Inspect `lib/services/do_repository.dart:82-105` to confirm `getById` returns tombstoned rows + `getActiveById` filters them (the badge needs `getById`, not `getActiveById`).
+4. Inspect `lib/screens/home.dart:797-806` to find the existing pause-indicator row (the badge integrates here; no new row).
+5. Write `lib/widgets/do_anchor_paused_badge.dart` (~80 lines) with the small widget contract from ADR-065.
+6. Edit `lib/screens/home.dart` (`_HabitTileState`) to add `Do? _targetHabit` field + cached lookup in `initState` + `didUpdateWidget` + render of the badge when `isDeleted`.
+7. Append ARB keys `doAnchorTargetPaused` + `doAnchorTargetPausedHelp` to `lib/l10n/app_en.arb` + `lib/l10n/app_es.arb`.
+8. Append SYS-134 to `docs/v_model/requirements.md`, ADR-065 to `docs/v_model/decision_record.md`, WF-062 row to `docs/v_model/traceability_matrix.md`, v1.4-stab-G row to `docs/v_model/implementation_status.md`, v1.4-stab-G sub-entry to `docs/v_model/plan.md`, v1.4-stab-G block to `docs/v_model/CHANGELOG.md`, feature.md update.
+9. Write `test/widgets/do_anchor_paused_badge_test.dart` (NEW) with 4 tests.
+10. Extend `test/screens/home_test.dart` with 1 test (badge rendering via `KeyedSubtree`).
+11. Extend `test/screens/home_tile_sparkline_test.dart` with 1 BUG-019 test (single-point sparkline).
+12. 3-gate verification + targeted tests + rebuild APK + commit + push + CI watch + squash-merge + memory file.
+
+**Total: 6 new tests + 1 new widget + 2 ARB keys + 1 home.dart edit (~30 lines).** Test count: 1379 → 1385. Coverage: `home.dart` 85.7% → ≥90%; `home_tile_sparkline.dart` 78.6% → ≥85%; `do_anchor_paused_badge.dart` 0% → ≥90%.
+
+**Refs:**
+- SYS-134 (v1.4-stab-G — the Target paused badge requirement)
+- ADR-065 (v1.4-stab-G — the small-widget + cached-lookup design)
+- ADR-056 (the v1.4l `deletedAtMillis` data-layer precedent that this cycle's UI surfaces)
+- ADR-059 §4 (the parking-lot deferral that Cycle G retires)
+- `~/.claude/projects/-home-shyam-common-games-doit/memory/v1-4-stab-F-cycle-shipped.md` (Cycle F precedent for the 12-step flow)

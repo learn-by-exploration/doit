@@ -1840,4 +1840,62 @@ void main() {
       expect(find.text('1 selected'), findsOneWidget);
     },
   );
+
+  testWidgets('home tile shows the Target paused badge when the DoAnchor points '
+      'at a tombstoned habit (v1.4-stab-G / Phase 47 / SYS-134 / ADR-065 / '
+      'WF-062) — BUG-004 closure', (tester) async {
+    await _resetDb(tester);
+    // Seed an active DoAnchor () and a tombstoned
+    // target habit () that the anchor tracks.
+    await DoRepository.instance.save(
+      DoFixed(
+        id: 'h-target',
+        name: 'Wake up',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 1, 15),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(7, 0),
+      ),
+    );
+    // Soft-delete the target via the v1.4l tombstone shape
+    // (ADR-056). The badge's gate ()
+    // surfaces on this condition.
+    await DoRepository.instance.softDeleteById(
+      'h-target',
+      at: DateTime(2026, 6, 15),
+    );
+    await DoRepository.instance.save(
+      DoAnchor(
+        id: 'h-anchor',
+        name: 'Morning routine',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 1, 2),
+        restDaysPerMonth: 2,
+        targetDoId: 'h-target',
+        lastAnchor: DateTime(2026, 5, 31),
+      ),
+    );
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    // The badge is wrapped in KeyedSubtree(key:
+    // 'doAnchorTargetPaused-<habit.id>') per ADR-065 — the
+    // test seam lets us find the badge without exposing the
+    // private widget. The lookup field is async-cached in
+    // _HabitTileState.initState; we give it > 1 frame to
+    // settle via tester.runAsync.
+    expect(
+      find.byKey(const Key('doAnchorTargetPaused-h-anchor')),
+      findsOneWidget,
+      reason:
+          'BUG-004 closure: the v1.4l data layer tombstone must surface as a UI badge',
+    );
+    // Sanity: the target itself is hidden from listAll
+    // (the home tile does not render it).
+    expect(find.text('Wake up'), findsNothing);
+  });
 }

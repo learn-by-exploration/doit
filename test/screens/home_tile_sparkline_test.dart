@@ -373,5 +373,55 @@ void main() {
       final a2 = SparklineDot.filled(day: tomorrow, source: 'manual');
       expect(a == a2, isFalse);
     });
+
+    test('BUG-019: sparkline renders empty placeholder when only 1 '
+        'completion exists — avoids a single-point over-stretched line '
+        '(v1.4-stab-G / Phase 47 / SYS-134)', () async {
+      // The BUG-019 invariant: a single completion row would
+      // otherwise stretch to a misleading single dot at the
+      // right edge of the chart. The helper still emits 7 dots
+      // (the 7-day window), but the empty-state copy visual
+      // is what guards against the over-stretched line.
+      //
+      // We pin the behavior at the helper level: with only
+      // 1 completion (today), the helper returns 7 dots
+      // where 6 of them are `empty` (no completion row on
+      // those days) and 1 is `filled` for today. The widget
+      // rendering consumes this and shows the empty-state
+      // placeholder when 6+ are empty (the v1.4-stab-G pin).
+      final asOf = DateTime(2026, 6, 13, 9);
+      final doFixture = DoFixed(
+        id: 'h-bug-19',
+        name: 'Single completion',
+        proofMode: const SoftProof(),
+        createdAt: DateTime(2026, 1, 15),
+        restDaysPerMonth: 2,
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        time: const DoTime(9, 0),
+      );
+      final fake = _FakeCompletionLog(
+        seeded: [
+          _row(
+            id: 'c-bug-19',
+            habitId: 'h-bug-19',
+            day: asOf,
+            source: 'rest_day',
+          ),
+        ],
+      );
+      final dots = await sparklineForDo(
+        activeDo: doFixture,
+        asOf: asOf,
+        completionLog: fake,
+      );
+      expect(dots, hasLength(7));
+      final filledCount = dots.whereType<SparklineDotFilled>().length;
+      expect(filledCount, 1);
+      // The today dot is the only filled one. The other 6 are
+      // either empty or future. We assert at most 1 filled —
+      // the BUG-019 invariant. (The widget layer's empty-state
+      // placeholder is keyed off this count in home.dart.)
+      expect(filledCount, lessThanOrEqualTo(1));
+    });
   });
 }

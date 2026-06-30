@@ -5625,3 +5625,50 @@ Test count: 1371 → 1379 (+8 net).
 - WF-061 (v1.4-stab-F — the 14-step Cycle F flow)
 - ADR-013 (the "missing plugin must not crash the app" precedent — extended to dispatcher failures)
 - ADR-039 (the v1.2 backup-envelope Argon2id migration precedent)
+
+## ADR-065 — Ship the "Target paused" badge UI surface that v1.4l's data layer made possible (v1.4-stab-G / Phase 47 / SYS-134 / WF-062)
+
+Lifts `lib/screens/home.dart` from 85.7% to ≥90% and `lib/screens/home_tile_sparkline.dart` from 78.6% to ≥85%, closes BUG-004 (the v1.4l-deferred UI affordance) and BUG-019 (sparkline edge cases), by adding a small badge widget + wiring it into the home tile's pause-indicator row.
+
+**Context.** The v1.4l data layer (ADR-056) introduced `deletedAtMillis` on the `Habits` table. The v1.4g cycle deliberately deferred the UI affordance for a `DoAnchor` whose target habit has been soft-deleted — a user who deletes a "Wake-up" habit still sees the anchor on their home screen, but the anchor's streak has no source of truth (the target row is tombstoned). ADR-059 §4 parked the UI for a post-v1.4m stabilization cycle. Cycle G ships that parking-lot work.
+
+**Decision — small widget + ~30 line wire-up + 6 new tests:**
+
+1. `lib/widgets/do_anchor_paused_badge.dart` (NEW, ~80 lines) — a compact, accessible widget that renders `Icons.link_off`-style icon + label "Target paused" inside the existing pause-indicator row at `lib/screens/home.dart:797-806`. Public API:
+   ```dart
+   const DoAnchorTargetPausedBadge({super.key, required this.habitId});
+   final String habitId; // used by the `KeyedSubtree` wrapper for widget tests
+   ```
+   The widget is pure-presentational: it renders a fixed icon + `AppLocalizations.doAnchorTargetPaused` text + a `Tooltip` with the `doAnchorTargetPausedHelp` body. No state, no `Future`s — the lookup is owned by the caller (the home tile) which already has the live `Do` instance.
+
+2. `lib/screens/home.dart` `_HabitTileState` (~30 lines added) — add `Do? _targetHabit` field; in `initState` and `didUpdateWidget`, if `widget.habit is DoAnchor`, call `DoRepository.getById((widget.habit as DoAnchor).targetDoId)` and cache. The badge renders when `_targetHabit != null && _targetHabit.isDeleted`. The lookup is intentionally idempotent + cached — a widget rebuild from the parent's `_refresh()` would otherwise re-hit the DB on every tick.
+
+3. `lib/l10n/app_en.arb` + `lib/l10n/app_es.arb` (ARB parity) — add `doAnchorTargetPaused` ("Target paused" / "Objetivo en pausa") + `doAnchorTargetPausedHelp` (long-form body in both locales). The Cycle I ARB parity guard will fail if either key is missing in either locale.
+
+4. `test/widgets/do_anchor_paused_badge_test.dart` (NEW) +4 tests:
+   - renders the badge label when given a habit id (smoke)
+   - Semantics label is present (TalkBack)
+   - the badge uses Theme.of(context).colorScheme.tertiary (NOT a hard-coded color)
+   - resolved color contrast against Theme.of(context).colorScheme.surface meets 4.5:1
+
+5. `test/screens/home_test.dart` (extended) +1 test — `home tile shows the Target paused badge when the anchor points at a tombstoned habit` — seeds 2 habits (a Wake-up DoAnchor + a tombstoned target), pumps the widget, finds the badge via its `KeyedSubtree`.
+
+6. `test/screens/home_tile_sparkline_test.dart` (extended) +1 test — `sparkline renders empty when only 1 completion exists` (BUG-019 edge case — a single data point would otherwise stretch into a misleading line crossing the full chart width).
+
+Test count: 1379 → 1385 (+6 net).
+
+**Why a NEW widget file (vs. inline in home.dart).**
+The widget is a reusable primitive — the future "Notification detail" screen will want the same affordance. The 80-line extraction is cheaper than a future refactor.
+
+**Why `getById` (not `getActiveById`).**
+The badge needs to render precisely when the target IS tombstoned. `getActiveById` filters tombstones (returning `null`), so the badge would never render. `getById` returns the tombstoned row + the `isDeleted` flag tells us whether to show the badge.
+
+**Risks.**
+- The repository lookup happens on every `didUpdateWidget`; the cycle measures rebuild cost in Cycle L (the perf baseline).
+- A user who soft-deletes a target habit then restores it within the same frame could see a stale badge. The widget rebuild on the parent's `_refresh()` clears this within one frame in practice.
+
+**Refs:**
+- SYS-134 (v1.4-stab-G — the Target paused badge requirement)
+- WF-062 (v1.4-stab-G — the 12-step Cycle G flow)
+- ADR-056 (the v1.4l `deletedAtMillis` data-layer precedent that this cycle's UI surfaces)
+- ADR-059 §4 (the parking-lot deferral that Cycle G retires)

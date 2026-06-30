@@ -835,6 +835,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back to do it'**
   String get widgetConfigureBackToHome;
+
+  /// v1.4-stab-G / Phase 47 / SYS-134 / ADR-065 / WF-062. Badge label rendered on the home tile when a DoAnchor do references a tombstoned (soft-deleted) target habit. Mirrors the v1.4l tombstone semantics (ADR-056) at the UI layer.
+  ///
+  /// In en, this message translates to:
+  /// **'Target paused'**
+  String get doAnchorTargetPaused;
+
+  /// v1.4-stab-G / Phase 47 / SYS-134 / ADR-065 / WF-062. Long-form body of the Tooltip that surfaces when the user long-presses the Target paused badge on the home tile.
+  ///
+  /// In en, this message translates to:
+  /// **'The habit this anchor was tracking has been paused or deleted. Restore it from Settings to resume this anchor.'**
+  String get doAnchorTargetPausedHelp;
 }
 
 class _AppLocalizationsDelegate

@@ -23,6 +23,8 @@
 // stream; the home screen re-fetches on `didChangeAppLifecycleState`
 // (resume).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:doit/do/consecutive_counter.dart';
@@ -39,6 +41,7 @@ import 'package:doit/screens/rest_day_picker_dialog.dart';
 import 'package:doit/screens/home_tile_streak.dart';
 import 'package:doit/screens/home_tile_undo.dart';
 import 'package:doit/screens/mission_launcher.dart';
+import 'package:doit/widgets/do_anchor_paused_badge.dart';
 import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/db/schema.dart';
 import 'package:doit/services/do_repository.dart';
@@ -334,6 +337,51 @@ class _HabitTileState extends State<_HabitTile> {
   bool _isSkippedToday = false;
 
   bool get _isResolvedToday => _isCompletedToday || _isSkippedToday;
+
+  /// v1.4-stab-G / Phase 47 / SYS-134 / ADR-065 / WF-062:
+  /// cached lookup of the target habit (for `DoAnchor` dos).
+  /// The widget rebuild path re-fetches on `didUpdateWidget`
+  /// but in practice the parent's `_refresh()` re-creates
+  /// the entire `_HomeScreenState`, so the lookup runs once
+  /// per habit-creation. `null` means either: (a) the tile
+  /// is not a `DoAnchor` (the common case), (b) the target
+  /// row does not exist, or (c) the lookup is in-flight.
+  /// The badge's own gate (`isDeleted == true`) ensures the
+  /// badge renders ONLY when the target is tombstoned.
+  Do? _targetHabit;
+
+  /// v1.4-stab-G / SYS-134 / ADR-065 — resolves the target
+  /// habit row once per habit pass. Safe to call before
+  /// `build` (the call returns after the first setState in
+  /// the parent's `_refresh()` chain — the badge widget is
+  /// resilient to `target == null`).
+  Future<void> _resolveTargetHabit() async {
+    final h = widget.habit;
+    if (h is! DoAnchor) {
+      if (_targetHabit != null && mounted) {
+        setState(() => _targetHabit = null);
+      }
+      return;
+    }
+    // getById is intentional — getActiveById would filter
+    // tombstones out, defeating the badge. ADR-065 §"Why
+    // getById (not getActiveById)".
+    final resolved = await DoRepository.instance.getById(h.targetDoId);
+    if (!mounted) return;
+    setState(() {
+      _targetHabit = resolved;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Fire-and-forget — the badge widget handles `null`
+    // gracefully. Subsequent `setState` calls (from the
+    // parent's `_refresh`) re-create this State, so the
+    // lookup runs once per habit-creation.
+    unawaited(_resolveTargetHabit());
+  }
 
   Future<void> _onMarkDonePressed() async {
     if (_busy) return;
@@ -803,6 +851,23 @@ class _HabitTileState extends State<_HabitTile> {
                                 color: Theme.of(context).colorScheme.outline,
                               ),
                             ),
+                          // v1.4-stab-G / Phase 47 / SYS-134 /
+                          // ADR-065 / WF-062: surfaces the v1.4l
+                          // tombstone semantics at the UI layer
+                          // — renders a "Target paused" badge
+                          // when this is a `DoAnchor` whose
+                          // target habit has been soft-deleted.
+                          // The badge widget is self-gating
+                          // (visibility = `target.isDeleted`)
+                          // and resilient to `null`. The lookup
+                          // is owned by `_resolveTargetHabit()`
+                          // in `initState` — see ADR-065 §"Why
+                          // a NEW widget file (vs. inline in
+                          // home.dart)".
+                          DoAnchorTargetPausedBadge(
+                            habitId: habit.id,
+                            target: _targetHabit,
+                          ),
                         ],
                       ),
                       const SizedBox(height: Spacing.xs),
