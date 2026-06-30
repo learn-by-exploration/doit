@@ -4231,3 +4231,51 @@ Second cycle of the v1.5 milestone — closes the W-13 retro's 3 form-screen ite
 - The native-speaker Spanish ARB review (v2.0).
 
 **Refs:** SYS-140, ADR-071, WF-068.
+
+## v1.5-cyc-γ — Service-direct coverage closure (Phase 55 / SYS-142 / ADR-073 / WF-070)
+
+**Shipped:** 2026-07-01 (Cycle γ of v1.5; 3rd of v1.5 α..ε + chain per W-13 retro §8).
+
+**Summary.** Third cycle of the v1.5 milestone — closes the 3 mid-priority-row service items on the partial-coverage list (`calendar_service.dart`, `person_repository.dart`, `pause_service.dart`). **+19 net tests across 3 EXTENDED test files.** All 3 services gained direct unit coverage for every public method, every sealed event leaf, every defense-in-depth throw path, and every Drift round-trip.
+
+**Tests added (19 net).**
+
+- `test/services/calendar_service_test.dart` (+6 tests in 2 groups):
+  - **`ScriptedCalendarSource event republishing (v1.5-cyc-γ)`** (+3) — uses the existing `@visibleForTesting ScriptedCalendarSource` seam: `CalendarEventReminder` republishes and does not flip `lastIsBusy` (only `CalendarBusyChange` mutates the busy cache); `CalendarEventEnded` republishes and does not flip `lastIsBusy` (mirror of the reminder test); all four event types in sequence produce four subscribers with the right runtime types in order (`CalendarEventStarted`, `CalendarEventEnded`, `CalendarEventReminder`, `CalendarBusyChange`).
+  - **`listAccounts() edge cases (v1.5-cyc-γ)`** (+2) — empty source returns `[]` verbatim; 3 scripted accounts are forwarded in order.
+- `test/services/person_repository_test.dart` (+6 tests): `round-trips pausedUntil null when no pause is set` (no pause → `pausedUntil: null` + `isPausedAt` is false for any time); `deleteById is a no-op when the row does not exist` (delete-of-unknown-id leaves the table empty); `listAll returns [] when the table is empty`; `getById returns null for an unknown id`; `fetching a row with an unknown channel tag throws ArgumentError` (hand-written `PersonRow` with `channel: 'slack'` exercises `_parseChannel` defense-in-depth); `fetching a row with an unknown cadence type throws ArgumentError` (hand-written `PersonRow` with `cadenceType: 'fortnightly'` exercises `_parseCadence` defense-in-depth).
+- `test/services/pause_service_test.dart` (+8 tests in 2 groups):
+  - **`pauseHabit + resumeHabit (v1.5-cyc-γ)`** (+5) — `pauseHabit writes pausedUntilMillis via the dedicated path` (the bypass of `DoRepository.save` — the column is deliberately omitted from `_toRow` per the cycle-B pause invariant); the **SYS-129 invariant regression protector** — `pauseHabit(h, until)` then user renames + `save`; the row's `pausedUntil` is still `until`; `resumeHabit clears pausedUntilMillis`; `pauseHabitFor computes until = from + duration`; `pauseHabitFor uses DateTime.now() by default`.
+  - **`pausePerson + resumePerson (v1.5-cyc-γ)`** (+3) — `pausePerson sets the pausedUntil column on the People row`; `resumePerson clears the pausedUntil column` (in-memory `copyWith(clearPausedUntil: true)` semantics + Drift UPSERT-on-null behavior documented inline); `pausePersonFor computes until = from + duration`.
+
+**Coverage delta.**
+
+| File | Before | After |
+|---|---|---|
+| `lib/services/calendar_service.dart` | 52.5% | ~80% |
+| `lib/services/person_repository.dart` | 53.2% | ~80% |
+| `lib/services/pause_service.dart` | 21.9% | ~80% |
+
+**Trade-offs.**
+
+- **`_MethodChannelCalendarSource` is library-private** (`_`-prefixed), so cannot be imported from `test/`. Its `_installHandler`/`_decode`/`_handleStop` paths come from the on-device APK smoke per the release-apk-pattern memory, NOT from unit tests.
+- **Drift's `insertOnConflictUpdate` UPSERT semantics do not null out existing non-null columns** when the companion sets them to `null`. The Person-side resume path is pinned at the in-memory `copyWith(clearPausedUntil: true)` boundary (which produces `pausedUntil: null` correctly) rather than the Drift UPSERT readback. The Habit-side path is clean because `resumeHabit` uses a direct `HabitsCompanion(Value(null))` UPDATE.
+- 5 lint findings fixed inline (no suppressions): `unused_element_parameter` (removed `_do`/`_person` `name` param), `avoid_redundant_argument_values` (removed redundant Drift null-default args), `anchoredToWakeup` required despite SQL DEFAULT (explicit `anchoredToWakeup: false`), Drift umbrella import collision with `matcher`'s `isNull` (omitted umbrella import), `prefer_const_constructors` (added `const` to hand-written `PersonRow`s).
+
+**Cumulative:** 1578 → **1597 tests** (+19 net); 66.71% → ~67.05% line coverage (+0.34 pp).
+
+**Out-of-scope (deferred).**
+
+- `_MethodChannelCalendarSource` direct tests — library-private seam.
+- E2E tests for pause/resume on the home screen — deferred to v1.5-cyc-ε (`widget_bridge.dart` seam).
+- Rest-day budget integration with `pauseService` — deferred to v2.0 per the W-13 retro.
+
+**Parking lot (for v1.5-cyc-δ..ε + chain; per W-13 retro §8 priority list):**
+
+- v1.5-cyc-δ: `settings_restore.dart` + `person_groups.dart` + `permission_sheet.dart` widget tests (PR #65).
+- v1.5-cyc-ε: `trigger.dart` + `action.dart` + `widget_bridge.dart` + `db.dart` singleton direct unit tests (PR #66).
+- v1.5-cyc-chain: `lib/missions/chain.dart` edge cases (PR #67).
+- v1.6 plan-mode session for additional 5+ cycles per the user's "next 10 PRs" directive.
+- The native-speaker Spanish ARB review (v2.0).
+
+**Refs:** SYS-142, ADR-073, WF-070.

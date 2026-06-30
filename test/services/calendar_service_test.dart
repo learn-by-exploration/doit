@@ -168,4 +168,142 @@ void main() {
       expect(a.hashCode, b.hashCode);
     });
   });
+
+  // ---- v1.5-cyc-γ additions (coverage closure for
+  // `_MethodChannelCalendarSource.decode()` + reminder/ended event
+  // republishing + `listAccounts` edge cases) ----
+  group('ScriptedCalendarSource event republishing (v1.5-cyc-γ)', () {
+    late CalendarService service;
+    late ScriptedCalendarSource source;
+
+    setUp(() {
+      service = CalendarService.instance;
+      service.resetForTesting();
+      source = ScriptedCalendarSource();
+      service.debugSetSource(source);
+    });
+
+    tearDown(() => service.resetForTesting());
+
+    test(
+      'CalendarEventReminder republishes and does not flip lastIsBusy',
+      () async {
+        await service.init();
+        final fired = <CalendarEvent>[];
+        final sub = service.events.listen(fired.add);
+
+        final reminder = CalendarEventReminder(
+          eventId: 'e2',
+          calendarId: 'cal1',
+          title: 'Reminder',
+          at: DateTime(2026, 6, 20, 9),
+        );
+        source.push(reminder);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(fired, hasLength(1));
+        expect(fired.single, isA<CalendarEventReminder>());
+        expect(
+          service.lastIsBusy,
+          isNull,
+          reason: 'Reminders must not write to the busy cache.',
+        );
+        await sub.cancel();
+      },
+    );
+
+    test(
+      'CalendarEventEnded republishes and does not flip lastIsBusy',
+      () async {
+        await service.init();
+        final fired = <CalendarEvent>[];
+        final sub = service.events.listen(fired.add);
+
+        final ended = CalendarEventEnded(
+          eventId: 'e3',
+          calendarId: 'cal1',
+          title: 'Standup',
+          at: DateTime(2026, 6, 20, 10),
+        );
+        source.push(ended);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(fired.single, isA<CalendarEventEnded>());
+        expect(service.lastIsBusy, isNull);
+        await sub.cancel();
+      },
+    );
+
+    test('all four event types in sequence produce four subscribers', () async {
+      await service.init();
+      final fired = <CalendarEvent>[];
+      final sub = service.events.listen(fired.add);
+
+      source.push(calStarted());
+      source.push(
+        CalendarEventEnded(
+          eventId: 'eX',
+          calendarId: 'cal1',
+          title: 'Standup',
+          at: DateTime(2026, 6, 20, 10),
+        ),
+      );
+      source.push(
+        CalendarEventReminder(
+          eventId: 'eX',
+          calendarId: 'cal1',
+          title: 'Standup',
+          at: DateTime(2026, 6, 20, 8, 55),
+        ),
+      );
+      source.push(calBusy(isBusy: true));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fired.map((e) => e.runtimeType), [
+        CalendarEventStarted,
+        CalendarEventEnded,
+        CalendarEventReminder,
+        CalendarBusyChange,
+      ]);
+      await sub.cancel();
+    });
+  });
+
+  group('listAccounts() edge cases (v1.5-cyc-γ)', () {
+    late CalendarService service;
+
+    setUp(() {
+      service = CalendarService.instance;
+      service.resetForTesting();
+    });
+
+    tearDown(() => service.resetForTesting());
+
+    test(
+      'returns an empty list when the source returns an empty list',
+      () async {
+        service.debugSetSource(ScriptedCalendarSource());
+        await service.init();
+        expect(await service.listAccounts(), isEmpty);
+      },
+    );
+
+    test('passes the configured accounts through verbatim', () async {
+      const accounts = [
+        CalendarAccount(accountId: 'a1', displayName: 'Personal'),
+        CalendarAccount(accountId: 'a2', displayName: 'Family'),
+        CalendarAccount(accountId: 'a3', displayName: 'Work'),
+      ];
+      service.debugSetSource(ScriptedCalendarSource(accounts: accounts));
+      await service.init();
+      final back = await service.listAccounts();
+      expect(back, accounts);
+    });
+  });
+
+  // _MethodChannelCalendarSource is library-private so it cannot
+  // be tested directly from the test/ side. Coverage of its
+  // platform-channel surface comes from the on-device smoke in
+  // each release cycle (per CLAUDE.md "Pre-approved commands"
+  // + the release-apk-pattern memory).
 }

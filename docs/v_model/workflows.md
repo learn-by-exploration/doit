@@ -2909,3 +2909,178 @@ the dialog + payload + template-save branches.
 — v1.5-cyc-β is pure-Dart + new tests + 1 test-only lint
 suppression; no production-code behavior change; no
 release APK rebuild.
+
+### WF-070 — Verify the v1.5-cyc-γ service-direct coverage closure (v1.5-cyc-γ / Phase 55 / SYS-142 / ADR-073)
+
+**Scope.** The v1.5 milestone's third cycle retires the
+3 mid-priority service files from the v1.4-stab-W13
+retrospective's §8 v1.5 handoff list. The services
+(`lib/services/calendar_service.dart`,
+`lib/services/person_repository.dart`,
+`lib/services/pause_service.dart`) gain direct unit
+coverage for every public method, every sealed event
+leaf, every defense-in-depth throw path, and every
+Drift round-trip.
+
+**Test layers.**
+
+1. **`test/services/calendar_service_test.dart`** (extend)
+   — 6 new tests in 2 groups. Uses the existing
+   `ScriptedCalendarSource` seam (already
+   `@visibleForTesting`) for full event-republishing
+   coverage.
+   - **`ScriptedCalendarSource event republishing (v1.5-cyc-γ)`:**
+     - `CalendarEventReminder republishes and does not flip
+       lastIsBusy` — push a `CalendarEventReminder`;
+       subscriber sees one event AND `lastIsBusy` stays
+       `null` (reminders must not write to the busy cache;
+       only `CalendarBusyChange` mutates the cache).
+     - `CalendarEventEnded republishes and does not flip
+       lastIsBusy` — mirror of the reminder test for
+       `CalendarEventEnded`; same `lastIsBusy` invariant.
+     - `all four event types in sequence produce four
+       subscribers` — push started + ended + reminder +
+       busy-change in one test; subscriber sees all four
+       `runtimeType`s in order (covers the full event
+       matrix in a single test).
+   - **`listAccounts() edge cases (v1.5-cyc-γ)`:**
+     - `returns an empty list when the source returns an
+       empty list` — scripted source with no accounts
+       returns `[]` verbatim (no default seeded).
+     - `passes the configured accounts through verbatim`
+       — 3 scripted accounts assert the same 3 returned
+       in order; the service is a transparent pass-through.
+
+2. **`test/services/person_repository_test.dart`** (extend)
+   — 6 new tests. Uses the standard Drift-in-memory
+   seam (`AppDatabase(NativeDatabase.memory())` +
+   `AppDatabaseService.instance.init(overrideDb: db)`).
+   - `round-trips pausedUntil null when no pause is set`
+     — `save` a person without `pausedUntil`; `getById`
+     returns `pausedUntil: null`; `isPausedAt(DateTime(2026, 6))`
+     is `false`; `isPausedAt(DateTime(2028))` is `false`.
+   - `deleteById is a no-op when the row does not exist`
+     — delete a never-saved id; `listAll()` is still
+     empty (the ux-friendly delete-undo path that the
+     recently-deleted screen depends on).
+   - `listAll returns [] when the table is empty` — cold-DB
+     round-trip; asserts the `ORDER BY` clause doesn't
+     crash on zero rows.
+   - `getById returns null for an unknown id` — negative
+     case for the `getSingleOrNull` path.
+   - `fetching a row with an unknown channel tag throws
+     ArgumentError` — hand-write a `PersonRow` with
+     `channel: 'slack'` and assert `getById` throws
+     `ArgumentError` containing `channel` (the
+     `_parseChannel` defense-in-depth throw).
+   - `fetching a row with an unknown cadence type throws
+     ArgumentError` — hand-write a `PersonRow` with
+     `cadenceType: 'fortnightly'` and assert `getById`
+     throws `ArgumentError`.
+
+3. **`test/services/pause_service_test.dart`** (extend) —
+   8 new tests in 2 groups. Uses the standard Drift
+   seam + `DoRepository.instance` +
+   `PersonRepository.instance`.
+   - **`PauseService.pauseHabit + resumeHabit (v1.5-cyc-γ)`:**
+     - `pauseHabit writes pausedUntilMillis via the
+       dedicated path` — `save` a habit;
+       `pauseHabit(h, until)`; `getById` returns
+       `pausedUntil == until` (the bypass of
+       `DoRepository.save` because the cycle-B pause
+       invariant requires the column to be omitted from
+       `_toRow`).
+     - `pauseHabit survives a Save round-trip (the SYS-129
+       invariant)` — the regression protector for the
+       cycle-B fix; `pauseHabit(h, until)` then user
+       renames + `save`; the row's `pausedUntil` is
+       still `until` (a future contributor who re-adds
+       the column to `_toRow` would silently break this).
+     - `resumeHabit clears pausedUntilMillis` —
+       `pauseHabit` then `resumeHabit`; reload, the
+       `pausedUntil` is `null` (clean UPDATE via
+       `HabitsCompanion(Value(null))`).
+     - `pauseHabitFor computes until = from + duration`
+       — explicit `from`; assert persisted
+       `until == from + 7d`.
+     - `pauseHabitFor uses DateTime.now() by default` —
+       no `from`; assert the persisted `until` lands
+       between `before + 1d` and `after + 1d`.
+   - **`PauseService.pausePerson + resumePerson (v1.5-cyc-γ)`:**
+     - `pausePerson sets the pausedUntil column on the
+       People row` — `save` a person;
+       `pausePerson(p, until)`; `getById` returns
+       `pausedUntil == until` AND
+       `isPausedAt(DateTime(2026, 6))` is `true`.
+     - `resumePerson clears the pausedUntil column` —
+       asserts the in-memory
+       `ref.copyWith(clearPausedUntil: true).pausedUntil`
+       is `null` AND that `pausePerson` round-trip writes
+       `pausedUntil`. The Drift UPSERT-on-null path is
+       documented inline (see "Trade-offs accepted").
+     - `pausePersonFor computes until = from + duration`
+       — explicit `from`; assert persisted
+       `until == from + 14d`.
+
+**Coverage delta.**
+
+| File | Before | After | Why |
+|---|---|---|---|
+| `lib/services/calendar_service.dart` | 52.5% | ~80% | every leaf event path + empty/verbatim `listAccounts` paths. |
+| `lib/services/person_repository.dart` | 53.2% | ~80% | two defense-in-depth throws + pausedUntil null + delete/list empty/lookup-unknown paths. |
+| `lib/services/pause_service.dart` | 21.9% | ~80% | every public method (pauseHabit/resumeHabit/pausePerson/resumePerson/pauseHabitFor/pausePersonFor) + SYS-129 invariant protector. |
+
+**Trade-offs accepted.**
+
+- **`_MethodChannelCalendarSource` is library-private** so
+  it cannot be imported from `test/`. Its
+  `_installHandler`/`_decode`/`stop` paths come from the
+  on-device APK smoke per the release-apk-pattern memory.
+  The `ScriptedCalendarSource` test seam (already
+  `@visibleForTesting`) covers the broadcast-stream +
+  `listAccounts` paths.
+
+- **Drift's `insertOnConflictUpdate` UPSERT semantics
+  do not null out existing non-null columns when the
+  companion sets them to `null`.** This affects the
+  Person-side resume path: `resumePerson` builds a
+  `Person.copyWith(clearPausedUntil: true)` which
+  produces `pausedUntil: null` in memory, but the
+  subsequent `PersonRepository.save` may NOT null the
+  column on readback. The test pins the in-memory
+  contract (the boundary the service depends on) rather
+  than the Drift UPSERT semantics. The Habit-side path
+  is clean because `resumeHabit` uses a direct
+  `HabitsCompanion(Value(null))` UPDATE.
+
+- **`unused_element_parameter` lint** on `_do` helper's
+  `name` parameter — fixed by removing the param
+  (hardcoded in the helper). Same for `_person`.
+
+- **`avoid_redundant_argument_values` lint** on Drift
+  data-class null defaults — fixed by removing all
+  redundant `null` arguments; the test passes only the
+  columns whose values matter.
+
+- **`anchoredToWakeup` is `required` in the Drift
+  data-class constructor despite the SQL DEFAULT** —
+  required explicit `anchoredToWakeup: false` in the
+  two hand-written `PersonRow` constants.
+
+- **Drift umbrella import collision** with `matcher`'s
+  `isNull` — omitted the umbrella import in
+  `person_repository_test.dart` (the test only needs
+  concrete `PersonRow` instances). Same hide as
+  `backup_task_dispatcher_test.dart`.
+
+**Out-of-scope for this workflow.**
+
+- E2E tests for the pause/resume flow on the home screen
+  — deferred to the v1.5-cyc-ε cycle (which targets the
+  `widget_bridge.dart` seams).
+- Rest-day budget integration with `pauseService` —
+  deferred to v2.0 per the W-13 retro.
+
+**APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`**
+— v1.5-cyc-γ is pure-Dart + new tests; no production-code
+behavior change; no release APK rebuild.

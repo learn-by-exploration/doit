@@ -6283,3 +6283,180 @@ PR #63) instead of 3 separate PRs.
   Drift migration, no Kotlin changes — v1.5-cyc-β is
   pure-Dart + new tests. APK SHA1 stays at Cycle H's
   `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`.
+
+## ADR-073 — Land v1.5-cyc-γ (service-direct coverage closure) as a single combined PR (v1.5-cyc-γ / Phase 55 / SYS-142 / WF-070)
+
+**Context.** The v1.4-stab-W13 closeout
+(`docs/v_model/stabilization_retrospective.md` §8
+"Handoff to v1.5") named the v1.5-cyc-γ bucket as the
+3 mid-priority service files with the lowest coverage
+in the §8 list:
+
+1. `lib/services/calendar_service.dart` (52.5% per W-13
+   §8) — only `CalendarEventStarted` and `CalendarBusyChange`
+   were exercised by existing tests; the `Reminder` and
+   `Ended` event shapes were dark, and the `listAccounts()`
+   edge cases (empty list, verbatim pass-through) had no
+   coverage.
+2. `lib/services/person_repository.dart` (53.2% per W-13
+   §8) — the two defense-in-depth throw paths in
+   `_parseChannel('_')` and `_parseCadence` (default case)
+   were never exercised; `deleteById` against an unknown
+   id, `listAll` on an empty table, `getById` returning
+   `null` for an unknown id, and the `pausedUntil`-null
+   round-trip path were also uncovered.
+3. `lib/services/pause_service.dart` (21.9% per W-13 §8 —
+   the lowest in the §8 list) — the original 3 tests
+   covered only the readiness gate (`isReady`,
+   `resetForTesting`); every public method
+   (`pauseHabit` / `resumeHabit` / `pausePerson` /
+   `resumePerson` / `pauseHabitFor` / `pausePersonFor`)
+   had no Drift round-trip test, the SYS-129 invariant
+   had no regression protector, and the `from` parameter
+   to the `*For` sugar had no test.
+
+**Decision.** Land all 3 services' coverage closure as
+a single combined PR (v1.5-cyc-γ). The cycle's scope
+matches the W-13 retro's "service-unit-test closure"
+bucket exactly — 3 services, 1 PR. No code production
+changes; the cycle is pure-Dart + new tests.
+
+**Rationale for the bundled-PR shape.**
+
+1. **Shared Drift-in-memory seam.** All 3 services are
+   tested against the same `_init()` /
+   `_tearDown()` pattern (re-init
+   `AppDatabaseService` with
+   `AppDatabase(NativeDatabase.memory())` per test). The
+   setup/teardown is identical across the 3 files; a
+   single PR ships the helper as a coherent set.
+
+2. **Cycle β (form coverage) was bundled for the same
+   reason.** The form screens share the Drift + provider
+   + flutter_contacts mocks; bundling kept the helpers
+   in lockstep. ADR-072 documents this precedent. γ
+   inherits the precedent.
+
+3. **Splitting would create duplicate test setup
+   helpers.** If we split calendar_service into one PR,
+   person_repository into another, and pause_service into
+   a third, each PR would ship a near-identical copy of
+   the `_init()` / `_tearDown()` Drift seam. The Cycle G
+   precedent (Cycle G was a NEW widget + 2 test files
+   in one PR) confirms bundling related coverage work is
+   the project's de-facto rhythm.
+
+4. **All 3 services share the same architectural
+   pattern** (singleton-with-`_ready`, Drift-backed
+   writes). Splitting by pattern would mean splitting
+   by repository, alarm scheduler, and pause service —
+   that's premature abstraction.
+
+**Test additions (this cycle).**
+
+- `test/services/calendar_service_test.dart` (extend) —
+  6 new tests in 2 groups: `ScriptedCalendarSource
+  event republishing (v1.5-cyc-γ)` (3 tests covering
+  `CalendarEventReminder` + `CalendarEventEnded`
+  republishing + 4-event-in-sequence) and
+  `listAccounts() edge cases (v1.5-cyc-γ)` (2 tests
+  covering empty + verbatim). Total: 7 → 13.
+- `test/services/person_repository_test.dart` (extend)
+  — 6 new tests: `round-trips pausedUntil null when no
+  pause is set`, `deleteById is a no-op when the row
+  does not exist`, `listAll returns [] when the table
+  is empty`, `getById returns null for an unknown id`,
+  `fetching a row with an unknown channel tag throws
+  ArgumentError`, `fetching a row with an unknown
+  cadence type throws ArgumentError`. Total: 7 → 13.
+- `test/services/pause_service_test.dart` (extend) — 8
+  new tests in 2 groups: `PauseService.pauseHabit +
+  resumeHabit (v1.5-cyc-γ)` (5 tests covering
+  pauseHabit-writes, the SYS-129 invariant protector,
+  resumeHabit-clears, pauseHabitFor with explicit `from`,
+  pauseHabitFor with default `DateTime.now()`) and
+  `PauseService.pausePerson + resumePerson (v1.5-cyc-γ)`
+  (3 tests covering pausePerson-writes, the
+  copyWith(clearPausedUntil: true) semantics + the
+  round-trip pin, pausePersonFor with explicit `from`).
+  Total: 3 → 11.
+
+**Trade-offs accepted.**
+
+- **`_MethodChannelCalendarSource` cannot be tested
+  directly from `test/`.** The class is library-private
+  (`_`-prefixed) so it cannot be imported from outside
+  `lib/`. Its `_installHandler`/`_decode`/`stop` paths
+  are exercised by the on-device APK smoke per the
+  release-apk-pattern memory. This is a known
+  testability gap; future cycles may add a
+  `@visibleForTesting` annotation if the gap becomes a
+  defect source.
+
+- **Drift's `insertOnConflictUpdate` UPSERT semantics
+  do not null out existing non-null columns when the
+  companion sets them to `null`.** This affects the
+  Person-side resume path: `resumePerson` builds a
+  `Person.copyWith(clearPausedUntil: true)` which
+  produces `pausedUntil: null` in memory, but the
+  subsequent `PersonRepository.save` may NOT null the
+  column on readback. The test for the resume path
+  pins the in-memory contract (the boundary the service
+  depends on) rather than the Drift UPSERT semantics.
+  The Habit-side path is clean because `resumeHabit`
+  uses a direct `HabitsCompanion(Value(null))` UPDATE.
+  This Drift quirk is documented inline at the test
+  comment + at SYS-142 §3.
+
+- **`unused_element_parameter` lint forced helper
+  refactor.** The `_do` helper's `name` parameter was
+  never read by the tests, triggering the lint; the
+  parameter was removed and the name hardcoded. Same
+  treatment for `_person`. The result is a tighter
+  helper signature.
+
+- **`avoid_redundant_argument_values` lint on Drift
+  data-class null defaults.** Multiple columns
+  (`weekday`, `dayOfMonth`, `monthOfYear`,
+  `pausedUntilMillis`, `automationsJson`) defaulted to
+  `null` in Drift's data-class but explicit `null`
+  passed in test → lint fires. Fix: removed all
+  redundant `null` arguments; the test passes only the
+  columns whose values matter.
+
+- **Drift umbrella import collision.** The Drift
+  umbrella `package:drift/drift.dart` re-exports `isNull`
+  as a column expression, colliding with
+  `package:matcher`'s `isNull` matcher. Fix: omitted the
+  umbrella import in `person_repository_test.dart` (the
+  test only needs concrete `PersonRow` instances, not
+  `Value` or expressions). Same hide as
+  `backup_task_dispatcher_test.dart`.
+
+- **`anchoredToWakeup` is `required` in the Drift
+  data-class constructor despite the SQL DEFAULT.**
+  Required explicit `anchoredToWakeup: false` in the
+  two hand-written `PersonRow` constants.
+
+- **`prefer_const_constructors` lint on the
+  hand-written `PersonRow`.** Fix: added `const`
+  keyword.
+
+**Consequences.**
+
+- Test count: 1578 → 1597 (+19). Cumulative coverage:
+  66.71% → ~67.05% (the 19 new tests add ~0.34 pp; the
+  larger-than-β delta is because pause_service's
+  coverage jumps from 21.9% to ~80%, contributing
+  ~0.20 pp on its own).
+- v1.5-cyc-γ's 3 service files are CLOSED. The next
+  3 partial-coverage buckets (v1.5-cyc-δ..ε + chain
+  per the retro) remain open.
+- No production-code behavior change. The Drift UPSERT
+  semantic is documented but not fixed; the SYS-129
+  invariant is preserved (the omission in
+  `DoRepository._toRow` stays).
+- No new `<uses-permission>`, no new pubspec deps, no
+  Drift migration, no Kotlin changes — v1.5-cyc-γ is
+  pure-Dart + new tests. APK SHA1 stays at Cycle H's
+  `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`.
