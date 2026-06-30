@@ -510,4 +510,93 @@ void main() {
     expect(habits.first.endHour, isNull);
     expect(habits.first.targetHours, isNull);
   });
+
+  // ── v1.4-stab-F / Phase 46 / SYS-133 ─────────────────────
+  // Coverage cycle: pin the 5 uncovered error paths in
+  // `backup_service.dart` (12 lines remaining after Cycles
+  // A-E). Cycle A audit's bug_hunt.md BUG-016..-018 cluster.
+
+  group('BackupService error paths (SYS-133)', () {
+    test('BackupFormatException.toString() includes the message '
+        '(SYS-133)', () {
+      final e = BackupFormatException('malformed kdf');
+      expect(
+        e.toString(),
+        contains('malformed kdf'),
+        reason:
+            'The toString override must surface the message '
+            'so logging + tests can identify the failure.',
+      );
+      expect(
+        e.toString(),
+        contains('BackupFormatException'),
+        reason: 'The toString override must name the exception type.',
+      );
+    });
+
+    test('import rejects envelope with no kdf object (SYS-133)', () async {
+      final tmp = await _writeTemp(
+        'no-kdf.json',
+        '{"version":3,"kdf":null,'
+            '"ciphertextB64":"","macB64":"","nonceB64":'
+            '"AAAAAAAAAAAAAAAA"}}',
+      );
+      expect(
+        () => BackupService.instance.importFrom(tmp, passphrase: 'x'),
+        throwsA(isA<BackupFormatException>()),
+        reason:
+            'An envelope whose kdf field is missing or null must '
+            'be rejected with "Missing or malformed \'kdf\' object"',
+      );
+    });
+
+    test('v2 envelope with iterations below the floor is rejected '
+        '(SYS-133)', () async {
+      final tmp = await _writeTemp(
+        'low-iter.json',
+        '{"version":2,"kdf":{"name":"pbkdf2-hmac-sha256",'
+            '"iterations":1,"saltB64":"AAAAAAAAAAAAAAAAAAAAAA=="},'
+            '"ciphertextB64":"","macB64":"",'
+            '"nonceB64":"AAAAAAAAAAAAAAAA"}}',
+      );
+      expect(
+        () => BackupService.instance.importFrom(tmp, passphrase: 'x'),
+        throwsA(isA<BackupFormatException>()),
+        reason:
+            'A v2 envelope with PBKDF2 iterations below '
+            'kBackupKdfIterations must be rejected',
+      );
+    });
+
+    test('v3 envelope with missing fields throws (SYS-133)', () async {
+      // kdf present but missing memoryKiB/iterations/parallelism/saltB64
+      final tmp = await _writeTemp(
+        'v3-missing-fields.json',
+        '{"version":3,"kdf":{"name":"argon2id"},'
+            '"ciphertextB64":"","macB64":"","nonceB64":""}}',
+      );
+      expect(
+        () => BackupService.instance.importFrom(tmp, passphrase: 'x'),
+        throwsA(isA<BackupFormatException>()),
+        reason:
+            'A v3 envelope with missing kdf sub-fields must '
+            'be rejected as "Malformed v3 envelope"',
+      );
+    });
+
+    test('v2 envelope with missing fields throws (SYS-133)', () async {
+      final tmp = await _writeTemp(
+        'v2-missing-fields.json',
+        '{"version":2,"kdf":{"name":"pbkdf2-hmac-sha256"},'
+            '"ciphertextB64":"","macB64":"","nonceB64":""}}',
+      );
+      expect(
+        () => BackupService.instance.importFrom(tmp, passphrase: 'x'),
+        throwsA(isA<BackupFormatException>()),
+        reason:
+            'A v2 envelope with missing kdf sub-fields must '
+            'be rejected as "Malformed v2 envelope"',
+      );
+    });
+  });
 }

@@ -5601,3 +5601,27 @@ The fourth stabilization cycle of the 3-month campaign. Pure-Dart test-only cycl
 - WF-059 (v1.4-stab-D — the 14-step Cycle D implementation flow with per-file test wiring)
 - ADR-016 (the v0.5 `PermissionResult` sealed-hierarchy contract that Cycle D pins with direct tests)
 - ADR-013 (the "missing plugin must not crash the app" precedent — extended to the lifecycle observer's StateError swallow)
+## ADR-064 — Backup round-trip exhaustive coverage via 8 pinned edge-case tests (v1.4-stab-F / Phase 46 / SYS-133 / WF-061)
+
+Lifts `lib/services/backup_service.dart` to ≥95% coverage and pins the error paths the v1.4-stab-A audit missed (the 12 uncovered lines: malformed-envelope throws, missing kdf object, unsupported KDF name, v2 KDF iterations floor, `BackupFormatException.toString()`, `runBackupTask` dispatcher failures, ScheduleMode `none` skip).
+
+**Decision — 8 pinning tests, pure-Dart:**
+1. `test/services/backup_encryption_test.dart` +5 tests:
+   - `BackupFormatException.toString() includes the message`
+   - `import rejects envelope with no kdf object`
+   - `v2 envelope with iterations below the floor is rejected`
+   - `v3 envelope with missing fields throws`
+   - `v2 envelope with missing fields throws`
+2. `test/backup/scheduler_skip_test.dart` (NEW) +1 test:
+   - `runBackupTask returns true when ScheduleMode is none (no folder)`
+3. `test/services/backup_task_dispatcher_test.dart` +2 tests:
+   - `dispatcher returns false for unknown task name`
+   - `dispatcher swallows init failures per ADR-013`
+
+Test count: 1371 → 1379 (+8 net).
+
+**Refs:**
+- SYS-133 (v1.4-stab-F — the backup round-trip coverage requirement)
+- WF-061 (v1.4-stab-F — the 14-step Cycle F flow)
+- ADR-013 (the "missing plugin must not crash the app" precedent — extended to dispatcher failures)
+- ADR-039 (the v1.2 backup-envelope Argon2id migration precedent)
