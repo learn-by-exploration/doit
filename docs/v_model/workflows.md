@@ -2492,3 +2492,123 @@ on-device smoke step that the harness cannot perform — see ADR-069).
   harness-runnable contribution) are pinned via the 3-gate; the
   on-device smoke is a deferred verification step per the v1.4-stab
   cycle plan.
+
+### WF-067 — Verify the perf baseline + fuzz regression suite (v1.4-stab-L / Phase 52 / SYS-139 / ADR-070)
+
+**Trigger:** developer runs the v1.4-stab-L cycle's 3-gate verification
+loop, OR a future stabilization / feature cycle lands code that touches
+`build()`, the `DoRepository` read paths, or the pure-Dart model layer.
+
+**Actor:** developer (or CI).
+
+**Preconditions:**
+- `flutter pub get` has run.
+- The new `test/perf/` + `test/fuzz/` directories exist with the 6 new
+  test files (3 widget-rebuild + 2 SQL-benchmark + 4 fuzz) — see
+  `docs/v_model/performance_baseline.md` for the file map.
+- `docs/v_model/performance_baseline.md` exists with the observed
+  baseline numbers from Cycle L's first run.
+
+**Steps:**
+
+1. **Run the widget-rebuild benchmarks.**
+
+   ```bash
+   flutter test test/perf/widget_rebuild_test.dart --reporter=expanded
+   ```
+
+   The test prints the cold mount µs + the median per-rebuild µs over
+   100 iterations. If a future contributor adds heavy synchronous
+   work to `build()` (e.g., a `find.byType(...)` scan, a DB read on the
+   UI thread, or a JSON parse in the hot path), the median will exceed
+   the budget (750 ms cold / 5 ms single-tile / 25 ms 10-tile) and the
+   test fails with a `reason:` block showing the observed median vs.
+   the budget.
+
+2. **Run the SQL-benchmark.**
+
+   ```bash
+   flutter test test/perf/sql_benchmark_test.dart --reporter=expanded
+   ```
+
+   The test asserts exactly 1 SELECT for `DoRepository.listAll` and
+   `listActive` at N=10 seeded habits + a median ms budget for
+   `listActive` (≤ 10 ms per call on in-memory DB). A future contributor
+   who splits `listAll` / `listActive` into per-do reads (the N+1
+   antipattern) will trip the SELECT-count assertion.
+
+3. **Run the fuzz tests.**
+
+   ```bash
+   flutter test test/fuzz/do_model_fuzz_test.dart \
+                test/fuzz/person_model_fuzz_test.dart \
+                test/fuzz/mission_model_fuzz_test.dart \
+                test/fuzz/consecutive_counter_fuzz_test.dart \
+                --reporter=expanded
+   ```
+
+   The fuzz tests run 1000 iterations each with `Random(42..45)` (the
+   seed is pinned per file for reproducibility). A future contributor
+   who breaks an invariant (e.g., makes `copyWith(name:)` ignore the
+   new name, or makes `ConsecutiveCounter.compute` non-deterministic)
+   will trip a fuzz test within the first iteration that lands the bad
+   code path.
+
+4. **Run the full perf + fuzz suite in one go (CI variant).**
+
+   ```bash
+   flutter test test/perf test/fuzz --reporter=expanded
+   ```
+
+   This is the command documented in `performance_baseline.md` §
+   "How to re-run the baseline" — it captures every metric in
+   ~3 minutes on a typical CI box.
+
+5. **Run the full 3-gate.**
+
+   ```bash
+   dart format --output=none --set-exit-if-changed .
+   flutter analyze --fatal-infos
+   flutter test
+   ```
+
+   The 3-gate MUST pass; Cycle L adds 10 tests to the count (1537 → 1547)
+   and contributes the `docs/v_model/performance_baseline.md` file which
+   the `dart format` step will check for trailing-newline consistency.
+
+6. **Cross-check the perf-baseline doc.**
+
+   Open `docs/v_model/performance_baseline.md` and verify the observed
+   baseline numbers in the table match the test output. If a future
+   cycle legitimately changes the baseline (e.g., a refactor that
+   actually reduces per-rebuild cost by 2×), the doc's table MUST be
+   updated in the same PR — the numbers in the doc are the canonical
+   reference.
+
+**Postconditions:**
+- Every future contributor who lands a regression in the perf baseline
+  OR a broken model invariant is caught by the corresponding test.
+- The stabilization campaign closes with the project at 1547 tests
+  passing and a documented perf baseline + fuzz regression suite.
+
+**Notes:**
+
+- The widget-rebuild + SQL-benchmark budgets are GENEROUS — they pin
+  regression direction (a 2-3× median shift), not absolute perf. Real-
+  device release builds are 3-5× faster than `flutter test` debug-build
+  fake-async.
+- The fuzz tests use `dart:math.Random(seed)`, NOT `package:faker`, per
+  the Cycle L pre-auth. The seed is pinned in the file
+  (`Random(42)` etc.) so the run is reproducible across CI runs and
+  developer machines.
+- The Drift `QueryExecutor` proxy in `sql_benchmark_test.dart` is the
+  standard Drift test seam — it delegates every method to the wrapped
+  executor, so the behavior under test is unchanged. The proxy is the
+  test's only side-channel; the production code is unchanged.
+- Cycle L is the FINAL cycle in the v1.4-stab 3-month stabilization
+  campaign. APK SHA1 stays at Cycle J's
+  `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` — Cycle L does NOT ship a
+  release APK.
+- The doc's "What Cycle L does NOT cover" section defers profile-mode
+  timings + end-to-end scroll perf + APK size to the W-13 closeout
+  (the stabilization retrospective).
