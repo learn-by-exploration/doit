@@ -6,6 +6,12 @@ import 'package:doit/people/person.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/db/schema.dart';
 import 'package:doit/services/person_repository.dart';
+// Hand-writing `PersonRow`s for the unknown-channel / unknown-cadence
+// throw tests does not require any `package:drift/drift.dart`
+// symbols (we use concrete `PersonRow` instances). Note: importing
+// the Drift umbrella in this file would collide with
+// `package:matcher`'s `isNull` matcher; see the existing
+// `backup_task_dispatcher_test.dart` for the same hide.
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -184,5 +190,104 @@ void main() {
       expect(cleared.cadence, const EveryNDays(7));
       expect(cleared.channel, const ChannelDialer('+15555550199'));
     });
+
+    // ---- v1.5-cyc-γ additions (coverage closure) ----
+
+    test('round-trips pausedUntil null when no pause is set', () async {
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p-no-pause',
+          lookupKey: 'k-no-pause',
+          channel: const ChannelDialer('+1'),
+          cadence: const EveryNDays(1),
+          createdAt: DateTime(2026),
+        ),
+      );
+      final back =
+          await PersonRepository.instance.getById('p-no-pause')
+              as ContactPerson;
+      expect(back.pausedUntil, isNull);
+      expect(back.isPausedAt(DateTime(2026, 6)), isFalse);
+      expect(back.isPausedAt(DateTime(2028)), isFalse);
+    });
+
+    test('deleteById is a no-op when the row does not exist', () async {
+      // Saving nothing + deleting must not throw and must leave
+      // the table empty.
+      await PersonRepository.instance.deleteById('does-not-exist');
+      expect(await PersonRepository.instance.listAll(), isEmpty);
+    });
+
+    test('listAll returns [] when the table is empty', () async {
+      expect(await PersonRepository.instance.listAll(), isEmpty);
+    });
+
+    test('getById returns null for an unknown id', () async {
+      expect(await PersonRepository.instance.getById('nope'), isNull);
+    });
+
+    test(
+      'fetching a row with an unknown channel tag throws ArgumentError',
+      () async {
+        // Hand-write a row with an unrecognised channel tag to
+        // exercise the `_parseChannel` defense-in-depth throw
+        // (forward-compat guard for new channel kinds). Only
+        // the columns whose values matter for this test are
+        // named; the rest fall back to the Drift-generated
+        // data-class defaults.
+        final db = AppDatabaseService.instance.db;
+        await db
+            .into(db.people)
+            .insert(
+              const PersonRow(
+                id: 'p-bad-channel',
+                lookupKey: 'k-bad',
+                displayName: '',
+                channel: 'slack', // not in the v0.1 set
+                handle: 'u/handle',
+                createdAtMillis: 0,
+                cadenceType: 'every_n_days',
+                nDays: 1,
+                anchoredToWakeup: false,
+              ),
+            );
+        await expectLater(
+          PersonRepository.instance.getById('p-bad-channel'),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message?.toString() ?? '',
+              'message',
+              contains('channel'),
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'fetching a row with an unknown cadence type throws ArgumentError',
+      () async {
+        // Hand-write a row with an unrecognised cadence_type.
+        final db = AppDatabaseService.instance.db;
+        await db
+            .into(db.people)
+            .insert(
+              const PersonRow(
+                id: 'p-bad-cadence',
+                lookupKey: 'k-bad-cadence',
+                displayName: '',
+                channel: 'dialer',
+                handle: '+1',
+                createdAtMillis: 0,
+                cadenceType: 'fortnightly',
+                anchoredToWakeup: false,
+              ),
+            );
+        await expectLater(
+          PersonRepository.instance.getById('p-bad-cadence'),
+          throwsA(isA<ArgumentError>()),
+        );
+      },
+    );
   });
 }
