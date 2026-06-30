@@ -3917,3 +3917,24 @@ Test changes:
 **On-device smoke (mirrors v1.4l 6-step).** Install new APK on Android 13+ → add a new do via AddHabitScreen → Save (verify it persists) → edit do's name → Save (verify automations + pause state preserved — the test invariant) → pause a habit via the home tile's pause action (verify the badge shows "Paused" + reminders stop) → resume the habit (verify badge clears + reminders resume) → edit a paused habit (just change its name) → Save (verify pause STILL active — the BUG-002 fix invariant; Save does NOT silently resume).
 
 **Parking lot for v1.4-stab-C+.** BUG-003 (Android 14+ `USE_FULL_SCREEN_INTENT` permission — full-screen launch hardening) → Cycle C. BUG-004 (DoAnchor "Target paused" badge UI for the v1.4l data layer) → Cycle G. BUG-005 (`callScreening` permission probe) → Cycle D. BUG-006 (Spanish `es` ARB stale copy — needs native-speaker review, separate from stabilization) → Cycle I (partial — test coverage only). Final test count 1337 / 1337 (+3 from Cycle B).
+
+## v1.4-stab-D — Permission flow coverage (Phase 44 / SYS-131 / ADR-062 / WF-059)
+
+**Date:** 2026-06-30
+
+**Type:** test-only cycle (no production code changes; pure-Dart + new tests + docs)
+
+**Closes:** BUG-005 (callScreening probe coverage), BUG-011 (PermissionResult direct tests), BUG-012 (partial — person.dart at ≥80%), BUG-020 (lifecycle observer edge cases).
+
+**Headline metric:** test count 1348 → 1363 (+15 net). Coverage: `lib/services/permission_result.dart` 18.9% → 100%; `lib/services/permission_service.dart` 93.4% → ≥95%; `lib/services/permission_lifecycle_observer.dart` 78.6% → ≥90%; `lib/people/person.dart` 54.5% → ≥80% (Cycle K brings to 100%).
+
+**Six new + extended test files:**
+- `test/services/permission_result_test.dart` (NEW, +6 tests) — every sealed subclass on `PermissionResult` + `BackupFolderResult`; includes an exhaustive `switch` regression protector
+- `test/people/person_test.dart` (NEW, +3 tests) — `isPausedAt` future/expired/null branches + `copyWith(clearPausedUntil: true)`
+- `test/services/permission_lifecycle_observer_test.dart` (extended, +1 test) — non-`resumed` lifecycle events do NOT trigger a permission refresh
+- `test/services/permission_service_test.dart` (extended, +4 tests) — `limited`/`restricted`/`provisional`/`permanentlyDenied` `PermissionStatus` mappings
+
+**V-Model artifacts:** SYS-131 (requirements.md) + ADR-062 (decision_record.md) + WF-059 (workflows.md) + traceability row + implementation_status row + plan.md sub-entry.
+
+**No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** On-device smoke deferred to user (no `adb` binary in this harness environment) — same pattern as Cycles A, B, C.
+
