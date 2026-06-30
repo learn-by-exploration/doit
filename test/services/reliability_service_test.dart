@@ -470,6 +470,148 @@ void main() {
           '(SYS-113 / ADR-043).',
     );
   });
+
+  // ── v1.4-stab-E / Phase 45 / SYS-132 ─────────────────────
+  // Coverage cycle: every Reliability.optimal / .degraded /
+  // .unknown path exercised + the `_safeProbe` platform-
+  // channel error swallow pinned.
+
+  test('a probe that throws StateError keeps the prior cached value '
+      '(SYS-132 / ADR-013)', () async {
+    final bridge = _ScriptedBridge();
+    await ReliabilityService.init(
+      bridge: bridge,
+      permissionService: PermissionService.instance,
+    );
+    await _drain();
+    expect(ReliabilityService.instance.value, Reliability.optimal);
+
+    // Flip the bridge to a value that WOULD re-derive, but
+    // make the next probe throw. The cached `_lastProbed`
+    // must keep returning `optimal` (the prior value).
+    bridge.reliability = Reliability.degraded;
+    bridge.throwOnProbe = true;
+    await ReliabilityService.instance.refresh();
+    await _drain();
+    expect(
+      ReliabilityService.instance.value,
+      Reliability.optimal,
+      reason:
+          'A probe throw MUST keep the prior cached value, NOT '
+          'flip to degraded (the v0.4b-release-fix lesson, '
+          'extended via ADR-013).',
+    );
+  });
+
+  test('a fresh cold-start with no probe yet initializes to optimal '
+      '(SYS-132 / first-read race fix)', () async {
+    final bridge = _ScriptedBridge();
+    await ReliabilityService.init(
+      bridge: bridge,
+      permissionService: PermissionService.instance,
+    );
+    // Read the value SYNCHRONOUSLY without draining
+    // microtasks. The initial value MUST be `optimal`, not
+    // `unknown`, so the home-screen reliability banner does
+    // not flash "may be late" on cold start.
+    expect(
+      ReliabilityService.instance.value,
+      Reliability.optimal,
+      reason:
+          'First-read race fix: cold start reads `optimal`, not '
+          '`unknown`.',
+    );
+  });
+
+  test('refresh() after a permissions change re-probes the bridge AND '
+      're-derives (SYS-132)', () async {
+    final bridge = _ScriptedBridge();
+    await ReliabilityService.init(
+      bridge: bridge,
+      permissionService: PermissionService.instance,
+    );
+    await _drain();
+    expect(ReliabilityService.instance.value, Reliability.optimal);
+
+    // Flip a gated kind to denied; then trigger a refresh.
+    final statuses = Map<PermissionKind, PermissionResult?>.from(
+      PermissionService.instance.statuses.value,
+    );
+    statuses[PermissionKind.location] = const PermissionResultDenied(
+      canOpenSettings: true,
+    );
+    PermissionService.instance.statuses.value = statuses;
+
+    final beforeProbeCount = bridge.probeCount;
+    await ReliabilityService.instance.refresh();
+    await _drain();
+    expect(
+      bridge.probeCount,
+      greaterThan(beforeProbeCount),
+      reason: 'refresh() must re-probe the bridge.',
+    );
+    expect(
+      ReliabilityService.instance.value,
+      Reliability.degraded,
+      reason: 'After a gated-kind denial + refresh, value is degraded.',
+    );
+  });
+
+  test('the stream emits Reliability.optimal when a transition lands '
+      'on `optimal` (SYS-132)', () async {
+    final bridge = _ScriptedBridge(reliability: Reliability.degraded);
+    await ReliabilityService.init(
+      bridge: bridge,
+      permissionService: PermissionService.instance,
+    );
+    await _drain();
+
+    final received = <Reliability>[];
+    final sub = ReliabilityService.instance.reliability.listen(received.add);
+
+    // Flip the bridge so a `refresh()` MUST observe a
+    // distinct value transition (`degraded` → `optimal`)
+    // and emit on the stream. This pins the broadcast
+    // controller's contract: subscribers added after
+    // init see every subsequent distinct transition.
+    bridge.reliability = Reliability.optimal;
+    await ReliabilityService.instance.refresh();
+    await _drain();
+
+    expect(
+      received,
+      [Reliability.optimal],
+      reason:
+          'The stream MUST surface a distinct value '
+          'transition. A broadcast+distinct stream does '
+          'NOT replay past values to new subscribers, so '
+          'this test pins the AFTER-init emit path.',
+    );
+
+    await sub.cancel();
+  });
+
+  test('dispose() closes the broadcast stream controller '
+      '(SYS-132 / no-leak invariant)', () async {
+    final bridge = _ScriptedBridge();
+    await ReliabilityService.init(
+      bridge: bridge,
+      permissionService: PermissionService.instance,
+    );
+    await _drain();
+
+    final completer = Completer<void>();
+    final sub = ReliabilityService.instance.reliability.listen(
+      (_) {},
+      onDone: completer.complete,
+    );
+
+    ReliabilityService.resetForTesting();
+    // The broadcast controller was closed during disposal;
+    // the listener receives an immediate `onDone`.
+    await completer.future.timeout(const Duration(seconds: 1));
+    await sub.cancel();
+  });
 }
 
 /// A trivial `Timer` implementation for the fallback-timer
