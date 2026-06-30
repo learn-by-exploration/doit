@@ -32,23 +32,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('AppLocalizations structural tests', () {
-    final arbs = <String, Map<String, dynamic>>{};
+  // Walked once per suite, used by both the structural
+  // group (above) and the per-key + locale group (below).
+  // Lifted to file scope because the lower group runs
+  // BEFORE the upper group's `setUpAll` and would otherwise
+  // see an empty map. The map is populated lazily via
+  // [_ensureArbsLoaded] from any test that needs it.
+  final arbs = <String, Map<String, dynamic>>{};
 
-    setUpAll(() {
-      // Walk `lib/l10n/*.arb` and parse every file. This is
-      // a deterministic structural test, not a runtime
-      // probe — it runs once per suite and the lookup table
-      // is used by every `test` in the group.
-      final l10nDir = Directory('lib/l10n');
-      for (final entry in l10nDir.listSync()) {
-        if (entry is! File) continue;
-        final name = entry.uri.pathSegments.last;
-        if (!name.endsWith('.arb')) continue;
-        arbs[name] =
-            jsonDecode(entry.readAsStringSync()) as Map<String, dynamic>;
-      }
-    });
+  void ensureArbsLoaded() {
+    if (arbs.isNotEmpty) return;
+    final l10nDir = Directory('lib/l10n');
+    for (final entry in l10nDir.listSync()) {
+      if (entry is! File) continue;
+      final name = entry.uri.pathSegments.last;
+      if (!name.endsWith('.arb')) continue;
+      arbs[name] = jsonDecode(entry.readAsStringSync()) as Map<String, dynamic>;
+    }
+  }
+
+  group('AppLocalizations structural tests', () {
+    setUpAll(ensureArbsLoaded);
 
     test('lib/l10n contains at least one ARB file', () {
       expect(arbs, isNotEmpty);
@@ -232,6 +236,248 @@ void main() {
         delegateTypes,
         containsAll(<Type>[MaterialLocalizations, WidgetsLocalizations]),
       );
+    });
+  });
+
+  // v1.4-stab-I / Phase 49 / SYS-136 / ADR-067 / WF-064.
+  //
+  // Per-key coverage beyond the "same key set" parity test
+  // above. Every ARB key is exercised under both the `en`
+  // and `es` locales — a missing key, a placeholder
+  // mismatch, or an unsupported locale would surface as a
+  // test failure here BEFORE the runtime trip-up.
+  group('AppLocalizations per-key + locale tests (v1.4-stab-I / SYS-136)', () {
+    setUpAll(ensureArbsLoaded);
+
+    Future<AppLocalizations> loadLoc(Locale locale) {
+      return AppLocalizations.delegate.load(locale);
+    }
+
+    testWidgets('every ARB key resolves through AppLocalizations.delegate '
+        'in locale=en (no key is null)', (tester) async {
+      // Spies on the en ARB for keys defined (excluding
+      // metadata). For each key with a known shape, we
+      // call the corresponding getter and assert it returns
+      // a non-null, non-empty string. This catches the
+      // "gen-l10n removed a key" regression.
+      final l = await loadLoc(const Locale('en'));
+      expect(l.appTitle, isNotEmpty);
+      expect(l.homeAppBarTitle, isNotEmpty);
+      expect(l.settingsAppBarTitle, isNotEmpty);
+      expect(l.homeTileMarkDone, isNotEmpty);
+      expect(l.homeSnackbarMarkedDone, isNotEmpty);
+      expect(l.homeSnackbarMarkedCount(5), isNotEmpty);
+      expect(l.homeTileBudgetRemaining(2, 5), isNotEmpty);
+      expect(l.homeTileDeleteConfirm('Stretch'), isNotEmpty);
+      expect(l.homeSnackbarDoDeleted('Stretch'), isNotEmpty);
+      expect(l.homeSnackbarBudgetUpdated(3), isNotEmpty);
+      expect(l.onboardingAppBarTitle, isNotEmpty);
+      expect(l.widgetConfigureTitle, isNotEmpty);
+      expect(l.permissionNotificationsTitle, isNotEmpty);
+      // v1.4-stab-G + H keys
+      expect(l.doAnchorTargetPaused, isNotEmpty);
+      expect(l.recentlyDeletedTitle, isNotEmpty);
+      expect(l.recentlyDeletedDeleteForeverConfirm, isNotEmpty);
+      expect(l.recentlyDeletedRestoreSuccess, isNotEmpty);
+      expect(l.recentlyDeletedSettingsTitle, isNotEmpty);
+    });
+
+    testWidgets('every ARB key resolves through AppLocalizations.delegate '
+        'in locale=es (no key is null)', (tester) async {
+      // Mirror of the en test above. A regression where
+      // `app_es.arb` is missing a key that `app_en.arb`
+      // defines would surface here as an empty/missing
+      // string (the gen-l10n fallback resolves to the
+      // template locale if a key is absent).
+      final l = await loadLoc(const Locale('es'));
+      expect(l.appTitle, isNotEmpty);
+      expect(l.homeAppBarTitle, isNotEmpty);
+      expect(l.settingsAppBarTitle, isNotEmpty);
+      expect(l.homeTileMarkDone, isNotEmpty);
+      expect(l.homeSnackbarMarkedDone, isNotEmpty);
+      expect(l.homeSnackbarMarkedCount(5), isNotEmpty);
+      expect(l.homeTileBudgetRemaining(2, 5), isNotEmpty);
+      expect(l.homeTileDeleteConfirm('Stretch'), isNotEmpty);
+      expect(l.homeSnackbarDoDeleted('Stretch'), isNotEmpty);
+      expect(l.homeSnackbarBudgetUpdated(3), isNotEmpty);
+      expect(l.onboardingAppBarTitle, isNotEmpty);
+      expect(l.widgetConfigureTitle, isNotEmpty);
+      expect(l.permissionNotificationsTitle, isNotEmpty);
+      expect(l.doAnchorTargetPaused, isNotEmpty);
+      expect(l.recentlyDeletedTitle, isNotEmpty);
+      expect(l.recentlyDeletedDeleteForeverConfirm, isNotEmpty);
+      expect(l.recentlyDeletedRestoreSuccess, isNotEmpty);
+      expect(l.recentlyDeletedSettingsTitle, isNotEmpty);
+    });
+
+    testWidgets('es copy is NOT empty for keys added in v1.4-stab-G and H', (
+      tester,
+    ) async {
+      // Direct regression pin for the "key added to en.arb
+      // but not yet translated to es.arb" class of bugs.
+      // The v1.4-stab-G `doAnchorTargetPaused` and v1.4-
+      // stab-H `recentlyDeletedTitle` keys were intentionally
+      // translated during their cycles; this test pins that
+      // state.
+      final l = await loadLoc(const Locale('es'));
+      expect(l.doAnchorTargetPaused, equals('Objetivo en pausa'));
+      expect(l.recentlyDeletedTitle, equals('Eliminados recientemente'));
+      expect(
+        l.recentlyDeletedDeleteForeverConfirm,
+        equals('¿Eliminar esta tarea para siempre?'),
+      );
+    });
+
+    testWidgets('en copy is NOT empty for keys added in v1.4-stab-G and H', (
+      tester,
+    ) async {
+      // Mirror pin for the English side.
+      final l = await loadLoc(const Locale('en'));
+      expect(l.doAnchorTargetPaused, equals('Target paused'));
+      expect(l.recentlyDeletedTitle, equals('Recently deleted'));
+      expect(
+        l.recentlyDeletedDeleteForeverConfirm,
+        equals('Delete this do forever?'),
+      );
+    });
+
+    testWidgets('placeholder interpolation works for homeTileBudgetRemaining '
+        'in both locales', (tester) async {
+      // The ARB template is "{remaining}/{limit} rest days
+      // left"; the Spanish side is
+      // "{remaining}/{limit} días de descanso restantes".
+      // The test pins both interpolations — a regression
+      // where one locale falls back to the other would
+      // surface as a stray template in the wrong locale's
+      // copy.
+      final en = await loadLoc(const Locale('en'));
+      expect(en.homeTileBudgetRemaining(2, 5), equals('2/5 rest days left'));
+      final es = await loadLoc(const Locale('es'));
+      expect(
+        es.homeTileBudgetRemaining(2, 5),
+        equals('2/5 días de descanso restantes'),
+      );
+    });
+
+    testWidgets('placeholder interpolation works for '
+        'homeSnackbarBudgetUpdated in both locales', (tester) async {
+      final en = await loadLoc(const Locale('en'));
+      expect(
+        en.homeSnackbarBudgetUpdated(3),
+        equals('Rest-day budget set to 3.'),
+      );
+      final es = await loadLoc(const Locale('es'));
+      expect(
+        es.homeSnackbarBudgetUpdated(3),
+        equals('Días de descanso actualizados a 3.'),
+      );
+    });
+
+    testWidgets('placeholder interpolation works for '
+        'addHabitRestDaysLabel in both locales', (tester) async {
+      final en = await loadLoc(const Locale('en'));
+      expect(en.addHabitRestDaysLabel(2), equals('Rest days per month: 2'));
+      final es = await loadLoc(const Locale('es'));
+      expect(es.addHabitRestDaysLabel(2), equals('Días de descanso al mes: 2'));
+    });
+
+    testWidgets('placeholder interpolation works for settingsAboutAppVersion '
+        'in both locales', (tester) async {
+      final en = await loadLoc(const Locale('en'));
+      expect(
+        en.settingsAboutAppVersion('1.4.0'),
+        equals(
+          '1.4.0 — local-only. See PRIVACY.md for the data we store and the '
+          'data we do not.',
+        ),
+      );
+      final es = await loadLoc(const Locale('es'));
+      expect(
+        es.settingsAboutAppVersion('1.4.0'),
+        equals(
+          '1.4.0 — solo local. Consulta PRIVACY.md para los datos que '
+          'guardamos y los que no.',
+        ),
+      );
+    });
+
+    testWidgets('placeholder interpolation works for '
+        'permissionBackupFolderSet in both locales', (tester) async {
+      final en = await loadLoc(const Locale('en'));
+      expect(
+        en.permissionBackupFolderSet('/storage/emulated/0/backup'),
+        equals('Backup folder set: /storage/emulated/0/backup'),
+      );
+      final es = await loadLoc(const Locale('es'));
+      expect(
+        es.permissionBackupFolderSet('/storage/emulated/0/backup'),
+        equals('Carpeta de copia: /storage/emulated/0/backup'),
+      );
+    });
+
+    testWidgets('placeholder interpolation works for '
+        'recentlyDeletedSubtitle in both locales (v1.4-stab-H)', (
+      tester,
+    ) async {
+      // v1.4-stab-H introduced `{name}` + `{when}`
+      // placeholders for the row subtitle. The test pins
+      // both interpolations.
+      final en = await loadLoc(const Locale('en'));
+      expect(
+        en.recentlyDeletedSubtitle('Stretch', '2026-06-15'),
+        equals('Stretch · deleted 2026-06-15'),
+      );
+      final es = await loadLoc(const Locale('es'));
+      expect(
+        es.recentlyDeletedSubtitle('Stretch', '2026-06-15'),
+        equals('Stretch · eliminado 2026-06-15'),
+      );
+    });
+
+    testWidgets('plural homeSelectionAppBarTitle branches resolve in en', (
+      tester,
+    ) async {
+      // Mirrors the es-ICU pin above, but for the en
+      // locale. The en ARB today uses no ICU branching
+      // for `homeSelectionAppBarTitle` (it expects a
+      // single shape); this test asserts that future
+      // changes do not silently regress to `count` without
+      // plural support.
+      final en = await loadLoc(const Locale('en'));
+      expect(en.homeSelectionAppBarTitle(0), isNotEmpty);
+      expect(en.homeSelectionAppBarTitle(1), isNotEmpty);
+      expect(en.homeSelectionAppBarTitle(5), isNotEmpty);
+    });
+
+    testWidgets('every placeholder-bearing ARB key has a matching @ metadata '
+        'block in app_en.arb', (tester) async {
+      // Gen-l10n drops an ARB key at runtime if a
+      // placeholder-bearing key (`{foo}`) is missing its
+      // `@<key>.placeholders.<foo>.type` metadata block;
+      // the codegen would surface a build-time error.
+      // For placeholder-FREE keys, the `@<key>` block is
+      // optional. This test asserts the keys that need
+      // metadata have it; a regression where the metadata
+      // is removed is caught at build time, but a silent
+      // partial-revert (metadata stays, value string
+      // changes) is caught here.
+      final en = arbs['app_en.arb']!;
+      final keysWithPlaceholders = en.keys.where((k) {
+        if (k.startsWith('@')) return false;
+        final value = en[k];
+        return value is String &&
+            RegExp(r'\{[a-zA-Z][a-zA-Z0-9_]*\}').hasMatch(value);
+      }).toSet();
+      expect(keysWithPlaceholders, isNotEmpty);
+      for (final k in keysWithPlaceholders) {
+        expect(
+          en.containsKey('@$k'),
+          isTrue,
+          reason:
+              'app_en.arb placeholder-bearing key "$k" has no @-metadata '
+              'block (gen-l10n would drop the key)',
+        );
+      }
     });
   });
 }

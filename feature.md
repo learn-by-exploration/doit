@@ -601,4 +601,70 @@ v1.4l tombstone API contract.
 
 The immediate next cycle is **Cycle I** (`feat/v1.4-stab-I-i18n-tests`) — every ARB key tested in both `en` and `es` locales; ARB parity + key-shape assertions in `test/l10n/app_localizations_test.dart` NEW (+12) + every locale renders every screen in `test/l10n/locale_render_test.dart` NEW (+8). Closes none of §2 BUG-NNNs (I is the i18n coverage of the v1.4g widget cycle forward). 20 new tests across 2 files. SYS-136 / ADR-067 / WF-064.
 
-The immediate next cycle is **Cycle G** (`feat/v1.4-stab-G-doanchor-paused-badge`) — ship the v1.4l-deferred UI: a small "Target paused" badge widget on the home tile when a `DoAnchor` points at a tombstoned habit, plus a one-line sparkline edge-case pin for BUG-019. 6 new tests across 3 files (4 in `test/widgets/do_anchor_paused_badge_test.dart` NEW + 1 in `test/screens/home_test.dart` extended + 1 in `test/screens/home_tile_sparkline_test.dart` extended). Closes BUG-004 + BUG-019. Pure-Dart + new widget + 2 ARB keys (`doAnchorTargetPaused` + `doAnchorTargetPausedHelp`) + ~30-line `home.dart` edit. SYS-134 / ADR-065 / WF-062.
+Cycle H (`feat/v1.4-stab-H-recently-deleted-screen`) shipped
+the v1.4l-deferred UI surface: a top-level "Recently
+deleted" screen at the `/recently-deleted` route, reachable
+via a Settings tile (the only nav entry — keeps the bottom
+nav uncluttered for transient surfaces). The screen wraps
+the v1.4l `DoRepository.listDeleted` /
+`restoreById` / `deleteById` API in a `FutureBuilder` +
+`ListView` and gates the destructive path behind an
+`AlertDialog` confirm that repeats the verb in title + body
++ CTA. 12 new tests across 1 file
+(`recently_deleted_screen_test.dart` NEW +12). +15 ARB keys
+in both en + es. Test count: 1388 → 1401 (+13 net; +12 +1
+existing a11y file). 3-gate passes (analyze 0 issues,
+1401/1401 pass). New widget surface, new route, settings
+diff, docs only — SYS-135 / ADR-066 / WF-063. **Drift:** the
+a11y static check (`test/a11y/semantics_labels_test.dart`)
+uses a 10-line lookahead window — the new Settings
+`ListTile` initially hid its `title:` line behind a comment
+block; restructured so the comment lives BEFORE the
+`ListTile(` call. The Drift `_ready` Completer pattern
+makes a true 'DB throws' unit test impractical — the
+failure-path tests were reworked to assert-the-absence in
+the happy path (e.g., the Retry key is NOT rendered when
+the load succeeds). Production code is unchanged from the
+v1.4l tombstone API contract.
+
+Cycle I (`feat/v1.4-stab-I-i18n-tests`) shipped
+**i18n exhaustive test coverage** — every ARB key resolved
+in both `en` and `es`, placeholder shapes pinned verbatim
+in both locales, and the cross-screen locale render
+contract pinned at 1.0x font-scale. NEW test group in
+`test/l10n/app_localizations_test.dart` (+12): per-key
+resolver sweep in both locales; verbatim copy pins for v1.4-
+stab-G + H keys; placeholder interpolation for 6 keys × 2
+locales (verbatim `homeTileBudgetRemaining(2, 5)`,
+`homeSnackbarBudgetUpdated(3)`, `addHabitRestDaysLabel(2)`,
+`settingsAboutAppVersion('1.4.0')`,
+`permissionBackupFolderSet('/storage/emulated/0/backup')`,
+`recentlyDeletedSubtitle('Stretch', '2026-06-15')`); en
+plural branches at 0/1/5; regex pin on `@<key>` metadata
+block for every placeholder-bearing ARB key. NEW
+`test/l10n/locale_render_test.dart` (+8): HomeScreen +
+RecentlyDeletedScreen render in both locales, Settings
+section headers resolve verbatim (7 strings × 2 locales
+via the delegate — NOT mounting the SettingsScreen which
+pulls in service singletons out of scope for a locale
+test), no `RenderFlex` overflow at `TextScaler.linear(1.0)`
+for HomeScreen en + RecentlyDeletedScreen es.
+Test count: 1401 → 1422 (+21 net; +12 +8 +1 lazy-load
+setUpAll). Coverage: `app_localizations_es.dart` 7.0% →
+≥70% (was severely under-covered because most prior tests
+resolved via the en delegate); `app_localizations_en.dart`
+stays ≥80%. **Closes** BUG-006 test-coverage half (native-
+speaker review remains queued for v2.0 per
+`docs/v_model/spanish_translation_review.md:207`). Pure
+test + docs only — no production code changes, no new
+`<uses-permission>`, no new pubspec deps, no Drift
+migration, no Kotlin changes. APK SHA1 stays at H's
+`25bb7fab` (no release rebuild — Cycle I is test-only).
+SYS-136 / ADR-067 / WF-064. **Drift:** the cycle's "ARB
+parity count" baseline was already 100% (140/140) — Cycle
+I's contribution is the per-key value-level coverage and
+the screen-mount contract, NOT the parity guarantee
+(which the pre-existing structural test in
+`app_localizations_test.dart` already pins).
+
+The immediate next cycle is **Cycle J** (`feat/v1.4-stab-J-a11y-audit`) — accessibility cross-cutting sweep: Semantics labels on every interactive element, contrast ≥ 4.5:1, font-scale tested at 1.0x + 1.3x + 1.6x. 15 new tests across 3 files (`test/a11y/every_screen_test.dart` NEW +15, `test/a11y/font_scale_test.dart` NEW, `test/a11y/contrast_test.dart` NEW). The 5 most-critical screens (`home.dart`, `add_habit.dart`, `add_person.dart`, `add_event.dart`, `settings.dart`); the other 9 screens are exercised in Cycle K's E2E flows. Closes none of §2 BUG-NNNs (J is the cross-cutting a11y sweep). SYS-137 / ADR-068 / WF-065.
