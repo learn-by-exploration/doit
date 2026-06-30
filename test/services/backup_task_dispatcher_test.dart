@@ -108,13 +108,21 @@ void main() {
       // dispatcher boundary, not at `runBackupTask`. The
       // pin here is the contract via the `kBackupNightlyTaskName`
       // symbol.
-      expect(kBackupNightlyTaskName, isNotEmpty,
-          reason: 'The canonical task name MUST be a non-empty '
-              'string so the OS can match it.');
-      expect(kBackupNightlyTaskName, equals('doit.backup.nightly'),
-          reason: 'The pinned task name matches the v0.4b / SYS-060 '
-              'string. A future rename would silently break '
-              'every installed device.');
+      expect(
+        kBackupNightlyTaskName,
+        isNotEmpty,
+        reason:
+            'The canonical task name MUST be a non-empty '
+            'string so the OS can match it.',
+      );
+      expect(
+        kBackupNightlyTaskName,
+        equals('doit.backup.nightly'),
+        reason:
+            'The pinned task name matches the v0.4b / SYS-060 '
+            'string. A future rename would silently break '
+            'every installed device.',
+      );
     });
 
     test('runBackupTask swallows init failures per ADR-013 (SYS-133) '
@@ -126,8 +134,7 @@ void main() {
       // next periodic interval"). Pin: a directory URI is
       // configured AND pointing to a path that triggers a
       // Permission exception (a file, not a directory).
-      final dir = await Directory.systemTemp
-          .createTemp('doit-backup-perm-');
+      final dir = await Directory.systemTemp.createTemp('doit-backup-perm-');
       // Wrap a FILE as if it were a directory URI — `dir.exists()`
       // returns true (it exists), but `File('${dir.path}/x')`
       // mkdir would fail. Easier: pass a path where the parent
@@ -136,9 +143,9 @@ void main() {
       // path's parent.
       final blockingFile = File('${dir.path}/doit-backup.json');
       await blockingFile.writeAsString('{}');
-      SharedPreferences.setMockInitialValues(
-        {'doit.backup.folder_uri': blockingFile.uri.toString()},
-      );
+      SharedPreferences.setMockInitialValues({
+        'doit.backup.folder_uri': blockingFile.uri.toString(),
+      });
       // The catch-all path: `dir.exists()` may return true for
       // the file-as-folder URI; `File('${dir.path}/...')`
       // constructor will not throw, but `exportTo` writing to
@@ -150,9 +157,13 @@ void main() {
       // succeed silently on some FS implementations. We
       // assert that `runBackupTask` DID NOT throw — the
       // contract is exception-swallow on any failure.
-      expect(ok, isA<bool>(),
-          reason: 'runBackupTask must return a bool (never throw), '
-              'per the catch-all at backup_scheduler.dart:124.');
+      expect(
+        ok,
+        isA<bool>(),
+        reason:
+            'runBackupTask must return a bool (never throw), '
+            'per the catch-all at backup_scheduler.dart:124.',
+      );
       // Sanity: cleanup.
       await blockingFile.delete();
     });

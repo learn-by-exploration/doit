@@ -40,8 +40,7 @@ void main() {
   });
 
   test('runBackupTask returns true when no backup folder has been '
-      'picked yet (ScheduleMode.none early-return / SYS-133)',
-      () async {
+      'picked yet (ScheduleMode.none early-return / SYS-133)', () async {
     // The user has not completed onboarding; SharedPreferences
     // has no value for 'doit.backup.folder_uri'. The scheduler
     // MUST short-circuit to a `true` return (success-no-op)
@@ -53,7 +52,8 @@ void main() {
     expect(
       ok,
       isTrue,
-      reason: 'When no folder is configured, runBackupTask must '
+      reason:
+          'When no folder is configured, runBackupTask must '
           'return true (the "no-op success" path) so the '
           'WorkManager periodic task does not flag the run as '
           'failed. The next periodic interval retries.',

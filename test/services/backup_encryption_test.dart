@@ -520,15 +520,21 @@ void main() {
     test('BackupFormatException.toString() includes the message '
         '(SYS-133)', () {
       final e = BackupFormatException('malformed kdf');
-      expect(e.toString(), contains('malformed kdf'),
-          reason: 'The toString override must surface the message '
-              'so logging + tests can identify the failure.');
-      expect(e.toString(), contains('BackupFormatException'),
-          reason: 'The toString override must name the exception type.');
+      expect(
+        e.toString(),
+        contains('malformed kdf'),
+        reason:
+            'The toString override must surface the message '
+            'so logging + tests can identify the failure.',
+      );
+      expect(
+        e.toString(),
+        contains('BackupFormatException'),
+        reason: 'The toString override must name the exception type.',
+      );
     });
 
-    test('import rejects envelope with no kdf object (SYS-133)',
-        () async {
+    test('import rejects envelope with no kdf object (SYS-133)', () async {
       final tmp = await _writeTemp(
         'no-kdf.json',
         '{"version":3,"kdf":null,'
@@ -538,7 +544,8 @@ void main() {
       expect(
         () => BackupService.instance.importFrom(tmp, passphrase: 'x'),
         throwsA(isA<BackupFormatException>()),
-        reason: 'An envelope whose kdf field is missing or null must '
+        reason:
+            'An envelope whose kdf field is missing or null must '
             'be rejected with "Missing or malformed \'kdf\' object"',
       );
     });
@@ -555,7 +562,8 @@ void main() {
       expect(
         () => BackupService.instance.importFrom(tmp, passphrase: 'x'),
         throwsA(isA<BackupFormatException>()),
-        reason: 'A v2 envelope with PBKDF2 iterations below '
+        reason:
+            'A v2 envelope with PBKDF2 iterations below '
             'kBackupKdfIterations must be rejected',
       );
     });
@@ -570,7 +578,8 @@ void main() {
       expect(
         () => BackupService.instance.importFrom(tmp, passphrase: 'x'),
         throwsA(isA<BackupFormatException>()),
-        reason: 'A v3 envelope with missing kdf sub-fields must '
+        reason:
+            'A v3 envelope with missing kdf sub-fields must '
             'be rejected as "Malformed v3 envelope"',
       );
     });
@@ -584,7 +593,8 @@ void main() {
       expect(
         () => BackupService.instance.importFrom(tmp, passphrase: 'x'),
         throwsA(isA<BackupFormatException>()),
-        reason: 'A v2 envelope with missing kdf sub-fields must '
+        reason:
+            'A v2 envelope with missing kdf sub-fields must '
             'be rejected as "Malformed v2 envelope"',
       );
     });
