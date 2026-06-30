@@ -2612,3 +2612,108 @@ loop, OR a future stabilization / feature cycle lands code that touches
 - The doc's "What Cycle L does NOT cover" section defers profile-mode
   timings + end-to-end scroll perf + APK size to the W-13 closeout
   (the stabilization retrospective).
+
+### WF-068 — Verify the v1.5-cyc-α widget-config + service-proxy coverage closure (v1.5-cyc-α / Phase 53 / SYS-140 / ADR-071)
+
+**Scope.** The v1.5 milestone's first cycle retires the 2
+trivial widget-related coverage gaps from the v1.4-stab-W13
+retrospective's §8 v1.5 handoff list. The screen
+(`lib/widget/widget_config_screen.dart`) goes from 2.3% to
+100%; the proxy (`lib/widget/widget_service_proxy.dart`)
+stays at 33.3% (its single forwarder line is covered
+indirectly by `widget_service_test.dart`'s 11 tests of
+`WidgetService.setSelectedHabitId`).
+
+**Test layers.**
+
+1. **`test/widget/widget_service_proxy_test.dart`** (NEW) —
+   3 tests. Uses a `_RecordingProxy extends WidgetServiceProxy`
+   subclass to capture forwarding behavior without touching
+   `WidgetService.instance`:
+   - `setSelectedHabitId forwards a non-null habitId to the override` —
+     asserts the recorded call's argument equals the input.
+   - `setSelectedHabitId forwards null without throwing` — mirrors the
+     non-null case but with `null`. The null path is used by the
+     picker when the user wants to unbind a widget.
+   - `const constructor is stable for the screen default-parameter seam` —
+     `identical(const WidgetServiceProxy(), const WidgetServiceProxy())`
+     must hold. The screen relies on `const WidgetServiceProxy()`
+     as a default parameter value at
+     `lib/widget/widget_config_screen.dart:49`; a future refactor
+     that drops `const` would silently break the screen's
+     default-parameter compile.
+
+2. **`test/widget/widget_config_screen_test.dart`** (NEW) —
+   7 tests. Mirrors the `recently_deleted_screen_test.dart`
+   pattern (`_resetDb` + `_wrap` + `_RecordingProxy` +
+   `_PopObserver`):
+   - `list-loaded: shows one row per do` — seed 2 `DoFixed`s
+     via `DoRepository.instance.save` and assert the per-row
+     `ListTile` renders both names.
+   - `list-empty: shows the empty-state copy + Back button` —
+     no DB seed; assert the localized `widgetConfigureEmptyState`
+     and `widgetConfigureBackToHome` texts both render.
+   - `picker-row tap forwards to proxy and pops with the habitId` —
+     inject a `_RecordingProxy` + a `_PopObserver extends NavigatorObserver`;
+     tap a row; assert `proxy.calls == ['h1']` AND `observer.poppedRoute
+     != null`. The picker MUST forward the picked habitId BEFORE the
+     pop, otherwise the Kotlin side reads `RESULT_OK` with no payload.
+   - `loading-state: shows CircularProgressIndicator before the future resolves` —
+     pumpWidget only (no `pumpAndSettle`) to land in the
+     `connectionState != done` branch; assert the spinner is visible
+     on the first frame, then settle and assert it disappears.
+   - `AppBar title is the localized widgetConfigureTitle` —
+     assert `l.widgetConfigureTitle` is `findsOneWidget` in `locale=en`.
+   - `ARB-parity: Spanish locale renders the localized strings` —
+     same pattern as Cycle I's screen-mount-with-sweep, but for the
+     configurator screen.
+   - `empty-state Back button pops the route` — tap the
+     `FilledButton` in the empty state; assert the observer sees
+     the pop (the launcher's `RESULT_CANCELED` handshake requires
+     the configurator to dismiss itself).
+
+**KDoc fix.** `lib/widget/widget_config_screen.dart` lines
+52-57 — drop the "Displayed in the AppBar" claim. The `build`
+method (line 96) only renders `l.widgetConfigureTitle`; the
+`widgetId` parameter is accepted but not displayed. The
+multi-instance AppBar-id rendering is parked to
+`open_questions.md`.
+
+**3-gate verification (mirrors Cycles C..L).**
+
+- `dart format --output=none --set-exit-if-changed .` → 2 NEW test
+  files were auto-formatted by `dart format .`; re-run shows 0
+  changed.
+- `flutter analyze --fatal-infos lib test` → 0 issues.
+- `flutter test` → 1557/1557 pass (the documented Cycle L perf
+  flake does not appear at the cycle-α test surface).
+- Targeted: `flutter test test/widget/widget_service_proxy_test.dart
+  test/widget/widget_config_screen_test.dart` → 10/10 pass.
+
+**What this workflow does NOT cover.**
+
+- The proxy body's single forwarder line
+  (`return WidgetService.instance.setSelectedHabitId(habitId);`) —
+  this is intentionally not tested; the forwarding target has 11
+  dedicated tests in `widget_service_test.dart`. Wiring
+  `WidgetService.init` with full fakes just to exercise the 1-line
+  forwarder has poor ROI (no branching, no edge cases, no state).
+- On-device E2E of the configurator activity — the activity lives in
+  `android/app/src/main/kotlin/` and has no JVM test harness in this
+  repo. The Dart side mirrors the Kotlin contract shape (route name
+  + query-string arg + the picked habitId payload); the existing
+  `test/widget/widget_deep_link_test.dart` pins the route-construction
+  contract.
+- Multi-instance AppBar-id rendering — parked to `open_questions.md`.
+
+**Out-of-scope for this workflow.**
+
+- The 11 files < 50% line coverage identified in the W-13 retro's
+  bottom-15 partial-coverage list (v1.5-cyc-β..ε).
+- The 5 v2.0 follow-ups (BUG-006 native-speaker review + Kotlin
+  `ReminderBridge.showFullScreen` channel arm + on-device E2E +
+  per-form 1.6x font-scale mounting + the partial-coverage list).
+
+**APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`**
+— v1.5-cyc-α is pure-Dart + 1 KDoc fix + new tests; no production-code
+behavior change; no release APK rebuild.

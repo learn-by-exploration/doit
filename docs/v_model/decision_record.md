@@ -6060,3 +6060,110 @@ cycle (Cycle L), with the following structure:
   unchanged.
 - APK SHA1 stays at Cycle J's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`
   — the campaign does NOT ship a v1.4-stab-L release APK.
+
+## ADR-071 — Land v1.5-cyc-α (widget-config + service-proxy coverage closure) as a single combined PR (v1.5-cyc-α / Phase 53 / SYS-140 / WF-068)
+
+**Context.** The v1.4-stab-W13 closeout
+(`docs/v_model/stabilization_retrospective.md` §8 "Handoff to
+v1.5") identified 5 candidate v1.5 cycle groupings (α..ε)
+to retire the 15-file partial-coverage list. The α bucket
+contained 2 trivial widget-related gaps:
+
+- `lib/widget/widget_config_screen.dart` at 2.3% line coverage
+  (1/44 — only the `createState` override from a transitive
+  import)
+- `lib/widget/widget_service_proxy.dart` at 33.3% (1/3 —
+  only the `const` constructor)
+
+The retro recommended two separate PRs (one per file). The
+user pre-decided **one combined PR** (recommended) — both
+files are widget-picker-adjacent, both share the same
+`_RecordingProxy extends WidgetServiceProxy` seam, and the
+3-gate cost is ~10 minutes either way.
+
+**Decision.** Ship v1.5-cyc-α as a single PR. Two new test
+files, one KDoc fix:
+
+1. `test/widget/widget_service_proxy_test.dart` (NEW) — 3 tests:
+   forwarding of non-null habitId; forwarding of null without
+   throwing; const-constructor canonicalization (pins the
+   `WidgetConfigScreen` default-parameter seam at line 49).
+2. `test/widget/widget_config_screen_test.dart` (NEW) — 7 tests:
+   list-loaded (one row per do); list-empty (empty-state copy +
+   Back button); picker-row tap forwards to proxy + pops with
+   habitId (the regression-protector); loading-state
+   (`CircularProgressIndicator` on first frame);
+   AppBar-title-localized; ARB-parity Spanish locale;
+   empty-state Back button pops the route.
+3. `lib/widget/widget_config_screen.dart` KDoc fix (lines 52-57):
+   drop the "Displayed in the AppBar" claim — the `build()`
+   method (line 96) only renders `l.widgetConfigureTitle`;
+   the widgetId parameter is accepted but not displayed
+   (the multi-instance AppBar-id rendering is parked to
+   `open_questions.md`).
+
+**Why not separate PRs.** Two reasons:
+
+- The proxy file is mechanically a forwarder (1 line). The
+  3 tests covering it total ~50 LOC. Splitting the PR adds
+  CI cycles and a V-Model artifact set for a trivial
+  surface.
+- The screen tests DEPEND on the proxy's subclass-override
+  seam (`_RecordingProxy extends WidgetServiceProxy`). A
+  2-PR sequence where PR #1 lands the proxy's own contract
+  and PR #2 lands the screen-level contract is fine — but
+  PR #2 is blocked on PR #1's merge to main, which adds
+  ~10 min of CI latency with no benefit.
+
+**Why not include the proxy body's coverage.** The proxy's
+single uncovered line (`return WidgetService.instance.setSelectedHabitId(habitId);`)
+is a 1-line forwarder. The forwarding TARGET
+(`WidgetService.setSelectedHabitId`) has 11 dedicated tests
+in `test/widget/widget_service_test.dart` (the Cycle K
+test file) — those tests cover the BEHAVIOR. To cover the
+proxy's body line we'd need to wire `WidgetService.init`
+with full fakes (FakeWidgetBridge + fake DoRepository +
+fake CompletionLog + fake ReliabilityService) just to
+exercise the forwarder. The ROI is poor: the proxy's
+single-line body has no branching, no edge cases, and no
+state. The seam contract (forwarding + null + const) is
+what the 3 proxy tests cover.
+
+**Coverage delta.**
+
+| File | Before | After | Why |
+|---|---|---|---|
+| `lib/widget/widget_config_screen.dart` | 2.3% (1/44) | 100% (44/44) | All 5 code paths exercised (initState, loading, empty, list, _onPicked, _PickerRow, _EmptyState). |
+| `lib/widget/widget_service_proxy.dart` | 33.3% (1/3) | 33.3% (1/3) | Proxy body is a 1-line forwarder; covered indirectly by `widget_service_test.dart`'s 11 tests of `WidgetService.setSelectedHabitId`. |
+
+The screen's coverage jump (2.3% → 100%) exceeds the
+retrospective's projection (~85-90%) because every code
+path is reachable through the `_RecordingProxy` +
+`_PopObserver` + `_wrap()` helper triple.
+
+**Trade-offs accepted.**
+
+- The PR bundle is larger than the 1-file-scope typical
+  of recent cycles. Mitigated by the docs-only KDoc fix
+  (1 line) + 2 new test files (10 tests).
+- The proxy file's coverage does not improve. The
+  justification above (1-line forwarder, 11 covering tests
+  of the target) is documented in `widget_service_proxy_test.dart`'s
+  file-level comment so future readers understand why.
+
+**Consequences.**
+
+- Test count: 1547 → 1557 (+10). Cumulative coverage:
+  66.41% → 66.51% (the proxy file's missing 2 lines do
+  not move the percentage measurably; the screen's 43
+  newly-hit lines are 0.31% of 13841 total).
+- v1.5-cyc-α's 2 file targets are CLOSED. The next 13
+  partial-coverage files (v1.5-cyc-β..ε per the retro)
+  remain open.
+- No production-code behavior change. The KDoc fix is
+  cosmetic; the configurator activity continues to be the
+  only consumer of these widgets.
+- No new `<uses-permission>`, no new pubspec deps, no
+  Drift migration, no Kotlin changes — v1.5-cyc-α is
+  pure-Dart + 1 KDoc fix + new tests. APK SHA1 stays at
+  Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`.
