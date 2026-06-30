@@ -50,10 +50,10 @@ class WidgetConfigScreen extends StatefulWidget {
   });
 
   /// The `AppWidgetId` for the widget instance being
-  /// configured. Displayed in the AppBar so the user can
-  /// distinguish two widget instances during a multi-bind
-  /// (the v1.4k scope is single-widget; multi-instance
-  /// selection is parked to open_questions OQ-XX). Nullable
+  /// configured. Accepted by the screen but NOT currently
+  /// rendered (the v1.4k scope is single-widget; rendering
+  /// the id in the AppBar to support multi-instance
+  /// selection is parked to open_questions). Nullable
   /// for tests.
   final int? widgetId;
 

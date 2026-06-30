@@ -4142,3 +4142,46 @@ The W-13 closeout of the 3-month stabilization campaign — **docs-only**. No te
 5. The 11 files < 50% line coverage — the v1.5 milestone is the natural home (see the retrospective §8 for the prioritized list).
 
 **Refs:** the 11 stabilization PRs (#50..#60) live on `main`. The W-13 closeout is PR #61. The Campaign's V-Model artifact IDs: SYS-128..SYS-139, ADR-059..ADR-070, WF-056..WF-067.
+
+## v1.5-cyc-α — Widget-config + service-proxy coverage closure (Phase 53 / SYS-140 / ADR-071 / WF-068)
+
+First cycle of the v1.5 milestone — post-3-month-stabilization-campaign coverage closure. **test-only** + 1 KDoc fix; no production-code behavior change. Closes the W-13 retro's first 2 items on the partial-coverage list (see [`docs/v_model/stabilization_retrospective.md` §8](docs/v_model/stabilization_retrospective.md#8-handoff-to-v15)).
+
+**New code (test-only):**
+
+- `test/widget/widget_service_proxy_test.dart` (NEW, +3 tests) — `_RecordingProxy extends WidgetServiceProxy` records `setSelectedHabitId` calls. (a) Forwards a non-null `habitId` to `WidgetService.instance.setSelectedHabitId`. (b) Forwards `null` without throwing (the `WidgetService` accepts nulls as "no selection"). (c) The `const` constructor returns canonicalized instances (`identical(const WidgetServiceProxy(), const WidgetServiceProxy()) == true`) — required for the screen's default-parameter seam at `widget_config_screen.dart:49`.
+- `test/widget/widget_config_screen_test.dart` (NEW, +7 testWidgets) — mirrors the v1.4-stab-H `recently_deleted_screen_test.dart` Pattern B (in-memory Drift via `AppDatabase(NativeDatabase.memory())` + `AppDatabaseService.instance.init(overrideDb: db)` + `addTearDown`; `_RecordingProxy` + `_PopObserver extends NavigatorObserver` capturing `didPop`; `_wrap({locale, proxy, observer})` helper). Tests: `(a)` list-loaded shows one row per do (`ListView.separated` + `_PickerRow` rendering); `(b)` list-empty shows the localized `widgetConfigureEmptyState` + `widgetConfigureBackToHome`; `(c)` picker-row tap forwards the picked habitId to the `_RecordingProxy` AND pops the route (the `_onPicked` happy path on line 89); `(d)` loading-state shows `CircularProgressIndicator` on the very first frame BEFORE `DoRepository.listAll()` resolves (asserted via `pumpWidget` only, never `pumpAndSettle` — the Drift in-memory fake-async resolves the future synchronously on `tester.pump()`); `(e)` AppBar title is the localized `l.widgetConfigureTitle`; `(f)` ARB-parity under `Locale('es')` resolves to `l.widgetConfigureTitle` via `AppLocalizations.delegate.load(const Locale('es'))`; `(g)` empty-state Back button pops the route.
+
+**KDoc fix:**
+
+- `lib/widget/widget_config_screen.dart:52-57` — drop the "Displayed in the AppBar so the user can distinguish two widget instances during a multi-bind (the v1.4k scope is single-widget; multi-instance selection is parked to open_questions OQ-XX). Nullable for tests." claim (the `build` method at line 96 only renders `l.widgetConfigureTitle`; the multi-instance AppBar-id rendering is parked to `open_questions.md` per ADR-071). New wording: "Accepted by the screen but NOT currently rendered (the v1.4k scope is single-widget; rendering the id in the AppBar to support multi-instance selection is parked to `open_questions.md`). Nullable for tests."
+
+**Coverage delta:**
+
+| File | Before | After | Reason |
+|---|---|---|---|
+| `lib/widget/widget_config_screen.dart` | 2.3% (1/44) | **100% (44/44)** | All 5 code paths covered: `initState` seeding `_dosFuture`; `build`'s loading/empty/list branches; `_onPicked`; `_PickerRow.build`; `_EmptyState.build` |
+| `lib/widget/widget_service_proxy.dart` | 33.3% (1/3) | **33.3%** (stays) | per ADR-071's trade-off — the single forwarder line `return WidgetService.instance.setSelectedHabitId(habitId);` is covered indirectly by `widget_service_test.dart`'s 11 dedicated tests of `WidgetService.setSelectedHabitId`. Brute-forcing direct coverage on the 1-line forwarder is poor ROI. The `const` constructor is now covered (canonicalization test). |
+
+**Cumulative campaign+v1.5:**
+
+- Test count: 1547 → **1557** (+10 net, +16% from Cycle A baseline).
+- Line coverage: 66.41% → **66.51%** (+1.90 pp from baseline; +0.10 pp vs campaign close).
+
+**What this cycle does NOT change:**
+
+- No new `<uses-permission>` in `AndroidManifest.xml` — the `doit/widget` MethodChannel surface is unchanged.
+- No new pubspec deps.
+- No Drift migration.
+- No Kotlin changes — the configurator activity (`android/app/src/main/kotlin/.../DoitWidgetConfigureActivity.kt`) is the only consumer of these widgets; no Kotlin rebuild required.
+- No release APK rebuild — APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` (v1.5-cyc-α is pure-Dart + 1 KDoc fix + new tests; the production-code surface is unchanged).
+- No Drift migration (per `AGENTS.md` "A migration is its own PR").
+
+**Parking lot (for v1.5-cyc-β..ε; per W-13 retro §8 priority list):**
+
+- `lib/missions/chain.dart` (42.9%, transitively-covered) — next cycle.
+- The per-form font_scale E2E (Cycle J's deferred-to-Cycle-K pragmatic split).
+- The Kotlin-side `ReminderBridge.showFullScreen` channel arm (out-of-scope for Dart-only cycles).
+- The native-speaker Spanish ARB review (v2.0).
+
+**Refs:** SYS-140, ADR-071, WF-068.
