@@ -338,5 +338,74 @@
   "doAnchorTargetPausedHelp": "The habit this anchor was tracking has been paused or deleted. Restore it from Settings to resume this anchor.",
   "@doAnchorTargetPausedHelp": {
     "description": "v1.4-stab-G / Phase 47 / SYS-134 / ADR-065 / WF-062. Long-form body of the Tooltip that surfaces when the user long-presses the Target paused badge on the home tile."
+  },
+
+  "recentlyDeletedTitle": "Recently deleted",
+  "@recentlyDeletedTitle": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. AppBar title of the top-level /recently-deleted screen — exposes the v1.4l tombstone surface (ADR-056) at the UI layer."
+  },
+  "recentlyDeletedEmpty": "Nothing here — deleted dos stay for 30 days before being purged.",
+  "@recentlyDeletedEmpty": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Empty-state copy rendered on the /recently-deleted screen when no dos are currently tombstoned. Mentions the 30-day TTL so the user knows the surface is not permanent."
+  },
+  "recentlyDeletedRestoreAction": "Restore",
+  "@recentlyDeletedRestoreAction": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Label of the IconButton on each row of the /recently-deleted screen that calls DoRepository.restoreById (the inverse of the v1.4l soft-delete)."
+  },
+  "recentlyDeletedDeleteForeverAction": "Delete forever",
+  "@recentlyDeletedDeleteForeverAction": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Label of the IconButton on each row of the /recently-deleted screen that calls DoRepository.deleteById (the force-purge path) after a confirm dialog."
+  },
+  "recentlyDeletedDeleteForeverConfirm": "Delete this do forever?",
+  "@recentlyDeletedDeleteForeverConfirm": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Title of the AlertDialog that confirms a force-purge from the /recently-deleted screen. Mirrors the v1.4l home-tile delete-confirm tone but with a stronger verb."
+  },
+  "recentlyDeletedDeleteForeverConfirmBody": "The do, its completion history, and its rest-day budget will be permanently removed. This cannot be undone.",
+  "@recentlyDeletedDeleteForeverConfirmBody": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Body of the AlertDialog that confirms a force-purge. Lists the three row types that get hard-deleted (do row + completions + rest-day budget) so the user knows the full cost."
+  },
+  "recentlyDeletedDeleteForeverConfirmCta": "Delete forever",
+  "@recentlyDeletedDeleteForeverConfirmCta": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Confirm button label inside the AlertDialog. Matches the row-level action label so the user can see the destructive verb twice before tapping."
+  },
+  "recentlyDeletedDeleteForeverCancel": "Cancel",
+  "@recentlyDeletedDeleteForeverCancel": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Cancel button label inside the AlertDialog. Standard Material 3 wording."
+  },
+  "recentlyDeletedRestoreSuccess": "Restored.",
+  "@recentlyDeletedRestoreSuccess": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Snackbar copy after a successful Restore tap on the /recently-deleted screen. Single-word feedback matching the v1.4l Undo SnackBar tone."
+  },
+  "recentlyDeletedRestoreFailed": "Could not restore. Try again.",
+  "@recentlyDeletedRestoreFailed": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Snackbar copy when a Restore tap completes but DoRepository.restoreById returns false (no matching tombstoned row). Defensive — the row was probably force-purged by a concurrent action."
+  },
+  "recentlyDeletedDeleteForeverFailed": "Could not delete. Try again.",
+  "@recentlyDeletedDeleteForeverFailed": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Snackbar copy when a Delete-forever tap fails. The screen catches the throw and surfaces the failed snackbar; the row stays in the list so the user can retry."
+  },
+  "recentlyDeletedRetry": "Retry",
+  "@recentlyDeletedRetry": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Label of the Retry button rendered in the error state of the /recently-deleted screen. Tapping it re-runs the list query (mirrors the v1.4l home-tile error-state pattern)."
+  },
+  "recentlyDeletedSubtitle": "{name} · deleted {when}",
+  "@recentlyDeletedSubtitle": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Subtitle on each row of the /recently-deleted screen. Shows the do's name and a human-friendly relative-time for the tombstone (e.g. '2 hours ago'). placeholders: name (String), when (String).",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "recentlyDeletedSettingsTitle": "Recently deleted",
+  "@recentlyDeletedSettingsTitle": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Title of the Settings tile that navigates to the /recently-deleted screen. Matches the screen's AppBar title verbatim."
+  },
+  "recentlyDeletedSettingsSubtitle": "Restore or permanently delete dos you removed in the last 30 days.",
+  "@recentlyDeletedSettingsSubtitle": {
+    "description": "v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Subtitle of the Settings tile. Mentions the 30-day TTL (matches the v1.4m / ADR-057 auto-purge policy) so the user knows how long tombstoned dos are kept."
   }
 }

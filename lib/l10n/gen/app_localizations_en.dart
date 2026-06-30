@@ -438,4 +438,55 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get doAnchorTargetPausedHelp =>
       'The habit this anchor was tracking has been paused or deleted. Restore it from Settings to resume this anchor.';
+
+  @override
+  String get recentlyDeletedTitle => 'Recently deleted';
+
+  @override
+  String get recentlyDeletedEmpty =>
+      'Nothing here — deleted dos stay for 30 days before being purged.';
+
+  @override
+  String get recentlyDeletedRestoreAction => 'Restore';
+
+  @override
+  String get recentlyDeletedDeleteForeverAction => 'Delete forever';
+
+  @override
+  String get recentlyDeletedDeleteForeverConfirm => 'Delete this do forever?';
+
+  @override
+  String get recentlyDeletedDeleteForeverConfirmBody =>
+      'The do, its completion history, and its rest-day budget will be permanently removed. This cannot be undone.';
+
+  @override
+  String get recentlyDeletedDeleteForeverConfirmCta => 'Delete forever';
+
+  @override
+  String get recentlyDeletedDeleteForeverCancel => 'Cancel';
+
+  @override
+  String get recentlyDeletedRestoreSuccess => 'Restored.';
+
+  @override
+  String get recentlyDeletedRestoreFailed => 'Could not restore. Try again.';
+
+  @override
+  String get recentlyDeletedDeleteForeverFailed =>
+      'Could not delete. Try again.';
+
+  @override
+  String get recentlyDeletedRetry => 'Retry';
+
+  @override
+  String recentlyDeletedSubtitle(String name, String when) {
+    return '$name · deleted $when';
+  }
+
+  @override
+  String get recentlyDeletedSettingsTitle => 'Recently deleted';
+
+  @override
+  String get recentlyDeletedSettingsSubtitle =>
+      'Restore or permanently delete dos you removed in the last 30 days.';
 }

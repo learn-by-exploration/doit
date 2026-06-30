@@ -447,4 +447,57 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get doAnchorTargetPausedHelp =>
       'La tarea que este anclaje seguía ha sido pausada o eliminada. Restáurala desde Ajustes para reanudar este anclaje.';
+
+  @override
+  String get recentlyDeletedTitle => 'Eliminados recientemente';
+
+  @override
+  String get recentlyDeletedEmpty =>
+      'Nada aquí — las tareas eliminadas permanecen 30 días antes de purgarse.';
+
+  @override
+  String get recentlyDeletedRestoreAction => 'Restaurar';
+
+  @override
+  String get recentlyDeletedDeleteForeverAction => 'Eliminar para siempre';
+
+  @override
+  String get recentlyDeletedDeleteForeverConfirm =>
+      '¿Eliminar esta tarea para siempre?';
+
+  @override
+  String get recentlyDeletedDeleteForeverConfirmBody =>
+      'La tarea, su historial de finalización y su presupuesto de descanso se eliminarán de forma permanente. Esta acción no se puede deshacer.';
+
+  @override
+  String get recentlyDeletedDeleteForeverConfirmCta => 'Eliminar para siempre';
+
+  @override
+  String get recentlyDeletedDeleteForeverCancel => 'Cancelar';
+
+  @override
+  String get recentlyDeletedRestoreSuccess => 'Restaurada.';
+
+  @override
+  String get recentlyDeletedRestoreFailed =>
+      'No se pudo restaurar. Inténtalo de nuevo.';
+
+  @override
+  String get recentlyDeletedDeleteForeverFailed =>
+      'No se pudo eliminar. Inténtalo de nuevo.';
+
+  @override
+  String get recentlyDeletedRetry => 'Reintentar';
+
+  @override
+  String recentlyDeletedSubtitle(String name, String when) {
+    return '$name · eliminado $when';
+  }
+
+  @override
+  String get recentlyDeletedSettingsTitle => 'Eliminados recientemente';
+
+  @override
+  String get recentlyDeletedSettingsSubtitle =>
+      'Restaura o elimina permanentemente las tareas que quitaste en los últimos 30 días.';
 }

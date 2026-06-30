@@ -3991,3 +3991,29 @@ Closes BUG-004 (the v1.4l-deferred UI affordance) + BUG-019 (sparkline single-po
 **On-device smoke deferred to user** (no `adb` binary in this harness environment). Release APK rebuilt on this branch (Cycle G has production code; SHA1 may differ from v1.4-stab-F's `155b77243c6c0ab1d340c861e08dd7e5dea73d45`).
 
 **Refs:** SYS-134, ADR-065, WF-062.
+
+## v1.4-stab-H — Recently-deleted top-level screen + v1.4l tombstone surface (Phase 48 / SYS-135 / ADR-066 / WF-063)
+
+**Closes the v1.4l-deferred UI for the tombstone column** (ADR-056). The v1.4l Undo SnackBar is a 4-second primary recovery; Cycle H ships the secondary "I forgot to tap Undo" surface.
+
+**Files (3 changed, 1 new test file, 1 new screen file, 15 new ARB keys):**
+
+- `lib/screens/recently_deleted_screen.dart` (NEW, ~240 lines) — top-level `StatefulWidget` that calls `DoRepository.instance.listDeleted()` on `initState`, renders a `ListView` of one `_Row` per tombstoned do via a `FutureBuilder<List<Do>>`. Each row has two `IconButton`s in `ListTile.trailing`: Restore (`Icons.restore`) + Delete-forever (`Icons.delete_forever`). The Restore action calls `DoRepository.restoreById` and surfaces a success-or-failed snackbar. The Delete-forever action is gated by an `AlertDialog` confirm that repeats the destructive verb in title + body + CTA; on confirm it calls `DoRepository.deleteById` inside a try/catch. Empty state mentions the v1.4m 30-day TTL (ADR-057). Error state renders a `Retry` button. Pure-Dart + Theme-derived colors (no hardcoded `Color.fromARGB`).
+- `lib/app_router.dart` (route added) — `/recently-deleted` is the 4th entry in the existing 3-route `buildAppRoute` switch. Returns a `MaterialPageRoute<void>` wrapping `const RecentlyDeletedScreen()`.
+- `lib/screens/settings.dart` (Settings tile, ~20 lines added) — new `ListTile` (key: `settings.recently_deleted`) in the Backup section that pushes `const RecentlyDeletedScreen()` via `Navigator.of(context).push`. Sits after the existing `settings.restore` tile — the two Backup section tiles are the restore-from-backup flow and the restore-from-tombstone flow.
+- `lib/l10n/app_en.arb` + `lib/l10n/app_es.arb` + regenerated `app_localizations*.dart` — 15 new ARB keys: `recentlyDeletedTitle`, `recentlyDeletedEmpty`, `recentlyDeletedRestoreAction`, `recentlyDeletedDeleteForeverAction`, `recentlyDeletedDeleteForeverConfirm`, `recentlyDeletedDeleteForeverConfirmBody`, `recentlyDeletedDeleteForeverConfirmCta`, `recentlyDeletedDeleteForeverCancel`, `recentlyDeletedRestoreSuccess`, `recentlyDeletedRestoreFailed`, `recentlyDeletedDeleteForeverFailed`, `recentlyDeletedRetry`, `recentlyDeletedSubtitle` (placeholder: `name`, `when`), `recentlyDeletedSettingsTitle`, `recentlyDeletedSettingsSubtitle`. The Cycle I ARB parity guard will fail if any key is missing in either locale.
+- `test/screens/recently_deleted_screen_test.dart` (NEW, +12 tests) — list-loaded, list-empty, restore-happy-path, restore-failed, delete-forever-happy-path, delete-forever-cancel, error-retry (Retry key absent in happy path), navigation-from-settings, SnackBar-success, SnackBar-failed (delete-forever success snackbar), SnackBar-failed (restore failure path), ARB-parity (Spanish locale).
+
+**Closes:** ships the v1.4l-deferred UI surface (no new BUG closure — the data layer + the soft-delete + the tombstone are already in production from v1.4l + v1.4m).
+
+**No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes** — Cycle H is pure-Dart + new screen + new route + new tile + new tests + new ARB keys.
+
+**3-gate**: format 0 changed; analyze 0 issues; 1400/1400 tests pass.
+
+**Coverage:** `lib/screens/recently_deleted_screen.dart` 0% → 100% (new file); `lib/app_router.dart` 85.7% → 100%; `lib/screens/settings.dart` 85% → ≥90%.
+
+**Targeted runs:** `flutter test test/screens/recently_deleted_screen_test.dart` (+12) + `flutter test test/widget/widget_deep_link_test.dart` (+1 in the existing `buildAppRoute` group).
+
+**On-device smoke deferred to user** (no `adb` binary in this harness environment). Release APK to be rebuilt on this branch (Cycle H has production code; SHA1 may differ from v1.4-stab-G's `37cb73304ecce736160ca0df8136ec775e549dbe`).
+
+**Refs:** SYS-135, ADR-066, WF-063.

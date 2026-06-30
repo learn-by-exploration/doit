@@ -847,6 +847,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The habit this anchor was tracking has been paused or deleted. Restore it from Settings to resume this anchor.'**
   String get doAnchorTargetPausedHelp;
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. AppBar title of the top-level /recently-deleted screen — exposes the v1.4l tombstone surface (ADR-056) at the UI layer.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently deleted'**
+  String get recentlyDeletedTitle;
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Empty-state copy rendered on the /recently-deleted screen when no dos are currently tombstoned. Mentions the 30-day TTL so the user knows the surface is not permanent.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing here — deleted dos stay for 30 days before being purged.'**
+  String get recentlyDeletedEmpty;
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Label of the IconButton on each row of the /recently-deleted screen that calls DoRepository.restoreById (the inverse of the v1.4l soft-delete).
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get recentlyDeletedRestoreAction;
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Label of the IconButton on each row of the /recently-deleted screen that calls DoRepository.deleteById (the force-purge path) after a confirm dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete forever'**
+  String get recentlyDeletedDeleteForeverAction;
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Title of the AlertDialog that confirms a force-purge from the /recently-deleted screen. Mirrors the v1.4l home-tile delete-confirm tone but with a stronger verb.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this do forever?'**
+  String get recentlyDeletedDeleteForeverConfirm;
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Body of the AlertDialog that confirms a force-purge. Lists the three row types that get hard-deleted (do row + completions + rest-day budget) so the user knows the full cost.
+  ///
+  /// In en, this message translates to:
+  /// **'The do, its completion history, and its rest-day budget will be permanently removed. This cannot be undone.'**
+  String get recentlyDeletedDeleteForeverConfirmBody;
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Confirm button label inside the AlertDialog. Matches the row-level action label so the user can see the destructive verb twice before tapping.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete forever'**
+  String get recentlyDeletedDeleteForeverConfirmCta;
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Cancel button label inside the AlertDialog. Standard Material 3 wording.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get recentlyDeletedDeleteForeverCancel;
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Snackbar copy after a successful Restore tap on the /recently-deleted screen. Single-word feedback matching the v1.4l Undo SnackBar tone.
+  ///
+  /// In en, this message translates to:
+  /// **'Restored.'**
+  String get recentlyDeletedRestoreSuccess;
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Snackbar copy when a Restore tap completes but DoRepository.restoreById returns false (no matching tombstoned row). Defensive — the row was probably force-purged by a concurrent action.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not restore. Try again.'**
+  String get recentlyDeletedRestoreFailed;
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Snackbar copy when a Delete-forever tap fails. The screen catches the throw and surfaces the failed snackbar; the row stays in the list so the user can retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not delete. Try again.'**
+  String get recentlyDeletedDeleteForeverFailed;
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Label of the Retry button rendered in the error state of the /recently-deleted screen. Tapping it re-runs the list query (mirrors the v1.4l home-tile error-state pattern).
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get recentlyDeletedRetry;
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Subtitle on each row of the /recently-deleted screen. Shows the do's name and a human-friendly relative-time for the tombstone (e.g. '2 hours ago'). placeholders: name (String), when (String).
+  ///
+  /// In en, this message translates to:
+  /// **'{name} · deleted {when}'**
+  String recentlyDeletedSubtitle(String name, String when);
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Title of the Settings tile that navigates to the /recently-deleted screen. Matches the screen's AppBar title verbatim.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently deleted'**
+  String get recentlyDeletedSettingsTitle;
+
+  /// v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063. Subtitle of the Settings tile. Mentions the 30-day TTL (matches the v1.4m / ADR-057 auto-purge policy) so the user knows how long tombstoned dos are kept.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore or permanently delete dos you removed in the last 30 days.'**
+  String get recentlyDeletedSettingsSubtitle;
 }
 
 class _AppLocalizationsDelegate

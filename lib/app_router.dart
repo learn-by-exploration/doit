@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:doit/screens/add_habit.dart';
 import 'package:doit/screens/home.dart';
 import 'package:doit/screens/mission_launcher.dart';
+import 'package:doit/screens/recently_deleted_screen.dart';
 import 'package:doit/screens/routine_overlay_screen.dart';
 import 'package:doit/widget/widget_config_screen.dart';
 
@@ -32,6 +33,15 @@ Route<dynamic>? buildAppRoute(RouteSettings settings) {
       return buildHabitRoute(settings);
     case '/widget-config':
       return buildWidgetConfigRoute(settings);
+    case '/recently-deleted':
+      // v1.4-stab-H / Phase 48 / SYS-135 / ADR-066 / WF-063.
+      // Top-level route for the v1.4l tombstone surface.
+      // The screen renders its own AppBar so the route
+      // returns a `MaterialPageRoute<void>` (no result).
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => const RecentlyDeletedScreen(),
+      );
     default:
       return null;
   }
