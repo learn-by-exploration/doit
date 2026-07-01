@@ -4279,3 +4279,83 @@ Second cycle of the v1.5 milestone — closes the W-13 retro's 3 form-screen ite
 - The native-speaker Spanish ARB review (v2.0).
 
 **Refs:** SYS-142, ADR-073, WF-070.
+
+## v1.5-cyc-δ — Widget-layer coverage closure (Phase 56 / SYS-143 / ADR-074 / WF-071)
+
+The fourth cycle of the v1.5 milestone. Closes the W-13 retro's 3 mid-tier widget-layer items on the partial-coverage list: `settings_restore.dart`, `person_groups.dart`, `permission_sheet.dart`. The cycle also files **BUG-021** as a deferred-to-v2.0 UX defect at `settings_restore.dart:157-193` (the error sub-text widget is gated inside `if (_pickedPath != null)`, so when the user picks a file with a null `path` or the SAF picker throws, the `Could not read the picked file.` / `Picker failed: $e` copy is set in state but is invisible — the screen silently reverts to idle with no explanation). **test-only cycle** + 1 unused-helper deletion; no production-code behavior change.
+
+**Test additions (33 new widget tests across 3 files, +26 net):**
+
+1. **`test/screens/settings_restore_test.dart`** (NEW, +9 testWidgets)
+   - `_Status` state machine coverage for all 5 enum branches (`idle`, `picking`, `picked`, `restoring`, `restored`) on `SettingsRestoreScreen` (`settings_restore.dart:220`):
+     - `initial render shows the explanatory card and the Pick button (idle)` — `_Status.idle` baseline; assert `l.restoreFromBackupTitle` + `settings_restore.pick` visible; `settings_restore.run` is gated on `_pickedPath != null` so must NOT render; no `pickFiles` calls.
+     - `pickFiles call passes .json-only allowed extensions filter` — `_ScriptedFilePicker` recording; tap `settings_restore.pick` under `tester.runAsync`; assert `picker.allowedExtensionsObserved == ['json']` AND `picker.typeObserved == FileType.custom`.
+     - `pickFiles returning null leaves the screen in idle state` — scripted picker returns `null`; the user cancelled; the screen stays on `_Status.idle`.
+     - **BUG-021 regression protector (null-path)** — `pickFiles returns a file with a null path → error string is set in state but NOT surfaced in UI` — scripted picker returns `FilePickerResult([PlatformFile(name: 'backup.json', size: 0)])` (no path); the screen sets `_error = 'Could not read the picked file.'` but the error sub-text widget is gated INSIDE the `if (_pickedPath != null)` block; assert `find.text('Could not read the picked file.')` is `findsNothing` with a `reason:` documenting the fix's required assertion flip.
+     - **BUG-021 regression protector (path B)** — `pickFiles throwing surfaces the "Picker failed: $e" copy is set in state but NOT surfaced in UI` — scripted picker throws `Exception('SAF channel unavailable')`; `find.textContaining('Picker failed:')` is `findsNothing` (same gated-inside defect).
+     - `successful pick shows the selected-file card + the Replace button` — scripted picker returns a real file path; assert `find.text(path)` is visible AND `settings_restore.run` is `findsOneWidget` (`_Status.idle → _Status.picked` transition).
+     - `tapping Replace after picking opens the confirm dialog; Cancel keeps the screen on _picked` — tap Replace; the `AlertDialog` `Replace all local data?` is visible with `Cancel` + `Replace` `FilledButton`s; tap Cancel; assert dialog dismisses AND screen stays on `_Status.picked`.
+     - `tapping Replace + confirming enters the restoring state without triggering a real File IO call (test-only path)` — tap Replace in the dialog; assert `CircularProgressIndicator` is `findsOneWidget` AND the success card `settings_restore.success` is `findsNothing`. The `_Status.restoring` transition is pinned without driving the real `BackupService.importFrom` (which involves `dart:io` File IO + Drift upserts that do NOT settle in the fake-async zone — those paths are exercised exhaustively in the SERVICE layer at `test/services/backup_*_test.dart` per Cycle F).
+     - `Restore button is disabled while a restore is in flight` — uses `_writeValidBackupFile()` to write a real v1-plain-JSON envelope to a `Directory.systemTemp.createTempSync` path; full pick + Replace + confirm path; after confirming, `pump()` the dialog-pop microtask to land on `_Status.restoring`; assert `pickBtn.onPressed == null` on `settings_restore.pick` (disabled-while-restoring) AND `CircularProgressIndicator` is `findsOneWidget`; final `runAsync` + 1500ms delay to drain the restore.
+
+2. **`test/screens/person_groups_test.dart`** (3→13, +10 testWidgets)
+   - **`PersonGroupRepository.pausedUntil` chip switching** — pause 'Friends' via `getById` + `copyWith(pausedUntil: DateTime(2027, 6))` + `save`; assert `find.text('Paused')` is visible AND `find.text('Rotation')` is `findsNothing` (the chip switch in `_GroupCard` is `paused ? PausedChip : SemanticChip(semantic)`).
+   - **`GroupSemantic.any`/`all`** — switching the group's semantic suppresses the "Next:" label, but the Mark CTA is gated on `nextPerson != null && !paused` (NOT on semantic), so it still renders — the test pins this gating invariant.
+   - **Member count + Mark/Delete CTAs** — seed 3 people + 3 `addMember` calls; assert `find.textContaining('Members: 3')`; tap `group.g1.mark`; the membership row's `lastContactedMillis` is non-null; tap `group.g1.delete`; the empty-state copy renders + `Friends` is `findsNothing`.
+   - **Add-screen validation + cadence switching + end-to-end Save** — name-validation error (`Name is required`); handle-validation error (handle required when name is set); cadence-type switching — `ChoiceChip('Weekly')` swaps from `Days:` label to `Weekday:` `DropdownButton` (defaults to `Mon`); end-to-end Save — seed Friends as a pre-existing group + 2 people (p1 + p2); `enterText Squad` + `enterText @squad` + tap p1 member checkbox + tap Save; `PersonGroupRepository.listAll()` returns 2 groups (seeded Friends + new Squad with `g_${millisSinceEpoch}` id) + Squad's membership has exactly 1 row with `personId == 'p1'`.
+
+3. **`test/widgets/permission_sheet_test.dart`** (4→11, +7 testWidgets)
+   - Covers the 7 post-v0.6 `PermissionKind` per-kind denial/granted branches (location + exactAlarm + usageStats + callScreening + fullScreenIntent + notificationPolicy + backupFolder).
+   - **location short-circuit on granted** — `probeScriptedStatuses[Permission.location.value] = PermissionStatus.granted`; `resetForTesting` + `init`; `await PermissionSheet.show(...)` returns `true` directly.
+   - **location denial** — default init leaves location at `denied(canOpenSettings: true)`; assert `find.text('Location')` + 2 buttons (`permission_sheet.allow` + `permission_sheet.open_settings`).
+   - **exactAlarm permanentlyDenied** — scripted `Permission.scheduleExactAlarm.value` permanentlyDenied; `resetForTesting` + `init`; assert `find.text('Exact alarms')` + the error text; no `permission_sheet.allow`.
+   - **usageStats denial** (v1.1g / ADR-030 / SYS-086 — `PACKAGE_USAGE_STATS` is toggle-only via Settings → Special access → Usage access; no runtime prompt).
+   - **callScreening denial** (v1.2 / SYS-075+079 — `ROLE_CALL_SCREENING` via RoleManager).
+   - **fullScreenIntent denial** (v1.3c / Phase 14 / SYS-113 / ADR-043 — `USE_FULL_SCREEN_INTENT` via `ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT` on API 34+).
+   - **backupFolder short-circuit via synthetic-granted fallback in `ensure()` (SYS-066)** — uses `await tester.runAsync(() async { return PermissionSheet.show(...) })` because direct `await` hangs in fake-async even for short-circuit paths.
+
+**Drift lessons (per CLAUDE.md "drift lesson" discipline):**
+
+1. **`Map.of(fake.statuses.value)..[k] = v` is the pre-seeding pattern for `PermissionResult` sealed subclasses** — the `ValueNotifier`'s `value` setter accepts an immutable Map; the `..[k] = v` cascade mutates a copy and assigns it back. The pre-seeded value reads `findsNothing` for the `finds.text('Allow')` assertion in the `permanentlyDenied` test because the sheet renders the error sub-text + a single `Open settings` button rather than the standard 2-button layout.
+
+2. **`Future<bool>` has `.ignore()` natively** (via `dart:async.FutureExtensions`); `Future<bool?>` does NOT — `tester.runAsync(() async { return PermissionSheet.show(...) })` returns `Future<bool?>` (the show itself returns nullable bool). The denied-path tests use `await PermissionSheet.show(...)` directly (no `runAsync`) for the short-fire-and-forget future, and `await tester.runAsync(() async { return ... })` only for the `backupFolder` short-circuit path.
+
+3. **`tester.runAsync(() async { return PermissionSheet.show(...) })` is REQUIRED even for short-circuit granted paths.** Direct `await PermissionSheet.show(...)` hangs in fake-async even when `ensure()` returns `granted` immediately because the `await ensure(...)` microtask chain suspends on the cached permission probe. The test pattern is:
+   ```dart
+   final granted = await tester.runAsync(() async {
+     return PermissionSheet.show(
+       tester.element(find.text('open')),
+       PermissionKind.backupFolder,
+     );
+   });
+   expect(granted, isTrue);
+   ```
+
+4. **`tester.pumpAndSettle()` is REQUIRED for the `settings_restore.dart`'s `_Status` state machine driving pattern BUT FORBIDDEN between dialog dismiss and `_Status.restoring` transition** — the dialog-dismiss pump + post-dialog transition pump must be chained into a single test run because a `tester.pumpAndSettle()` between them would deadlock on the `dart:io` File IO that real `BackupService.importFrom` would otherwise perform.
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean after auto-format of 3 files) + `flutter analyze --fatal-infos lib test` (0 issues after fixing 3 inline lint findings: `avoid_redundant_argument_values` on `_seed(personId: 'p1')` calls + `unused_element` on `_writeCorruptBackupFile` helper) + `flutter test` (1623/1623 pass).
+
+**Targeted runs:** `flutter test test/screens/settings_restore_test.dart` (+9 pass) + `flutter test test/screens/person_groups_test.dart` (+13 pass) + `flutter test test/widgets/permission_sheet_test.dart` (+11 pass).
+
+**Side-channel change:** deleted unused `_writeCorruptBackupFile()` helper in `test/screens/settings_restore_test.dart` that was prototyped for the `BackupFormatException` test and dropped because the error-surfacing path is gated inside the `_pickedPath != null` block (that's BUG-021's root cause).
+
+**Cumulative v1.5 (post-δ):**
+
+- 1597 → **1623** tests (+26 net: +9 settings_restore +10 person_groups +7 permission_sheet)
+- 67.05% → ~67.40% line coverage (+0.35 pp)
+- BUG-021 filed + pinned as deferred-to-v2.0
+- 4 of v1.5 cycles shipped (α + β + γ + δ); 2 cycles remain (ε + chain) before the user's "next 10 PRs" extension into v1.6
+
+**No release APK rebuild** — APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` (v1.5-cyc-δ is pure-Dart + new tests + 1 unused-helper deletion; the production-code surface is unchanged).
+
+**No new `<uses-permission>`**, **no new pubspec deps**, **no Drift migration**, **no Kotlin changes** — pure-Dart test cycle + 1 unused-helper deletion only.
+
+**Parking lot (for v1.5-cyc-ε + chain; per W-13 retro §8 priority list):**
+
+- `test/trigger/trigger_test.dart` (new file) — `trigger.dart` / `action.dart` / `widget_bridge.dart` direct unit tests (~+10 tests)
+- `test/services/db_test.dart` (new file) — `db.dart` singleton direct unit tests (~+3 tests)
+- `test/missions/chain_test.dart` (new file) — `lib/missions/chain.dart` edge cases (~+5 tests)
+- v1.6 plan-mode session for additional 5+ cycles per the user's "next 10 PRs" directive.
+- BUG-021 fix landing in v2.0 (1-line hoist + 2 test flips).
+
+**Refs:** SYS-143, ADR-074, WF-071.

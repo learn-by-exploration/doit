@@ -3084,3 +3084,256 @@ Drift round-trip.
 **APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`**
 — v1.5-cyc-γ is pure-Dart + new tests; no production-code
 behavior change; no release APK rebuild.
+### WF-071 — Verify the v1.5-cyc-δ widget-layer coverage closure (v1.5-cyc-δ / Phase 56 / SYS-143 / ADR-074)
+
+**Scope.** The v1.5 milestone's fourth cycle retires
+the 3 widget-layer files from the v1.4-stab-W13
+retrospective's §8 v1.5 handoff list. The screen widgets
+(`lib/screens/settings_restore.dart`,
+`lib/screens/person_groups.dart`,
+`lib/widgets/permission_sheet.dart`) gain widget tests for
+every state-machine transition, every per-semantic chip
++ paused-chip + member-count path, and every post-v0.6
+`PermissionKind` per-kind denial/granted branch.
+
+**Test layers.**
+
+1. **`test/screens/settings_restore_test.dart`** (extend)
+   — **9 testWidgets** covering the `SettingsRestoreScreen`
+   `_Status` state machine (`settings_restore.dart:220`).
+   Uses a `_ScriptedFilePicker extends FilePicker` that
+   records `allowedExtensions` + `type` + `pickFilesCalls`
+   and can return either a `FilePickerResult` or throw.
+   - `initial render shows the explanatory card and the
+     Pick button (idle)` — `_Status.idle` baseline; assert
+     `l.restoreFromBackupTitle` + `settings_restore.pick`
+     visible; `settings_restore.run` is gated on
+     `_pickedPath != null` so must NOT render; no
+     `pickFiles` calls.
+   - `pickFiles call passes .json-only allowed extensions
+     filter` — tap `settings_restore.pick` under
+     `tester.runAsync`; assert `picker.allowedExtensionsObserved
+     == ['json']` AND `picker.typeObserved ==
+     FileType.custom` (the SAF picker must filter to
+     `.json` so users cannot pick arbitrary binaries).
+   - `pickFiles returning null leaves the screen in idle
+     state` — scripted picker returns `null`; the user
+     cancelled; the screen stays on `_Status.idle` (Pick
+     button still visible, Replace not visible, no error
+     surfaced).
+   - **`BUG-021 regression protector** — `pickFiles returns
+     a file with a null path → error string is set in state
+     but NOT surfaced in UI` — scripted picker returns
+     `FilePickerResult([PlatformFile(name: 'backup.json',
+     size: 0)])` (no path); the screen sets `_error =
+     'Could not read the picked file.'` but the error
+     sub-text widget is gated INSIDE the
+     `if (_pickedPath != null)` block at
+     `settings_restore.dart:157-193`; assert
+     `find.text('Could not read the picked file.')` is
+     `findsNothing`. **BUG-021 is filed as a deferred-to-v2.0
+     UX defect**; when fixed, this assertion flips to
+     `findsOneWidget`.
+   - **BUG-021 path B regression protector** — `pickFiles
+     throwing surfaces the "Picker failed: $e" copy is set
+     in state but NOT surfaced in UI` — scripted picker
+     throws `Exception('SAF channel unavailable')`;
+     `find.textContaining('Picker failed:')` is
+     `findsNothing` (same gated-inside defect).
+   - `successful pick shows the selected-file card + the
+     Replace button` — scripted picker returns a real file
+     path; assert `find.text(path)` is visible AND
+     `settings_restore.run` is `findsOneWidget`
+     (`_Status.idle → _Status.picked` transition).
+   - `tapping Replace after picking opens the confirm
+     dialog; Cancel keeps the screen on _picked` — tap
+     `settings_restore.run` under
+     `tester.pump(const Duration(milliseconds: 250))`; the
+     `AlertDialog` `Replace all local data?` is visible
+     with `Cancel` + `Replace` `FilledButton`s; tap Cancel;
+     assert the dialog dismisses AND the screen stays on
+     `_Status.picked`.
+   - `tapping Replace + confirming enters the restoring
+     state without triggering a real File IO call
+     (test-only path)` — tap Replace in the dialog; assert
+     `CircularProgressIndicator` is `findsOneWidget` AND
+     the success card `settings_restore.success` is
+     `findsNothing`. The `_Status.restoring` transition
+     is pinned without driving the real
+     `BackupService.importFrom` (which involves `dart:io`
+     File IO + Drift upserts that do NOT settle in the
+     fake-async zone — those paths are exercised
+     exhaustively in the SERVICE layer at
+     `test/services/backup_*_test.dart` per Cycle F).
+   - `Restore button is disabled while a restore is in
+     flight` — uses `_writeValidBackupFile()` to write a
+     real v1-plain-JSON envelope to a
+     `Directory.systemTemp.createTempSync` path; full
+     pick + Replace + confirm path; after confirming,
+     `pump()` the dialog-pop microtask to land on
+     `_Status.restoring`; assert `pickBtn.onPressed ==
+     null` on `settings_restore.pick`
+     (disabled-while-restoring) AND
+     `CircularProgressIndicator` is `findsOneWidget`;
+     final `runAsync` + 1500ms delay to drain the restore
+     before the next test starts.
+
+2. **`test/screens/person_groups_test.dart`** (extend)
+   — **13 testWidgets** covering the list-screen + the
+   add-form-screen.
+   - **Pre-existing baseline (3 tests)**: empty state
+     shows the "No contact groups" copy; renders a seeded
+     group with the next member; add screen shows the form
+     + the Save action.
+   - **`PersonGroupRepository.pausedUntil` chip switching
+     (v1.5-cyc-δ)**: pause 'Friends' via `getById` +
+     `copyWith(pausedUntil: DateTime(2027, 6))` + `save`;
+     assert `find.text('Paused')` is visible AND
+     `find.text('Rotation')` is `findsNothing` (the chip
+     switch in `_GroupCard` is `paused ? PausedChip :
+     SemanticChip(semantic)`).
+   - **GroupSemantic.any (v1.5-cyc-δ)**: switching the
+     group to `GroupSemantic.any` makes the "Next:" label
+     hide (semantic.any means "any member" — there is no
+     specific next); the Mark-contacted CTA is gated on
+     `nextPerson != null && !paused` (NOT on semantic), so
+     it still renders — assert
+     `find.byKey(const ValueKey('group.g1.mark'))` is
+     `findsOneWidget`.
+   - **GroupSemantic.all (v1.5-cyc-δ)**: same as any but
+     for `all`; the "Next:" line is suppressed.
+   - **member count (v1.5-cyc-δ)**: seed 3 people +
+     `addMember` 3 times; assert
+     `find.textContaining('Members: 3')` is `findsOneWidget`.
+   - **Mark-contacted CTA (v1.5-cyc-δ)**: tap
+     `group.g1.mark`; the membership row's
+     `lastContactedMillis` is no longer null
+     (`PersonGroupRepository.markContacted` writes a
+     non-null `DateTime.now()`).
+   - **Delete CTA (v1.5-cyc-δ)**: tap `group.g1.delete`;
+     the empty-state copy renders; `Friends` is
+     `findsNothing`.
+   - **name validation (v1.5-cyc-δ)**: tap Save on an
+     empty form; assert `find.text('Name is required')` is
+     `findsOneWidget` (the `_save()` validator gates at
+     `person_groups.dart:~250`).
+   - **handle validation (v1.5-cyc-δ)**: enterText `Test
+     group` for the name; tap Save; assert
+     `find.textContaining('Handle')` is `findsOneWidget`.
+   - **cadence type switching (v1.5-cyc-δ)**: default is
+     `EveryNDays` (Days: 7); tap `ChoiceChip('Weekly')`;
+     assert `Weekday:` label is visible AND `Mon` is the
+     selected dropdown value.
+   - **end-to-end Save (v1.5-cyc-δ)**: seed Friends as a
+     pre-existing group + 2 people (p1 + p2); pump
+     `AddPersonGroupScreen`; enterText `Squad` +
+     `@squad`; tap `group.member.p1`; tap
+     `add_person_group.save`; assert `listAll()` returns
+     2 groups (the seeded Friends + the new Squad) AND
+     the Squad's membership table has exactly 1 row with
+     `personId == 'p1'`.
+
+3. **`test/widgets/permission_sheet_test.dart`** (extend)
+   — **11 testWidgets** covering the 7 post-v0.6
+   `PermissionKind` per-kind denial branches plus the
+   existing 4 (notifications + contacts +
+   batteryOptimization + permanentlyDenied).
+   - **Pre-existing baseline (4 tests)**: notifications
+     granted short-circuit (SYS-067); contacts tap-Allow
+     path; permanentlyDenied shows error + single Open
+     settings button; batteryOptimization deep-link uses
+     the live bridge, not `openAppSettings` (SYS-068).
+   - **location short-circuit on granted (v1.5-cyc-δ)**:
+     `probeScriptedStatuses[Permission.location.value] =
+     PermissionStatus.granted`; `resetForTesting` + `init`
+     pattern from the notifications test; `await
+     PermissionSheet.show(...)` returns `true` directly.
+   - **location denial (v1.5-cyc-δ)**: default init leaves
+     location at `denied(canOpenSettings: true)`; assert
+     `find.text('Location')` + `permission_sheet.allow`
+     + `permission_sheet.open_settings`.
+   - **exactAlarm permanentlyDenied (v1.5-cyc-δ)**: scripted
+     `Permission.scheduleExactAlarm.value` permanentlyDenied;
+     `resetForTesting` + `init`; assert
+     `find.text('Exact alarms')` + the error text; no
+     `permission_sheet.allow`.
+   - **usageStats denial (v1.5-cyc-δ)** (v1.1g / ADR-030 /
+     SYS-086 — `PACKAGE_USAGE_STATS` is toggle-only via
+     Settings → Special access → Usage access; no runtime
+     prompt): default init leaves usageStats at
+     `denied(canOpenSettings: true)`; assert
+     `find.text('Usage access')` + 2 buttons.
+   - **callScreening denial (v1.5-cyc-δ)** (v1.2 / SYS-075
+     + SYS-079 — `ROLE_CALL_SCREENING` via RoleManager):
+     default init leaves callScreening denied; assert
+     `find.text('Call screening')` + 2 buttons.
+   - **fullScreenIntent denial (v1.5-cyc-δ)** (v1.3c /
+     Phase 14 / SYS-113 / ADR-043 — `USE_FULL_SCREEN_INTENT`
+     via `ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT` on API 34+):
+     default init leaves fullScreenIntent denied; assert
+     `find.text('Full-screen access')` + 2 buttons.
+   - **backupFolder short-circuit via synthetic-granted
+     (v1.5-cyc-δ)** (SYS-066 — the "permission" is a SAF
+     tree-URI; the sheet is never shown because `ensure()`
+     returns a synthetic `granted` when the cached value is
+     `null`): the test must `await tester.runAsync(() async
+     { return PermissionSheet.show(...); })` because direct
+     `await PermissionSheet.show` hangs in fake-async even
+     for short-circuit paths; assert the returned `bool?`
+     is `true`.
+
+**Closes.** The Cycle W-13 retro's 3 mid-tier widget-layer
+items on the partial-coverage list
+(`settings_restore.dart` + `person_groups.dart` +
+`permission_sheet.dart`). BUG-021 pinned as deferred-to-v2.0
+regression-protector.
+
+**Out-of-scope (deferred to a future cycle).** No
+production-code change in any of the 3 files. The cycle is
+test-only + 1 unused-helper deletion
+(`test/screens/settings_restore_test.dart:_writeCorruptBackupFile`
+was prototyped for the BackupFormatException path and
+dropped because the error-surfacing path is gated inside the
+`_pickedPath != null` block — that's BUG-021's root cause;
+filing the bug and pinning the regression-protector is the
+correct v1.5-cyc-δ deliverable; the actual fix lands when the
+error Card is hoisted OUTSIDE the `_pickedPath != null`
+gating — a 1-line code change + a test flip, deferred to v2.0
+per the W-13 closeout).
+
+**Coverage delta (estimated; final numbers land after Cycle
+ε's coverage-baseline run).** `lib/screens/settings_restore.dart`
+↑ from the state-machine-only gap to full state-machine
+coverage of all 5 `_Status` enum branches; `lib/screens/person_groups.dart`
+↑ from the 3 pre-existing tests to 13 covering the
+list-screen + add-form paths; `lib/widgets/permission_sheet.dart`
+7 post-v0.6 `PermissionKind` branches now have direct
+denial-path coverage + 1 granted-short-circuit path.
+
+**Verification.**
+
+1. **3-gate** (CLAUDE.md mandatory):
+   ```bash
+   dart format --output=none --set-exit-if-changed .
+   flutter analyze --fatal-infos lib test
+   flutter test
+   ```
+
+2. **Targeted** (per CLAUDE.md "always paste"):
+   ```bash
+   flutter test test/screens/settings_restore_test.dart
+   flutter test test/screens/person_groups_test.dart
+   flutter test test/widgets/permission_sheet_test.dart
+   ```
+
+3. **Expected results.** `dart format` clean after
+   auto-format of 3 files (the `flutter analyze` reports 3
+   initial issues — `avoid_redundant_argument_values` on
+   `_seed(personId: 'p1')` calls and `unused_element` on
+   `_writeCorruptBackupFile` — all fixed inline);
+   `flutter analyze --fatal-infos lib test` 0 issues;
+   `flutter test` 1623/1623 pass.
+
+**Cross-references.** SYS-143; ADR-074; WF-071; Milestone 13
+`### v1.5-cyc-δ`; v1.5-cyc-δ row; CHANGELOG `## v1.5-cyc-δ`;
+feature.md `## v1.5`.
