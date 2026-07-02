@@ -4364,12 +4364,30 @@ Fifth and last cycle of the v1.5 milestone. Closes the W-13 retro §8 last items
 
 **No new `<uses-permission>`**, **no new pubspec deps**, **no Drift migration**, **no Kotlin changes** — pure-Dart test cycle + 3 lint fixes only.
 
-**Parking lot (for v1.5-cyc-ε + chain; per W-13 retro §8 priority list):**
+**Parking lot (for v1.6 plan-mode session; per W-13 retro §8 priority list):**
 
-- `test/trigger/trigger_test.dart` (new file) — `trigger.dart` / `action.dart` / `widget_bridge.dart` direct unit tests (~+10 tests)
-- `test/services/db_test.dart` (new file) — `db.dart` singleton direct unit tests (~+3 tests)
-- `test/missions/chain_test.dart` (new file) — `lib/missions/chain.dart` edge cases (~+5 tests)
-- v1.6 plan-mode session for additional 5+ cycles per the user's "next 10 PRs" directive.
-- BUG-021 fix landing in v2.0 (1-line hoist + 2 test flips).
+- `lib/screens/add_habit.dart` + `add_person.dart` + `add_event.dart` form sub-branches (~+50 tests; v1.6-β..δ)
+- Sealed-hierarchy sweep: Action / Condition / MissionResult / DoProofMode (~+14 tests; v1.6-ε)
+- `calendar_service.dart` + `person_repository.dart` error paths (~+14 tests; v1.6-ζ)
+- `widget_bridge.dart` + `widget_action_invoker.dart` + `widget_service_proxy.dart` (~+10 tests; v1.6-η)
+- `MissionChain` + `sparkline` + `consecutive_counter` + `mission_result.dart` (~+10 tests; v1.6-θ)
+- `db.dart` + `migrations` + `permission_observer` + `main.dart` (~+18 tests; v1.6-ι)
+- Functional-bug cycle: `TemplateLibrary.seedBuiltIns` wiring + `automationsJson` restore (~+8 tests; v1.6-κ)
+- Doc cleanups: 2 stale TODOs + stale implementation_status header date (v1.6-λ)
+- BUG-021 fix landing in v1.6-α (1-line hoist + 2 test flips)
 
 **Refs:** SYS-143, ADR-074, WF-071.
+
+## v1.5-cyc-chain — `MissionChain` + `MissionChainExecutor` coverage closure (Phase 58 / SYS-145 / ADR-076 / WF-073)
+
+Sixth and final cycle of the v1.5 milestone. Closes the W-13 retro §8 last partial-coverage item: `lib/missions/chain.dart` (42.9% per W-13 §8 — transitively covered by the baseline 6 tests) + `lib/missions/chain_executor.dart` (the executor edge cases not previously exercised directly). **Test count:** 1637 → **1650** (+13 net — the plan targeted +15 but the 2 deferred `MissionTimedOut` propagation tests are pinned as a deferred-to-v2.0 item in the test file header per ADR-076). **Cumulative v1.5:** ~67.50% → ~67.57% line coverage (+0.07 pp; `chain.dart` 42.9% → ~75% + `chain_executor.dart` ↑ to direct unit coverage of all 6 plan target edge-case categories). **APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`** — v1.5-cyc-chain is pure-Dart + new tests; no production-code behavior change; no release APK rebuild.
+
+**EXTEND `test/missions/chain_test.dart` (+8 tests)** — `MissionChainExecutor.run` edge cases. (a) `input type mismatch at mission 0 returns ChainFailedAt wrapping MissionFailed("input-mismatch")` (feed `TextInput('ok')` to a `HoldMission`; `ChainFailedAt(index: 0)` wrapping `MissionFailed(reason: 'input-mismatch')`); (b) `idempotent for same chain + inputs (run twice yields identical results)` (3-mission all-pass chain run twice; both return `ChainPassed` with same length + identical per-index `runtimeType`); (c) `executor short-circuits on first failure (passed input at index N+1 would have produced MissionPassed)` — **INDIRECT-PROOF pattern** (chain of 3; index 1 fails via `TextInput('nope')`; index 2 carries a passing `MathInput`; if executor walked all 3 → `ChainPassed`; the `ChainFailedAt(1, ...)` result proves short-circuit WITHOUT a spy — the `Mission` sealed-class constraint forbids spy extensions; ADR-076 §1); (d) `first-mission failing stops at index 0` (chain `[_type, _hold, _math]` with `TextInput('nope')` at index 0; `ChainFailedAt(0, ...)`); (e) `last-mission failing stops at last index` (chain `[_hold, _type, _math]` with `MathInput(answer: 999)` at index 2; `ChainFailedAt(2, ...)` + `reason` startsWith `'wrong-answer:'`); (f) `single-mission chain failing returns ChainFailedAt(index: 0)` (chain `[_type]` with `TextInput('nope')`; `ChainFailedAt(index: 0)` + `reason == 'phrase-mismatch'` — input-length 1==1 so NOT input-length-mismatch); (g) `ChainTimedOut is-a ChainFailedAt (the type hierarchy)` (`const ChainTimedOut(index: 0)`; assert `isA<ChainFailedAt>()` + `isA<MissionChainResult>()` + `index == 0` + `result is MissionTimedOut` — pins the wrap contract INDEPENDENTLY of the executor; the dynamic execution path is not exercised because no public mission emits `MissionTimedOut` today); (h) `ChainPassed contains all per-mission results in order` (3-mission all-pass; assert `ChainPassed.results.length == 3` with all `MissionPassed`; per-mission detail pinning: `results[0].detail == 'held=2000ms'` HoldMission deterministic, `results[1].detail == null` TypeMission, `results[2].detail == null` MathMission).
+
+**NEW `test/missions/chain_api_test.dart` (+5 tests)** — `MissionChain` API surface. (a) `from wraps the source as unmodifiable (mutator throws UnsupportedError)` — `MissionChain.from([_hold, _type])`; assert `chain.add(...)` + `chain.removeAt(0)` + `chain[0] = ...` ALL throw `UnsupportedError` (the `UnmodifiableListView` contract from `lib/missions/chain.dart`); length unchanged after each rejected mutation; (b) `empty has length 0 and is reusable` (`identical(MissionChain.empty, MissionChain.empty) == true`; assert `length == 0` + `isEmpty == true` + `expect(a, isEmpty)` — the canonical empty sentinel); (c) `totalTimeout sums per-mission timeouts (SYS-031)` (chain `[_hold (5s), _hold2 (10s), _type (7s)]`; `chain.totalTimeout == Duration(seconds: 22)` — pins SUM behavior independently of the SYS-031 5-minute cap); (d) `value equality + hashCode match for identical contents` (two chains built independently with same missions; `expect(a, equals(b))` + `a.hashCode == b.hashCode` + `identical(a, b) == false` — enables Set<MissionChain> + Map<MissionChain, ...> consumers); (e) `== returns false when order differs` (`[_hold, _type]` vs `[_type, _hold]`; `expect(a == b, isFalse)` — order-sensitive equality).
+
+**v1.5 milestone is now COMPLETE** (6 cycles: α + β + γ + δ + ε + chain). Cycle v1.5-cyc-chain is the **LAST cycle** in the v1.5 milestone. **Cumulative v1.5:** 1547 (post-stab) → **1650** tests (+103 net across 6 cycles; +6.66% from post-stabilization baseline); 66.41% → ~67.57% line coverage (+1.16 pp); APK SHA1 stayed at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` throughout (every cycle was pure-Dart + new tests; zero production-code behavior changes). Next up: **v1.6-α (PR #68) BUG-021 fix** (1-line hoist in `lib/screens/settings_restore.dart:157-193` + 2 test flips in `test/screens/settings_restore_test.dart:200-255`).
+
+**No new `<uses-permission>`**, **no new pubspec deps**, **no Drift migration**, **no Kotlin changes** — pure-Dart test cycle only.
+
+**Refs:** SYS-145, ADR-076, WF-073.

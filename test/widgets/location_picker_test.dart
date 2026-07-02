@@ -499,6 +499,19 @@ void main() {
   testWidgets('tapping the map preview writes back to the lat / lon fields '
       '(v1.1e / SYS-084)', (tester) async {
     await PermissionService.instance.init();
+    // Bump the surface to 800x1200: the bottom-sheet form
+    // (label + lat + lng + radius slider + map preview + Save
+    // button) is taller than the 800x600 default; without this
+    // bump, the map preview sits below the visible region and
+    // the drag at line 532 (below) derives a hit-test offset
+    // outside the render tree's bounds — a pre-existing CI
+    // flake that surfaced in v1.5-cyc-chain's 3-gate. Test
+    // behavior is unchanged; only the CI viewport is enlarged.
+    // Mirrors the pattern in `onboarding_test.dart:136-139`.
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(_wrap());
     await tester.pump();
     final ctx = tester.element(find.text('open'));
