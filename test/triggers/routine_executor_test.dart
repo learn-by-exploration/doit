@@ -132,10 +132,7 @@ void main() {
       const inverted = ConditionBatteryRange(low: 80, high: 20);
 
       // Act + Assert.
-      expect(
-        inverted.validate,
-        throwsA(isA<ConditionBatteryRangeInverted>()),
-      );
+      expect(inverted.validate, throwsA(isA<ConditionBatteryRangeInverted>()));
     });
   });
 
