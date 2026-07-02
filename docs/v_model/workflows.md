@@ -3337,3 +3337,118 @@ denial-path coverage + 1 granted-short-circuit path.
 **Cross-references.** SYS-143; ADR-074; WF-071; Milestone 13
 `### v1.5-cyc-δ`; v1.5-cyc-δ row; CHANGELOG `## v1.5-cyc-δ`;
 feature.md `## v1.5`.
+
+### WF-072 — Verify the v1.5-cyc-ε direct-unit-test coverage closure (v1.5-cyc-ε / Phase 57 / SYS-144 / ADR-075)
+
+**Scope.** The v1.5 milestone's fifth cycle retires
+the W-13 retro §8's last 2 items on the partial-coverage
+list (the `RoutineExecutor` direct unit tests + the
+`AppDatabaseService` singleton direct unit tests) plus
+the `PlatformWidgetBridge.skip` / `undo` widget-action
+sub-paths. Three test files gain direct unit tests; no
+production-code change.
+
+**Test layers.**
+
+1. **`test/triggers/routine_executor_test.dart`** (NEW)
+   — **8 tests** in 4 groups. Direct unit tests for
+   `RoutineExecutor`:
+   - **dispatch group (2 tests)**: `dispatch_fires_after_validation`
+     (valid automation + `enabled: true` fires once);
+     `dispatch_skipped_when_disabled` (the `enabled`
+     flag IS the "expires" idiom — no separate
+     `TriggerExpired` exists in the model).
+   - **condition group (2 tests)**: `shouldFire_propagates_condition_validation`
+     (null condition is always-true; valid
+     `ConditionTimeWindow(9-17)` passes; inverted
+     `ConditionBatteryRange(low: 80, high: 20)` throws
+     `ConditionBatteryRangeInverted`);
+     `condition_battery_range_inverted_low_greater_than_high_throws`
+     (the model-level `validate()` throws).
+   - **action group (3 tests)**: `action_dispatch_overrides_silent_per_ringer_mode`
+     (each `SilentMode` leaf maps to a `RingerMode` leaf
+     with the same `wireName` — regression-protector for
+     the dispatcher's `_toRingerMode` switch);
+     `action_dispatch_open_app_pending_routes` (the
+     public-API path for the home-screen listener —
+     `executor.appendOpenApp(RoutineOpenAppRequest(...))`
+     appends to `pendingOpenApp`);
+     `action_validate_propagates_through_automation_validate_chain`
+     (an `ActionNotify` with empty body throws
+     `ActionNotifyEmptyBody`; `Automation.validate()`
+     propagates the same exception — does NOT wrap it
+     in `AutomationInvalid`).
+   - **resetForTesting group (1 test)**:
+     `routine_executor_reset_for_testing_clears_registry_and_pending`
+     (clears both the registry AND the pending
+     `pendingOpenApp` queue).
+
+2. **`test/services/db_singleton_test.dart`** (NEW) —
+   **3 tests** for `AppDatabaseService`:
+   - `init_is_idempotent` — a second `init()` does not
+     re-bind `db` and resolves immediately.
+   - `closeForTesting_re_init_round_trip` — the
+     round-trip used by every repository test in
+     `setUp`/`tearDown`.
+   - `db_getter_throws_StateError_pre_init` — the
+     documented pre-init guard.
+
+3. **`test/widget/widget_bridge_test.dart`** (extend,
+   +3 tests) — `FakeWidgetBridge.skip` / `undo`
+   recording + scripted-return contract;
+   `PlatformWidgetBridge.skip` / `undo` swallow
+   `MissingPluginException` and return `false` per
+   ADR-013 (the "missing plugin = false" uniform
+   contract for the widget-action surface).
+
+**Trade-offs accepted.**
+
+- **`routine_executor.dart` private state machinery
+  (`_dispatchAction`, `_toRingerMode`, etc.) is NOT
+  directly unit-testable.** The private arms are
+  exercised via the public `dispatch` / `shouldFire` /
+  `appendOpenApp` entry points; the `_toRingerMode`
+  wireName contract is pinned by the
+  `action_dispatch_overrides_silent_per_ringer_mode`
+  test's leaf-by-leaf check.
+- **`routine_executor` `Condition` validation uses
+  the model's `validate()` method directly**, not
+  the executor's own private validator. This is
+  intentional — the model owns its validation
+  contract; the executor delegates. The
+  `shouldFire_propagates_condition_validation`
+  test exercises the propagation, not the
+  executor's own validation logic.
+- **No `_MethodChannelCalendarSource`-style
+  `MissingPluginException` test for the new
+  `widget_bridge` paths** — the swallow is in
+  `_safeResult` which is a private helper. The
+  test exercises the public `skip` / `undo` methods
+  end-to-end through the `_safeResult` path; the
+  contract is the same as the existing
+  `snapshot` / `requestRefresh` tests.
+
+**Test count impact.** 1623 → **1637** (+14 net).
+
+**3-gate verification (this cycle).**
+
+- `dart format --output=none --set-exit-if-changed .`
+  (clean after auto-format of 3 files)
+- `flutter analyze --fatal-infos lib test` (0 issues)
+- `flutter test` (1637/1637 pass)
+
+**Files changed in this cycle.**
+
+- **NEW** `test/triggers/routine_executor_test.dart`
+  (+8 tests, 246 lines).
+- **NEW** `test/services/db_singleton_test.dart` (+3
+  tests, 102 lines).
+- **EXTEND** `test/widget/widget_bridge_test.dart`
+  (+3 tests beyond the existing 19; ~+50 lines).
+- **0 production-code changes** in any
+  `lib/triggers/`, `lib/routines/`, `lib/services/`,
+  or `lib/widget/` file.
+- **No manifest changes, no pubspec changes, no
+  Kotlin changes, no new Drift migration.**
+
+**Cross-references.** SYS-144; ADR-075; WF-072; Milestone 13.
