@@ -53,6 +53,24 @@ void main() {
       final bridge = FakeWidgetBridge();
       expect(await bridge.snapshot(), isNull);
     });
+
+    // v1.5-cyc-ε — FakeWidgetBridge.skip / undo recording
+    // (SYS-144 / ADR-075 / WF-072). Single test pins both
+    // skip and undo recording + scripted-result contract.
+    test(
+      'skip and undo record the habit id + return the scripted result',
+      () async {
+        final bridge = FakeWidgetBridge();
+        bridge.nextSkipResult = false;
+        bridge.nextUndoResult = false;
+
+        expect(await bridge.skip('h1'), isFalse);
+        expect(await bridge.undo('h2'), isFalse);
+
+        expect(bridge.skipHabitIds, ['h1']);
+        expect(bridge.undoHabitIds, ['h2']);
+      },
+    );
   });
 
   group('PlatformWidgetBridge', () {
@@ -123,6 +141,33 @@ void main() {
         throw MissingPluginException('not implemented');
       });
       await bridge.requestRefresh();
+    });
+
+    // v1.5-cyc-ε — skip / undo round-trip contract
+    // (SYS-144 / ADR-075 / WF-072). ADR-013 says a
+    // MissingPluginException surfaces as `false` (the safe
+    // side-effect-free answer).
+    test('skip returns false on MissingPluginException (ADR-013)', () async {
+      // Arrange — the channel throws MissingPluginException.
+      final bridge = PlatformWidgetBridge();
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        throw MissingPluginException('not implemented');
+      });
+
+      // Act + Assert — `_safeResult` swallows the exception
+      // and returns `null`; `skip` then defaults to `false`.
+      expect(await bridge.skip('h1'), isFalse);
+    });
+
+    test('undo returns false on MissingPluginException (ADR-013)', () async {
+      // Arrange — the channel throws MissingPluginException.
+      final bridge = PlatformWidgetBridge();
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        throw MissingPluginException('not implemented');
+      });
+
+      // Act + Assert — same `_safeResult` swallow path.
+      expect(await bridge.undo('h1'), isFalse);
     });
   });
 

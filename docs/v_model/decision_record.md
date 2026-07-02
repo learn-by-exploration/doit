@@ -6662,3 +6662,175 @@ warning cleanups in `_ScriptedFilePicker`'s long arg list
    await _ensure(Permission.location); break;`). Adding a
    new `PermissionKind` value requires adding a new test
    that covers the new branch.
+
+---
+
+## ADR-075 — Land v1.5-cyc-ε (trigger/action/widget_bridge/db singleton coverage closure) as a single combined PR (v1.5-cyc-ε / Phase 57 / SYS-144 / WF-072)
+
+**Status.** Accepted 2026-07-02 (this PR #66).
+
+**Context.**
+
+The v1.4-stab-W13 retrospective (§8 "Handoff to v1.5")
+identified the last 2 items on the partial-coverage list
+plus a `widget_bridge` sub-path:
+
+1. `lib/triggers/action.dart` and
+   `lib/triggers/condition.dart` + `RoutineExecutor` —
+   the trigger/condition/action sealed hierarchy has full
+   direct unit tests for `Action` and `Condition` in
+   `test/triggers/action_test.dart` and
+   `condition_test.dart` (since v0.x), but
+   `RoutineExecutor` (the state-machine that registers
+   automations and dispatches `AutomationFired` events)
+   has only **transitive** coverage from integration tests
+   — no direct unit tests for the `dispatch` /
+   `shouldFire` / `_dispatchAction` /
+   `appendOpenApp` / `resetForTesting` surfaces.
+2. `lib/services/db.dart` — the `AppDatabaseService`
+   singleton has only transitive coverage from the ~30
+   repository test files that call
+   `AppDatabaseService.instance.closeForTesting()` in
+   `setUp`. The singleton's `init()` idempotency, the
+   `db` getter's pre-init `StateError` guard, and the
+   `closeForTesting()` re-init round-trip are not pinned
+   by a dedicated test.
+3. `lib/widget/widget_bridge.dart` — the `PlatformWidgetBridge`
+   class has tests for the `snapshot` / `cacheSnapshot` /
+   `requestRefresh` surfaces, but `skip` and `undo` (the
+   2 widget-actions the user can tap from the home-screen
+   widget) lack direct tests for the `MissingPluginException`
+   swallow path (ADR-013 says a missing plugin returns
+   `false` — the safe side-effect-free answer).
+
+**Decision.**
+
+Land v1.5-cyc-ε as a single combined PR covering all 3
+sources of coverage closure. The tests-only cycle adds
+14 net tests across 3 test files:
+
+1. NEW `test/triggers/routine_executor_test.dart` (+8
+   tests) — direct unit tests for `RoutineExecutor`:
+   - `dispatch` fires when trigger + condition + action
+     all validate and `enabled=true` (happy path).
+   - `dispatch` skips when `enabled=false` (the
+     "expires" idiom — the `enabled` flag IS the
+     expires mechanism).
+   - `shouldFire` propagates condition validation: null
+     condition is always-true; valid condition passes;
+     `ConditionBatteryRange(low: 80, high: 20)` throws
+     `ConditionBatteryRangeInverted`.
+   - `ConditionBatteryRange.validate()` throws
+     `ConditionBatteryRangeInverted` when low > high.
+   - The `SilentMode` → `RingerMode` mapping in the
+     dispatcher's `_toRingerMode` switch is 1:1
+     (regression-protector for the wireName contract).
+   - `appendOpenApp` appends a `RoutineOpenAppRequest`
+     to `pendingOpenApp` (the public API for the
+     home-screen listener).
+   - `Action.validate()` propagates
+     `ActionNotifyEmptyBody` through
+     `Automation.validate()` (regression-protector for
+     the exception-wrapping discipline).
+   - `resetForTesting()` clears the registry AND the
+     pending `pendingOpenApp` queue.
+2. NEW `test/services/db_singleton_test.dart` (+3 tests)
+   — direct unit tests for `AppDatabaseService`:
+   - `init()` is idempotent (a second `init()` does not
+     re-bind `db` and resolves immediately).
+   - `closeForTesting()` then `init()` re-opens a fresh
+     DB (the round-trip used by every repository test).
+   - The `db` getter throws `StateError` with a
+     documented message before `init()` has resolved
+     (the documented pre-init guard).
+3. EXTEND `test/widget/widget_bridge_test.dart` (+3
+   tests) — `PlatformWidgetBridge.skip()` swallows
+   `MissingPluginException` and returns `false`
+   (ADR-013); `PlatformWidgetBridge.undo()` does the
+   same; `FakeWidgetBridge.skip` / `FakeWidgetBridge.undo`
+   record the habit id and return the scripted result.
+
+**Rationale.**
+
+1. **Single-PR bundled scope matches the v1.5 α β γ δ
+   precedent.** Each of the 3 sources is a low-Δcoverage
+   direct unit-test gap; bundling them shares the
+   V-Model artifact overhead (SYS + ADR + WF + 5 doc
+   updates + memory file) across the 3 files instead of
+   repeating it 3x. The per-cycle ritual is the
+   expensive part; the per-file test additions are cheap.
+2. **Tests-only cycle is minimal-touch.** The 3 sources
+   have NO production-code changes. The 3 new test files
+   use only `flutter_test` + the in-memory Drift
+   executor (already present per `pubspec.yaml`).
+3. **`RoutineExecutor` is the dispatcher, not the
+   model.** The `Action` / `Condition` / `Trigger` model
+   classes (in `lib/triggers/`) are pure-Dart and have
+   dedicated direct tests since v0.x. The
+   `RoutineExecutor` (in `lib/routines/`) is the
+   state-machine that registers, fires, and resets —
+   the model-vs-executor split is intentional. The
+   executor's surfaces are the coverage gap, not the
+   model.
+4. **`AppDatabaseService` is the most-imported service
+   in the app.** The 3 new tests pin the singleton's
+   idempotency / re-init round-trip / pre-init guard
+   that every repository test relies on transitively.
+
+**Consequences.**
+
+- **Test count:** 1623 → **1637** (+14 net). See
+  `docs/v_model/implementation_status.md` v1.5-cyc-ε
+  row for the per-file deltas.
+- **APK SHA1 stays at Cycle H's
+  `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`** —
+  v1.5-cyc-ε is pure-Dart + new tests; no
+  production-code behavior change; no release APK
+  rebuild.
+- **No new `<uses-permission>`**, **no new pubspec
+  deps**, **no Drift migration**, **no Kotlin
+  changes** — pure-Dart test cycle only.
+- **No V-Model artifact ripple.** SYS-144, ADR-075,
+  WF-072 are the only new IDs for this cycle.
+- **`flutter_test` 2-arg test pattern:** every new
+  test uses AAA structure with deterministic
+  caller-supplied `now: DateTime(2026, 7, 1, 10)` —
+  no `DateTime.now()` in tests (per `lib-habits.md` /
+  `lib-missions.md` model-purity rule, extended to
+  the executor layer).
+
+**Drift lessons (per CLAUDE.md "drift lesson"
+discipline).**
+
+1. **`avoid_redundant_argument_values` lint is a
+   false-positive on `DateTime(2026, 7, 1)`** — the
+   `RoutineOpenAppRequest.at` named parameter is
+   `required` (no default), so the analyzer SHOULD
+   not flag an explicit value. The lint fires anyway
+   for `at: DateTime(2026, 7, 1)` (without hours);
+   the workaround is to add an hour component
+   (`DateTime(2026, 7, 1, 12)`) which makes the
+   analyzer happy. The lint logic is buggy; this is
+   a documented workaround for v1.5-cyc-ε and
+   downstream v1.6 cycles.
+
+2. **`unnecessary_lambdas` lint prefers
+   `setUp(RoutineExecutor.instance.resetForTesting)`
+   over `setUp(() { ... })`** when the callback is a
+   single method tearoff. v1.5-cyc-ε uses the tearoff
+   form.
+
+3. **`prefer_const_declarations` lint fires on
+   `final` locals initialized to a `const` expression**
+   — the v1.5-cyc-ε test file uses `const trigger =
+   const TriggerTimeOfDay(hour: 9, minute: 0)` (not
+   `final`).
+
+4. **`Future<bool?>` has `.ignore()` natively** in
+   `dart:async.FutureExtensions` — the
+   `PermissionSheet.show` future (used in v1.5-cyc-δ)
+   is `Future<bool?>` and needs `await
+   tester.runAsync(() async { return ... })` for the
+   synthetic-granted `backupFolder` short-circuit path
+   (the `await ensure(...)` microtask chain suspends
+   on the cached permission probe).
