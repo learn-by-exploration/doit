@@ -6834,3 +6834,31 @@ discipline).**
    synthetic-granted `backupFolder` short-circuit path
    (the `await ensure(...)` microtask chain suspends
    on the cached permission probe).
+
+## ADR-076 — `MissionChain` + `MissionChainExecutor` test seam: sealed-class constraint + indirect-proof pattern (v1.5-cyc-chain)
+
+**Context.** v1.5-cyc-chain closes the last item on the v1.4-stab-W13 retrospective §8 priority list — `lib/missions/chain.dart` + `lib/missions/chain_executor.dart`. The plan targeted +15 net tests (10 edge-case executor + 5 API surface), but the `Mission` sealed-class constraint blocked the spy-based approach: `Mission` is declared `sealed` in `lib/missions/mission.dart`, so any test file outside that library cannot extend it. Spy-style tests with `_SpyMission extends Mission { int verifyCalls = 0; MissionResult verify(MissionInput) => (++verifyCalls, ...); }` fail to compile with `"The class 'Mission' can't be extended, implemented, or mixed in outside of its library because it's a sealed class."`
+
+**Decision.**
+
+1. **Test against public `Mission` subclasses only.** The executor's behavior is fully exercised by feeding `HoldMission`/`TypeMission`/`MathMission` crafted `MissionInput`s that return `MissionPassed` or `MissionFailed`. The 2 genuinely-impossible-to-test cases — `MissionTimedOut` propagation at index 0 / at last index with a verify-counter assertion — are **deferred to v2.0** when a `MissionTimedOut`-returning leaf mission lands (currently no public mission emits TimedOut; the widget owns the wall-clock and passes a "no answer" `MissionInput`). Documented in the `chain_test.dart` header comment so the deferral is explicit.
+
+2. **Use the indirect-proof pattern for short-circuit testing.** A naive test for "executor stops at first failure" would use a spy mission with a `verifyCalls` counter. Since spies are forbidden, the test feeds a PASSING input at index N+1 to prove the executor stopped: if the executor walked all N, it would have returned `ChainPassed`. The fact that it returns `ChainFailedAt(N-1, ...)` proves short-circuit without instrumenting the executor. The third chain_test test (`executor short-circuits on first failure (passed input at index N+1 would have produced MissionPassed)`) is the canonical example.
+
+3. **Pin the `ChainTimedOut` data shape independently.** The executor's `r is MissionTimedOut` branch wraps as `ChainTimedOut(index: i)`, but no public mission emits TimedOut. The type-hierarchy test (`ChainTimedOut is-a ChainFailedAt`) instantiates the sealed subclass directly (`const ChainTimedOut(index: 0)`) and asserts the `isA<ChainFailedAt>` + `isA<MissionChainResult>` + `index == 0` + `result is MissionTimedOut` shape. This pins the wrap contract independently of the dynamic execution path.
+
+4. **`UnmodifiableListView` is the chain's API surface, NOT a named `missions` getter.** `chain.missions` does NOT exist (the user might assume it does). The chain implements `List<Mission>` directly (length/isEmpty/[]/iterator), so iteration uses `chain[i]` or `chain.length`. The `chain_api_test.dart` tests use `chain.length`, `chain.isEmpty`, `expect(chain, isEmpty)` — never `chain.missions.length`. The unmodifiable contract is verified by `chain.add(...) throws UnsupportedError` + `chain.removeAt(...) throws UnsupportedError` + `chain[0] = ... throws UnsupportedError` (the `UnmodifiableListView` rejects all three mutation paths).
+
+**Drift lessons for the cycle.**
+
+(a) **`Mission` is sealed at the language level** (Dart 3 `sealed` modifier in `lib/missions/mission.dart`), so the test file's import line `import 'package:doit/missions/mission.dart';` brings in the type but cannot extend it. A `// ignore: cannot_be_extended` lint suppression does NOT exist — there is no path to compile a spy. The only escape hatches are: (i) test against public subclasses (chosen), (ii) wait for v2.0 when a TimedOut leaf lands, (iii) refactor `Mission` from `sealed` to `abstract` (rejected — `sealed` is the Dart 3 exhaustive-switch guarantee).
+
+(b) **`UnmodifiableListView` accepts only `length`/`isEmpty`/`[]`/`iterator`** for reads — any `add`/`removeAt`/indexed-assign throws `UnsupportedError`. The 3 mutations are pinned explicitly in `chain_api_test.dart`'s first test.
+
+(c) **`isA<ChainPassed>()` chained with `isNot(isA<ChainPassed>())` is the indirect-proof pattern** — the chain_test "executor short-circuits" test asserts `expect(result, isNot(isA<ChainPassed>()))` AFTER asserting `result is ChainFailedAt(1, ...)`. This is a slightly redundant pair, but the `isNot` assertion makes the "would-have-passed" intent explicit in the test code.
+
+(d) **`MissionChain.empty` is a canonical `static const` singleton**, not a factory. `identical(MissionChain.empty, MissionChain.empty) == true`. The chain_api_test pins this with `expect(identical(a, b), isTrue)` — a future refactor that switches to `const MissionChain.empty = MissionChain(<Mission>[])` would break the canonicalization if the constructor becomes non-const; the test pins the contract.
+
+(e) **The 2 deferred tests are documented inline** in the test file header comment (not just in this ADR). The header comment says "the '+2' dropped tests (MissionTimedOut propagation at index 0 / at last index with a verify-counter assertion) are deferred to v2.0 when a `MissionTimedOut`-returning leaf mission lands". This is the regression-protector pattern: when v2.0 adds a TimedOut-emitting mission, the developer reads the header and adds the 2 tests back.
+
+**Consequences.** The cycle ships at +13 net tests instead of targeted +15 (the 2 deferred TimedOut tests are documented, not lost). All 13 tests pass against the public `Mission` surface. The executor's contract — short-circuit on first failure, idempotent run, type-hierarchy branch wrap — is fully pinned. Future cycles that add a new `Mission` subclass automatically pick up the existing tests' coverage IF the subclass plays the same input/result contract (no test file changes required).

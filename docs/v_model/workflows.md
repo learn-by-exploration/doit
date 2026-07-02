@@ -3452,3 +3452,18 @@ production-code change.
   Kotlin changes, no new Drift migration.**
 
 **Cross-references.** SYS-144; ADR-075; WF-072; Milestone 13.
+
+## WF-073 — Verify the `MissionChain` + `MissionChainExecutor` coverage closure (v1.5-cyc-chain / Phase 58)
+
+**Test layers** (in execution order):
+
+- **EXTEND** `test/missions/chain_test.dart`
+  (+8 tests beyond the existing 6 baseline; ~+204 lines).
+- **NEW** `test/missions/chain_api_test.dart`
+  (+5 tests; ~+112 lines).
+- **0 production-code changes** in any
+  `lib/missions/` file (chain + executor are pure Dart).
+- **No manifest changes, no pubspec changes, no
+  Kotlin changes, no new Drift migration.**
+
+**Cross-references.** SYS-145; ADR-076; WF-073; Milestone 13.
