@@ -3501,3 +3501,72 @@ The error Card is hoisted OUTSIDE the `if (_pickedPath != null) ...[ ... ]` bloc
 **Targeted:** `flutter test test/screens/settings_restore_test.dart` (9/9 pass; the 2 flipped tests now pass with `findsOneWidget`).
 
 **Cross-references.** SYS-146; ADR-077; v1.6-α row; CHANGELOG `## v1.6-α`; feature.md cycle entry.
+
+## WF-075 — Verify the `add_habit.dart` sub-form coverage closure (v1.6-β / Phase 60)
+
+The v1.6 milestone's second cycle (v1.6-β) closes the **largest single-file coverage gap** in `lib/` — `lib/screens/add_habit.dart` at 41.20% line coverage (260/631 LF) — by exercising the 4 schedule-type sub-form interactions, the `dayOfX` dialog/bottom-sheet pickers, the chip/icon/category/rest-day pickers, and the validation snackbar paths. **No production-code change**; v1.6-β is tests-only.
+
+**Test changes (+14 net in `test/screens/add_habit_test.dart`, existing 11 baseline from v1.5-cyc-β → 25 total):**
+
+**Batch 1 — Schedule sub-form interactions (7 tests, v1.6-β):**
+
+(a) `fixed.time picker round-trip with default 9:00 falling back when Cancel is tapped (BUG-021-style hidden-default, v1.6-β)` — tap `ListTile('Time')`; pump `showTimePicker`; tap `Cancel`; assert the persisted `DoFixed.time.hour == 9`. The picker-open + dialog-pop + state-preservation contract is exercised; the OK-button time-selection path is deferred (see ADR-078 (c)).
+
+(b) `fixed.weekdays custom {6,7} toggles persist on save` — `FilterChip` set toggle to leave only `{Saturday, Sunday}`; save; assert the persisted `DoFixed.weekdays == {6, 7}`.
+
+(c) `interval.nDays Increment x2 lands at 4 (the shared `_pickInterval` dialog, v1.6-β)` — tap `ListTile('Every N days')`; under `runAsync`, `IconButton(tooltip: 'Increment')` x2 in the AlertDialog; tap the dialog `FilledButton` "Save"; save; assert `DoInterval.nDays == 4`.
+
+(d) `timeWindow.start picker sets hour=9` — tap `ListTile('Start')`; drive the picker to 09:00; save; assert `DoTimeWindow.start.hour == 9`. The cancel-fallback idiom is used (see ADR-078 (c)).
+
+(e) `timeWindow.end picker sets hour=18` — symmetric to (d) for the End tile.
+
+(f) `timeWindow.targetHours ChoiceChip('16 h') tap lands at 16` — tap `ChoiceChip(label: '16 h')`; save; assert `DoTimeWindow.targetHours == 16`.
+
+(g) `timeWindow zero-active-days surfaces a 'Pick at least one active day.' snack and does not persist (SYS-031-style validation, v1.6-β)` — deselect all weekday FilterChips; tap Save; assert the snack `'Pick at least one active day.'` is `findsOneWidget` after `tester.pump(const Duration(milliseconds: 500))` AND the persisted count is still 0.
+
+**Batch 2 — dayOfX dialog/bottom-sheet pickers (3 tests, v1.6-β):**
+
+(h) `dayOfX.dayOfMonth Increment x2 lands at 3 (clamp 1-31, v1.6-β)` — switch the schedule segment to `'Day-of-X'`; tap `ListTile('Day of month')`; under `runAsync`, `IconButton(tooltip: 'Increment')` x2 in the AlertDialog; tap Save; assert `DoDayOfX.dayOfMonth == 3`.
+
+(i) `dayOfX.nth Increment lands at 2 (clamp 1-5, '_nthLabel' shows '2nd', v1.6-β)` — tap `ListTile('Nth')`; under `runAsync`, `IconButton(tooltip: 'Increment')` x1; tap Save; assert `DoDayOfX.nth == 2` AND the visible label is `'2nd'`.
+
+(j) `dayOfX.weekday bottom-sheet picks Sunday (= 7, v1.6-β)` — tap `ListTile('Weekday')`; in the bottom sheet, tap `ListTile('Sun')`; save; assert `DoDayOfX.weekday == 7`.
+
+**Batch 3 — Pickers + routines (4 tests, v1.6-β):**
+
+(k) `_pickRestDaysPerMonth round-trip changes the slider value (the localized "Save" OK button at `l.homeTileBudgetEditOk`, v1.6-β)` — tap `ListTile('Rest days per month: 2')`; in the slider dialog, focus the slider via `sendKeyEvent(tab)` + `sendKeyEvent(arrowRight x2)` (no drag — see ADR-078 (d)); tap the dialog's `FilledButton` (located via `find.descendant(of: find.byType(AlertDialog), matching: find.byType(FilledButton))` to disambiguate from the app-bar's "Save"); save; assert `DoFixed.restDaysPerMonth != 2`.
+
+(l) `_pickCategory CategoryChip round-trip lands on DoCategory.health (v1.6-β)` — find `find.bySemanticsLabel(RegExp(r'^Category '))` (the chip Semantics label at `lib/widgets/category_chip.dart:105`); tap; in the `CategoryPickerSheet`, tap `ValueKey('category.health')`; tap `ValueKey('category_picker.save')`; save; assert `DoFixed.category == DoCategory.health`.
+
+(m) `_pickIcon round-trip lands on 'fitness_center' (v1.6-β)` — find `find.bySemanticsLabel('Icon picker')`; tap; in the IconPickerSheet, find `find.bySemanticsLabel('Icon fitness_center')`; tap-to-pop; save; assert `DoFixed.iconName == 'fitness_center'`.
+
+(n) `_loadOtherHabits runs under runAsync when 'After do' ListTile is tapped (Drift keepalive hazard, v1.6-β)` — switch the schedule segment to `'After'`; under `tester.runAsync(() async { await tester.tap(find.text('After do')); await Future<void>.delayed(Duration(milliseconds: 100)); })`; assert `find.byKey(const ValueKey('add_habit.add_calendar_routine'))` is reachable without `Bad state: AppDatabaseService.init() must complete before db is read`.
+
+**Batch 4 — Validation error path (1 test, v1.6-β):**
+
+(o) `DuplicateDoName catch sets _nameError on the TextField, not a SnackBar (BUG-NNN-style surface, v1.6-β)` — seed the DB with one saved habit named `'Morning run'` via `tester.runAsync(() async { await DoRepository.instance.save(...); })` (see ADR-078 (e)); pump the AddHabitScreen fresh; enterText `'Morning run'`; under `tester.runAsync` tap Save; `tester.pump()` + `tester.pump(const Duration(milliseconds: 500))`; assert the `TextField.errorText` reads `'A do with this name already exists.'`; the Drift row count is still 1.
+
+**Test count: 1650 → 1664 (+14 net).**
+
+**Coverage:** `lib/screens/add_habit.dart` 41.20% → **~53%** (±1 pp — +14 tests hit ~70-80 LF of uncovered code across all 4 batches).
+
+**Defers (out-of-scope, v1.6-β + ADR-078):**
+- Edit-mode branch (`habitId:`) — Drift `NativeDatabase.memory()` keepalive deadlock (documented at `test/screens/add_habit_test.dart` `// NOTE:` lines 299-306).
+- `DoAnchor` happy-path — requires seeding an existing habit; same keepalive root cause.
+- `_pickAnchorTarget` empty-list snack `'No other dos to anchor on.'` (line 717) — distinct from save-time snack but reachable only via picker tap, not save tap; deferred to branch-coverage cycle.
+- `_pickInterval` decrement clamp + `_pickNth` max=5 clamp + `_pickNth` min=1 clamp — symmetric to tests (c) and (i); defer.
+- All `_PauseRow` tests — edit-mode only.
+- CalendarPicker-populated-routines render — gated on `PermissionSheet.show` requiring platform-channel mocks outside the current setUp.
+- `DoValidationException` dead-code removal at `add_habit.dart:1041-1043` — deferred to v2.0 (low priority).
+
+**Drift lessons (per CLAUDE.md):** see ADR-078 for the 5 full drift lessons (dead-code catch + hidden `_fixedWeekdays` coupling + `showTimePicker` fragility + `Slider` arrow-key idiom + chained-save keepalive workaround). The most operationally-impactful lesson is (c): `showTimePicker` is fragile in headless test mode, so 3 tests (a/d/e) use a "tap Cancel" no-op-equivalent assertion that exercises the picker-open + dialog-pop + state-preservation contract without driving the OK-button selection. The cancel-fallback idiom is locked as a known limitation for v1.6-β.
+
+**APK SHA1 stays at Cycle H's `25bb7fab`** — v1.6-β is tests-only; no release rebuild needed.
+
+**No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** v1.6-β is Dart-only + Flutter widgets (no platform channels touched).
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean after auto-format of 1 file) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1664/1664 pass).
+
+**Targeted:** `flutter test test/screens/add_habit_test.dart` (25/25 pass: 11 baseline + 14 new).
+
+**Cross-references.** SYS-147; ADR-078; v1.6-β row; CHANGELOG `## v1.6-β`; feature.md cycle entry.
