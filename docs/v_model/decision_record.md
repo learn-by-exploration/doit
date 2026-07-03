@@ -7295,3 +7295,159 @@ reusable.
 
 **SYS-IDs affected:** SYS-152 (new).
 **Cross-references:** SYS-152; ADR-083; WF-080; Milestone 14 `### v1.6-η`; v1.6-η row; CHANGELOG `## v1.6-η`; feature.md cycle entry.
+
+## ADR-084 — v1.6-θ (cross-cutting invariants coverage closure): 5 drift lessons from the +10 tests
+
+**Date:** 2026-07-04
+**Cycle:** v1.6-θ (Phase 66 / SYS-153 / WF-081)
+**Author:** v1.6-θ cycle (auto-generated)
+**Status:** Accepted
+
+### Context
+
+The v1.6-θ cycle closed cross-cutting invariant + boundary coverage gaps on 3
+small-but-mission-critical Dart modules: `lib/missions/chain.dart`, `lib/screens/
+home_tile_sparkline.dart`, and `lib/do/consecutive_counter.dart`. The cycle
+landed +10 net tests (2 chain_api + 4 sparkline + 4 consecutive_counter),
+bringing the cumulative v1.6 test count to **1747 tests**. Each module already
+had partial coverage from prior cycles (chain_api from v1.5-cyc-chain,
+sparkline from v1.4-stab-G, consecutive_counter from v1.4-stab-K); v1.6-θ
+targeted the cross-cutting boundary + invariant gaps that were deferred from
+those cycles because they were either non-trivial (the grace-window 03:00
+boundary) or implementation-defined (the toString contract).
+
+The 5 drift lessons below capture the cross-cutting invariants that the tests
+pin, the implementation details discovered during the cycle, and the patterns
+that future tests for similar Dart 3 `sealed` hierarchies + unmodifiable
+collections + boundary-condition calculators should follow.
+
+### Decision
+
+We add the 10 new tests (2 + 4 + 4 split) as cross-cutting invariant pins,
+NOT as new feature coverage. Each test pins a PUBLIC contract (value-equality,
+iteration order, boundary behavior, debug representation) that the cycle's
+discovery showed was implementation-defined in subtle ways.
+
+### Drift lessons
+
+#### Lesson 1 — `const` literals with identical fields are canonicalized
+
+`const a = StreakSnapshot(...)` and `const b = StreakSnapshot(...)` resolve to
+the SAME object instance. `identical(a, b) == true`. This is a Dart language
+guarantee: identical `const` literals are canonicalized. The v1.6-θ cycle
+discovered this empirically when an initial `StreakSnapshot` value-equality
+test asserted `expect(identical(a, b), isFalse)` and FAILED — because the two
+`const` literals were canonicalized to the same instance.
+
+The test pins the PUBLIC contract (value-equality + matching `hashCode`) without
+asserting on identity. The canonicalization behavior is implementation-defined
+(Dart spec says identical `const` literals are canonicalized, but this is an
+implementation detail that future Dart changes could relax). Future tests for
+`StreakSnapshot` equality MUST follow the same pattern: assert on
+`expect(a, equals(b))` and `expect(a.hashCode, b.hashCode)`, NEVER on
+`expect(identical(a, b), isFalse)`.
+
+#### Lesson 2 — Grace window logic ONLY fires when `daysSinceLast == 1`
+
+The `ConsecutiveCounter.compute()` calculator at
+`lib/do/consecutive_counter.dart:206-208` short-circuits the grace window with:
+
+```dart
+final daysSinceLast = _daysBetween(lastCompletion, asOf);
+final isStreakAlive = daysSinceLast == 0 ||
+    (daysSinceLast == 1 && _withinGrace(lastCompletion, asOf, config.graceWindow));
+```
+
+A `daysSinceLast == 2` (or more) does NOT enter the grace branch, even if the
+grace window is 3 hours. The cycle discovered this when an initial
+`grace-window boundary at exactly 03:00 of the day after a missed day` test used
+`asOf = 2026-01-17 02:59:59` (2 days after `lastCompletion = 2026-01-15`) and
+expected `snapInside.currentStreak == 1`. The actual result was
+`snapInside.currentStreak == 0` because `daysSinceLast == 2` bypassed the
+grace check entirely.
+
+Fix: shift the `asOf` by 1 day to actually exercise the boundary — use
+`asOf = 2026-01-16 02:59:59` (1 day after lastCompletion) for the "inside"
+case and `asOf = 2026-01-16 03:00:01` for the "just past" case. Future tests
+for grace-window behavior MUST use `daysSinceLast == 1` to actually exercise
+the `_withinGrace` branch.
+
+#### Lesson 3 — `SparklineDotFilled.toString` is implementation-defined but MUST include both fields
+
+The `toString` method at `lib/screens/home_tile_sparkline.dart:86` is currently
+formatted as `'SparklineDot.filled(day: $day, source: $source)'`. The cycle's
+test pins the two-field-presence contract (the rendered string contains both
+`day.toString()` AND `'rest_day'`) WITHOUT locking the format string. This is
+the right test posture for any `toString` override: assert on the FIELDS that
+must appear, NEVER on the exact format (a future refactor that reorders the
+fields or changes the surrounding brackets should not break the test).
+
+Future tests for `toString` overrides on data classes in `lib/` should follow
+the same pattern. See ADR-074 (cycle 4 / `person_groups_test.dart`) for an
+earlier example of "pin the fields, not the format" applied to a string-
+rendered helper.
+
+#### Lesson 4 — `completionLog.listForHabit` is called per-helper-invocation
+
+The `extendedSparklineForDo(...)` helper at
+`lib/screens/home_tile_sparkline.dart:130-180` is `Future`-returning and calls
+`completionLog.listForHabit(habitId)` internally on every invocation. Two
+consecutive calls with identical args + the same `_FakeCompletionLog` produce
+structurally equal but independently-allocated dot lists (because the DB
+materialization is per-call).
+
+The determinism test in v1.6-θ asserts on `first == second` (structural
+equality, element-by-element), NOT on `identical(first, second)` (identity).
+A regression here would surface as a flickering home tile — if the helper
+becomes non-deterministic (e.g., uses `Random()` without a seed), the test
+fails.
+
+Future tests for `Future`-returning helpers that depend on DB calls should
+use a deterministic shim (`_FakeCompletionLog`) and assert on structural
+equality. The `_FakeCompletionLog` pattern (handled in
+`test/screens/home_tile_sparkline_test.dart` lines 28-46) is reusable for any
+future helper that reads from the completion log.
+
+#### Lesson 5 — MissionChain inherits `UnmodifiableListView`'s `iterator`
+
+`MissionChain` at `lib/missions/chain.dart:6-43` is `extends
+UnmodifiableListView<Mission>`. The chain's `for`/`fold`/`where`/`contains`
+surface is the canonical Dart `Iterable` API. The v1.6-θ cycle's "iterator
+yields missions in declared order" test pins declared-order iteration +
+`first`/`last`/`contains` so a future "wrap as a `Set` instead" refactor
+fails loudly (chain semantics are ordered, not set-semantic).
+
+The Strong-mode executor at `lib/missions/chain_executor.dart` walks the chain
+in this exact order via `for (final mission in chain) { ... }`. A reverse-
+order bug would be silent in production (the executor would silently process
+missions in the wrong sequence). The v1.6-θ test catches this regression
+class at the unit-test layer.
+
+Future tests for `MissionChain` (or any future `UnmodifiableListView`
+subclass) MUST pin both declared-order iteration AND the cross-cutting
+`Iterable` surface (`first`, `last`, `contains`, `length`, `isEmpty`).
+
+### Cross-cutting invariants pinned
+
+The 10 tests in v1.6-θ collectively pin:
+
+1. **`MissionChain.totalTimeout` boundary at empty chain** — `fold(Duration.zero, ...)` over an empty list returns the seed (no off-by-one)
+2. **`MissionChain` `Iterable` iterator contract** — declared-order iteration via `for-in` + `first`/`last`/`contains`
+3. **`SparklineDotFilled` non-manual source-tag preservation** — `'auto'` (extends the v1.4e pin that covered `'manual'` + `'rest_day'`)
+4. **`extendedSparklineForDo` 14-day window boundary** — row at day-15 is excluded; pins the 14-day boundary at day-15
+5. **`extendedSparklineForDo` determinism contract** — two consecutive calls produce structurally-equal dot lists
+6. **`SparklineDotFilled.toString` debug-representation** — both `day` and `source` fields must appear in the rendered string
+7. **`StreakSnapshot` value-equality contract** — two `const` literals with identical fields are `equals` AND have matching `hashCode`; single-field-different `const` literal is NOT equal (the contract is sound in both directions)
+8. **`CompletionLogEntry` identity-equality pin** — does NOT override `==`; identity-equality applies (pins the current behavior so a future "add value-equality" change fails loudly here)
+9. **`ConsecutiveCounter` grace-window boundary at exactly 03:00** — `asOf = 2026-01-16 02:59:59` keeps the run alive (inside the grace window of `lastCompletion = 2026-01-15`); `asOf = 2026-01-16 03:00:01` breaks the run with `brokenAt = 2026-01-16`
+10. **`SkipBudget` → `StreakSnapshot.restDaysUsed` cross-cutting propagation** — `consume(date)` on a `SkipBudget` propagates to the snapshot's `restDaysUsed` field (the home tile uses this to show "1 of 2 skip days used this month")
+
+### Status
+
+Accepted. All 10 tests land in v1.6-θ (PR #75, squash-merged). The cycle
+ships at 1747/1747 tests passing (per the 3-gate). No production-code changes
+(no new `<uses-permission>`, no new pubspec deps, no Drift migration, no
+Kotlin changes). APK SHA1 stays at Cycle H's `25bb7fab` (no release rebuild).
+
+**SYS-IDs affected:** SYS-153 (new).
+**Cross-references:** SYS-153; ADR-084; WF-081; Milestone 14 `### v1.6-θ`; v1.6-θ row; CHANGELOG `## v1.6-θ`; feature.md cycle entry.

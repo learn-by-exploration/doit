@@ -3867,3 +3867,82 @@ lint fixes inline on the new `MethodCall` literals) + `flutter analyze --fatal-i
 
 **Cross-references.** SYS-152; ADR-083; v1.6-η row; CHANGELOG `## v1.6-η`;
 feature.md cycle entry.
+
+## WF-081 — Verify the cross-cutting invariants coverage closure (v1.6-θ / Phase 66)
+
+**Goal.** Land the v1.6-θ cycle's +10 cross-cutting invariant + boundary tests
+on 3 small-but-mission-critical Dart modules — `lib/missions/chain.dart`,
+`lib/screens/home_tile_sparkline.dart`, and `lib/do/consecutive_counter.dart` —
+and verify the new tests pass the 3-gate + targeted suite cleanly.
+
+**Pre-conditions.**
+- `main` branch is at the v1.6-η tip (post PR #74 squash-merge).
+- Working tree is clean.
+- Flutter SDK is on PATH; `flutter pub get` has been run.
+
+**Steps.**
+
+1. **Branch.** `git checkout -b feat/v1.6-θ-sparkline-counter` from main.
+
+2. **EXTEND `test/missions/chain_api_test.dart` (+2 tests)** in the existing
+   `group('MissionChain API')` block, before the file's closing brace:
+   - `totalTimeout of an empty chain is Duration.zero (boundary invariant — v1.6-θ)` — pins the `fold(Duration.zero, ...)` seed behavior on an empty list. Pins both `MissionChain.empty.totalTimeout` and `MissionChain.from(<Mission>[]).totalTimeout`.
+   - `iterator yields missions in declared order (cross-cutting Iterable contract — v1.6-θ)` — pins declared-order iteration via `for-in` + `first`/`last`/`contains`. The Strong-mode executor walks the chain in this exact order; a reverse-order bug would be silent in production.
+
+3. **EXTEND `test/screens/home_tile_sparkline_test.dart` (+4 tests)** in the
+   existing `group('sparklineForDo')` block, with a `// ---- v1.6-θ ----`
+   banner above the new tests:
+   - `SparklineDotFilled preserves non-manual source tags (v1.6-θ)` — seed a `_FakeCompletionLog` with `source: 'auto'`; assert the rendered dot is `SparklineDotFilled` with `source == 'auto'`. Extends the v1.4e pin to the future-`trigger` automation path.
+   - `extendedSparklineForDo(days: 14) ignores a row 15 days ago (boundary at day-15 — v1.6-θ)` — pins the 14-day window boundary.
+   - `extendedSparklineForDo is deterministic across two consecutive calls with the same args (idempotency — v1.6-θ)` — element-by-element structural equality (NOT identity).
+   - `SparklineDotFilled.toString includes day + source for debugging (debug-representation pin — v1.6-θ)` — pins both fields' presence in the rendered string without locking the format.
+
+4. **EXTEND `test/do/consecutive_counter_test.dart` (+4 tests)** in a NEW
+   `group('Cross-cutting invariants (v1.6-θ)')` block at the end of the file:
+   - `StreakSnapshot value equality + hashCode match for identical contents (v1.6-θ)` — two `const StreakSnapshot(...)` with identical fields are `equals` AND have matching `hashCode`; single-field-different `const StreakSnapshot` is NOT equal.
+   - `CompletionLogEntry value equality matches field-wise (v1.6-θ)` — `CompletionLogEntry` does NOT override `==`; identity-equality applies. Pins the current behavior.
+   - `grace window boundary at exactly 03:00 of the day after a missed day keeps the run alive (v1.6-θ)` — `asOf = 2026-01-16 02:59:59` keeps the run alive; `asOf = 2026-01-16 03:00:01` breaks the run with `brokenAt = 2026-01-16`. NOTE: `daysSinceLast` MUST equal 1 for the grace branch to fire.
+   - `SkipBudget consumption propagates into StreakSnapshot.restDaysUsed (cross-cutting — v1.6-θ)` — consume 1 day from the budget; the resulting snapshot has `restDaysUsed == 1` even with a fresh 1-completion log.
+
+5. **3-gate (CLAUDE.md mandatory).**
+   - `dart format --output=none --set-exit-if-changed .` — clean. Auto-format will normalize 4-space indent on `home_tile_sparkline_test.dart` and apply `prefer_const_declarations` fixes on 3 `final a/b/diff` → `const` conversions in `consecutive_counter_test.dart`.
+   - `flutter analyze --fatal-infos lib test` — 0 issues.
+   - `flutter test` — **1747/1747 pass**.
+
+6. **Targeted (per-cycle primary files).**
+   - `flutter test test/missions/chain_api_test.dart` — 7/7 pass (5 baseline + 2 new v1.6-θ).
+   - `flutter test test/screens/home_tile_sparkline_test.dart` — 17/17 pass (13 baseline + 4 new v1.6-θ).
+   - `flutter test test/do/consecutive_counter_test.dart` — 11/11 pass (7 baseline + 4 new v1.6-θ).
+
+7. **V-Model artifacts (per CLAUDE.md "V-Model-aware workflow").**
+   - **SYS-153** appended to `docs/v_model/requirements.md` — describes the cycle's +10 tests in 3 groups (chain_api + sparkline + consecutive_counter) with full drift-lesson pointers.
+   - **ADR-084** appended to `docs/v_model/decision_record.md` — captures the 5 drift lessons: (a) `const` canonicalization, (b) grace-window `daysSinceLast == 1` requirement, (c) `toString` field-presence pinning, (d) `_FakeCompletionLog` determinism pattern, (e) `MissionChain` `UnmodifiableListView` iterator contract.
+   - **WF-081** appended to `docs/v_model/workflows.md` — this entry.
+   - **Traceability row** appended to `docs/v_model/traceability_matrix.md` (WF-081 → SYS-153 → 3 source files).
+   - **Implementation status** appended to `docs/v_model/implementation_status.md` (`## v1.6-θ` row).
+   - **Plan** appended to `docs/v_model/plan.md` (`### v1.6-θ` row).
+   - **CHANGELOG** appended to `CHANGELOG.md` (`## v1.6-θ` entry).
+   - **feature.md** appended with v1.6-θ cycle paragraph (EIGHTH cycle in v1.6).
+
+8. **Commit + push + PR.**
+   - `git add -A`
+   - `git commit -m "test: v1.6-θ — cross-cutting invariants coverage closure (+10 tests / SYS-153 / ADR-084 / WF-081) (#75)"`
+   - `git push -u origin feat/v1.6-θ-sparkline-counter`
+   - `gh pr create --base main --title "test: v1.6-θ — cross-cutting invariants coverage closure (+10 tests / SYS-153 / ADR-084 / WF-081)" --body "..."` for PR #75.
+   - `gh pr checks 75 --watch` until green (3-gate + Build Debug APK).
+   - `gh pr merge 75 --squash --delete-branch` (squash-merge per the v1.4-stab + v1.5 campaign convention).
+
+9. **Memory file.** Write
+   `/home/shyam/.claude/projects/-home-shyam-common-games-doit/memory/v1-6-cyc-θ-cycle-shipped.md`
+   mirroring the v1.5 α..δ + v1.6 α..η pattern (commit SHA, scope, drift
+   lessons, test count delta, APK SHA1, V-Model IDs, out-of-scope defers,
+   next-cycle pointer). Append a one-line pointer in `MEMORY.md`.
+
+**Post-conditions.**
+- `main` is at the v1.6-θ tip (commit hash for PR #75).
+- 1747/1747 tests pass; APK SHA1 stays at H's `25bb7fab` (no production-code change).
+- V-Model artifacts SYS-153 + ADR-084 + WF-081 are committed alongside the code.
+- Memory file + MEMORY.md pointer for v1.6-θ exist on disk.
+
+**Cross-references.** SYS-153; ADR-084; v1.6-θ row; CHANGELOG `## v1.6-θ`;
+feature.md cycle entry.

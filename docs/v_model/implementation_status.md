@@ -435,3 +435,38 @@ Cycle is the SIXTH in the v1.6 milestone — next is **v1.6-η (PR #74) widget_b
 Cycle is the SEVENTH in the v1.6 milestone — next is **v1.6-θ (PR #75) MissionChain + sparkline + consecutive_counter + mission_result**.
 
 **Refs:** SYS-152, ADR-083, WF-080.
+
+## v1.6-θ — Cross-cutting invariants coverage closure (Phase 66 / SYS-153 / ADR-084 / WF-081)
+
++10 tests across 3 EXTENDED test files. **Tests-only cycle; no production-code change**.
+
+**Chain_api tests (2 new in `MissionChain API` group):**
+
+1. `totalTimeout of an empty chain is Duration.zero (boundary invariant — v1.6-θ)` — both `MissionChain.empty.totalTimeout` and `MissionChain.from(<Mission>[]).totalTimeout` return `Duration.zero`; pins the `fold(Duration.zero, ...)` seed behavior so a future refactor that seeds with a non-zero default fails loudly here.
+2. `iterator yields missions in declared order (cross-cutting Iterable contract — v1.6-θ)` — a 3-mission chain `[hold, hold2, type]` iterates in that exact order via `for-in`; `chain.first == hold`, `chain.last == type`, `chain.contains(hold)` (the Strong-mode executor walks the chain in this exact order; a reverse-order bug would be silent in production but visible here).
+
+**Home_tile_sparkline tests (4 new in `sparklineForDo` group, with `// ---- v1.6-θ ----` banner):**
+
+3. `SparklineDotFilled preserves non-manual source tags (v1.6-θ)` — seed a `_FakeCompletionLog` with `source: 'auto'`; assert the rendered dot is `SparklineDotFilled` with `source == 'auto'` (the v1.4e baseline covered `'manual'` + `'rest_day'`; this extends the pin to the future-`trigger` automation path).
+4. `extendedSparklineForDo(days: 14) ignores a row 15 days ago (boundary at day-15 — v1.6-θ)` — pins the 14-day window boundary at day-15.
+5. `extendedSparklineForDo is deterministic across two consecutive calls with the same args (idempotency — v1.6-θ)` — element-by-element structural equality (NOT identity).
+6. `SparklineDotFilled.toString includes day + source for debugging (debug-representation pin — v1.6-θ)` — pins both fields' presence in the rendered string without locking the format.
+
+**Consecutive_counter tests (4 new in NEW `Cross-cutting invariants (v1.6-θ)` group):**
+
+7. `StreakSnapshot value equality + hashCode match for identical contents (v1.6-θ)` — two `const StreakSnapshot(...)` with identical fields are `equals` AND have matching `hashCode`; single-field-different `const StreakSnapshot` is NOT equal (the contract is sound in both directions).
+8. `CompletionLogEntry value equality matches field-wise (v1.6-θ)` — `CompletionLogEntry` does NOT override `==` so identity-equality applies; pins the current behavior.
+9. `grace window boundary at exactly 03:00 of the day after a missed day keeps the run alive (v1.6-θ)` — `asOf = 2026-01-16 02:59:59` (1 day after `lastCompletion = 2026-01-15`) keeps the run alive; `asOf = 2026-01-16 03:00:01` breaks the run with `brokenAt = 2026-01-16`. NOTE: `daysSinceLast` MUST equal 1 for the grace branch to fire.
+10. `SkipBudget consumption propagates into StreakSnapshot.restDaysUsed (cross-cutting — v1.6-θ)` — consume 1 day from the budget; the resulting snapshot has `restDaysUsed == 1` even with a fresh 1-completion log.
+
+**APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`** — v1.6-θ is tests-only; no production-code behavior change; no release APK rebuild.
+
+**No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.**
+
+**Drift lessons per ADR-084:** (a) **`const` literals with identical fields are canonicalized** — `const a = StreakSnapshot(...)` and `const b = StreakSnapshot(...)` resolve to the SAME instance; `identical(a, b) == true`. The tests pin the PUBLIC contract (value-equality + matching hashCodes) WITHOUT asserting on identity; (b) **Grace window logic ONLY fires when `daysSinceLast == 1`** — an `asOf` 2+ days after the last completion is BROKEN regardless of grace window; (c) **`SparklineDotFilled.toString` is implementation-defined but MUST include both fields** — pins the two-field-presence contract WITHOUT locking the format string; (d) **`completionLog.listForHabit` is called per-helper-invocation** — two consecutive calls produce structurally equal but independently-allocated dot lists; (e) **MissionChain inherits `UnmodifiableListView`'s `iterator`** — pins declared-order iteration + `first`/`last`/`contains` so a future "wrap as a `Set` instead" refactor fails loudly.
+
+**Out-of-scope (deferred to v2.0 + ADR-084):** `SparklineDot.future(day)` factory direct emission (the helper's 7-day/14-day window always ends at `asOf`'s local-midnight; covered by the v1.4e value-equality test); `MissionChain.from(<Mission>[])` equality with `MissionChain.empty` (the cross-cutting equality pin via non-canonical pair is the next-best coverage); `StreakSnapshot` `copyWith` (no such method exists); `CompletionLogEntry` value-equality override (would be a behavior change).
+
+Cycle is the EIGHTH in the v1.6 milestone — next is **v1.6-ι (PR #76) db.dart + migrations + permission_observer + main.dart**.
+
+**Refs:** SYS-153, ADR-084, WF-081.
