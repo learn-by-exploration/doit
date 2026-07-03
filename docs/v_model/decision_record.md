@@ -7056,3 +7056,126 @@ The +14 test count is achievable BECAUSE the form is so simple — the reachable
 
 **SYS-IDs affected:** SYS-150 (new).
 **Cross-references:** SYS-150; ADR-081; WF-078; Milestone 14 `### v1.6-ε`; v1.6-ε row; CHANGELOG `## v1.6-ε`; feature.md cycle entry.
+
+## ADR-082 — v1.6-ζ (service-layer error-path coverage): 5 drift lessons from the +14 tests
+
+**Status:** Accepted 2026-07-03.
+
+**Context:** v1.6-ζ is the sixth cycle of the v1.6 milestone. The plan called for
+`test/services/calendar_service_test.dart` (+6 tests covering
+`_MethodChannelCalendarSource._decode` per-kind + unknown-kind + `stop()`
+`MissingPluginException` swallow) and `test/services/person_repository_test.dart`
+(+8 tests covering `_toRow`/`_fromRow` `automationsJson` encode/decode round-trip
++ `ChannelTelegram` username-as-handle preservation). The cycle hit the +14
+target exactly. The two gaps are distinct layers (platform-channel decode vs.
+Drift JSON column round-trip) but share the property that they were
+**structurally not unit-testable** through the existing seams:
+`_MethodChannelCalendarSource` is library-private (leading underscore, cannot
+be imported from `test/`) and the `automationsJson` write/read paths were
+covered only by the empty-list case. Both gaps close cleanly via canonical
+Flutter + Drift test patterns.
+
+**Decision:** Close both gaps with the standard Flutter test infrastructure:
+
+1. **Calendar service (6 tests in `calendar_service_test.dart`):**
+   - **Production-source testing via `TestDefaultBinaryMessenger`.** The
+     `_MethodChannelCalendarSource` is library-private so we cannot instantiate
+     it directly. Instead, install a `setMockMethodCallHandler` on the
+     `doit/calendar` `MethodChannel`, do NOT call `service.debugSetSource(...)`,
+     and let `service.init()` lazily construct the real production source. The
+     mock returns `null` for Dart→platform calls (`startStream`, `stopStream`).
+   - **Decode-via-handler testing via `defaultBinaryMessenger.handlePlatformMessage`.**
+     The handler is installed by `_installHandler()` during `start()`. To trigger
+     it, ship an encoded `MethodCall('onCalendarEvent', {kind: ..., ...})`
+     through the messenger — this is the same wire path the Kotlin side uses
+     to publish events. The canonical Flutter test pattern is:
+     `await messenger.handlePlatformMessage(channelName, StandardMethodCodec().encodeMethodCall(call), (_) {})`.
+   - **`stop()` defensive-swallow testing.** Install a mock that throws
+     `MissingPluginException` on `stopStream`; `service.resetForTesting()` fires
+     `_source!.stop()`; assert the future completes (the catch at
+     `calendar_service.dart:254-256` swallows the exception).
+
+2. **Person repository (8 tests in `person_repository_test.dart`):**
+   - **`_toRow` write-side coverage via raw Drift query.** Save a Person with
+     `automations: const []`; read the raw `PersonRow` via Drift's `select` API;
+     assert `row.automationsJson == null` (pins the write path at
+     `person_repository.dart:70-72`).
+   - **`_fromRow` read-side coverage via hand-written `PersonRow`.** Insert a
+     `PersonRow` with `automationsJson: null` (default) and a separate row with
+     `automationsJson: ''`; `getById` should return a Person with
+     `automations: []` in both cases (pins the null AND empty-string fallback in
+     `decodeAutomationList` at `routine.dart:496`).
+   - **Round-trip coverage for per-trigger-type automations.** Save Persons
+     with one or more Automations using `TriggerLocationEnter`,
+     `TriggerCalendarEventStart`, and a mixed list; `getById` should return
+     `back.automations` with full equality (id + trigger + condition + action +
+     enabled per `Automation.==`).
+   - **Hand-written JSON envelope coverage.** Insert a `PersonRow` with the
+     full `automationsJson` envelope `[{id, trigger: {type: 'timeOfDay', hour, minute}, condition: null, action: {type: 'notify', title, body}, enabled}]`;
+     `getById` should decode one Automation with the expected trigger + action
+     fields (pins the decode path independently of the encode path so future
+     refactors cannot pass with broken JSON symmetry).
+   - **ChannelTelegram username-as-handle.** Save a Person with
+     `ChannelTelegram('alice_t')`; assert `(back.channel as ChannelTelegram).username == 'alice_t'`
+     (the only channel with a non-phone handle; the `_channelTagAndHandle`
+     switch at `person_repository.dart:90-98` must funnel the username into
+     the `handle` column correctly).
+
+**Drift lessons (5):**
+
+(a) **`_MethodChannelCalendarSource` is library-private but the production
+surface is testable via `TestDefaultBinaryMessenger`.** The key insight is to
+NOT call `debugSetSource(...)` in `setUp` — let `init()` lazily construct the
+real production source. Then drive the platform-channel surface via mock
+handlers (for Dart→platform calls) and `defaultBinaryMessenger.handlePlatformMessage`
+(for platform→Dart calls). This pattern works for ANY library-private
+`MethodChannel`-based source in this app (calendar, widget, etc.).
+
+(b) **`kDebugMode` debugPrint in test mode produces noisy output during
+teardown.** When the mock is uninstalled BEFORE `resetForTesting()` calls
+`_source!.stop()`, the second `invokeMethod('stopStream')` throws
+`MissingPluginException` which is caught at `calendar_service.dart:254-256`
+and printed via `debugPrint`. This is the swallow path working as designed
+(NOT a failure). The `CalendarSource.stop: MissingPluginException(...)` noise
+is acceptable; do not `skip` the test, do not silence `debugPrint`. The
+defensive swallow is the contract being verified.
+
+(c) **`StandardMethodCodec().encodeMethodCall(...)` is the correct way to
+simulate platform→Dart pushes.** The pattern is:
+```dart
+await messenger.handlePlatformMessage(
+  channel.name,
+  codec.encodeMethodCall(MethodCall('onCalendarEvent', args)),
+  (_) {},
+);
+```
+This is documented in `flutter/services.dart` but easy to miss because most
+test examples use `setMockMethodCallHandler` for Dart→platform calls only.
+
+(d) **`decodeAutomationList('')` returns `[]` (empty-string fallback)**
+symmetric to `decodeAutomationList(null)`. Both short-circuit at
+`routine.dart:496` (`if (raw == null || raw.isEmpty) return const <Automation>[]`).
+The repository's `_toRow` writes `null` when automations is empty (NOT the
+literal `'[]'`) so the decode path can short-circuit on the null branch. The
+two hand-written-row tests pin BOTH branches independently — important
+because a future refactor that changes `_toRow` to write `'[]'` would not
+break the null-decode test (would still pass) but the empty-string-decode
+test would catch the asymmetry.
+
+(e) **`ChannelTelegram` is the ONLY channel with a non-phone handle.** The
+other 4 channels (`Dialer`, `WhatsApp`, `Signal`, `Sms`) all use `phoneNumber`;
+`ChannelTelegram` uses `username`. The `_channelTagAndHandle` switch at
+`person_repository.dart:90-98` destructures the right field per leaf — the
+new explicit test pins that the `username` field (not `phoneNumber`) is what
+lands in the `handle` Drift column for Telegram. Existing tests cover the
+Telegram IS-A check but not the username-as-handle round-trip.
+
+**Consequences:** No production-code change. v1.6-ζ is tests-only. Both gaps
+close cleanly without modifying the production source. The 5 drift lessons
+above should inform future tests for library-private `MethodChannel`-based
+sources in this app (calendar, widget) — the pattern is reusable. The
+`_toRow` empty-list `automationsJson: null` write is now a pinned invariant;
+a future refactor that changes this would flip the explicit test.
+
+**SYS-IDs affected:** SYS-151 (new).
+**Cross-references:** SYS-151; ADR-082; WF-079; Milestone 14 `### v1.6-ζ`; v1.6-ζ row; CHANGELOG `## v1.6-ζ`; feature.md cycle entry.

@@ -19,6 +19,7 @@
 //     debug screen both need this).
 
 import 'package:doit/services/calendar_service.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 CalendarEventStarted calStarted({
@@ -306,4 +307,178 @@ void main() {
   // platform-channel surface comes from the on-device smoke in
   // each release cycle (per CLAUDE.md "Pre-approved commands"
   // + the release-apk-pattern memory).
+
+  // ---- v1.6-ζ additions (coverage closure for
+  // `_MethodChannelCalendarSource._decode()` + `stop()`
+  // MissingPluginException swallow) ----
+  //
+  // The `_MethodChannelCalendarSource` is library-private so we
+  // exercise it through the public `CalendarService.init()`
+  // surface with the `doit/calendar` `MethodChannel` mocked via
+  // `TestDefaultBinaryMessenger`. We do NOT call
+  // `debugSetSource(...)` so `init()` lazily constructs the real
+  // production source.
+
+  group('_MethodChannelCalendarSource (v1.6-ζ)', () {
+    const channel = MethodChannel('doit/calendar');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    const codec = StandardMethodCodec();
+
+    late CalendarService service;
+
+    setUp(() {
+      service = CalendarService.instance;
+      service.resetForTesting();
+      // Allow init() to construct the real _MethodChannelCalendarSource
+      // (which sets up the platform-channel handler). The mock returns
+      // null for Dart->platform calls (`startStream`, `stopStream`,
+      // `listAccounts`).
+      messenger.setMockMethodCallHandler(channel, (call) async => null);
+    });
+
+    tearDown(() {
+      messenger.setMockMethodCallHandler(channel, null);
+      service.resetForTesting();
+    });
+
+    /// Simulate a platform->Dart `onCalendarEvent` push by encoding
+    /// the MethodCall and shipping it through the binary messenger.
+    /// This is the same wire path the Kotlin `CalendarChannel.kt`
+    /// uses to publish events.
+    Future<void> pushOnCalendarEvent(Map<String, Object?> args) async {
+      await messenger.handlePlatformMessage(
+        channel.name,
+        codec.encodeMethodCall(MethodCall('onCalendarEvent', args)),
+        (_) {},
+      );
+    }
+
+    test('start() invokes startStream on the channel', () async {
+      final invoked = <String>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        invoked.add(call.method);
+        return null;
+      });
+      await service.init();
+      expect(invoked, contains('startStream'));
+    });
+
+    test('handler decodes kind=start into CalendarEventStarted', () async {
+      await service.init();
+      final fired = <CalendarEvent>[];
+      final sub = service.events.listen(fired.add);
+
+      await pushOnCalendarEvent({
+        'kind': 'start',
+        'eventId': 'e-start',
+        'calendarId': 'cal1',
+        'title': 'Standup',
+        'atMs': DateTime(2026, 6, 20, 9).millisecondsSinceEpoch,
+      });
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fired, hasLength(1));
+      final ev = fired.single;
+      expect(ev, isA<CalendarEventStarted>());
+      expect((ev as CalendarEventStarted).eventId, 'e-start');
+      expect(ev.calendarId, 'cal1');
+      expect(ev.title, 'Standup');
+      expect(ev.at, DateTime(2026, 6, 20, 9));
+      await sub.cancel();
+    });
+
+    test('handler decodes kind=end into CalendarEventEnded', () async {
+      await service.init();
+      final fired = <CalendarEvent>[];
+      final sub = service.events.listen(fired.add);
+
+      await pushOnCalendarEvent({
+        'kind': 'end',
+        'eventId': 'e-end',
+        'calendarId': 'cal1',
+        'title': 'Standup',
+        'atMs': DateTime(2026, 6, 20, 10).millisecondsSinceEpoch,
+      });
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fired.single, isA<CalendarEventEnded>());
+      expect((fired.single as CalendarEventEnded).eventId, 'e-end');
+      expect(
+        service.lastIsBusy,
+        isNull,
+        reason: 'Ended events must not flip the busy cache.',
+      );
+      await sub.cancel();
+    });
+
+    test(
+      'handler decodes kind=busy with isBusy=true into CalendarBusyChange',
+      () async {
+        await service.init();
+        final fired = <CalendarEvent>[];
+        final sub = service.events.listen(fired.add);
+
+        await pushOnCalendarEvent({
+          'kind': 'busy',
+          'eventId': 'e-busy',
+          'calendarId': 'cal1',
+          'title': 'Focus',
+          'atMs': DateTime(2026, 6, 20, 11).millisecondsSinceEpoch,
+          'isBusy': true,
+        });
+        await Future<void>.delayed(Duration.zero);
+
+        expect(fired.single, isA<CalendarBusyChange>());
+        final ev = fired.single as CalendarBusyChange;
+        expect(ev.eventId, 'e-busy');
+        expect(ev.isBusy, true);
+        expect(service.lastIsBusy, true);
+        await sub.cancel();
+      },
+    );
+
+    test('handler decodes unknown kind by ignoring the event', () async {
+      await service.init();
+      final fired = <CalendarEvent>[];
+      final sub = service.events.listen(fired.add);
+
+      await pushOnCalendarEvent({
+        'kind': 'unknown_future_kind',
+        'eventId': 'e-x',
+        'calendarId': 'cal1',
+        'title': '???',
+        'atMs': 0,
+      });
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        fired,
+        isEmpty,
+        reason:
+            'The unknown-kind default branch must skip the push (forward-'
+            'compat for new Kotlin-side kinds).',
+      );
+      await sub.cancel();
+    });
+
+    test('stop() swallows MissingPluginException when the platform side '
+        'is gone (defensive tear-down)', () async {
+      await service.init();
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'stopStream') {
+          throw MissingPluginException(
+            'doit/calendar not registered (test only)',
+          );
+        }
+        return null;
+      });
+      // resetForTesting calls _source!.stop() (fire-and-forget via
+      // unawaited). The MissingPluginException must NOT propagate.
+      await expectLater(
+        Future<void>.sync(() => service.resetForTesting()),
+        completes,
+      );
+    });
+  });
 }
