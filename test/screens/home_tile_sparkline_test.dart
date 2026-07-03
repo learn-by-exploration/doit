@@ -16,6 +16,18 @@
 // `listForHabit` call AND seeds the matching rows. This
 // avoids mockito (not in pubspec dev_dependencies) AND
 // avoids spinning up a real database for a pure helper.
+//
+// Coverage:
+//   - v1.4e baseline (Phase 32): 7-day window, source-tag
+//     preservation, multiple-rows-same-day tiebreak, outside-
+//     window skip, chronological-order monotonicity.
+//   - v1.4i extension (SYS-123): 14-day `extendedSparklineForDo`
+//     with arbitrary `days:` arg.
+//   - v1.4-stab-G (SYS-134): BUG-019 single-completion render.
+//   - v1.6-θ (SYS-153 / ADR-084 / WF-081): +4 cross-cutting
+//     invariants — `'auto'` source tag preservation, 14-day
+//     boundary at day-15, determinism across two consecutive
+//     calls, `SparklineDotFilled.toString` debug representation.
 
 import 'package:doit/do/do.dart';
 import 'package:doit/do/proof_mode.dart';
@@ -372,6 +384,131 @@ void main() {
       final tomorrow = today.add(const Duration(days: 1));
       final a2 = SparklineDot.filled(day: tomorrow, source: 'manual');
       expect(a == a2, isFalse);
+    });
+
+    // ---- v1.6-θ / SYS-153 / ADR-084 / WF-081 ----
+    // Four additional coverage tests targeting the helper's
+    // cross-cutting invariants and the boundary cases that the
+    // v1.4-stab-G baseline (13 tests) did not pin.
+    test('SparklineDotFilled preserves non-manual source tags '
+        '(v1.6-θ) — the widget branches on the tag for color', () async {
+      // Arrange — a day with a `'auto'` source (e.g., a future
+      // `trigger` automation resolving the do). The v1.4e
+      // baseline covers `'manual'` + `'rest_day'`; v1.6-θ
+      // extends the pin to any source tag passed through the
+      // helper.
+      final today = DateTime(2026, 6, 13, 14, 30);
+      final dayMinus1 = DateTime(
+        today.year,
+        today.month,
+        today.day,
+      ).subtract(const Duration(days: 1));
+      final fake = _FakeCompletionLog(
+        seeded: [
+          _row(id: 'c-auto', habitId: 'h1', day: dayMinus1, source: 'auto'),
+        ],
+      );
+
+      // Act.
+      final dots = await sparklineForDo(
+        activeDo: _do(),
+        asOf: today,
+        completionLog: fake,
+      );
+
+      // Assert — day -1 is filled and the source is preserved
+      // verbatim. The widget renders this as a distinct color
+      // per SYS-123.
+      expect(dots[5], isA<SparklineDotFilled>());
+      expect((dots[5] as SparklineDotFilled).source, 'auto');
+    });
+
+    test('extendedSparklineForDo(days: 14) ignores a row 15 days ago '
+        '(boundary at day-15 — v1.6-θ)', () async {
+      // Arrange — a row 15 days old is OUTSIDE the 14-day
+      // window; the helper must skip it. (The v1.4e baseline
+      // pins the 7-day boundary; this pins the 14-day one.)
+      final today = DateTime(2026, 6, 13, 14, 30);
+      final dayMinus15 = DateTime(
+        today.year,
+        today.month,
+        today.day,
+      ).subtract(const Duration(days: 15));
+      final fake = _FakeCompletionLog(
+        seeded: [_row(id: 'c-old', habitId: 'h1', day: dayMinus15)],
+      );
+
+      // Act.
+      final dots = await extendedSparklineForDo(
+        activeDo: _do(),
+        asOf: today,
+        completionLog: fake,
+      );
+
+      // Assert — all 14 dots are empty; the day-15 row is
+      // outside the window.
+      expect(dots, hasLength(14));
+      expect(dots.every((d) => d is SparklineDotEmpty), isTrue);
+    });
+
+    test('extendedSparklineForDo is deterministic across two consecutive '
+        'calls with the same args (idempotency — v1.6-θ)', () async {
+      // Arrange — the helper is a `Future` over the
+      // `completionLog.listForHabit` call, so two calls must
+      // produce structurally equal dot lists (a regression
+      // here would surface as a flickering home tile).
+      final today = DateTime(2026, 6, 13, 14, 30);
+      final dayMinus3 = DateTime(
+        today.year,
+        today.month,
+        today.day,
+      ).subtract(const Duration(days: 3));
+      final fake = _FakeCompletionLog(
+        seeded: [_row(id: 'c-1', habitId: 'h1', day: dayMinus3)],
+      );
+
+      // Act — call twice with identical args.
+      final first = await extendedSparklineForDo(
+        activeDo: _do(),
+        asOf: today,
+        completionLog: fake,
+      );
+      final second = await extendedSparklineForDo(
+        activeDo: _do(),
+        asOf: today,
+        completionLog: fake,
+      );
+
+      // Assert — element-by-element equality (uses the
+      // sealed `SparklineDot.==` defined per factory).
+      expect(first, equals(second));
+      expect(first.length, second.length);
+      for (var i = 0; i < first.length; i++) {
+        expect(first[i], equals(second[i]));
+        expect(first[i].day, second[i].day);
+      }
+    });
+
+    test('SparklineDotFilled.toString includes day + source for debugging '
+        '(debug-representation pin — v1.6-θ)', () async {
+      // Arrange — the `toString` is the primary debugging
+      // surface for the home tile (logged in widget asserts
+      // and the V-Model reviewer's crash dumps). A regression
+      // that strips either field would make crash dumps
+      // useless.
+      final today = DateTime(2026, 6, 13);
+      final dot = SparklineDot.filled(day: today, source: 'rest_day');
+
+      // Act.
+      final rendered = dot.toString();
+
+      // Assert — both day and source are present in the
+      // debug string. The format is implementation-defined
+      // (per the v1.4e `toString` override), but the two
+      // fields MUST appear so a debugger can read them off
+      // the log line.
+      expect(rendered, contains(today.toString()));
+      expect(rendered, contains('rest_day'));
     });
 
     test('BUG-019: sparkline renders empty placeholder when only 1 '
