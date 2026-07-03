@@ -3680,3 +3680,55 @@ The v1.6 milestone's fourth cycle (v1.6-δ) closes a mid-tier screen coverage ga
 **Targeted:** `flutter test test/screens/add_event_test.dart` (28/28 pass: 14 baseline + 14 new).
 
 **Cross-references.** SYS-149; ADR-080; v1.6-δ row; CHANGELOG `## v1.6-δ`; feature.md cycle entry.
+
+## WF-078 — Verify the sealed-hierarchy sweep coverage closure (v1.6-ε / Phase 63)
+
+The v1.6 milestone's fifth cycle (v1.6-ε) closes a pure-Dart sealed-hierarchy coverage gap — the 4 sealed hierarchies that drive the engine (`Action`, `Condition`, `MissionResult + MissionChainResult`, `DoProofMode`) had their per-leaf `validate()` exception paths + `==`/`hashCode` contracts uncovered. **No production-code change**; v1.6-ε is tests-only.
+
+**Test changes (+19 net in `test/sealed/triggers_test.dart`, NEW file — over-delivered vs plan's +14 by +5):**
+
+**Group A — `Action` (5 leaves + per-leaf validation, 5 tests, v1.6-ε):**
+- (a) `ActionNotify` with empty title throws `ActionNotifyEmptyTitle` (line 28-33 contract: `title.isEmpty` guard).
+- (b) `ActionNotify` with whitespace-only body throws `ActionNotifyEmptyBody` after trim (the `body.trim().isEmpty` guard).
+- (c) `ActionCallIntercept` decision enum has 3 leaves (`decline`/`declineWithAutoReply`/`mute`) + `==`/`hashCode` (the `CallInterceptDecision` enum cardinality + value-equality contract).
+- (d) `ActionOverrideSilent` with `SilentMode.silent` target + `validate()` returns self + `==`/`hashCode` (the validate-returns-self idempotent contract).
+- (e) `ActionOpenApp` with empty route throws `ActionOpenAppEmptyRoute` + `==`/`hashCode` (the `route.isEmpty` guard + distinct-routes-distinct-`==` contract).
+
+**Group B — `Condition` (7 leaves + per-leaf validation, 7 tests, v1.6-ε):**
+- (f) `ConditionTimeWindow` with `startHour=24` throws `ConditionTimeWindowInvalidHour` (off-by-one boundary at 24).
+- (g) `ConditionDayOfWeek` with empty set throws `ConditionDayOfWeekEmpty` + setEquals is order-insensitive (the empty-set guard + order-insensitive equality contract).
+- (h) `ConditionDayOfWeek` with `weekday=0` throws `ConditionDayOfWeekInvalidWeekday` (off-by-one at 0; Monday is 1).
+- (i) `ConditionBatteryRange` with `low > high` throws `ConditionBatteryRangeInverted` (the inverted-bounds guard).
+- (j) `ConditionBatteryRange` with `low=-1` throws `ConditionBatteryRangeInvalidBound` (the negative-bound guard).
+- (k) `ConditionBatteryRange` with both bounds null is the open-ended window (no throw — the `low != null || high != null` short-circuit).
+- (l) `ConditionSilentMode(.vibrate)` `==` self + `SilentMode` has 3 leaves (`silent`/`vibrate`/`normal`) (the enum cardinality + value-equality contract).
+
+**Group C — `MissionResult + MissionChainResult` (3 + 3 leaves, 3 tests, v1.6-ε):**
+- (m) `ChainPassed` carries an immutable `List<MissionResult>` (length 1 + first element `MissionPassed` — the unmodifiable-list contract).
+- (n) `ChainFailedAt(index, result)` round-trips index + result (the named-parameter round-trip).
+- (o) `ChainTimedOut` is-a `ChainFailedAt` with result `MissionTimedOut` (the type-hierarchy contract).
+
+**Group D — `DoProofMode` (3 leaves + validator, 4 tests, v1.6-ε):**
+- (p) `SoftProof().validateProofMode()` returns without throwing (the SoftProof no-op validate).
+- (q) `StrongProof(MissionChain.empty)` throws `StrongChainInvalid` with `"non-empty mission chain"` message (the empty-chain guard per `lib/do/proof_mode.dart:79-83`).
+- (r) `StrongProof` with `totalTimeout > 5 min` throws `StrongChainInvalid` with `"5-minute cap"` message (SYS-031 5-minute cap; 6 TypeMissions × 1 min = 6 min total triggers the guard).
+- (s) `AutoProof().validateProofMode()` throws `AutoProofNotSupported` + `AutoProof == self` (AutoProof is rejected in v0.1 per ADR-012).
+
+**Test count: 1694 → 1713 (+19 net — over-delivered vs plan's +14 by +5).**
+
+**Drift lessons per ADR-081:**
+- (a) **Sealed hierarchy `validate()` contracts are easy to test with `throwsA(isA<...>())`** — the throwsA matcher with the sealed exception type gives a clean 1-line assertion; the sealed-class constraint forces the contract to live in the leaf's `validate()` method, so the test surface is finite and predictable.
+- (b) **`MissionChain.empty` is `static final`, NOT `const`** — `final proof = StrongProof(MissionChain.empty)` is required because the empty sentinel cannot be const-evaluated (per `lib/missions/chain.dart:9`); mirrors the v1.6-γ `pickEditCadenceSaveAndReadback` rename pattern (compile-time constants vs runtime singletons).
+- (c) **`TypeMission` has additional required `expectedPhrase` parameter** beyond `id, label, timeout` — the 6-mission chain test for the 5-minute cap (SYS-031) requires `expectedPhrase` on every `TypeMission`; the cycle pin-points this as the canonical TypeMission constructor signature.
+- (d) **`prefer_const_literals_to_create_immutables` lint applies to `ConditionDayOfWeek(Set<int>)`** — 4 set literals needed `const` prefix (`const <int>{}`, `const {1, 2, 3}`, `const {3, 2, 1}`, `const {0, 1}`); mirrors the v1.6-δ `prefer_const_constructors` lint pattern.
+- (e) **Over-delivered vs plan +14 by +5** (19 vs 14) by writing per-leaf tests for each validation exception — discovered 5 more reachable exception paths during the cycle (ChainPassed immutability, ChainTimedOut type hierarchy, BatteryRange open-ended, SilentMode cardinality, ConditionDayOfWeek order-insensitive).
+
+**Out-of-scope (deferred to v2.0 + ADR-081):** `ActionNotify` `body` validation paths for non-ASCII whitespace (e.g. NBSP) — out-of-scope; full `ActionOverrideSilent` dispatch chain (the executor test is in `routine_executor_test.dart`); `AutoProof` in any widget (it throws at validate); per-mission type exhaustive equality for `HoldMission`/`ShakeMission`/`MemoryMission` — outside the 4-hierarchy scope.
+
+**Coverage:** 4 sealed hierarchies (`Action` + `Condition` + `MissionResult + MissionChainResult` + `DoProofMode`) — every per-leaf `validate()` exception path + every `==`/`hashCode` contract now pinned.
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean after auto-format of 1 file — `prefer_const_literals_to_create_immutables` lint fixes on 4 ConditionDayOfWeek set literals) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1713/1713 pass).
+
+**Targeted:** `flutter test test/sealed/triggers_test.dart` (19/19 pass).
+
+**Cross-references.** SYS-150; ADR-081; v1.6-ε row; CHANGELOG `## v1.6-ε`; feature.md cycle entry.
