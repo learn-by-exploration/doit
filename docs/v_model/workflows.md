@@ -3792,3 +3792,78 @@ baseline + 8 new v1.6-ζ).
 
 **Cross-references.** SYS-151; ADR-082; v1.6-ζ row; CHANGELOG `## v1.6-ζ`;
 feature.md cycle entry.
+
+## WF-080 — Verify the widget-channel coverage closure (v1.6-η / Phase 65)
+
+The v1.6 milestone's seventh cycle (v1.6-η) closes the home-widget bridge +
+inbound dispatcher coverage gap. The widget channel surface (`doit/widget`)
+was the last un-covered inbound channel in the app (calendar was closed in
+v1.6-ζ); this cycle brings it to parity.
+
+**Files in scope:**
+- `lib/widget/widget_bridge.dart` — `PlatformWidgetBridge` outbound side
+  (`cacheSnapshot`/`snapshot`/`skip`/`undo`/`requestRefresh`) and the
+  `FakeWidgetBridge` test double used throughout widget tests.
+- `lib/widget/widget_action_invoker.dart` — the inbound-side singleton that
+  receives `MethodCall` pushes from Kotlin and dispatches them to
+  `WidgetService.instance`.
+- `lib/widget/widget_service_proxy.dart` — stays at 33.3% per the ADR-071
+  trade-off (no change in this cycle).
+
+**Test additions (10 new tests):**
+
+- `test/widget/widget_bridge_test.dart` (+2 tests): `cacheSnapshot swallows
+  MissingPluginException (ADR-013)` — installs a `setMockMethodCallHandler`
+  that throws `MissingPluginException`; calls `bridge.cacheSnapshot(sample(
+  DateTime(2026, 6, 15, 10)))`; asserts the future resolves without throwing
+  (the `_safe` adapter at `widget_bridge.dart:148-156` catches + debugPrints).
+  `FakeWidgetBridge counts refresh and snapshot independently` — caches 2
+  distinct snapshots + invokes `requestRefresh` once; asserts
+  `cachedSnapshots.length == 2` AND `refreshCount == 1` (the counters are
+  orthogonal — a future refactor that conflates them fails this test).
+
+- `test/widget/widget_action_invoker_test.dart` (+8 tests, NEW
+  `group('v1.6-η — dispatcher contract + channel wiring')` block):
+  **(c)** `dispatcher returns false when invoker singleton is null` — call
+  `widgetActionDispatch` WITHOUT first calling `attach()`; assert `false`
+  (the top-level dispatcher short-circuits at `widget_action_invoker.dart:223-224`).
+  **(d)** `dispatcher returns false when args is non-Map non-null` — pass
+  `MethodCall('markDone', <Object?>['not', 'a', 'map'])`; assert `false`
+  (the dispatcher reads `args['habitId']` only when `args is Map`).
+  **(e)** `dispatcher returns false when habitId is a non-string` — pass
+  `MethodCall('markDone', {habitId: 42})`; assert `false` (the dispatcher
+  checks `raw is String` at line 174). **(f)** `attach with a custom channel
+  leaves the invoker attached` — `attach(channel: MethodChannel('test/custom_invoker'))`;
+  assert `isAttached == true` (pinned at the boolean level because the inbound
+  handler is not directly observable via `messenger.handlePlatformMessage` —
+  see ADR-083 drift lesson (e)). **(g)** `resetForTesting on a never-attached
+  invoker does not throw` — defensive: a reset on a fresh state must be a
+  no-op. **(h)** `attach + reset + re-attach toggles isAttached cleanly` —
+  lifecycle pin; after a reset + re-attach, the dispatcher must find the
+  freshly-attached singleton. **(i)** `default attach wires a working
+  handler` — `attach()` without a custom channel wires the default
+  `doit/widget` channel; `widgetActionDispatch` finds the singleton.
+  **(j)** `dispatcher with detach-then-no-attach returns false` — attach +
+  reset + dispatch; without a fresh attach, the dispatcher returns `false`.
+
+**Why the messenger-detour discovered in cycle 9 doesn't affect correctness:**
+The 3 initially-written `messenger.handlePlatformMessage` tests all failed
+because `setMockMethodCallHandler` overrides the inbound handler set by
+`attach()`. The fix was to pin the contract at `isAttached` (tests f, g, i)
+rather than the handler-invocation level. The dispatcher itself IS exercised
+end-to-end by `widget_service_test.dart`'s v1.4g baseline (`markDone appends
+the completion then re-derives`); the new tests pin the dispatcher's
+defensive contracts + lifecycle at a finer granularity.
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean after
+auto-format of 1 file — `widget_action_invoker_test.dart` trailing-comma + 4-space
+indent normalization + 3 `prefer_const_constructors` + 3 `prefer_const_literals_to_create_immutables`
+lint fixes inline on the new `MethodCall` literals) + `flutter analyze --fatal-infos lib test`
+(0 issues) + `flutter test` (1737/1737 pass).
+
+**Targeted:** `flutter test test/widget/widget_bridge_test.dart` (24/24 pass:
+22 baseline + 2 new v1.6-η) + `flutter test test/widget/widget_action_invoker_test.dart`
+(15/15 pass: 7 baseline + 8 new v1.6-η).
+
+**Cross-references.** SYS-152; ADR-083; v1.6-η row; CHANGELOG `## v1.6-η`;
+feature.md cycle entry.

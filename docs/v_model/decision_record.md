@@ -7179,3 +7179,119 @@ a future refactor that changes this would flip the explicit test.
 
 **SYS-IDs affected:** SYS-151 (new).
 **Cross-references:** SYS-151; ADR-082; WF-079; Milestone 14 `### v1.6-ζ`; v1.6-ζ row; CHANGELOG `## v1.6-ζ`; feature.md cycle entry.
+
+## ADR-083 — v1.6-η (widget-channel coverage closure): 5 drift lessons from the +10 tests
+
+The v1.6 milestone's seventh cycle (v1.6-η) closes the home-widget bridge +
+inbound dispatcher + service-proxy coverage gap. Three files were touched in
+production-facing surface area but no production code changed — v1.6-η is
+tests-only.
+
+**Files in scope:**
+- `lib/widget/widget_bridge.dart` — `PlatformWidgetBridge.cacheSnapshot`
+  `MissingPluginException` swallow path via the `_safe` adapter (distinct
+  from `_safeResult` already pinned in v1.5-cyc-ε); `FakeWidgetBridge` cache-vs-
+  refresh counter orthogonality.
+- `lib/widget/widget_action_invoker.dart` — defensive dispatcher contracts
+  (null singleton, non-Map args, non-string habitId, custom-channel attach
+  surface, no-op `resetForTesting`, attach→reset→re-attach lifecycle, default-
+  channel attach, attach-then-detach-then-dispatch fall-through).
+- `lib/widget/widget_service_proxy.dart` — stays at 33.3% per the ADR-071
+  trade-off (the proxy is a 3-line forwarding class with no internal branches;
+  cycle 9 does NOT change that coverage ceiling).
+
+### The 5 drift lessons
+
+(a) **`widgetActionDispatch` requires BOTH the invoker singleton AND
+`WidgetService.instance` to be available.** Three distinct failure modes —
+singleton detached (`_instance == null`), `WidgetService.instance` uninitialized
+(`StateError`), args malformed (non-Map or non-string `habitId`) — all return
+`false` from the dispatcher. The three modes are indistinguishable to the
+caller (Kotlin) but distinct from the test perspective; the new dispatcher
+tests (c), (d), (e) pin each mode independently. The test file header
+documents this as "trust the model in reverse" — the dispatcher's defensive
+contract is testable WITHOUT a real `WidgetService.instance` init, mirroring
+the v1.6-ζ `_toRow` null-write symmetry test that pins the write path without
+exercising the read path.
+
+(b) **Dispatcher defensive contracts are easier to pin than happy paths.** The
+happy path (a `MethodCall('markDone', {habitId: 'h1'})` that successfully marks
+the habit done) requires a real `WidgetService.instance` which needs Drift +
+the singleton-with-`_ready` pattern + the `Do` repository + the completion log
+service. Setting that up just to test a 1-line dispatch is high overhead. The
+defensive false-returning paths are reachable WITHOUT a real service: pass a
+non-Map args, pass a non-string `habitId`, or don't `attach()` the invoker.
+The 8 new dispatcher tests pin the contract at this level; the happy-path
+behavior is covered indirectly by `widget_service_test.dart`'s v1.4g baseline
+(`markDone appends the completion then re-derives`).
+
+(c) **`PlatformWidgetBridge.cacheSnapshot` goes through `_safe` (NOT
+`_safeResult`).** This is distinct from `snapshot`/`skip`/`undo` which use
+`_safeResult` (returning `null`/`false` on error). The `cacheSnapshot` method
+returns `void`, so the swallow pattern is `_safe` — catch + `debugPrint` per
+`kDebugMode`. Both swallow `MissingPluginException` per ADR-013 but the
+return-type semantics differ. The new test pins the void-returning
+`cacheSnapshot` contract; a future refactor that swaps the adapter for
+`_safeResult` (would break the void contract) fails the test.
+
+(d) **`FakeWidgetBridge` counter orthogonality is a regression-protector.**
+`cachedSnapshots` (a `List<DoitWidgetState>`) and `refreshCount` (an `int`) are
+INDEPENDENT counters. `cacheSnapshot` adds to `cachedSnapshots` without
+touching `refreshCount`; `requestRefresh` increments `refreshCount` without
+touching `cachedSnapshots`. The new test pins this orthogonality: 2 distinct
+`cacheSnapshot` calls + 1 `requestRefresh` → `cachedSnapshots.length == 2`
+AND `refreshCount == 1`. A future refactor that conflates the counters (e.g.,
+a "refresh count includes cache updates" semantic) would break this test.
+
+(e) **Attach-with-custom-channel wiring is observable only via `isAttached`.**
+The inbound handler registered via `_channel.setMethodCallHandler` is NOT
+directly observable via `messenger.handlePlatformMessage` in a unit test
+because the mock messenger's `setMockMethodCallHandler` overrides any real
+handler set via `setMethodCallHandler`. The cycle discovered this empirically:
+3 tests initially written via the `handlePlatformMessage` push pattern all
+failed because the mock handler intercepted the push before the invoker's
+handler ran. The fix: pin the contract at the `isAttached` level
+(test (f): `attach(channel: customChannel)` → `isAttached == true`) rather
+than the handler-invocation level. The handler is exercised indirectly by
+`widget_service_test.dart`'s v1.4g baseline which spins up a real
+`WidgetService.instance` and verifies the dispatcher's StateError catch fires
+via the `debugPrint` output (the `WidgetActionInvoker: WidgetService not
+initialized — Bad state...` message).
+
+### Why the 3-gate is clean despite the messenger-mock detour
+
+The detour cost nothing because:
+- The 3 detached-invoker tests (test (c), (j), and the lifecycle test (h))
+  use `widgetActionDispatch` DIRECTLY (no messenger at all) — they verify
+  the top-level dispatcher's null-singleton short-circuit.
+- The 2 attach-lifecycle tests (test (f), (g), (i)) pin the contract at the
+  `isAttached` boolean level — no messenger push, no handler invocation.
+- The 3 dispatcher-defensive tests (test (d), (e)) pass synthetic `MethodCall`
+  values with non-Map / non-string `habitId` args — the dispatcher short-circuits
+  on the malformed-args check BEFORE attempting to call `WidgetService.instance`.
+- `flutter analyze --fatal-infos lib test` reports 0 issues because the new
+  tests are all `async` with proper `await` semantics and `MethodCall` literals
+  are `const` where possible.
+- `dart format` requires no changes because the new tests follow the
+  existing 2-space indent + trailing-comma convention.
+
+### Why the test count lands exactly at the +10 plan target
+
+The plan called for +10 tests (+2 widget_bridge + +8 widget_action_invoker).
+The cycle landed at exactly +10. No over-delivery, no under-delivery:
+- 2 widget_bridge: 1 MissingPluginException swallow + 1 counter orthogonality.
+- 8 widget_action_invoker: 3 dispatcher defensive contracts (null singleton,
+  non-Map args, non-string habitId) + 5 lifecycle pins (custom-channel attach,
+  no-op reset, attach+reset+reattach, default-channel attach, detach-then-
+  dispatch).
+
+**Consequences:** No production-code change. v1.6-η is tests-only. The
+widget-channel surface now has parity with the calendar-channel surface
+covered in v1.6-ζ: both have `_decode`/`_encode` + `MissingPluginException`
+swallow pinned. The 5 drift lessons above should inform future tests for
+the action dispatcher or any future inbound channel handler — the pattern
+of "pin the defensive contracts via direct calls + `isAttached`" is
+reusable.
+
+**SYS-IDs affected:** SYS-152 (new).
+**Cross-references:** SYS-152; ADR-083; WF-080; Milestone 14 `### v1.6-η`; v1.6-η row; CHANGELOG `## v1.6-η`; feature.md cycle entry.

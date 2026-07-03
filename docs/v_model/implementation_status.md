@@ -405,3 +405,33 @@ The `automationsJson` round-trip tests cover the write-side (`_toRow` at `person
 Cycle is the SIXTH in the v1.6 milestone — next is **v1.6-η (PR #74) widget_bridge + widget_action_invoker + widget_service_proxy**.
 
 **Refs:** SYS-151, ADR-082, WF-079.
+
+## v1.6-η — Widget-channel coverage closure (Phase 65 / SYS-152 / ADR-083 / WF-080)
+
++10 tests across 2 EXTENDED test files. **Tests-only cycle; no production-code change**.
+
+**Widget_bridge tests (2 new in `PlatformWidgetBridge` group):**
+
+1. `cacheSnapshot swallows MissingPluginException (ADR-013)` — install a mock that throws `MissingPluginException` on `cacheSnapshot`; call `bridge.cacheSnapshot(sample(...))`; the call resolves without throwing (the `_safe` adapter at `widget_bridge.dart:148-156` catches + debugPrints the error per `kDebugMode`).
+2. `FakeWidgetBridge counts refresh and snapshot independently` — cache 2 distinct snapshots + invoke `requestRefresh` once; assert `cachedSnapshots.length == 2` AND `refreshCount == 1` (the counters are orthogonal — a future refactor that conflates them fails this test).
+
+**Widget_action_invoker tests (8 new in NEW `v1.6-η — dispatcher contract + channel wiring` group):**
+
+3. `dispatcher returns false when invoker singleton is null` — call `widgetActionDispatch` WITHOUT first calling `attach()`; assert `false` (the top-level dispatcher short-circuits at `widget_action_invoker.dart:223-224`).
+4. `dispatcher returns false when args is non-Map non-null` — pass `MethodCall('markDone', <Object?>['not', 'a', 'map'])`; assert `false` (the dispatcher reads `args['habitId']` only when `args is Map`).
+5. `dispatcher returns false when habitId is a non-string` — pass `MethodCall('markDone', {habitId: 42})`; assert `false` (the dispatcher checks `raw is String`).
+6. `attach with a custom channel leaves the invoker attached` — `attach(channel: MethodChannel('test/custom_invoker'))`; assert `isAttached == true` (pinned at the boolean level because the inbound handler is NOT directly observable via `messenger.handlePlatformMessage` in a unit test).
+7. `resetForTesting on a never-attached invoker does not throw` — defensive: a reset on a fresh state must be a no-op.
+8. `attach + reset + re-attach toggles isAttached cleanly` — lifecycle pin; after a reset + re-attach, the dispatcher must find the freshly-attached singleton.
+9. `default attach wires a working handler` — `attach()` without a custom channel wires the default `doit/widget` channel; `widgetActionDispatch` finds the singleton.
+10. `dispatcher with detach-then-no-attach returns false` — attach + reset + dispatch; without a fresh attach, the dispatcher returns `false`.
+
+**APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`** — v1.6-η is tests-only; no production-code behavior change; no release APK rebuild.
+
+**No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.**
+
+**Out-of-scope (deferred to v2.0 + ADR-083):** `WidgetActionInvoker.dispatch` happy path with a real `WidgetService.instance` (requires Drift + a real `Do` repository + the `WidgetService.init` happy-path fakes — out-of-cycle due to the singleton-with-`_ready` setup overhead; covered indirectly by `widget_service_test.dart`'s `markDone appends the completion then re-derives` baseline); `WidgetActionInvoker.ready` future (the `Completer<void> _ready` is private and tested via the public `attach`/`resetForTesting` contract); `WidgetServiceProxy` stays at 33.3% per the ADR-071 trade-off (the proxy is a 3-line forwarding class with no internal branches).
+
+Cycle is the SEVENTH in the v1.6 milestone — next is **v1.6-θ (PR #75) MissionChain + sparkline + consecutive_counter + mission_result**.
+
+**Refs:** SYS-152, ADR-083, WF-080.

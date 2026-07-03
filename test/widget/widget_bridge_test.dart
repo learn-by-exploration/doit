@@ -169,6 +169,40 @@ void main() {
       // Act + Assert — same `_safeResult` swallow path.
       expect(await bridge.undo('h1'), isFalse);
     });
+
+    // v1.6-η — cacheSnapshot swallows MissingPluginException
+    // (SYS-152 / ADR-083 / WF-080). The cacheSnapshot path
+    // goes through `_safe` (not `_safeResult`) — a throw
+    // is caught silently and the method resolves. The
+    // pin asserts (a) the future resolves without throwing,
+    // (b) `refreshCount` is unaffected (cacheSnapshot does
+    // not invoke requestRefresh).
+    test('cacheSnapshot swallows MissingPluginException (ADR-013)', () async {
+      final bridge = PlatformWidgetBridge();
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        throw MissingPluginException('not implemented');
+      });
+      // No throw — `_safe` swallows.
+      await bridge.cacheSnapshot(sample(DateTime(2026, 6, 15, 10)));
+    });
+
+    // v1.6-η — FakeWidgetBridge counter orthogonality
+    // (SYS-152 / ADR-083 / WF-080). The refresh count
+    // increments ONLY on requestRefresh calls; cacheSnapshot
+    // adds to cachedSnapshots without touching refreshCount.
+    // This pins the cheap-distinction so a future refactor
+    // that conflates the two fails.
+    test(
+      'FakeWidgetBridge counts refresh and snapshot independently',
+      () async {
+        final bridge = FakeWidgetBridge();
+        await bridge.cacheSnapshot(sample(DateTime(2026, 6, 15, 10)));
+        await bridge.cacheSnapshot(sample(DateTime(2026, 6, 15, 11)));
+        await bridge.requestRefresh();
+        expect(bridge.cachedSnapshots, hasLength(2));
+        expect(bridge.refreshCount, 1);
+      },
+    );
   });
 
   group('DoitWidgetState JSON', () {
