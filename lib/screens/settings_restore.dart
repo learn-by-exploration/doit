@@ -154,6 +154,32 @@ class _SettingsRestoreScreenState extends State<SettingsRestoreScreen> {
                 icon: const Icon(Icons.folder_open),
                 label: const Text('Pick a backup file'),
               ),
+              if (_error != null) ...[
+                const SizedBox(height: Spacing.md),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(Spacing.md),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        const SizedBox(width: Spacing.sm),
+                        Expanded(
+                          child: Text(
+                            _error!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               if (_pickedPath != null) ...[
                 const SizedBox(height: Spacing.md),
                 Card(
@@ -167,15 +193,6 @@ class _SettingsRestoreScreenState extends State<SettingsRestoreScreen> {
                           style: Theme.of(context).textTheme.titleSmall,
                         ),
                         Text(_pickedPath!),
-                        if (_error != null) ...[
-                          const SizedBox(height: Spacing.sm),
-                          Text(
-                            _error!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),
