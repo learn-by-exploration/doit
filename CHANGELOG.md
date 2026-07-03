@@ -4391,3 +4391,27 @@ Sixth and final cycle of the v1.5 milestone. Closes the W-13 retro §8 last part
 **No new `<uses-permission>`**, **no new pubspec deps**, **no Drift migration**, **no Kotlin changes** — pure-Dart test cycle only.
 
 **Refs:** SYS-145, ADR-076, WF-073.
+
+---
+
+## v1.6-α — BUG-021 fix (hoist `settings_restore` error Card) (Phase 59 / SYS-146 / ADR-077 / WF-074)
+
+**Production-code change + 2 test flips** (1 block-move in `lib/screens/settings_restore.dart:157-193` + 2 `findsNothing` → `findsOneWidget` flips in `test/screens/settings_restore_test.dart:200-234, 236-255` + 8 doc updates). **Closes BUG-021** (deferred from v1.5-cyc-δ to v1.6-α per the v1.6 11-cycle pre-auth plan). The defect was that the `if (_error != null) ...[ error sub-text widget ]` block was gated INSIDE the `if (_pickedPath != null) ...[ selected-file Card + Replace FilledButton.icon ]` block — when the picker returned a file with a `null` `path` (rare but real on Android SAF), or when `FilePicker.platform.pickFiles` threw (`MissingPluginException` / `PlatformException('SAF channel unavailable')`), the screen would set `_error = 'Could not read the picked file.'` / `_error = 'Picker failed: $e'` in state, revert to `_Status.idle`, and silently show no error to the user. **The fix is the smallest possible production-code change**: hoist the `if (_error != null) ...[ ... ]` block OUTSIDE the `if (_pickedPath != null) ...[ ... ]` block in `lib/screens/settings_restore.dart` so the error Card renders regardless of whether a path was picked. The error Card uses `Theme.of(context).colorScheme.error` for both the `Icon(Icons.error_outline)` color and the `Text(_error!)` style (per `.claude/rules/lib-screens.md`). The `Row`'s `crossAxisAlignment: CrossAxisAlignment.start` keeps the icon top-aligned when the error text wraps to multiple lines.
+
+**Test flips:** (d) `pickFiles returns a file with a null path → error Card surfaces the message in the UI (BUG-021 fix verification, v1.6-α)` flips `findsNothing` → `findsOneWidget` for `'Could not read the picked file.'` and removes the `reason:` docstring; `find.byKey(const ValueKey('settings_restore.run'))` stays `findsNothing` (the Replace button is still correctly gated on `_pickedPath != null` — no path → no restore, that's correct, not a bug). (e) `pickFiles throwing surfaces the "Picker failed: $e" copy in the UI (BUG-021 path B fix verification, v1.6-α)` flips `findsNothing` → `findsOneWidget` for `'Picker failed:'` and removes the `reason:` docstring.
+
+**Test count:** 1650 → **1650** (0 net — 2 flips only, no additions, no deletions). The post-fix tests serve as permanent regression-protectors — a future refactor that re-gates the error Card inside `if (_pickedPath != null)` would break both `findsOneWidget` assertions visibly.
+
+**Cumulative v1.6:** ~67.57% → ~67.57% (unchanged on a non-test cycle; the 1-block-move doesn't open new lines).
+
+**APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`** — v1.6-α is 1 block-move + 2 test flips + 8 doc updates; no behavioral diff in the happy path; no release APK rebuild.
+
+**No new `<uses-permission>`**, **no new pubspec deps**, **no Drift migration**, **no Kotlin changes** — Dart-only + Flutter widgets.
+
+**Drift lessons (per ADR-077):** (a) `flutter analyze --fatal-infos lib test` is non-negotiable for production-code touches (caught no issues; test suite 1650/1650 pass); (b) `Theme.of(context).colorScheme.error` over hardcoded `Colors.red` (per `.claude/rules/lib-screens.md`) — hardcoded `Colors.red` would have looked correct on the default light theme but would have been invisible on the dark theme; (c) the post-fix tests serve as permanent regression-protectors (their `findsOneWidget` assertions lock the error-surface contract in place); (d) v1.6-α is the FIRST cycle in the v1.6 milestone — BUG-021 lands first because the cycle is small (1 production-code change + 2 test flips + 8 doc updates) and unblocks the form-screen cycles (β, γ, δ) that follow.
+
+**Out-of-scope (deferred to v2.0):** full E2E coverage of `BackupFormatException` + `Restored N rows.` success-card surfacing paths in `settings_restore.dart` (require real `dart:io` File IO + Drift upserts that do NOT settle in the fake-async zone — exercised at the SERVICE layer in Cycle F's coverage closure).
+
+Cycle is the FIRST in the v1.6 milestone — next is **v1.6-β (PR #69) add_habit form sub-branches**.
+
+**Refs:** SYS-146, ADR-077, WF-074.

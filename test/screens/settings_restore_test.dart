@@ -198,8 +198,8 @@ void main() {
   });
 
   testWidgets('pickFiles returns a file with a null path → '
-      'error string is set in state but NOT surfaced in UI '
-      '(BUG-021, deferred to v2.0)', (tester) async {
+      'error Card surfaces the message in the UI '
+      '(BUG-021 fix verification, v1.6-α)', (tester) async {
     picker.script(
       result: FilePickerResult([PlatformFile(name: 'backup.json', size: 0)]),
     );
@@ -208,50 +208,28 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('settings_restore.pick')));
     await _driveMicrotasks(tester);
     await tester.pump();
-    // KNOWN UX DEFECT in `lib/screens/settings_restore.dart`
-    // (discovered while writing this test, Phase 55):
-    //   The error sub-text widget that reads `_error != null`
-    //   is gated INSIDE the `if (_pickedPath != null) ...`
-    //   block (lines 157-193 of settings_restore.dart). When
-    //   the picked file has a null path, the code path at
-    //   lines 47-54 sets `_error = 'Could not read the picked
-    //   file.'` and status back to `_Status.idle` — but the
-    //   error Card is gated on `_pickedPath != null` so the
-    //   message is invisible to the user. The user sees the
-    //   screen silently revert to idle with no explanation.
-    //
-    // Filed as BUG-021 (UX defect, deferred to v2.0).
-    // This test pins the current buggy behavior as the
-    // regression-protector so the fix lands visibly.
-    expect(
-      find.text('Could not read the picked file.'),
-      findsNothing,
-      reason:
-          'BUG-021: error sub-text is gated inside the _pickedPath block. '
-          'When fixed, this assertion flips to findsOneWidget.',
-    );
+    // BUG-021 fix (v1.6-α): the error Card is now hoisted
+    // OUTSIDE the `if (_pickedPath != null)` block in
+    // `lib/screens/settings_restore.dart`, so the
+    // "Could not read the picked file." message is visible
+    // to the user even when no path was picked. The Replace
+    // button stays hidden (no path → no restore).
+    expect(find.text('Could not read the picked file.'), findsOneWidget);
     expect(find.byKey(const ValueKey('settings_restore.run')), findsNothing);
   });
 
   testWidgets('pickFiles throwing surfaces the "Picker failed: \$e" copy '
-      'is set in state but NOT surfaced in UI '
-      '(BUG-021 path B, deferred to v2.0)', (tester) async {
+      'in the UI (BUG-021 path B fix verification, v1.6-α)', (tester) async {
     picker.script(exception: Exception('SAF channel unavailable'));
     await tester.pumpWidget(_wrap());
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('settings_restore.pick')));
     await _driveMicrotasks(tester);
     await tester.pump();
-    // Same UX defect as above — `Picker failed: ...` is set
-    // in `_error` but the Card is gated on
-    // `_pickedPath != null`, so the message never renders.
-    expect(
-      find.textContaining('Picker failed:'),
-      findsNothing,
-      reason:
-          'BUG-021 path B: same defect as the null-path branch — error copy '
-          'is gated inside the _pickedPath block. Pinning the bug.',
-    );
+    // BUG-021 path B fix (v1.6-α): the same hoisted error
+    // Card now surfaces `Picker failed: <e>` when the
+    // SAF picker throws.
+    expect(find.textContaining('Picker failed:'), findsOneWidget);
   });
 
   testWidgets(

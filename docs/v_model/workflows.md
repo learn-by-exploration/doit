@@ -3467,3 +3467,37 @@ production-code change.
   Kotlin changes, no new Drift migration.**
 
 **Cross-references.** SYS-145; ADR-076; WF-073; Milestone 13.
+
+---
+
+## WF-074 — Verify the BUG-021 fix lands visibly in `SettingsRestoreScreen` (v1.6-α / Phase 59)
+
+The first cycle of the v1.6 milestone closes **BUG-021** — the UX defect at `lib/screens/settings_restore.dart:157-193` where the `if (_error != null) ...[ error sub-text widget ]` was gated INSIDE the `if (_pickedPath != null) ...[ selected-file Card + Replace FilledButton.icon ]` block, with the result that picker-error messages were silently swallowed.
+
+**Production-code change (1 block-move in `lib/screens/settings_restore.dart:157-193`):**
+
+The error Card is hoisted OUTSIDE the `if (_pickedPath != null) ...[ ... ]` block. The new structure renders the error Card BEFORE the selected-file Card when both are present. The error Card uses `Theme.of(context).colorScheme.error` for both icon color and text style (per `.claude/rules/lib-screens.md`). The `Row`'s `crossAxisAlignment: CrossAxisAlignment.start` keeps the icon top-aligned when the error text wraps to multiple lines. The `Icon` is `Icons.error_outline` (the canonical error icon).
+
+**Test changes (2 flips in `test/screens/settings_restore_test.dart:200-234, 236-255`):**
+
+(d) **`pickFiles returns a file with a null path → error Card surfaces the message in the UI (BUG-021 fix verification, v1.6-α)`** — flipped from `findsNothing` → `findsOneWidget` for `'Could not read the picked file.'`. The `reason:` docstring documenting the deferred-to-v2.0 fix is removed. The `find.byKey(const ValueKey('settings_restore.run'))` assertion stays `findsNothing` — the Replace button is still correctly gated on `_pickedPath != null` (no path → no restore, that's correct, not a bug).
+
+(e) **`pickFiles throwing surfaces the "Picker failed: $e" copy in the UI (BUG-021 path B fix verification, v1.6-α)`** — flipped from `findsNothing` → `findsOneWidget` for `'Picker failed:'`. The `reason:` docstring documenting the deferred-to-v2.0 fix is removed.
+
+**Test count: 1650 → 1650 (0 net — 2 flips only, no additions, no deletions).**
+
+**Drift lessons (per CLAUDE.md):** the production-code change is 1 block-move (no behavioral diff in the happy path; the bug-fix surfaces messages that were already set in state, just not rendered); the post-fix tests serve as permanent regression-protectors — a future refactor that re-gates the error Card inside `if (_pickedPath != null)` would break both `findsOneWidget` assertions visibly; `flutter analyze --fatal-infos lib test` is non-negotiable for production-code touches (caught no issues; test suite 1650/1650 pass).
+
+**Coverage:** `lib/screens/settings_restore.dart` ↑ to full state-machine coverage of all 5 `_Status` enum branches + the 2 picker-error sub-paths now surfaced (the 2 BUG-021 regression-protector pins now have the post-fix `findsOneWidget` assertions, locking the error-surface contract in place).
+
+**Closes:** BUG-021 (deferred from v1.5-cyc-δ to v1.6-α per the v1.6 11-cycle pre-auth plan). The 2 regression-protector tests no longer carry the deferred-to-v2.0 `reason:` docstrings; the bug is fixed.
+
+**APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`** — v1.6-α is a 1-block-move production-code change + 2 test flips + 8 doc updates; no behavioral diff in the happy path; no release APK rebuild needed.
+
+**No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** v1.6-α is Dart-only + Flutter widgets (no platform channels touched).
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean — the 1-block-move does not affect line widths) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1650/1650 pass).
+
+**Targeted:** `flutter test test/screens/settings_restore_test.dart` (9/9 pass; the 2 flipped tests now pass with `findsOneWidget`).
+
+**Cross-references.** SYS-146; ADR-077; v1.6-α row; CHANGELOG `## v1.6-α`; feature.md cycle entry.
