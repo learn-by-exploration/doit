@@ -7026,3 +7026,33 @@ The +14 test count is achievable BECAUSE the form is so simple — the reachable
 
 **SYS-IDs affected:** SYS-149 (new).
 **Cross-references:** SYS-149; ADR-080; WF-077; Milestone 14 `### v1.6-δ`; v1.6-δ row; CHANGELOG `## v1.6-δ`; feature.md cycle entry.
+
+## ADR-081 — v1.6-ε (sealed-hierarchy sweep coverage closure): 5 drift lessons from the +19 tests
+
+**Status.** Accepted (2026-07-03). Authors: v1.6-ε cycle.
+
+**Context.** v1.6-ε is the fifth cycle of the v1.6 milestone. The cycle targets the 4 pure-Dart sealed hierarchies that drive the engine — `Action` (lib/triggers/action.dart — 5 leaves), `Condition` (lib/triggers/condition.dart — 7 leaves), `MissionResult + MissionChainResult` (lib/missions/mission_result.dart — 3 + 3 leaves), and `DoProofMode` (lib/do/proof_mode.dart — 3 leaves + 1 validator). The v1.6 pre-auth plan targeted +14 tests for a single NEW test file `test/sealed/triggers_test.dart`. The realized count is +19 (over-delivered by +5). The cycle pin-points the 4 sealed hierarchies' per-leaf `validate()` exception paths + `==`/`hashCode` contracts as pure-Dart unit-testable surface — no Flutter harness, no Drift, no platform channels required.
+
+**Decision.** Land +19 tests in `test/sealed/triggers_test.dart` in 4 grouped `group(...)` blocks (Action + Condition + MissionResult + DoProofMode). Tests-only cycle; no production-code behavior change; 4 `prefer_const_literals_to_create_immutables` lint fixes inline (4 set literals in `ConditionDayOfWeek` constructors needed `const` prefix). v1.6-ε is the FIRST cycle in v1.6 to land in a NEW `test/<area>/` directory (`test/sealed/`); all prior cycles extended existing directories.
+
+**Drift lessons (5 total, in order of importance for future pure-Dart model coverage cycles):**
+
+**(a) Sealed hierarchy `validate()` contracts are easy to test with `throwsA(isA<...>())`.** The Dart 3 `sealed` modifier forces every leaf to override the abstract `validate()` method (or the typed `validateProofMode` function for `DoProofMode`); the test surface is finite and predictable. The `expect(action.validate, throwsA(isA<ActionNotifyEmptyTitle>()))` idiom gives a clean 1-line assertion that pins the contract type + the leaf type. Mirrors the v1.5-cyc-chain ADR-076 `sealed-class constraint` insight — sealed types are a feature, not a bug, for test design.
+
+**(b) `MissionChain.empty` is `static final`, NOT `const`.** `final proof = StrongProof(MissionChain.empty)` is required because the empty sentinel cannot be const-evaluated (per `lib/missions/chain.dart:9`). The test at line 257 of `test/sealed/triggers_test.dart` documents this constraint inline: `// (MissionChain.empty is a static final; not const-evaluable.)`. Mirrors the v1.6-γ `pickEditCadenceSaveAndReadback` rename pattern (per ADR-079) — compile-time constants vs runtime singletons is a recurring Dart 3 design constraint.
+
+**(c) `TypeMission` has additional required `expectedPhrase` parameter** beyond `id, label, timeout`. The 6-mission chain test for the 5-minute cap (SYS-031) requires `expectedPhrase` on every `TypeMission`; the canonical TypeMission constructor signature is `(id, label, expectedPhrase, timeout)` (per `lib/missions/mission.dart`). Future pure-Dart model coverage cycles that exercise `StrongProof.validateProofMode` MUST use `expectedPhrase` in TypeMission constructors or hit a compile-time error.
+
+**(d) `prefer_const_literals_to_create_immutables` lint applies to `ConditionDayOfWeek(Set<int>)`.** 4 set literals needed `const` prefix (`const <int>{}`, `const {1, 2, 3}`, `const {3, 2, 1}`, `const {0, 1}`) to satisfy the lint on the `@immutable` ConditionDayOfWeek class. Mirrors the v1.6-δ `prefer_const_constructors` lint pattern (per ADR-080 (b)) — `@immutable` classes require `const` before literal arguments. Future pure-Dart model coverage cycles that exercise `@immutable` sealed-class leaves with collection-valued parameters MUST prefix every collection literal with `const`.
+
+**(e) Over-delivered vs plan +14 by +5 (19 vs 14)** by writing per-leaf tests for each validation exception. Discovered 5 more reachable exception paths during the cycle: (i) ChainPassed list-immutability (the `unmodifiableListView` contract from `lib/missions/chain.dart`), (ii) ChainTimedOut type-hierarchy wrap (it IS-A ChainFailedAt with `MissionTimedOut` result), (iii) BatteryRange open-ended window (both bounds null is a valid window, no throw — the `low != null || high != null` short-circuit), (iv) SilentMode enum cardinality (3 leaves: silent, vibrate, normal), (v) ConditionDayOfWeek order-insensitive equality (setEquals is order-insensitive, NOT order-sensitive). The plan listed +14; the cycle hit +19 by going DEEPER on the per-leaf exception surface, NOT WIDER on additional hierarchies. Mirrors the v1.6-β + v1.6-γ + v1.6-δ "form is much simpler than master plan assumed" pattern (ADR-078 + ADR-079 + ADR-080) but inverted — for pure-Dart model coverage, the master plan UNDER-counted because the validation exception surface is wider than the happy-path surface.
+
+**Consequences.**
+- **+19 tests.** 1694 → **1713**. Coverage: 4 sealed hierarchies (`Action` + `Condition` + `MissionResult + MissionChainResult` + `DoProofMode`) — every per-leaf `validate()` exception path + every `==`/`hashCode` contract now pinned.
+- **APK SHA1 stays at H's `25bb7fab`** — tests-only.
+- **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.**
+- **4 deferred items** (per `Out-of-scope` block in SYS-150): `ActionNotify` `body` non-ASCII whitespace (e.g. NBSP); full `ActionOverrideSilent` dispatch chain (covered by `routine_executor_test.dart`); `AutoProof` in any widget (throws at validate); per-mission exhaustive equality for `HoldMission`/`ShakeMission`/`MemoryMission` — all documented inline for v2.0 follow-up.
+- **First NEW `test/<area>/` directory in v1.6.** All prior v1.6 cycles (α..δ) extended existing test directories (`test/screens/`, `test/services/`, `test/missions/`); v1.6-ε creates `test/sealed/` as a new directory dedicated to sealed-hierarchy coverage.
+
+**SYS-IDs affected:** SYS-150 (new).
+**Cross-references:** SYS-150; ADR-081; WF-078; Milestone 14 `### v1.6-ε`; v1.6-ε row; CHANGELOG `## v1.6-ε`; feature.md cycle entry.
