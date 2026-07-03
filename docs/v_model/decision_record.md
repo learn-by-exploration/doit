@@ -6981,4 +6981,48 @@ The error Card uses `Theme.of(context).colorScheme.error` for both the `Icon` co
 - **Plan over-count discovered:** the v1.6 pre-auth plan listed add_person.dart at "712 LF" + "47.67%" but assumed per-channel + per-cadence UI tests would land in this cycle. The actual form renders 1 cadence shape + 1 channel; the reachable test surface is the 5 guards + 3 menu/picker states, not the 9 per-leaf variations. The +16 test count is achieved by going DEEPER on the reachable paths (cadence input edge cases + initialPayload validation + menu visibility + pause row states), not WIDER on the unreachable paths.
 
 **SYS-IDs affected:** SYS-148 (new).
-**Cross-references:** SYS-148; WF-076; Milestone 14 `### v1.6-γ`; v1.6-γ row; CHANGELOG `## v1.6-γ`; feature.md cycle entry.
+**Cross-references:** SYS-148; ADR-079; WF-076; Milestone 14 `### v1.6-γ`; v1.6-γ row; CHANGELOG `## v1.6-γ`; feature.md cycle entry.
+
+## ADR-080 — v1.6-δ (add_event.dart sub-form coverage closure): 5 drift lessons from the +14 tests
+
+**Status:** Accepted 2026-07-03 (v1.6-δ / Phase 62).
+
+**Context.** The v1.6 pre-auth plan targeted `lib/screens/add_event.dart` (~71% line coverage pre-cycle) and proposed +14 tests covering recurring-event sub-forms (interval, end-condition, weekday picker), retry-policy dropdowns (3 values), Calendar picker with scripted `CalendarAccount`, `MissionChain` composer, and Save with `automations_json` non-empty. Once the cycle started, the plan turned out to over-count (third such cycle — mirrors ADR-078 for `add_habit.dart` and ADR-079 for `add_person.dart`): the v0.1 UI form is much simpler than the master plan assumed. The +14 test count IS feasible — but the reachable paths are different from the plan's assumption.
+
+**Decisions.**
+
+**(a) The `add_event.dart` UI form renders ONLY 4 fields + 2 ChoiceChips + Routines section.** The form has: a `TextField` for name (line 414-420), a `ListTile('Date')` for `_at` date (line 151-169, opens `showDatePicker`), a `ListTile('Time')` for `_at` time (line 171-187, opens `showTimePicker`), a `ListTile('Notify me')` for `_leadMinutes` (line 189-226, opens a custom `_pickLead` AlertDialog with 7 presets), a `Wrap` of 2 `ChoiceChip`s for `_recurrence` (line 443-454: "Once" + "Yearly"), and a Routines section gated on `_routines.isNotEmpty` (line 464-471). The form does NOT have a recurring-event sub-form with interval/end-condition, a retry-policy dropdown, a weekday picker, a `MissionChain` composer, an `automationsJson` text editor, a Calendar picker with `CalendarAccount`, or a `_save` retry-policy catch. The header at the top of `add_event.dart` does NOT carry a v0.2 roadmap note like `add_person.dart:9` does — the form is genuinely minimal. This means:
+- Recurring-event sub-form tests are NOT feasible in v1.6 (the UI doesn't render recurrence depth).
+- Retry-policy dropdown tests are NOT feasible in v1.6 (the UI doesn't expose retry).
+- `MissionChain` composer tests are NOT feasible in v1.6 (`lib/missions/` is not imported by `add_event.dart`).
+- `automationsJson` text editor tests are NOT feasible in v1.6 (no such widget exists).
+
+The +14 test count is achievable BECAUSE the form is so simple — the reachable paths are the 2 ChoiceChips + 3 ListTiles + the `_pickLead` AlertDialog + the edit-mode rename + the edit-mode lead-change + the `initialPayload` defensive branches (5 fields × 1-3 defensive checks each) + the save-as-template dialog paths.
+
+**Action:** defer per-recurrence-depth UI sub-form tests + per-retry-policy UI dropdown tests + `MissionChain` composer + `automationsJson` editor + CalendarAccount picker to v0.2 (when the form actually supports the additions). The +14 tests target the reachable branches listed in SYS-149 §1 Batches 1-4.
+
+**(b) `_pickLead` AlertDialog requires viewport bump.** The 7 `RadioListTile<int>` presets (0, 5, 15, 30, 60, 120, 1440 minutes) at line 189-226 overflow the default 800×600 test viewport. The `add_event_test.dart` v1.5-cyc-β baseline (line 567) already uses the `1080×1920` viewport bump pattern (`tester.view.physicalSize = const Size(1080, 1920); tester.view.devicePixelRatio = 1.0; addTearDown(tester.view.reset)`) — mirrors `onboarding_test.dart:136-139` and the v1.6-β + v1.6-γ cycles' viewport bumps.
+
+**Action:** apply the viewport bump in test (f) `_pickLead "At the time" radio button sets _leadMinutes = 0` — mirrors the existing v1.5-cyc-β line-567 pattern. No new helper needed.
+
+**(c) `showDatePicker` / `showTimePicker` Cancel-fallback idiom.** Per ADR-078 (c), `showTimePicker` is fragile in headless test mode (3 tests in `add_habit_test.dart` v1.6-β used the cancel-fallback idiom). The same applies to `showDatePicker` — the OK-button path requires `tester.tap` on a `DatePickerDialog` day-cell + reading `_at.day`, which is flaky in the fake-async zone. The Cancel-fallback pattern (`find.byType(DatePickerDialog)` / `find.byType(TimePickerDialog)` then `find.text('Cancel')` + `tester.tap`) is deterministic and exercises the `_pickDate` / `_pickTime` Cancel branch of `add_event.dart:151-187`.
+
+**Action:** tests (d) + (e) use the Cancel-fallback idiom. Document this in `test/support/testing_idioms.md` if not present (mirrors ADR-078 (c) action item).
+
+**(d) Edit-mode rename preserves `createdAtMillis` (WF-019).** The Drift `insertOnConflictUpdate` UPSERT pattern (used by `EventRepository.save`) does NOT touch `createdAtMillis` on a primary-key match — this is the WF-019 immutability invariant, symmetric to the SYS-129 Do `pausedUntil` invariant. Test (g) pins this invariant for `Event`: seed event via `EventRepository.save` in `runAsync`; pump `AddEventScreen(existing: seeded)`; change name to a new value; tap Save; `EventRepository.getById` returns the row with `name == new name` AND `createdAtMillis == seeded.createdAtMillis`.
+
+**Action:** document this invariant in `docs/v_model/workflows.md` WF-019 (if not already present). Test (g) is the canonical regression-protector for future EventRepository.save refactors.
+
+**(e) `_saveAsTemplate` whitespace-only name guard.** The blank-name guard at `add_event.dart:329-378` checks `name.trim().isEmpty` and short-circuits with a snackbar (does NOT open the dialog). Test (m) verifies this guard: `enterText('   ')` in the name field; tap Save; the dialog stays open (the snackbar shows + the dialog persists). This is the `Event` analog of the `_save` empty-name early-return — both protect against persisting incomplete state.
+
+**Action:** document the whitespace-only guard in ADR-080 (this section). Test (m) is the canonical regression-protector for the guard.
+
+**Consequences.**
+- **+14 tests.** 1680 → **1694**. Coverage: `lib/screens/add_event.dart` ~71% → **~78%** (±1 pp).
+- **APK SHA1 stays at H's `25bb7fab`** — tests-only.
+- **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.**
+- **5 deferred items** (per-recurrence-depth UI + per-retry-policy UI dropdown + `MissionChain` composer + `automationsJson` editor + CalendarAccount picker) — documented inline in `test/screens/add_event_test.dart`'s v1.6-δ header for v0.2 / v2.0 follow-up.
+- **Plan over-count discovered (third time):** the v1.6 pre-auth plan listed `add_event.dart` at 269 LF with +14 tests for "recurring-event sub-form + retry-policy dropdown + Calendar picker + MissionChain composer + Save with automations_json". The actual form is 643 LF but renders only 4 fields + 2 ChoiceChips; the reachable test surface is the 3 ListTiles + 2 ChoiceChips + `_pickLead` AlertDialog + edit-mode rename + edit-mode lead-change + 3 initialPayload defensive branches + 3 save-as-template dialog paths, NOT the 5 per-leaf variations the plan assumed. The +14 test count is achieved by going DEEPER on the reachable paths (3 ChoiceChip + 3 picker Cancel + 3 _pickLead + 2 edit-mode + 3 initialPayload + 3 save-as-template), not WIDER on the unreachable paths.
+
+**SYS-IDs affected:** SYS-149 (new).
+**Cross-references:** SYS-149; ADR-080; WF-077; Milestone 14 `### v1.6-δ`; v1.6-δ row; CHANGELOG `## v1.6-δ`; feature.md cycle entry.

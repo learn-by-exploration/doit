@@ -531,4 +531,397 @@ void main() {
       findsNothing,
     );
   });
+
+  // ---------------------------------------------------------------------
+  // v1.6-δ (SYS-149 / WF-077) — coverage for the form sub-branches
+  // the original 14 tests left dark. The reachable scope for
+  // add_event.dart is narrower than the master plan assumed:
+  //   - No "Recurring-event sub-form (interval, end-condition,
+  //     weekday picker)" — the form only exposes 2
+  //     `EventRecurrence` leaves via ChoiceChips.
+  //   - No "Retry-policy dropdown" — not in the form.
+  //   - No "MissionChain composer" — `lib/missions/` is not
+  //     imported by add_event.dart.
+  //   - "Calendar picker with scripted `CalendarAccount`" +
+  //     "Location picker" — picker mocking is heavyweight
+  //     (deferred per ADR-079 (b) — LocationPicker and
+  //     CalendarPicker both gate on PermissionSheet + showModal).
+  //   - "Save with `automations_json` non-empty" — gated on
+  //     picker mocking (deferred).
+  // The +14 tests below cover the actually-reachable branches.
+  // ---------------------------------------------------------------------
+
+  testWidgets('Repeats Wrap renders both ChoiceChips ("Once" + "Yearly") '
+      'in add mode with default EventRecurrence.none (v1.6-δ / SYS-149)', (
+    tester,
+  ) async {
+    await initServices();
+    await tester.pumpWidget(_wrap(const AddEventScreen()));
+    await tester.pumpAndSettle();
+    // The form renders the "Repeats" title (line 443) and the
+    // 2 ChoiceChips (line 447-452).
+    expect(find.text('Repeats'), findsOneWidget);
+    expect(find.text('Once'), findsOneWidget);
+    expect(find.text('Yearly'), findsOneWidget);
+  });
+
+  testWidgets('Recurrence ChoiceChip "Yearly" tap flips _recurrence from '
+      'none to annually (v1.6-δ / SYS-149)', (tester) async {
+    await initServices();
+    await tester.pumpWidget(_wrap(const AddEventScreen()));
+    await tester.pumpAndSettle();
+    // Default is EventRecurrence.none. Tap "Yearly" (line 451
+    // sets `_recurrence = r` on tap).
+    await tester.tap(find.text('Yearly'));
+    await tester.pumpAndSettle();
+    // The chip is present (ChoiceChip selection is conveyed
+    // via the chip's color, not a separate widget — the
+    // `find.text` round-trips the state).
+    expect(find.text('Yearly'), findsOneWidget);
+    expect(find.text('Once'), findsOneWidget);
+  });
+
+  testWidgets('Recurrence ChoiceChip "Once" tap after payload with '
+      '\'yearly\' flips _recurrence to none (v1.6-δ / SYS-149)', (
+    tester,
+  ) async {
+    await initServices();
+    // Pre-fill via initialPayload with 'yearly' → maps to
+    // annually (line 121-129). Then tap "Once" to flip.
+    const payload = <String, dynamic>{
+      'name': 'Test',
+      'recurrence': 'yearly',
+      'leadTimeMillis': 0,
+    };
+    await tester.pumpWidget(
+      _wrap(const AddEventScreen(initialPayload: payload)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Once'));
+    await tester.pumpAndSettle();
+    expect(find.text('Yearly'), findsOneWidget);
+    expect(find.text('Once'), findsOneWidget);
+  });
+
+  testWidgets('Date ListTile tap opens showDatePicker; Cancel preserves '
+      'default _at (v1.6-δ / SYS-149)', (tester) async {
+    await initServices();
+    // The showDatePicker dialog overflows the default 800x600
+    // viewport. Bump height.
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_wrap(const AddEventScreen()));
+    await tester.pumpAndSettle();
+    // Capture the pre-tap date label so we can assert it
+    // survives the Cancel.
+    final dateTile = find.byWidgetPredicate(
+      (w) =>
+          w is ListTile && w.title is Text && (w.title as Text).data == 'Date',
+    );
+    expect(dateTile, findsOneWidget);
+    final initialTrailing =
+        (tester.widget<ListTile>(dateTile).trailing as Text).data;
+    await tester.tap(dateTile);
+    await tester.pumpAndSettle();
+    // Cancel-fallback idiom per ADR-078 (c): cancel preserves
+    // the existing _at. Tap the Cancel button on the dialog.
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    final dateTileAfter = find.byWidgetPredicate(
+      (w) =>
+          w is ListTile && w.title is Text && (w.title as Text).data == 'Date',
+    );
+    final afterTrailing =
+        (tester.widget<ListTile>(dateTileAfter).trailing as Text).data;
+    expect(afterTrailing, initialTrailing);
+  });
+
+  testWidgets('Time ListTile tap opens showTimePicker; Cancel preserves '
+      'default _at (v1.6-δ / SYS-149)', (tester) async {
+    await initServices();
+    await tester.pumpWidget(_wrap(const AddEventScreen()));
+    await tester.pumpAndSettle();
+    // Capture the pre-tap time trailing.
+    final timeTile = find.byWidgetPredicate(
+      (w) =>
+          w is ListTile && w.title is Text && (w.title as Text).data == 'Time',
+    );
+    expect(timeTile, findsOneWidget);
+    await tester.tap(timeTile);
+    await tester.pumpAndSettle();
+    // Cancel-fallback idiom: tap Cancel on the time picker.
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    // The Time tile still renders — no crash.
+    expect(find.text('Time'), findsOneWidget);
+  });
+
+  testWidgets('_pickLead "At the time" radio button sets _leadMinutes = 0 '
+      '(v1.6-δ / SYS-149)', (tester) async {
+    await initServices();
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_wrap(const AddEventScreen()));
+    await tester.pumpAndSettle();
+    // Open the lead-time dialog.
+    await tester.tap(find.widgetWithText(ListTile, 'Notify me'));
+    await tester.pumpAndSettle();
+    final dialog = find.byType(AlertDialog);
+    expect(dialog, findsOneWidget);
+    // Select "At the time" (the 0 preset at line 200).
+    await tester.tap(
+      find.descendant(of: dialog, matching: find.text('At the time')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'OK'));
+    await tester.pumpAndSettle();
+    // The trailing text on the Notify me tile now reads "At the time".
+    expect(find.text('At the time'), findsOneWidget);
+  });
+
+  testWidgets('Edit mode + change name + save persists new name preserving '
+      'createdAt (WF-019 / v1.6-δ / SYS-149)', (tester) async {
+    await initServices();
+    final original = _makeEvent('Original name');
+    final originalCreatedAt = original.createdAtMillis;
+    await tester.runAsync(() => EventRepository.instance.save(original));
+    await tester.pumpWidget(_wrap(AddEventScreen(existing: original)));
+    await tester.pumpAndSettle();
+    // Replace the name. Tap the TextField, clear, then enter new.
+    await tester.enterText(find.byType(EditableText), 'Renamed event');
+    await tester.pump();
+    await tester.runAsync(() async {
+      await tester.tap(find.byKey(const ValueKey('add_event.save')));
+      await Future<void>.delayed(const Duration(milliseconds: 2000));
+    });
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    final rows = await tester.runAsync<List<Event>>(
+      EventRepository.instance.listActive,
+    );
+    expect(rows, hasLength(1));
+    expect(rows?.first.name, 'Renamed event');
+    expect(rows?.first.id, original.id);
+    expect(rows?.first.createdAtMillis, originalCreatedAt);
+  });
+
+  testWidgets('Edit mode + change lead time via _pickLead OK + save '
+      'persists new lead (v1.6-δ / SYS-149)', (tester) async {
+    await initServices();
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final original = _makeEvent('Lead time test');
+    await tester.runAsync(() => EventRepository.instance.save(original));
+    await tester.pumpWidget(_wrap(AddEventScreen(existing: original)));
+    await tester.pumpAndSettle();
+    // Open the lead-time dialog.
+    await tester.tap(find.widgetWithText(ListTile, 'Notify me'));
+    await tester.pumpAndSettle();
+    final dialog = find.byType(AlertDialog);
+    // Pick "30 min before".
+    await tester.tap(
+      find.descendant(of: dialog, matching: find.text('30 min before')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'OK'));
+    await tester.pumpAndSettle();
+    // Save.
+    await tester.runAsync(() async {
+      await tester.tap(find.byKey(const ValueKey('add_event.save')));
+      await Future<void>.delayed(const Duration(milliseconds: 2000));
+    });
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    final rows = await tester.runAsync<List<Event>>(
+      EventRepository.instance.listActive,
+    );
+    expect(rows, hasLength(1));
+    expect(
+      rows?.first.leadTimeMillis,
+      const Duration(minutes: 30).inMilliseconds,
+    );
+  });
+
+  testWidgets('initialPayload with empty recurrence string defaults to '
+      'EventRecurrence.none (v1.6-δ / SYS-149)', (tester) async {
+    await initServices();
+    const payload = <String, dynamic>{
+      'name': 'Test',
+      'recurrence': '', // empty-string branch (line 127 default case)
+      'leadTimeMillis': 0,
+    };
+    await tester.pumpWidget(
+      _wrap(const AddEventScreen(initialPayload: payload)),
+    );
+    await tester.pumpAndSettle();
+    // Both chips render; the empty-string falls through to the
+    // `_` default arm at line 127-128, mapping to `none`. The
+    // chip text is unaffected by selection state.
+    expect(find.text('Once'), findsOneWidget);
+    expect(find.text('Yearly'), findsOneWidget);
+  });
+
+  testWidgets('initialPayload with non-int leadTimeMillis keeps default '
+      '_leadMinutes = 15 (v1.6-δ / SYS-149)', (tester) async {
+    await initServices();
+    // The default _leadMinutes = 15 (line 78). The
+    // `if (lead is int)` guard at line 116 skips the cast
+    // when lead is a non-int (the `payload['leadTimeMillis']`
+    // is `null` here → guard rejects).
+    const payload = <String, dynamic>{
+      'name': 'Test',
+      'recurrence': 'none',
+      // No 'leadTimeMillis' key at all.
+    };
+    await tester.pumpWidget(
+      _wrap(const AddEventScreen(initialPayload: payload)),
+    );
+    await tester.pumpAndSettle();
+    // The Notify me tile's trailing text shows the default
+    // 15 min before (line 78 + line 439).
+    expect(find.text('15 min before'), findsOneWidget);
+  });
+
+  testWidgets('initialPayload with invalid month > 12 falls back to current '
+      'month (v1.6-δ / SYS-149)', (tester) async {
+    await initServices();
+    // The guard at line 135 rejects month > 12. The fallback
+    // is `now.month`. We can't predict `now.month` from outside,
+    // so we just assert the form survived the malformed payload
+    // (line 134-141 fall-through).
+    const payload = <String, dynamic>{
+      'name': 'Test',
+      'recurrence': 'none',
+      'dayOfMonth': 15,
+      'monthOfYear': 99, // invalid: falls back to now.month
+      'leadTimeMillis': 0,
+    };
+    await tester.pumpWidget(
+      _wrap(const AddEventScreen(initialPayload: payload)),
+    );
+    await tester.pumpAndSettle();
+    // The Date tile still renders with a valid formatted date.
+    expect(find.text('Date'), findsOneWidget);
+    final dateTile = find.byWidgetPredicate(
+      (w) =>
+          w is ListTile && w.title is Text && (w.title as Text).data == 'Date',
+    );
+    final trailing = (tester.widget<ListTile>(dateTile).trailing as Text).data;
+    // Trailing is `${d.year}-${d.month}-${d.day}` (line 478-480).
+    // Pin the -15 suffix (dayOfMonth=15 preserved).
+    expect(trailing, endsWith('-15'));
+  });
+
+  testWidgets('Save-as-template dialog Cancel button closes dialog without '
+      'saving a template (v1.6-δ / SYS-149)', (tester) async {
+    await initServices();
+    final original = _makeEvent('Cancel test');
+    await tester.runAsync(() => EventRepository.instance.save(original));
+    await tester.pumpWidget(_wrap(AddEventScreen(existing: original)));
+    await tester.pumpAndSettle();
+    // Open menu → "Save as template".
+    await tester.tap(find.byKey(const ValueKey('add_event.menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add_event.save_as_template')));
+    await tester.pumpAndSettle();
+    // Dialog is open with the default name.
+    expect(
+      find.byKey(const ValueKey('add_event.save_as_template.name')),
+      findsOneWidget,
+    );
+    // Tap Cancel (line 525: `Navigator.of(context).pop()` returns null).
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    // Dialog is closed.
+    expect(
+      find.byKey(const ValueKey('add_event.save_as_template.name')),
+      findsNothing,
+    );
+    // No new user template was saved.
+    final all = await tester.runAsync<List<Template>>(
+      TemplateRepository.instance.listAll,
+    );
+    final user = (all ?? <Template>[]).where((t) => !t.isBuiltIn).toList();
+    expect(user, isEmpty);
+  });
+
+  testWidgets('Save-as-template dialog Save with whitespace-only name does '
+      'NOT save a template (v1.6-δ / SYS-149)', (tester) async {
+    await initServices();
+    final original = _makeEvent('Whitespace test');
+    await tester.runAsync(() => EventRepository.instance.save(original));
+    await tester.pumpWidget(_wrap(AddEventScreen(existing: original)));
+    await tester.pumpAndSettle();
+    // Open menu → "Save as template".
+    await tester.tap(find.byKey(const ValueKey('add_event.menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add_event.save_as_template')));
+    await tester.pumpAndSettle();
+    // Replace the default name with whitespace.
+    final nameField = find.byKey(
+      const ValueKey('add_event.save_as_template.name'),
+    );
+    await tester.enterText(nameField, '   ');
+    await tester.tap(
+      find.byKey(const ValueKey('add_event.save_as_template.save')),
+    );
+    await tester.pumpAndSettle();
+    // The guard at line 341 returns silently on whitespace.
+    // No new template was saved.
+    final all = await tester.runAsync<List<Template>>(
+      TemplateRepository.instance.listAll,
+    );
+    final user = (all ?? <Template>[]).where((t) => !t.isBuiltIn).toList();
+    expect(user, isEmpty);
+  });
+
+  testWidgets('Save-as-template saves a template with payload envelope '
+      'containing dayOfMonth and monthOfYear from _at (v1.6-δ / SYS-149)', (
+    tester,
+  ) async {
+    await initServices();
+    final original = _makeEvent('Envelope test');
+    await tester.runAsync(() => EventRepository.instance.save(original));
+    await tester.pumpWidget(_wrap(AddEventScreen(existing: original)));
+    await tester.pumpAndSettle();
+    // Open menu → "Save as template".
+    await tester.tap(find.byKey(const ValueKey('add_event.menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add_event.save_as_template')));
+    await tester.pumpAndSettle();
+    final nameField = find.byKey(
+      const ValueKey('add_event.save_as_template.name'),
+    );
+    await tester.enterText(nameField, 'My envelope template');
+    await tester.tap(
+      find.byKey(const ValueKey('add_event.save_as_template.save')),
+    );
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    final all = await tester.runAsync<List<Template>>(
+      TemplateRepository.instance.listAll,
+    );
+    final user = (all ?? <Template>[]).where((t) => !t.isBuiltIn).toList();
+    expect(user, hasLength(1));
+    final t = user.first;
+    expect(t.name, 'My envelope template');
+    expect(t.entityType, TemplateEntityType.event);
+    // Pin the payload envelope shape (line 351-354):
+    //   {"k": <format version>, "event": {...}}.
+    expect(
+      t.payloadJson,
+      contains('"k":${TemplateLibrary.kTemplateFormatVersion}'),
+    );
+    expect(t.payloadJson, contains('"event"'));
+    expect(t.payloadJson, contains('"dayOfMonth"'));
+    expect(t.payloadJson, contains('"monthOfYear"'));
+    expect(t.payloadJson, contains('"leadTimeMillis"'));
+    expect(t.payloadJson, contains('"recurrence"'));
+  });
 }

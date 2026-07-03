@@ -321,3 +321,23 @@ the V-Model audit trail.
 Cycle is the THIRD in the v1.6 milestone — next is **v1.6-δ (PR #71) add_event form sub-branches**.
 
 **Refs:** SYS-148, ADR-079, WF-076.
+
+## v1.6-δ — `add_event.dart` sub-form coverage closure (Phase 62 / SYS-149 / ADR-080 / WF-077)
+
+**Tests-only cycle** (`+14 net tests in test/screens/add_event_test.dart`, 14 baseline from v1.5-cyc-β → 28 total). Closes a mid-tier screen coverage gap: `lib/screens/add_event.dart` (~71% line coverage → ~78%). The form is 643 LF but renders only 4 fields (name + date + time + lead-time) + 2 recurrence ChoiceChips + Routines section; the master plan over-counted by assuming recurring-event sub-form + retry-policy dropdown + CalendarAccount picker + MissionChain composer + automationsJson editor all exist (they don't). **Batch 1 — Recurrence ChoiceChip flip tests (3 tests, v1.6-δ):** (a) `Repeats Wrap renders both ChoiceChips ("Once" + "Yearly") in add mode with default EventRecurrence.none (v1.6-δ)`; (b) `Recurrence ChoiceChip "Yearly" tap flips _recurrence from none to annually`; (c) `Recurrence ChoiceChip "Once" tap after payload with 'yearly' flips _recurrence to none`. **Batch 2 — Date/Time picker Cancel-fallback (2 tests, v1.6-δ):** (d) `Date ListTile tap opens showDatePicker; Cancel preserves default _at`; (e) `Time ListTile tap opens showTimePicker; Cancel preserves default _at`. **Batch 3 — _pickLead + edit-mode rename/lead-change (3 tests, v1.6-δ):** (f) `_pickLead "At the time" radio button sets _leadMinutes = 0` (viewport bump required — 7 RadioListTile presets overflow 800×600); (g) `Edit mode + change name + save persists new name preserving createdAt (WF-019)` — Drift `insertOnConflictUpdate` does NOT touch `createdAtMillis` on primary-key match; (h) `Edit mode + change lead time via _pickLead OK + save persists new lead`. **Batch 4 — initialPayload edge cases + save-as-template dialog paths (6 tests, v1.6-δ):** (i) `initialPayload with empty recurrence string defaults to EventRecurrence.none`; (j) `initialPayload with non-int leadTimeMillis keeps default _leadMinutes = 15`; (k) `initialPayload with invalid month > 12 falls back to current month`; (l) `Save-as-template dialog Cancel button closes dialog without saving a template`; (m) `Save-as-template dialog Save with whitespace-only name does NOT save a template`; (n) `Save-as-template saves a template with payload envelope containing dayOfMonth and monthOfYear from _at`.
+
+**Test count:** 1680 → **1694** (+14 net).
+
+**Cumulative v1.6:** ~67.95% → ~68.51% (+0.56 pp; `lib/screens/add_event.dart` ~71% → ~78%).
+
+**APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`** — v1.6-δ is pure-Dart + new tests; no production-code behavior change; no release APK rebuild.
+
+**No new `<uses-permission>`**, **no new pubspec deps**, **no Drift migration**, **no Kotlin changes** — pure-Dart test cycle only.
+
+**Drift lessons (per ADR-080):** (a) **UI form is much simpler than master plan assumed** — `add_event.dart` is 643 LF but the form only exposes 4 fields + 2 ChoiceChips + Routines section; the v0.1 form has NO recurring-event sub-form, NO retry-policy dropdown, NO weekday picker, NO MissionChain composer, NO automationsJson editor; (b) **`_pickLead` AlertDialog requires viewport bump** — 7 RadioListTile presets overflow 800×600 default; mirrors `add_event_test.dart:567` + `add_habit_test.dart` v1.6-β viewport patterns; (c) **`showDatePicker` / `showTimePicker` Cancel-fallback idiom** — Cancel pattern is deterministic in headless test mode (per ADR-078 (c)); (d) **Edit-mode rename preserves `createdAtMillis` (WF-019)** — Drift UPSERT pattern protects the immutability invariant; (e) **`_saveAsTemplate` whitespace-only name guard** — `name.trim().isEmpty` short-circuits with a snackbar (does NOT open the dialog); mirrors the `_save` empty-name early-return.
+
+**Out-of-scope (deferred to v2.0 + ADR-080):** `_pickDate` / `_pickTime` OK-button tap (would require `tester.tap` on a `DatePickerDialog` day-cell + reading `_at.day` — fragile in headless test mode per ADR-078 (c)); `_pickLead` OK-button-tap on non-zero preset (deferred to follow-up); `_save` validation-error catch (`EventValidationException` from `Event.validate()` — defer to v2.0 to mirror the DoValidationException-defer pattern from ADR-078 (a)); `_save` empty-name snackbar path (already covered by v1.5-cyc-β baseline); `_saveAsTemplate` TemplateValidationException catch (the existing v1.5-cyc-β baseline already covers the snackbar).
+
+Cycle is the FOURTH in the v1.6 milestone — next is **v1.6-ε (PR #72) Sealed hierarchies sweep**.
+
+**Refs:** SYS-149, ADR-080, WF-077.

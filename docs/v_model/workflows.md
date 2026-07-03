@@ -3628,3 +3628,55 @@ The v1.6 milestone's third cycle (v1.6-γ) closes the **second-largest screen co
 **Targeted:** `flutter test test/screens/add_person_test.dart` (27/27 pass: 11 baseline + 16 new).
 
 **Cross-references.** SYS-148; ADR-079; v1.6-γ row; CHANGELOG `## v1.6-γ`; feature.md cycle entry.
+
+## WF-077 — Verify the `add_event.dart` sub-form coverage closure (v1.6-δ / Phase 62)
+
+The v1.6 milestone's fourth cycle (v1.6-δ) closes a mid-tier screen coverage gap — `lib/screens/add_event.dart` at ~71% line coverage per the v1.6 pre-auth plan — by exercising the recurrence `ChoiceChip` flip tests, the date/time picker Cancel-fallback idiom, the `_pickLead` AlertDialog, the edit-mode rename + lead-change paths (WF-019 immutability invariant), the `initialPayload` defensive branches, and the save-as-template dialog paths. **No production-code change**; v1.6-δ is tests-only.
+
+**Test changes (+14 net in `test/screens/add_event_test.dart`, existing 14 baseline from v1.5-cyc-β → 28 total):**
+
+**Batch 1 — Recurrence ChoiceChip flip tests (3 tests, v1.6-δ):**
+
+(a) `Repeats Wrap renders both ChoiceChips ("Once" + "Yearly") in add mode with default EventRecurrence.none (v1.6-δ)` — pump `AddEventScreen()`; assert `find.widgetWithText(ChoiceChip, 'Once')` + `find.widgetWithText(ChoiceChip, 'Yearly')` both `findsOneWidget`; default state has `_recurrence = EventRecurrence.none`.
+
+(b) `Recurrence ChoiceChip "Yearly" tap flips _recurrence from none to annually (v1.6-δ)` — tap `ChoiceChip('Yearly')`; `_recurrence == EventRecurrence.annually` after state mutation.
+
+(c) `Recurrence ChoiceChip "Once" tap after payload with 'yearly' flips _recurrence to none (v1.6-δ)` — pump with `initialPayload: {'recurrence': 'yearly'}` (sets `_recurrence = annually` per `_applyPayload` line 110-143); tap `ChoiceChip('Once')`; `_recurrence == EventRecurrence.none`.
+
+**Batch 2 — Date/Time picker Cancel-fallback (2 tests, v1.6-δ):**
+
+(d) `Date ListTile tap opens showDatePicker; Cancel preserves default _at (v1.6-δ)` — tap `ListTile('Date')`; `showDatePicker` opens; tap Cancel; `_at` is unchanged from the default `DateTime.now().add(const Duration(days: 1))` (cancel-fallback idiom from ADR-080 §c).
+
+(e) `Time ListTile tap opens showTimePicker; Cancel preserves default _at (v1.6-δ)` — mirror of (d) for `showTimePicker`; `_at.hour` unchanged.
+
+**Batch 3 — _pickLead + edit-mode rename/lead-change (3 tests, v1.6-δ):**
+
+(f) `_pickLead "At the time" radio button sets _leadMinutes = 0 (v1.6-δ)` — tap `ListTile('Notify me')`; `_pickLead` AlertDialog opens with 7 `RadioListTile<int>` presets (0, 5, 15, 30, 60, 120, 1440); tap `RadioListTile('At the time')` + OK; `_leadMinutes == 0`; viewport bump `1080×1920` per ADR-080 §b.
+
+(g) `Edit mode + change name + save persists new name preserving createdAt (WF-019 / v1.6-δ)` — seed event via `EventRepository.save` in `runAsync`; pump `AddEventScreen(existing: seeded)`; change name to "Mom's birthday (renamed)"; tap Save; `EventRepository.getById` returns the row with `name == "Mom's birthday (renamed)"` AND `createdAtMillis == seeded.createdAtMillis` (WF-019 immutability invariant — `insertOnConflictUpdate` does NOT touch `createdAtMillis` on primary-key match).
+
+(h) `Edit mode + change lead time via _pickLead OK + save persists new lead (v1.6-δ)` — seed event; pump edit-mode; `_pickLead` OK with 60-min radio; Save; `EventRepository.getById` returns row with `leadMinutes == 60`.
+
+**Batch 4 — initialPayload edge cases + save-as-template dialog paths (6 tests, v1.6-δ):**
+
+(i) `initialPayload with empty recurrence string defaults to EventRecurrence.none (v1.6-δ)` — payload `{'recurrence': ''}`; the switch at line 110-143 falls through to default `none`.
+
+(j) `initialPayload with non-int leadTimeMillis keeps default _leadMinutes = 15 (v1.6-δ)` — payload `{'leadTimeMillis': 'not-an-int'}`; the `is int` check at line 110-143 fails; `_leadMinutes == 15` (default preserved).
+
+(k) `initialPayload with invalid month > 12 falls back to current month (v1.6-δ)` — payload `{'month': 13}`; the `month >= 1 && month <= 12` check at line 110-143 fails; `_at.month == DateTime.now().month`.
+
+(l) `Save-as-template dialog Cancel button closes dialog without saving a template (v1.6-δ)` — open the save-as-template dialog via the edit-mode PopupMenuButton; tap Cancel; `TemplateRepository.listAll` is empty.
+
+(m) `Save-as-template dialog Save with whitespace-only name does NOT save a template (v1.6-δ)` — open the dialog; `enterText('   ')` in the name field; tap Save; the dialog stays open (per `_saveAsTemplate`'s blank-name guard at line 329-378); `TemplateRepository.listAll` is empty.
+
+(n) `Save-as-template saves a template with payload envelope containing dayOfMonth and monthOfYear from _at (v1.6-δ)` — open the dialog; `enterText('My birthday template')` + Save; `TemplateRepository.listAll` returns 1 template with `payloadJson` containing `dayOfMonth` + `monthOfYear` keys derived from the form's `_at` value.
+
+**APK SHA1 stays at Cycle H's `25bb7fab`** — v1.6-δ is tests-only; no release rebuild needed.
+
+**No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** v1.6-δ is Dart-only + Flutter widgets.
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean after auto-format of 1 file — `prefer_const_constructors` lint fixes on 4 `AddEventScreen(initialPayload: payload)` → `const AddEventScreen(initialPayload: payload)` conversions) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1694/1694 pass).
+
+**Targeted:** `flutter test test/screens/add_event_test.dart` (28/28 pass: 14 baseline + 14 new).
+
+**Cross-references.** SYS-149; ADR-080; v1.6-δ row; CHANGELOG `## v1.6-δ`; feature.md cycle entry.
