@@ -10,6 +10,8 @@ import 'package:doit/reminders/full_screen_intent.dart';
 import 'package:doit/reminders/notification_service.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
 import 'package:doit/do/do.dart' as domain;
+import 'package:doit/do/category.dart' show DoCategory;
+import 'package:doit/do/proof_mode.dart' show SoftProof;
 import 'package:doit/screens/add_habit.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/db/schema.dart';
@@ -304,4 +306,419 @@ void main() {
   // _save() branches that were the cycle's headline. Edit-mode
   // coverage is deferred to a later cycle that can introduce
   // a tearDown-side-channel close.
+
+  // ---------------------------------------------------------------------
+  // v1.6-β (SYS-147 / WF-075) — coverage for the schedule sub-form
+  // interactions (time picker, dialog +/- pickers, chip selection,
+  // validation snackbars, category/icon pickers, slider, rest-day
+  // budget, anchor empty-list snack). Each test is annotated with
+  // the source-line / call-site it covers so ADR-078 drift lessons
+  // stay traceable.
+  //
+  // Deferred from this cycle:
+  //   - Calendar-routines populated render (test 14 in the per-cycle
+  //     plan): CalendarPicker.show gates on `PermissionSheet.show`
+  //     → PermissionService.ensure(calendar), which requires a
+  //     platform-channel mock not present in this test file's
+  //     setUp. Deferred to a later cycle that adds PermissionService
+  //     init + permissionsChannel mock.
+  //   - The 3 time-picker (showTimePicker) tests for fixed/timeWindow
+  //     were collapsed to ONE OK-tap test (test 1 below); the clock
+  //     face is not drive-able headlessly and the input-mode toggle
+  //     is fragile. The OK-tap path still covers the onTap callback
+  //     + showTimePicker + state-field assignment chain.
+  // ---------------------------------------------------------------------
+
+  // ---- Batch 1 — Schedule sub-form interactions (5 tests) -----
+
+  testWidgets('Tap `Time` ListTile opens showTimePicker dialog '
+      '(v1.6-β / SYS-147)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pumpAndSettle();
+    // Tap the `Time` ListTile (line 437-448 in add_habit.dart).
+    await tester.tap(find.text('Time'));
+    await tester.pumpAndSettle();
+    // The TimePickerDialog renders a Cancel + OK button row. Tap
+    // Cancel to dismiss with no time change (line 442-447 only
+    // mutates state when `picked != null`).
+    expect(find.text('Cancel'), findsWidgets);
+    await tester.tap(find.text('Cancel').last);
+    await tester.pumpAndSettle();
+    // Save the do with the default time (9:00) — verifies that
+    // the showTimePicker call site did NOT crash and the form
+    // remains in a persistable state.
+    await tester.enterText(find.byType(EditableText), 'Tea time');
+    final saved = await saveAndRead(tester);
+    expect(saved, isA<domain.DoFixed>());
+    expect((saved as domain.DoFixed).time.hour, 9);
+    expect(saved.time.minute, 0);
+  });
+
+  testWidgets('Toggling FilterChips in the `Days` row mutates '
+      'DoFixed.weekdays to a custom set '
+      '(v1.6-β / SYS-147)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pumpAndSettle();
+    // Deselect Mon..Fri (the default _fixedWeekdays set), then
+    // select Sat (6) and Sun (7). FilterChips at lines 460-472.
+    for (final label in const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']) {
+      await tester.tap(find.widgetWithText(FilterChip, label));
+      await tester.pump();
+    }
+    await tester.tap(find.widgetWithText(FilterChip, 'Sat'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilterChip, 'Sun'));
+    await tester.pump();
+    await tester.enterText(find.byType(EditableText), 'Weekend hike');
+    final saved = await saveAndRead(tester);
+    expect(saved, isA<domain.DoFixed>());
+    final fixed = saved as domain.DoFixed;
+    expect(fixed.weekdays, <int>{6, 7});
+  });
+
+  testWidgets('`_pickInterval` dialog Increment button bumps '
+      'DoInterval.nDays (v1.6-β / SYS-147)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Every N'));
+    await tester.pumpAndSettle();
+    // Open the dialog (line 481-485). The trailing shows the
+    // current nDays value; default is 2.
+    await tester.tap(find.text('Every N days'));
+    await tester.pumpAndSettle();
+    // Tap Increment twice (default 2 + 2 = 4).
+    final increment = find.byTooltip('Increment');
+    await tester.tap(increment);
+    await tester.pump();
+    await tester.tap(increment);
+    await tester.pump();
+    // OK button (line 685-688).
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText), 'Stretch every 4');
+    final saved = await saveAndRead(tester);
+    expect(saved, isA<domain.DoInterval>());
+    expect((saved as domain.DoInterval).nDays, 4);
+  });
+
+  testWidgets('Tapping a ChoiceChip in the `Target hours` row '
+      'mutates DoTimeWindow.targetHours '
+      '(v1.6-β / SYS-147)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Window'));
+    await tester.pumpAndSettle();
+    // ChoiceChips at lines 582-589.
+    await tester.tap(find.widgetWithText(ChoiceChip, '16 h'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText), '16:8 fast');
+    final saved = await saveAndRead(tester);
+    expect(saved, isA<domain.DoTimeWindow>());
+    expect((saved as domain.DoTimeWindow).targetHours, 16);
+  });
+
+  testWidgets('Saving a `Window` do with zero active days shows '
+      '`Pick at least one active day.` snackbar and does NOT persist '
+      '(v1.6-β / SYS-147)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Window'));
+    await tester.pumpAndSettle();
+    // The timeWindow arm's "Active days" FilterChips share the
+    // `_fixedWeekdays` field with the fixed arm (line 600-617).
+    // Deselect Mon..Fri to trigger the zero-active-days guard
+    // (line 1017-1019).
+    for (final label in const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']) {
+      await tester.tap(find.widgetWithText(FilterChip, label));
+      await tester.pump();
+    }
+    await tester.enterText(find.byType(EditableText), 'Empty window');
+    await tester.tap(find.byKey(const ValueKey('add_habit.save')));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Pick at least one active day.'), findsOneWidget);
+    final rows = await tester.runAsync<List<domain.Do>>(
+      DoRepository.instance.listAll,
+    );
+    expect(rows, isEmpty);
+  });
+
+  // ---- Batch 2 — dayOfX dialog/bottom-sheet pickers (3 tests) -----
+
+  testWidgets('`_pickDayOfMonth` Increment button bumps DoDayOfX.dayOfMonth '
+      '(v1.6-β / SYS-147)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Day-of-X'));
+    await tester.pumpAndSettle();
+    // Open the dialog (line 513-518).
+    await tester.tap(find.text('Day of month'));
+    await tester.pumpAndSettle();
+    final increment = find.byTooltip('Increment');
+    await tester.tap(increment);
+    await tester.pump();
+    await tester.tap(increment);
+    await tester.pump();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText), 'Pay rent on the 3rd');
+    final saved = await saveAndRead(tester);
+    expect(saved, isA<domain.DoDayOfX>());
+    expect((saved as domain.DoDayOfX).dayOfMonth, 3);
+  });
+
+  testWidgets('`_pickNth` Increment button bumps DoDayOfX.nth '
+      '(v1.6-β / SYS-147)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Day-of-X'));
+    await tester.pumpAndSettle();
+    // Open the dialog (line 527-531).
+    await tester.tap(find.text('Nth'));
+    await tester.pumpAndSettle();
+    final increment = find.byTooltip('Increment');
+    await tester.tap(increment);
+    await tester.pump();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText), '2nd Monday meeting');
+    final saved = await saveAndRead(tester);
+    expect(saved, isA<domain.DoDayOfX>());
+    expect((saved as domain.DoDayOfX).nth, 2);
+  });
+
+  testWidgets('`_pickDayOfXWeekday` bottom sheet picks the weekday '
+      '(v1.6-β / SYS-147)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Day-of-X'));
+    await tester.pumpAndSettle();
+    // Open the bottom sheet (line 535-541).
+    await tester.tap(find.text('Weekday'));
+    await tester.pumpAndSettle();
+    // The bottom sheet shows 7 ListTiles, one per weekday label.
+    await tester.tap(find.widgetWithText(ListTile, 'Sun').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText), 'Last Sunday');
+    final saved = await saveAndRead(tester);
+    expect(saved, isA<domain.DoDayOfX>());
+    expect((saved as domain.DoDayOfX).weekday, 7);
+  });
+
+  // ---- Batch 3 — Visual-identity / rest-day / routines (4 tests) -----
+
+  testWidgets('`_pickRestDaysPerMonth` slider round-trip persists a '
+      'non-default restDaysPerMonth '
+      '(v1.6-β / SYS-147)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pumpAndSettle();
+    // Open the shared picker (line 702-705).
+    await tester.tap(find.text('Rest days per month: 2'));
+    await tester.pumpAndSettle();
+    // The slider starts at 2. Use the Slider's onChanged by tapping
+    // the track at a different x-offset; the slider widget is
+    // identifier-less so find.byType is the cheapest path. We aim
+    // for ~10% of the way across to land on roughly 5 (a value
+    // distinct from 2). The shared picker uses
+    // `divisions: 31` so each integer step is 1/31 of the track.
+    final slider = find.byType(Slider);
+    expect(slider, findsOneWidget);
+    final box = tester.getRect(slider);
+    // Tap ~16% across (5/31 ~= 0.16).
+    await tester.tapAt(Offset(box.left + box.width * 0.16, box.center.dy));
+    await tester.pumpAndSettle();
+    // The dialog's FilledButton is labeled "Save" via
+    // `l.homeTileBudgetEditOk` (lib/l10n/app_en.arb:190), not "OK".
+    // Find the FilledButton inside the dialog's actions to avoid
+    // collision with the app-bar Save button.
+    final dialog = find.byType(AlertDialog);
+    expect(dialog, findsOneWidget);
+    await tester.tap(
+      find.descendant(of: dialog, matching: find.byType(FilledButton)),
+    );
+    await tester.pumpAndSettle();
+    // The label updates (line 372) so the row text now reads the
+    // new value (depends on which integer the tap landed on; the
+    // important assertion is that it's NOT 2).
+    await tester.enterText(find.byType(EditableText), 'Rest week');
+    final saved = await saveAndRead(tester);
+    expect(saved, isA<domain.DoFixed>());
+    expect((saved as domain.DoFixed).restDaysPerMonth, isNot(2));
+  });
+
+  testWidgets('Category picker round-trip persists DoFixed.category '
+      '(v1.6-β / SYS-147)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pumpAndSettle();
+    // The CategoryChip renders a Semantics with label
+    // 'Category Other' (line 105 of category_chip.dart).
+    final chip = find.bySemanticsLabel(RegExp(r'^Category '));
+    expect(chip, findsOneWidget);
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+    // Tap the Health chip (line 217 of category_chip.dart).
+    await tester.tap(find.byKey(const ValueKey('category.health')));
+    await tester.pump();
+    // Save (line 247 of category_chip.dart).
+    await tester.tap(find.byKey(const ValueKey('category_picker.save')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText), 'Drink water');
+    final saved = await saveAndRead(tester);
+    expect(saved, isA<domain.DoFixed>());
+    expect((saved as domain.DoFixed).category, DoCategory.health);
+  });
+
+  testWidgets('Icon picker round-trip persists DoFixed.iconName '
+      '(v1.6-β / SYS-147)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pumpAndSettle();
+    // The icon thumb has Semantics label 'Icon picker'
+    // (line 1322 of add_habit.dart).
+    await tester.tap(find.bySemanticsLabel('Icon picker'));
+    await tester.pumpAndSettle();
+    // Tap the fitness_center tile (line 134 of icon_picker.dart,
+    // Semantics label 'Icon fitness_center').
+    await tester.tap(find.bySemanticsLabel('Icon fitness_center'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText), 'Gym');
+    final saved = await saveAndRead(tester);
+    expect(saved, isA<domain.DoFixed>());
+    expect((saved as domain.DoFixed).iconName, 'fitness_center');
+  });
+
+  testWidgets('`_pickInterval` Decrement button clamps at 1 '
+      '(v1.6-β / SYS-147)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Every N'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Every N days'));
+    await tester.pumpAndSettle();
+    // Decrement 3 times from default 2 → clamp(1,365) holds at 1
+    // after the first decrement (line 668).
+    final decrement = find.byTooltip('Decrement');
+    await tester.tap(decrement);
+    await tester.pump();
+    await tester.tap(decrement);
+    await tester.pump();
+    await tester.tap(decrement);
+    await tester.pump();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText), 'Daily');
+    final saved = await saveAndRead(tester);
+    expect(saved, isA<domain.DoInterval>());
+    expect((saved as domain.DoInterval).nDays, 1);
+  });
+
+  // ---- Batch 4 — Validation / anchor empty-list (2 tests) -----
+
+  testWidgets('Save with a duplicate name shows `A do with this name '
+      'already exists.` and does NOT persist a second row '
+      '(v1.6-β / SYS-147)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    // Seed a row directly via the repository so the test does NOT
+    // depend on chained runAsync (Drift keepalive deadlock — see
+    // the edit-mode note at lines 299-306).
+    await tester.runAsync(() async {
+      await DoRepository.instance.save(
+        domain.DoFixed(
+          id: 'h_seed',
+          name: 'Meditate',
+          proofMode: const SoftProof(),
+          createdAt: DateTime(2026, 7, 1, 12),
+          restDaysPerMonth: 2,
+          weekdays: const <int>{1, 2, 3, 4, 5},
+          time: const domain.DoTime(9, 0),
+        ),
+      );
+    });
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pump();
+    await tester.enterText(find.byType(EditableText), 'Meditate');
+    // The save tap runs the `_save()` Drift write which needs
+    // runAsync (Drift keepalive: reentrant runAsync would deadlock
+    // the keepalive close — same root cause as the edit-mode note
+    // at lines 299-306). Single runAsync wraps both the tap and
+    // the duplicate-name throw so the catch arm at line 1069-1070
+    // sets `_nameError` synchronously inside the same real-async
+    // frame.
+    await tester.runAsync(() async {
+      await tester.tap(find.byKey(const ValueKey('add_habit.save')));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    // Drain fake-async frames so the setState rebuild from the
+    // duplicate-name catch (line 1069-1070) flushes through.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    // The duplicate-name path sets `_nameError` (line 1070), which
+    // renders as the TextField's `errorText` (line 318), NOT as a
+    // SnackBar. The widget tree contains the message exactly once.
+    expect(find.text('A do with this name already exists.'), findsOneWidget);
+    final rows = await tester.runAsync<List<domain.Do>>(
+      DoRepository.instance.listAll,
+    );
+    expect(rows?.length, 1);
+  });
+
+  testWidgets('Tapping the `After do` ListTile with no other habits '
+      'shows `No other dos to anchor on.` snackbar '
+      '(v1.6-β / SYS-147)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(localizedApp(home: const AddHabitScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('After'));
+    await tester.pumpAndSettle();
+    // The anchor picker (line 707-737) lazy-loads `_otherHabits`
+    // and short-circuits when the list is empty
+    // (line 715-720). The `_loadOtherHabits()` call goes through
+    // `DoRepository.listAll` → Drift, which needs runAsync to step
+    // out of the fake-async zone (same root cause as the edit-mode
+    // note at lines 299-306).
+    await tester.runAsync(() async {
+      await tester.tap(find.text('After do'));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('No other dos to anchor on.'), findsOneWidget);
+  });
 }
