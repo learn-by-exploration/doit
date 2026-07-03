@@ -3732,3 +3732,63 @@ The v1.6 milestone's fifth cycle (v1.6-ε) closes a pure-Dart sealed-hierarchy c
 **Targeted:** `flutter test test/sealed/triggers_test.dart` (19/19 pass).
 
 **Cross-references.** SYS-150; ADR-081; v1.6-ε row; CHANGELOG `## v1.6-ε`; feature.md cycle entry.
+
+## WF-079 — Verify the service-layer error-path coverage closure (v1.6-ζ / Phase 64)
+
+The v1.6 milestone's sixth cycle (v1.6-ζ) closes a service-layer coverage gap
+on two fronts:
+
+1. **`lib/services/calendar_service.dart` — `_MethodChannelCalendarSource` decode/stop paths.**
+   The `_decode(Map)` method's 4 kind branches (start/end/reminder/busy) + the
+   unknown-kind default + `stop()`'s `MissingPluginException` defensive swallow
+   were not covered. The class is library-private (leading underscore) so it
+   cannot be instantiated directly from `test/`. The cycle closes the gap via
+   `TestDefaultBinaryMessenger`: install a `setMockMethodCallHandler` mock on
+   the `doit/calendar` channel, do NOT call `debugSetSource(...)`, let
+   `service.init()` lazily construct the real production source, then drive
+   the platform-channel surface via mock handlers (for Dart→platform calls
+   like `startStream`/`stopStream`) and `defaultBinaryMessenger.handlePlatformMessage`
+   (for platform→Dart `onCalendarEvent` pushes — encoded via
+   `StandardMethodCodec().encodeMethodCall(MethodCall(...))`).
+
+2. **`lib/services/person_repository.dart` — `automationsJson` encode/decode round-trip + `ChannelTelegram` username-as-handle.**
+   The `automationsJson` Drift column's write/read paths were covered only by
+   the implicit empty-list case. The cycle adds 8 tests: write-side via raw
+   Drift query (asserts `_toRow` writes `null` when automations is empty), 2
+   read-side via hand-written `PersonRow`s (asserts `decodeAutomationList(null)`
+   AND `decodeAutomationList('')` both return `[]` — the empty-string fallback
+   at `routine.dart:496`), 3 round-trip tests for `TriggerLocationEnter` +
+   `TriggerCalendarEventStart` + a mixed list (asserts full `Automation.==`
+   equality across encode→decode), 1 hand-written JSON envelope test (pins
+   the decode path independently of the encode path), and 1
+   `ChannelTelegram` username-as-handle preservation test (the only channel
+   with a non-phone handle — `_channelTagAndHandle` at
+   `person_repository.dart:90-98` must funnel the username correctly).
+
+**Test changes (+14 net — exactly the plan target):**
+
+- `test/services/calendar_service_test.dart`: +6 tests in a NEW
+  `group('_MethodChannelCalendarSource (v1.6-ζ)')` block — start() invokes
+  startStream on the channel; handler decodes kind=start/end/busy (3 tests);
+  handler decodes unknown kind by ignoring the event; stop() swallows
+  MissingPluginException when the platform side is gone.
+- `test/services/person_repository_test.dart`: +8 tests in a NEW
+  `automations_json encode/decode (v1.6-ζ)` subgroup — `_toRow` writes null
+  when automations is empty (write side); `_fromRow` reads null + '' into
+  empty list (read side, 2 tests); round-trip LocationEnter; round-trip
+  CalendarEventStart; round-trip mixed list with full equality; hand-written
+  JSON envelope decode; ChannelTelegram preserves the username as the handle.
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean after
+auto-format of 2 files — trailing comma + 4-space indent normalization in
+`calendar_service_test.dart` and `person_repository_test.dart`) +
+`flutter analyze --fatal-infos lib test` (0 issues) + `flutter test`
+(1727/1727 pass).
+
+**Targeted:** `flutter test test/services/calendar_service_test.dart` (19/19
+pass: 12 baseline + 1 v1.5-cyc-γ + 6 new v1.6-ζ) +
+`flutter test test/services/person_repository_test.dart` (21/21 pass: 13
+baseline + 8 new v1.6-ζ).
+
+**Cross-references.** SYS-151; ADR-082; v1.6-ζ row; CHANGELOG `## v1.6-ζ`;
+feature.md cycle entry.

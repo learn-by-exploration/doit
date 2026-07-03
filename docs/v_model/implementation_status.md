@@ -369,3 +369,39 @@ The fifth cycle of the v1.6 milestone — closes the sealed-hierarchy `validate(
 Cycle is the FIFTH in the v1.6 milestone — next is **v1.6-ζ (PR #73) calendar_service + person_repository error paths**.
 
 **Refs:** SYS-150, ADR-081, WF-078.
+
+## v1.6-ζ — Service-layer error-path coverage closure (Phase 64 / SYS-151 / ADR-082 / WF-079)
+
+The sixth cycle of the v1.6 milestone — closes a service-layer coverage gap on two fronts: `lib/services/calendar_service.dart` `_MethodChannelCalendarSource._decode` per-kind + unknown-kind + `stop()` `MissingPluginException` swallow paths; and `lib/services/person_repository.dart` `automationsJson` encode/decode round-trip + `ChannelTelegram` username-as-handle preservation. **Test-only cycle**; no production-code behavior change; hits the v1.6 pre-auth plan target of +14 tests exactly (no over-delivery this cycle).
+
+The `_MethodChannelCalendarSource` is library-private (leading underscore) so it cannot be instantiated directly from `test/`. The cycle tests it via `TestDefaultBinaryMessenger`: install a `setMockMethodCallHandler` mock on the `doit/calendar` channel, do NOT call `debugSetSource(...)`, let `service.init()` lazily construct the real production source, then drive the platform-channel surface via mock handlers (for Dart→platform calls like `startStream`/`stopStream`) and `defaultBinaryMessenger.handlePlatformMessage` (for platform→Dart `onCalendarEvent` pushes — encoded via `StandardMethodCodec().encodeMethodCall(MethodCall(...))`).
+
+The `automationsJson` round-trip tests cover the write-side (`_toRow` at `person_repository.dart:70-72` writes `null` when automations is empty), the read-side with hand-written `PersonRow`s (both `null` and `''` decode to `[]` via the `decodeAutomationList` empty-string fallback at `routine.dart:496`), the per-trigger-type round-trips (`TriggerLocationEnter` + `TriggerCalendarEventStart` + mixed list with full `==` equality), and the hand-written JSON envelope decode (pins the decode path independently of the encode path).
+
+**Calendar_service tests (6 new in `_MethodChannelCalendarSource (v1.6-ζ)` group):**
+1. `start() invokes startStream on the channel` — install null-returning mock; `await service.init()`; assert mock's `invoked` list contains `'startStream'`.
+2. `handler decodes kind=start into CalendarEventStarted` — push via `defaultBinaryMessenger.handlePlatformMessage` with `MethodCall('onCalendarEvent', {kind: 'start', eventId: 'e-start', calendarId: 'cal1', title: 'Standup', atMs: <epoch>})`; assert the broadcast stream receives a `CalendarEventStarted` with all 4 fields preserved.
+3. `handler decodes kind=end into CalendarEventEnded` — mirror of (2); also assert `lastIsBusy == null` (Ended events must not flip the busy cache).
+4. `handler decodes kind=busy with isBusy=true into CalendarBusyChange` — push with `kind: 'busy', isBusy: true`; assert `CalendarBusyChange` with `isBusy == true` AND `service.lastIsBusy == true`.
+5. `handler decodes unknown kind by ignoring the event` — push with `kind: 'unknown_future_kind'`; assert the broadcast stream receives ZERO events (the default branch returns `null` and the handler skips `_controller.add`).
+6. `stop() swallows MissingPluginException when the platform side is gone (defensive tear-down)` — install a mock that throws `MissingPluginException` on `stopStream`; call `service.resetForTesting()` (which fires `_source!.stop()`); assert `Future<void>.sync(() => service.resetForTesting()) completes` (the catch at `calendar_service.dart:254-256` swallows the exception).
+
+**Person_repository tests (8 new in `automations_json encode/decode (v1.6-ζ)` subgroup):**
+1. `_toRow writes automationsJson=null when automations is empty` — save with default `automations: const []`; read raw `PersonRow` via Drift; assert `row.automationsJson == null`.
+2. `_fromRow reads automationsJson=null into an empty list` — hand-write `PersonRow` with no `automationsJson`; `getById` returns `automations: []`.
+3. `_fromRow reads automationsJson="" into an empty list` — mirror of (2) with explicit empty string; verifies the `decodeAutomationList` empty-string fallback at `routine.dart:496`.
+4. `round-trips a single LocationEnter automation` — save with `TriggerLocationEnter` + `ActionNotify`; `getById` returns the same Automation with all 5 geofence fields preserved + the action's title preserved.
+5. `round-trips a single CalendarEventStart automation` — mirror of (4) with `TriggerCalendarEventStart(calendarId: 'cal1', eventTitle: 'Standup')`.
+6. `round-trips a mixed list of automations in declared order` — save with `automations: [location, calendar]`; assert order preserved AND full `==` equality.
+7. `decodes a hand-written automationsJson array into Automations` — hand-write the full JSON envelope; `getById` returns one Automation with id='a1', `TriggerTimeOfDay(hour: 9, minute: 0)`, and `ActionNotify(title: 'Wake')`.
+8. `ChannelTelegram preserves the username as the handle` — save with `ChannelTelegram('alice_t')`; assert `(back.channel as ChannelTelegram).username == 'alice_t'` (the ONLY channel with a non-phone handle).
+
+**APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`** — v1.6-ζ is tests-only; no production-code behavior change; no release APK rebuild.
+
+**No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.**
+
+**Out-of-scope (deferred to v2.0 + ADR-082):** `_MethodChannelCalendarSource._decode` for the `kind: 'reminder'` branch (already covered by v1.5-cyc-γ `CalendarEventReminder` ScriptedCalendarSource test — decode-via-handler parallel to start/end/busy); `_MethodChannelCalendarSource.listAccounts` with a `null` result (line 265 fallback unreachable from a mocked channel that always returns null — covered indirectly by v1.5-cyc-γ); `_MethodChannelCalendarSource.listAccounts` `where((a) => a.accountId.isNotEmpty)` filter (also unreachable from a properly-mocked channel); `_toRow` write-side test for non-empty automations already round-tripped via tests (4)/(5)/(6).
+
+Cycle is the SIXTH in the v1.6 milestone — next is **v1.6-η (PR #74) widget_bridge + widget_action_invoker + widget_service_proxy**.
+
+**Refs:** SYS-151, ADR-082, WF-079.

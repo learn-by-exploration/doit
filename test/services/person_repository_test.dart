@@ -3,9 +3,12 @@
 
 import 'package:doit/people/cadence.dart';
 import 'package:doit/people/person.dart';
+import 'package:doit/routines/routine.dart';
 import 'package:doit/services/db.dart';
 import 'package:doit/services/db/schema.dart';
 import 'package:doit/services/person_repository.dart';
+import 'package:doit/triggers/action.dart';
+import 'package:doit/triggers/trigger.dart';
 // Hand-writing `PersonRow`s for the unknown-channel / unknown-cadence
 // throw tests does not require any `package:drift/drift.dart`
 // symbols (we use concrete `PersonRow` instances). Note: importing
@@ -289,5 +292,264 @@ void main() {
         );
       },
     );
+
+    // ---- v1.6-ζ additions (automations_json encode/decode round-trip
+    // + ChannelTelegram username-as-handle preservation) ----
+
+    test(
+      '_toRow writes automationsJson=null when automations is empty',
+      () async {
+        final p = ContactPerson(
+          id: 'p-empty-auto',
+          lookupKey: 'k-empty-auto',
+          channel: const ChannelDialer('+1'),
+          cadence: const EveryNDays(1),
+          createdAt: DateTime(2026),
+          // automations omitted -> default const [].
+        );
+        await PersonRepository.instance.save(p);
+        final db = AppDatabaseService.instance.db;
+        final row = await (db.select(
+          db.people,
+        )..where((t) => t.id.equals('p-empty-auto'))).getSingle();
+        expect(
+          row.automationsJson,
+          isNull,
+          reason:
+              'An empty automations list must persist as NULL — not as the '
+              'literal string "[]" — so the decode path can short-circuit.',
+        );
+      },
+    );
+
+    test('_fromRow reads automationsJson=null into an empty list', () async {
+      final db = AppDatabaseService.instance.db;
+      await db
+          .into(db.people)
+          .insert(
+            const PersonRow(
+              id: 'p-null-auto',
+              lookupKey: 'k-null-auto',
+              displayName: '',
+              channel: 'dialer',
+              handle: '+1',
+              createdAtMillis: 0,
+              cadenceType: 'every_n_days',
+              nDays: 1,
+              anchoredToWakeup: false,
+              // automationsJson intentionally omitted -> default null.
+            ),
+          );
+      final back =
+          await PersonRepository.instance.getById('p-null-auto')
+              as ContactPerson;
+      expect(back.automations, isEmpty);
+    });
+
+    test('_fromRow reads automationsJson="" into an empty list', () async {
+      final db = AppDatabaseService.instance.db;
+      await db
+          .into(db.people)
+          .insert(
+            const PersonRow(
+              id: 'p-empty-string-auto',
+              lookupKey: 'k-empty-string-auto',
+              displayName: '',
+              channel: 'dialer',
+              handle: '+1',
+              createdAtMillis: 0,
+              cadenceType: 'every_n_days',
+              nDays: 1,
+              anchoredToWakeup: false,
+              automationsJson: '',
+            ),
+          );
+      final back =
+          await PersonRepository.instance.getById('p-empty-string-auto')
+              as ContactPerson;
+      expect(
+        back.automations,
+        isEmpty,
+        reason:
+            'The empty-string fallback in decodeAutomationList must yield '
+            'an empty list (symmetric to the null-input path).',
+      );
+    });
+
+    test('round-trips a single LocationEnter automation', () async {
+      final automation = Automation(
+        trigger: const TriggerLocationEnter(
+          geofenceId: 'gf1',
+          label: 'Home',
+          latitude: 47.6,
+          longitude: -122.3,
+          radiusMeters: 100,
+        ),
+        action: const ActionNotify(title: 'Arrived', body: 'Welcome home'),
+      );
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p-loc',
+          lookupKey: 'k-loc',
+          channel: const ChannelDialer('+15555550111'),
+          cadence: const EveryNDays(7),
+          createdAt: DateTime(2026),
+          automations: [automation],
+        ),
+      );
+      final back =
+          await PersonRepository.instance.getById('p-loc') as ContactPerson;
+      expect(back.automations, hasLength(1));
+      final got = back.automations.single;
+      expect(got.trigger, isA<TriggerLocationEnter>());
+      final t = got.trigger as TriggerLocationEnter;
+      expect(t.geofenceId, 'gf1');
+      expect(t.label, 'Home');
+      expect(t.radiusMeters, 100);
+      expect(got.action, isA<ActionNotify>());
+      expect((got.action as ActionNotify).title, 'Arrived');
+    });
+
+    test('round-trips a single CalendarEventStart automation', () async {
+      final automation = Automation(
+        trigger: const TriggerCalendarEventStart(
+          calendarId: 'cal1',
+          eventTitle: 'Standup',
+        ),
+        action: const ActionNotify(title: 'Meeting', body: 'Starting now'),
+      );
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p-cal',
+          lookupKey: 'k-cal',
+          channel: const ChannelDialer('+15555550112'),
+          cadence: const EveryNDays(7),
+          createdAt: DateTime(2026),
+          automations: [automation],
+        ),
+      );
+      final back =
+          await PersonRepository.instance.getById('p-cal') as ContactPerson;
+      expect(back.automations, hasLength(1));
+      final got = back.automations.single;
+      expect(got.trigger, isA<TriggerCalendarEventStart>());
+      final t = got.trigger as TriggerCalendarEventStart;
+      expect(t.calendarId, 'cal1');
+      expect(t.eventTitle, 'Standup');
+    });
+
+    test('round-trips a mixed list of automations in declared order', () async {
+      final first = Automation(
+        trigger: const TriggerLocationEnter(
+          geofenceId: 'gf1',
+          label: 'Gym',
+          latitude: 47.6,
+          longitude: -122.3,
+          radiusMeters: 50,
+        ),
+        action: const ActionNotify(title: 'At the gym', body: 'Workout'),
+      );
+      final second = Automation(
+        trigger: const TriggerCalendarEventStart(
+          calendarId: 'cal2',
+          eventTitle: 'Lunch',
+        ),
+        action: const ActionNotify(title: 'Lunch', body: 'Eat well'),
+      );
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p-mixed',
+          lookupKey: 'k-mixed',
+          channel: const ChannelDialer('+15555550113'),
+          cadence: const EveryNDays(7),
+          createdAt: DateTime(2026),
+          automations: [first, second],
+        ),
+      );
+      final back =
+          await PersonRepository.instance.getById('p-mixed') as ContactPerson;
+      expect(back.automations, hasLength(2));
+      expect(back.automations[0].trigger, isA<TriggerLocationEnter>());
+      expect(back.automations[1].trigger, isA<TriggerCalendarEventStart>());
+      // Equality is on the full (id, trigger, condition, action,
+      // enabled) tuple per Automation's == implementation, so we
+      // round-trip cleanly only if encodeAutomationList preserves
+      // the order.
+      expect(back.automations[0], first);
+      expect(back.automations[1], second);
+    });
+
+    test(
+      'decodes a hand-written automationsJson array into Automations',
+      () async {
+        // Hand-write the JSON envelope so this test pins the decode
+        // path independently of the encode path (no round-trip
+        // symmetry assumption).
+        const raw =
+            '['
+            '{'
+            '"id":"a1",'
+            '"trigger":{"type":"timeOfDay","hour":9,"minute":0},'
+            '"condition":null,'
+            '"action":{"type":"notify","title":"Wake","body":"Up"},'
+            '"enabled":true'
+            '}'
+            ']';
+        final db = AppDatabaseService.instance.db;
+        await db
+            .into(db.people)
+            .insert(
+              const PersonRow(
+                id: 'p-hand-json',
+                lookupKey: 'k-hand-json',
+                displayName: '',
+                channel: 'dialer',
+                handle: '+1',
+                createdAtMillis: 0,
+                cadenceType: 'every_n_days',
+                nDays: 1,
+                anchoredToWakeup: false,
+                automationsJson: raw,
+              ),
+            );
+        final back =
+            await PersonRepository.instance.getById('p-hand-json')
+                as ContactPerson;
+        expect(back.automations, hasLength(1));
+        final got = back.automations.single;
+        expect(got.id, 'a1');
+        expect(got.trigger, isA<TriggerTimeOfDay>());
+        final t = got.trigger as TriggerTimeOfDay;
+        expect(t.hour, 9);
+        expect(t.minute, 0);
+        expect(got.action, isA<ActionNotify>());
+        expect((got.action as ActionNotify).title, 'Wake');
+      },
+    );
+
+    test('ChannelTelegram preserves the username as the handle', () async {
+      const username = 'alice_t';
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p-tg',
+          lookupKey: 'k-tg',
+          channel: const ChannelTelegram(username),
+          cadence: const EveryNDays(7),
+          createdAt: DateTime(2026),
+        ),
+      );
+      final back =
+          await PersonRepository.instance.getById('p-tg') as ContactPerson;
+      expect(back.channel, isA<ChannelTelegram>());
+      final c = back.channel as ChannelTelegram;
+      expect(
+        c.username,
+        username,
+        reason:
+            'ChannelTelegram is the only channel with a non-phone handle '
+            '(it is keyed on username, not phoneNumber); the (tag, handle) '
+            'mapping must funnel it through correctly.',
+      );
+    });
   });
 }
