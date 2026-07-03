@@ -25,6 +25,7 @@
 // `Contact` JSON for `getContact` (`select` method
 // channel call with the id).
 
+import 'package:doit/people/cadence.dart';
 import 'package:doit/people/person.dart';
 import 'package:doit/screens/add_person.dart';
 import 'package:doit/services/db.dart';
@@ -469,6 +470,502 @@ void main() {
       );
       expect(rows, hasLength(1));
       expect(rows?.first.lookupKey, 'persist1');
+    },
+  );
+
+  // ---------------------------------------------------------------------
+  // v1.6-γ (SYS-148 / WF-076) — coverage closure for add_person.dart.
+  //
+  // v1.5-cyc-β pinned the pick + save + cadence-default happy paths and
+  // the picker-denied + picker-no-phone + Routines empty-state branches.
+  // v1.6-γ extends that with 16 tests in 5 batches:
+  //
+  //   A. Cadence TextFormField input edge cases (5 tests) — verify the
+  //      `int.tryParse + n > 0` guard at lines 220-224 holds for "",
+  //      0, negative, non-numeric, and a valid happy-path round-trip.
+  //   B. initialPayload edge cases (4 tests) — verify the
+  //      `nDays != null && nDays > 0` guard at line 149 holds for 0,
+  //      negative, and the valid path (incl. the strict > 0 boundary).
+  //   C. Save-as-template menu visibility (2 tests) — verify the
+  //      `if (_isEdit)` AppBar action gate at line 160-161.
+  //   D. Contact picker variations (2 tests) — empty displayName
+  //      fallback (line 318), multi-phone first-phone pick (line 319).
+  //   E. Pause row state after pick (3 tests) — verify the three
+  //      visual states of `_PersonPauseRow` when pausedUntil is null.
+  //
+  // Deferred (per ADR-079):
+  //   - Edit-mode (`personId:`) full _loadExisting + save-as-template
+  //     dialog flow — chained runAsync + Drift keepalive close
+  //     deadlock documented at lines 393-401 of this file.
+  //   - Routines populated render — depends on LocationPicker.show
+  //     and CalendarPicker.show both being widget-mountable in the
+  //     headless test harness.
+  //   - `_pickPauseUntil` showDatePicker mocking — fragile in
+  //     headless mode; same pattern as add_habit's time-picker.
+  // ---------------------------------------------------------------------
+
+  // Helper: pick a scripted contact + edit the cadence field + save +
+  // read back the persisted Person. Returns the first row. Used by
+  // Batch A below.
+  Future<Person> pickEditCadenceSaveAndReadback(
+    WidgetTester tester, {
+    required String cadenceText,
+  }) async {
+    requestScriptedStatuses[Permission.contacts.value] =
+        PermissionStatus.granted;
+    scriptedContact = <String, dynamic>{
+      'id': 'helper',
+      'displayName': 'Helper User',
+      'phones': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'number': '+15559999',
+          'normalizedNumber': '+15559999',
+          'label': 'mobile',
+          'isPrimary': true,
+        },
+      ],
+    };
+    await _resetDb(tester);
+    await tester.pumpWidget(_wrap());
+    await tester.tap(find.byKey(const ValueKey('add_person.pick_contact')));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('permission_sheet.allow')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.byKey(const ValueKey('permission_sheet.allow')));
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    // Edit the cadence TextFormField (key `add_person.every_n`).
+    await tester.enterText(
+      find.byKey(const ValueKey('add_person.every_n')),
+      cadenceText,
+    );
+    await tester.pump();
+    // Save.
+    await tester.tap(find.byKey(const ValueKey('add_person.save')));
+    await tester.pumpAndSettle();
+    // Read back from the in-memory Drift.
+    final rows = await tester.runAsync<List<Person>>(
+      PersonRepository.instance.listAll,
+    );
+    return rows!.first;
+  }
+
+  // ---- Batch A: Cadence TextFormField input edge cases (5 tests) ----
+
+  testWidgets('Cadence input "" (empty) is a no-op and saves with the default '
+      'EveryNDays(7) (v1.6-γ / SYS-148)', (tester) async {
+    final person = await pickEditCadenceSaveAndReadback(
+      tester,
+      cadenceText: '',
+    );
+    expect(person, isA<ContactPerson>());
+    final contact = person as ContactPerson;
+    expect(contact.cadence, isA<EveryNDays>());
+    // tryParse('') returns null → guard at line 222 holds.
+    expect((contact.cadence as EveryNDays).nDays, 7);
+  });
+
+  testWidgets('Cadence input "0" is a no-op (the n > 0 guard at line 222) and '
+      'saves with the default EveryNDays(7) (v1.6-γ / SYS-148)', (
+    tester,
+  ) async {
+    final person = await pickEditCadenceSaveAndReadback(
+      tester,
+      cadenceText: '0',
+    );
+    final contact = person as ContactPerson;
+    expect(contact.cadence, isA<EveryNDays>());
+    // tryParse('0') returns 0 → n > 0 rejects → _everyNDays stays 7.
+    expect((contact.cadence as EveryNDays).nDays, 7);
+  });
+
+  testWidgets('Cadence input "-3" is a no-op (the n > 0 guard at line 222) and '
+      'saves with the default EveryNDays(7) (v1.6-γ / SYS-148)', (
+    tester,
+  ) async {
+    final person = await pickEditCadenceSaveAndReadback(
+      tester,
+      cadenceText: '-3',
+    );
+    final contact = person as ContactPerson;
+    expect(contact.cadence, isA<EveryNDays>());
+    // tryParse('-3') returns -3 → n > 0 rejects → _everyNDays stays 7.
+    expect((contact.cadence as EveryNDays).nDays, 7);
+  });
+
+  testWidgets(
+    'Cadence input "abc" is a no-op (tryParse returns null at line 221) '
+    'and saves with the default EveryNDays(7) (v1.6-γ / SYS-148)',
+    (tester) async {
+      final person = await pickEditCadenceSaveAndReadback(
+        tester,
+        cadenceText: 'abc',
+      );
+      final contact = person as ContactPerson;
+      expect(contact.cadence, isA<EveryNDays>());
+      // tryParse('abc') returns null → guard rejects → stays 7.
+      expect((contact.cadence as EveryNDays).nDays, 7);
+    },
+  );
+
+  testWidgets('Cadence input "14" round-trips to EveryNDays(14) on save '
+      '(v1.6-γ / SYS-148)', (tester) async {
+    final person = await pickEditCadenceSaveAndReadback(
+      tester,
+      cadenceText: '14',
+    );
+    final contact = person as ContactPerson;
+    expect(contact.cadence, isA<EveryNDays>());
+    // Happy path: tryParse('14') == 14, n > 0 → _everyNDays = 14.
+    expect((contact.cadence as EveryNDays).nDays, 14);
+  });
+
+  // ---- Batch B: initialPayload edge cases (4 tests) ----
+
+  testWidgets('initialPayload with nDays=0 is ignored (the nDays > 0 guard at '
+      'line 149) and the cadence field shows the default "7" '
+      '(v1.6-γ / SYS-148)', (tester) async {
+    await _resetDb(tester);
+    const payload = <String, dynamic>{
+      'cadenceType': 'everyNDays',
+      'nDays': 0,
+      'channel': 'dialer',
+    };
+    await tester.pumpWidget(
+      const MaterialApp(home: AddPersonScreen(initialPayload: payload)),
+    );
+    await tester.pump();
+    // nDays=0 → guard at line 149 (`nDays > 0`) rejects → default 7.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('add_person.every_n')),
+        matching: find.text('7'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('initialPayload with nDays=-5 is ignored (the nDays > 0 guard at '
+      'line 149) and the cadence field shows the default "7" '
+      '(v1.6-γ / SYS-148)', (tester) async {
+    await _resetDb(tester);
+    const payload = <String, dynamic>{
+      'cadenceType': 'everyNDays',
+      'nDays': -5,
+      'channel': 'dialer',
+    };
+    await tester.pumpWidget(
+      const MaterialApp(home: AddPersonScreen(initialPayload: payload)),
+    );
+    await tester.pump();
+    // nDays=-5 → guard rejects → default 7.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('add_person.every_n')),
+        matching: find.text('7'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'initialPayload with nDays=21 pre-fills the cadence field with "21" '
+    '(v1.6-γ / SYS-148)',
+    (tester) async {
+      await _resetDb(tester);
+      const payload = <String, dynamic>{
+        'cadenceType': 'everyNDays',
+        'nDays': 21,
+        'channel': 'dialer',
+      };
+      await tester.pumpWidget(
+        const MaterialApp(home: AddPersonScreen(initialPayload: payload)),
+      );
+      await tester.pump();
+      // Happy path: nDays > 0 → guard accepts → _everyNDays = 21.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('add_person.every_n')),
+          matching: find.text('21'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'initialPayload with nDays=1 (the strict > 0 boundary at line 149) '
+    'pre-fills the cadence field with "1" (v1.6-γ / SYS-148)',
+    (tester) async {
+      await _resetDb(tester);
+      const payload = <String, dynamic>{
+        'cadenceType': 'everyNDays',
+        'nDays': 1,
+        'channel': 'dialer',
+      };
+      await tester.pumpWidget(
+        const MaterialApp(home: AddPersonScreen(initialPayload: payload)),
+      );
+      await tester.pump();
+      // nDays=1 is the smallest accepted value (strict > 0).
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('add_person.every_n')),
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  // ---- Batch C: Save-as-template menu visibility (2 tests) ----
+
+  testWidgets('Add mode (no personId) hides the save-as-template menu '
+      '(the `if (_isEdit)` gate at line 160-161) (v1.6-γ / SYS-148)', (
+    tester,
+  ) async {
+    await _resetDb(tester);
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    // No personId → PopupMenuButton with key `add_person.menu` is
+    // absent (line 160-161 gates on `_isEdit`).
+    expect(find.byKey(const ValueKey('add_person.menu')), findsNothing);
+  });
+
+  testWidgets('Edit mode (personId provided) shows the save-as-template menu '
+      '(v1.6-γ / SYS-148)', (tester) async {
+    await _resetDb(tester);
+    await tester.pumpWidget(
+      const MaterialApp(home: AddPersonScreen(personId: 'some-id')),
+    );
+    await tester.pump();
+    // _isEdit is true (widget.personId != null) → PopupMenuButton
+    // renders. _loadExisting runs in the background and is allowed
+    // to dangle (the widget tree is already built); the assertion
+    // is synchronous and only depends on _isEdit.
+    expect(find.byKey(const ValueKey('add_person.menu')), findsOneWidget);
+  });
+
+  // ---- Batch D: Contact picker variations (2 tests) ----
+
+  testWidgets(
+    'Pick contact with empty displayName shows the "No name" fallback '
+    '(line 318) (v1.6-γ / SYS-148)',
+    (tester) async {
+      requestScriptedStatuses[Permission.contacts.value] =
+          PermissionStatus.granted;
+      scriptedContact = <String, dynamic>{
+        'id': 'no-name',
+        'displayName': '',
+        'phones': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'number': '+15550100',
+            'normalizedNumber': '+15550100',
+            'label': 'mobile',
+            'isPrimary': true,
+          },
+        ],
+      };
+      await _resetDb(tester);
+      await tester.pumpWidget(_wrap());
+      await tester.tap(find.byKey(const ValueKey('add_person.pick_contact')));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('permission_sheet.allow')),
+      );
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.tap(find.byKey(const ValueKey('permission_sheet.allow')));
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      // Empty displayName → `_pickedName = 'No name'` (line 318).
+      expect(find.text('No name'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Pick contact with multiple phones uses the first phone as the row '
+    'subtitle (line 319) (v1.6-γ / SYS-148)',
+    (tester) async {
+      requestScriptedStatuses[Permission.contacts.value] =
+          PermissionStatus.granted;
+      scriptedContact = <String, dynamic>{
+        'id': 'multi',
+        'displayName': 'Multi Phone',
+        'phones': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'number': '+15550111',
+            'normalizedNumber': '+15550111',
+            'label': 'mobile',
+            'isPrimary': true,
+          },
+          <String, dynamic>{
+            'number': '+15550222',
+            'normalizedNumber': '+15550222',
+            'label': 'work',
+            'isPrimary': false,
+          },
+        ],
+      };
+      await _resetDb(tester);
+      await tester.pumpWidget(_wrap());
+      await tester.tap(find.byKey(const ValueKey('add_person.pick_contact')));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('permission_sheet.allow')),
+      );
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.tap(find.byKey(const ValueKey('permission_sheet.allow')));
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      // First phone (mobile) is the subtitle; second phone (work) is
+      // never displayed in the row.
+      expect(find.text('+15550111'), findsOneWidget);
+      expect(find.text('+15550222'), findsNothing);
+    },
+  );
+
+  // ---- Batch E: Pause row state after pick (3 tests) ----
+
+  testWidgets(
+    'After a contact is picked, the Pause row title "Paused until" is '
+    'visible (line 691) (v1.6-γ / SYS-148)',
+    (tester) async {
+      requestScriptedStatuses[Permission.contacts.value] =
+          PermissionStatus.granted;
+      scriptedContact = <String, dynamic>{
+        'id': 'pause-1',
+        'displayName': 'Pause Tester',
+        'phones': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'number': '+15550999',
+            'normalizedNumber': '+15550999',
+            'label': 'mobile',
+            'isPrimary': true,
+          },
+        ],
+      };
+      await _resetDb(tester);
+      await tester.pumpWidget(_wrap());
+      await tester.tap(find.byKey(const ValueKey('add_person.pick_contact')));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('permission_sheet.allow')),
+      );
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.tap(find.byKey(const ValueKey('permission_sheet.allow')));
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('Paused until'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'After a contact is picked, the Pause row subtitle is "(not paused)" '
+    'when pausedUntil is null (line 694) (v1.6-γ / SYS-148)',
+    (tester) async {
+      requestScriptedStatuses[Permission.contacts.value] =
+          PermissionStatus.granted;
+      scriptedContact = <String, dynamic>{
+        'id': 'pause-2',
+        'displayName': 'Pause Tester 2',
+        'phones': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'number': '+15551000',
+            'normalizedNumber': '+15551000',
+            'label': 'mobile',
+            'isPrimary': true,
+          },
+        ],
+      };
+      await _resetDb(tester);
+      await tester.pumpWidget(_wrap());
+      await tester.tap(find.byKey(const ValueKey('add_person.pick_contact')));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('permission_sheet.allow')),
+      );
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.tap(find.byKey(const ValueKey('permission_sheet.allow')));
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      // Default state — _pausedUntil is null → subtitle "(not paused)".
+      expect(find.text('(not paused)'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'After a contact is picked, the Pause row Resume button is hidden '
+    'when pausedUntil is null (line 702) (v1.6-γ / SYS-148)',
+    (tester) async {
+      requestScriptedStatuses[Permission.contacts.value] =
+          PermissionStatus.granted;
+      scriptedContact = <String, dynamic>{
+        'id': 'pause-3',
+        'displayName': 'Pause Tester 3',
+        'phones': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'number': '+15551111',
+            'normalizedNumber': '+15551111',
+            'label': 'mobile',
+            'isPrimary': true,
+          },
+        ],
+      };
+      await _resetDb(tester);
+      await tester.pumpWidget(_wrap());
+      await tester.tap(find.byKey(const ValueKey('add_person.pick_contact')));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('permission_sheet.allow')),
+      );
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.tap(find.byKey(const ValueKey('permission_sheet.allow')));
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      // The Resume button (key `add_person.pause_resume`) is gated on
+      // `pausedUntil != null` (line 702). Default state hides it.
+      expect(
+        find.byKey(const ValueKey('add_person.pause_resume')),
+        findsNothing,
+      );
     },
   );
 }
