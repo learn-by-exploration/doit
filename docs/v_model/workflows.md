@@ -3570,3 +3570,61 @@ The v1.6 milestone's second cycle (v1.6-β) closes the **largest single-file cov
 **Targeted:** `flutter test test/screens/add_habit_test.dart` (25/25 pass: 11 baseline + 14 new).
 
 **Cross-references.** SYS-147; ADR-078; v1.6-β row; CHANGELOG `## v1.6-β`; feature.md cycle entry.
+
+## WF-076 — Verify the `add_person.dart` sub-form coverage closure (v1.6-γ / Phase 61)
+
+The v1.6 milestone's third cycle (v1.6-γ) closes the **second-largest screen coverage gap** — `lib/screens/add_person.dart` at 47.67% line coverage per the v1.6 pre-auth plan — by exercising the cadence `TextFormField` input-validation guard, the `initialPayload` validation guard, the `if (_isEdit)` save-as-template menu visibility gate, the contact-picker edge cases (empty displayName + multi-phone first), and the `_PersonPauseRow` initial-state visibility when `pausedUntil` is null. **No production-code change**; v1.6-γ is tests-only.
+
+**Test changes (+16 net in `test/screens/add_person_test.dart`, existing 11 baseline from v1.5-cyc-β → 27 total):**
+
+**Batch A — Cadence TextFormField input edge cases (5 tests, v1.6-γ):**
+
+(a) `Cadence input "" (empty) is a no-op and saves with the default EveryNDays(7)` — `int.tryParse('')` returns null → guard at `add_person.dart:222` (`n != null && n > 0`) rejects → `_everyNDays` stays at 7. The helper `pickEditCadenceSaveAndReadback` performs the full pick-contact + `enterText('')` + save + `PersonRepository.listAll` dance; the persisted row's `ContactPerson.cadence == EveryNDays(7)`.
+
+(b) `Cadence input "0" is a no-op (the n > 0 guard at line 222) and saves with the default EveryNDays(7)` — `tryParse('0')` returns 0 → `n > 0` rejects → stays 7.
+
+(c) `Cadence input "-3" is a no-op (the n > 0 guard at line 222) and saves with the default EveryNDays(7)` — `tryParse('-3')` returns -3 → rejects → stays 7.
+
+(d) `Cadence input "abc" is a no-op (tryParse returns null at line 221) and saves with the default EveryNDays(7)` — `tryParse('abc')` returns null → rejects → stays 7.
+
+(e) `Cadence input "14" round-trips to EveryNDays(14) on save (happy path)` — `tryParse('14')` returns 14, `n > 0` accepts → `_everyNDays = 14` → save persists `EveryNDays(14)`.
+
+**Batch B — initialPayload edge cases (4 tests, v1.6-γ):**
+
+(f) `initialPayload with nDays=0 is ignored (the nDays > 0 guard at line 149) and the cadence field shows the default "7"` — pump `AddPersonScreen(initialPayload: {'cadenceType': 'everyNDays', 'nDays': 0, 'channel': 'dialer'})`; assert the field's `find.descendant(..., matching: find.text('7'))` is `findsOneWidget`.
+
+(g) `initialPayload with nDays=-5 is ignored (the nDays > 0 guard at line 149) and the cadence field shows the default "7"` — symmetric to (f).
+
+(h) `initialPayload with nDays=21 pre-fills the cadence field with "21"` — happy path; the guard accepts `nDays > 0` → `_everyNDays = 21`.
+
+(i) `initialPayload with nDays=1 (the strict > 0 boundary at line 149) pre-fills the cadence field with "1"` — pins the exact `nDays > 0` boundary at the smallest accepted value.
+
+**Batch C — Save-as-template menu visibility (2 tests, v1.6-γ):**
+
+(j) `Add mode (no personId) hides the save-as-template menu (the 'if (_isEdit)' gate at line 160-161)` — pump `AddPersonScreen()`; assert `find.byKey(const ValueKey('add_person.menu'))` returns `findsNothing`.
+
+(k) `Edit mode (personId provided) shows the save-as-template menu` — pump `AddPersonScreen(personId: 'some-id')`; assert `find.byKey(const ValueKey('add_person.menu'))` returns `findsOneWidget`. The `_loadExisting` future dangles in the background; the menu widget is built synchronously from `widget.personId != null` so the assertion is independent of the async load.
+
+**Batch D — Contact picker variations (2 tests, v1.6-γ):**
+
+(l) `Pick contact with empty displayName shows the "No name" fallback (line 318)` — scripted contact with `displayName: ''`; after the pick dance, `find.text('No name')` returns `findsOneWidget`.
+
+(m) `Pick contact with multiple phones uses the first phone as the row subtitle (line 319)` — scripted contact with 2 phones (mobile +15550111 + work +15550222); `find.text('+15550111')` returns `findsOneWidget`; `find.text('+15550222')` returns `findsNothing` (the second phone is never displayed in the row).
+
+**Batch E — Pause row state after pick (3 tests, v1.6-γ):**
+
+(n) `After a contact is picked, the Pause row title "Paused until" is visible (line 691)` — pick a scripted contact; assert `find.text('Paused until')` returns `findsOneWidget`.
+
+(o) `After a contact is picked, the Pause row subtitle is "(not paused)" when pausedUntil is null (line 694)` — pick a scripted contact; assert `find.text('(not paused)')` returns `findsOneWidget`.
+
+(p) `After a contact is picked, the Pause row Resume button is hidden when pausedUntil is null (line 702)` — pick a scripted contact; assert `find.byKey(const ValueKey('add_person.pause_resume'))` returns `findsNothing`.
+
+**APK SHA1 stays at Cycle H's `25bb7fab`** — v1.6-γ is tests-only; no release rebuild needed.
+
+**No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** v1.6-γ is Dart-only + Flutter widgets (no platform channels touched; the existing `add_person_test.dart` setUp's `permission_handler` + `flutter_contacts` channel mocks are sufficient for the 8 tests that drive the picker flow).
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean after auto-format of 1 file: the cadence helper rename to drop the leading underscore, the `domain.Person` → `Person` substitution, and the `EveryNDays` import addition) + `flutter analyze --fatal-infos lib test` (0 issues — `no_leading_underscores_for_local_identifiers` lint satisfied after rename) + `flutter test` (1680/1680 pass).
+
+**Targeted:** `flutter test test/screens/add_person_test.dart` (27/27 pass: 11 baseline + 16 new).
+
+**Cross-references.** SYS-148; ADR-079; v1.6-γ row; CHANGELOG `## v1.6-γ`; feature.md cycle entry.

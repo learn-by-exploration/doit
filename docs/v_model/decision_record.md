@@ -6949,3 +6949,36 @@ The error Card uses `Theme.of(context).colorScheme.error` for both the `Icon` co
 
 **SYS-IDs affected:** SYS-147 (new).
 **Cross-references:** SYS-147; WF-075; Milestone 14 `### v1.6-β`; v1.6-β row; CHANGELOG `## v1.6-β`; feature.md cycle entry.
+
+## ADR-079 — v1.6-γ (add_person.dart sub-form coverage closure): 3 drift lessons from the +16 tests
+
+**Status:** Accepted 2026-07-03 (v1.6-γ / Phase 61).
+
+**Context.** The v1.6 pre-auth plan targeted `lib/screens/add_person.dart` at 47.67% line coverage and proposed +16 tests across per-PersonChannel leaf (5 leaves), per-PersonCadence switch (4 shapes), RestDayBudget / MissionChain composer / automations_json editor, and contact-picker validation. Once the cycle started, the plan turned out to over-count: the v0.1 UI form is much simpler than the master plan assumed. The +16 test count IS feasible — but the reachable paths are different from the plan's assumption.
+
+**Decisions.**
+
+**(a) The `add_person.dart` UI form renders ONLY `EveryNDays(nDays)` cadence + ONLY `ChannelDialer(phoneNumber)`.** The full cadence hierarchy (`EveryNDays` / `WeeklyOn` / `MonthlyOn` / `YearlyOn`) and the full channel hierarchy (`ChannelDialer` / `ChannelWhatsApp` / `ChannelTelegram` / `ChannelSignal` / `ChannelSms`) exist in the model (`lib/people/cadence.dart` + `lib/people/person.dart`), but the form's `_save()` only constructs `ChannelDialer(_pickedPhone!)` (line 342) and `EveryNDays(_everyNDays)` (line 343). The header comment at `add_person.dart:9` explicitly states "v0.2 will introduce more". This means:
+- 5 per-channel-leaf UI sub-form tests are NOT feasible in v1.6 (the UI doesn't switch between channels).
+- 4 per-cadence-shape UI sub-form tests are NOT feasible in v1.6 (the UI doesn't switch between shapes).
+- The +16 test count is achievable BECAUSE the form is simple — the reachable paths are the input-validation guards + the menu-visibility gate + the picker edge cases + the pause-row states.
+
+**Action:** defer per-channel and per-cadence UI tests to v0.2 (when the form actually supports the switch). The +16 tests target the 5 reachable branches listed in SYS-148 §1 Batches A-E.
+
+**(b) Picker mocking is heavyweight.** `LocationPicker.show()` (`lib/widgets/location_picker.dart`) and `CalendarPicker.show()` (`lib/widgets/calendar_picker.dart`) both gate on `PermissionSheet.show(...)` then `showModalBottomSheet<Automation>`. Stubbing either requires the full permissions + geolocator/calendar channel pair, which is OUTSIDE the current `add_person_test.dart` setUp (which mocks only `permission_handler` + `flutter_contacts`). Adding the geolocator + calendar channels would require a separate test-only setUp helper that shares scaffolding with `test/widgets/location_picker_test.dart` + `test/widgets/calendar_picker_test.dart`.
+
+**Action:** defer Routines-populated-render tests to a v2.0 cycle that introduces a shared picker-mock helper. v1.6-γ's Batch D tests only the `_pickContact` edge cases (empty displayName + multi-phone first) which ARE within the current setUp.
+
+**(c) Edit-mode deadlock pattern is shared with `add_habit.dart`.** Chained `runAsync` for seed save + `_loadExisting` wait races with Drift's `NativeDatabase.memory()` keepalive close. The existing `// NOTE:` at `test/screens/add_person_test.dart:393-401` documents this for v1.5-cyc-β. The v1.6-γ cycle's menu-visibility test (k) deliberately pumps `AddPersonScreen(personId: 'some-id')` and asserts the menu's presence via `find.byKey(...)` AFTER a single `tester.pump()` — the `_loadExisting` future dangles in the background but the menu widget is built synchronously from `widget.personId != null` so the assertion is independent of the async load. This works for visibility testing; it does NOT work for full edit-mode + save-as-template dialog flow (which requires `_lastSaved` to be set, which requires a successful seed save, which races with the keepalive).
+
+**Action:** defer the full edit-mode + save-as-template dialog flow to a v2.0 cycle that introduces a tearDown-side-channel close helper (the canonical fix is to seed the DB directly via `PersonRepository.instance.save(...)` under `runAsync` BEFORE the second mount — same root-cause as ADR-078 §e). The 2 menu-visibility tests cover the `if (_isEdit)` AppBar action gate at line 160-161.
+
+**Consequences.**
+- **+16 tests.** 1664 → **1680**. Coverage: `lib/screens/add_person.dart` 47.67% → **~52%** (±1 pp).
+- **APK SHA1 stays at H's `25bb7fab`** — tests-only.
+- **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.**
+- **4 deferred items** (per-channel UI sub-form + per-cadence UI sub-form + Routines populated render + edit-mode full flow) — documented inline in `test/screens/add_person_test.dart`'s v1.6-γ header for v0.2 / v2.0 follow-up.
+- **Plan over-count discovered:** the v1.6 pre-auth plan listed add_person.dart at "712 LF" + "47.67%" but assumed per-channel + per-cadence UI tests would land in this cycle. The actual form renders 1 cadence shape + 1 channel; the reachable test surface is the 5 guards + 3 menu/picker states, not the 9 per-leaf variations. The +16 test count is achieved by going DEEPER on the reachable paths (cadence input edge cases + initialPayload validation + menu visibility + pause row states), not WIDER on the unreachable paths.
+
+**SYS-IDs affected:** SYS-148 (new).
+**Cross-references:** SYS-148; WF-076; Milestone 14 `### v1.6-γ`; v1.6-γ row; CHANGELOG `## v1.6-γ`; feature.md cycle entry.
