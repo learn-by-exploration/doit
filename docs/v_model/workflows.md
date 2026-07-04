@@ -4015,3 +4015,58 @@ The ninth cycle of the v1.6 milestone — closes coverage gaps on 4 critical-pat
 ### Cross-references
 
 SYS-154; ADR-085; v1.6-ι row; CHANGELOG `## v1.6-ι`; feature.md cycle entry.
+
+### v1.6-κ — TemplateLibrary.seedBuiltIns wiring pin + automationsJson restore pin (Phase 68 / SYS-155 / ADR-086 / WF-083)
+
+The tenth cycle of the v1.6 milestone — closes 2 latent production bugs discovered via in-code TODO scan (both turned out to be **documentation bugs, not behavior bugs**). **Comment-cleanup + tests-only cycle; no production-code behavior change**.
+
+**Why this cycle is comment-cleanup, not production-fix:**
+
+1. **TemplateLibrary.seedBuiltIns(...) wiring** — the curated 25-row library has been shipped since the v1.0 reframe (Phase B PR 1), but the call that pushes it into Drift was never wired. **WAIT — the wiring IS already in place at `lib/main.dart:49-55`** (step 1a, between `AppDatabaseService.init()` and the rest of the init sequence). The 2 stale `/// TODO Phase B PR 2: wire this from main.dart /` comments at `lib/templates/template_library.dart:395` + `lib/services/db/migrations/v2_to_v3.dart:24` referenced the wiring as if it were still outstanding. **Action:** retire the stale TODOs; no production-code change.
+2. **automationsJson restore gap** — `lib/screens/home_tile_delete.dart:75` claimed `automationsJson` was lost across a soft-delete + restore. **WAIT — the v1.4l `restoreById` is a single UPDATE on `deletedAtMillis` only; Drift's UPDATE-without-column semantics preserve `automationsJson` by construction**. The stale comment referenced a v1.4h `_toRow` path that no longer exists. **Action:** update the comment to reflect v1.4l; no production-code change.
+
+**3 production-code comment edits** (file:line, edit):
+- `lib/templates/template_library.dart:395` — retired stale `Phase B PR 2` TODO; added pointer to `lib/main.dart` step 1a.
+- `lib/services/db/migrations/v2_to_v3.dart:24` — retired stale `Phase B PR 2` TODO; added pointer to `lib/main.dart` step 1a.
+- `lib/screens/home_tile_delete.dart:60-77` — updated the long-form comment to reflect v1.4l's `restoreById` contract (single UPDATE on `deletedAtMillis` only; `automationsJson` preserved by construction).
+
+**Group 1 — `lib/services/do_repository.dart` automationsJson restore (3 new tests in NEW `group('DoRepository automations survive restoreById (v1.6-κ)')`):**
+
+1. **Group 1 (a) `automations_survive_a_full_soft_delete_then_restore_round_trip (v1.6-κ)`** — Save a `DoFixed` do with the existing `_twoAutomations()` helper (one `TriggerTimeOfDay` + one `ActionNotify`); soft-delete via `DoRepository.softDeleteById`; restore via `DoRepository.restoreById`; re-read via `DoRepository.getActiveById`; assert both automations round-trip back with full tuple equality (id + trigger + action). Pins the round-trip contract.
+
+2. **Group 1 (b) `automations_chain_with_multiple_automation_types_survives_restore (v1.6-κ)`** — Same round-trip with both `TriggerBatteryLow` + `TriggerTimeOfDay` discriminators (the 2 trigger kinds available without permission mocking); assert each trigger round-trips with its discriminator intact (`is TriggerBatteryLow` vs `is TriggerTimeOfDay`). Pins that the JSON-encode/decode round-trip preserves each trigger kind.
+
+3. **Group 1 (c) `restoreById_does_not_change_automationsJson_column (v1.6-κ)`** — Direct column-pin via `select(db.habits).getSingle()`; read `automationsJson` BEFORE soft-delete + AFTER restore; assert string-equal. Pins the no-touch UPDATE semantics at the SQL level (the v1.4l `restoreById` is a single UPDATE on `deletedAtMillis` only; the `automationsJson` column is not in the UPDATE's set list, so Drift's UPDATE-without-column semantics leave the existing column value alone — the v1.6-κ column-pin locks this contract).
+
+**Group 2 — `lib/main.dart` step 1a `TemplateLibrary.seedBuiltIns(...)` wiring (3 new tests in NEW `group('TemplateLibrary.seedBuiltIns called from main() (v1.6-κ)')`):**
+
+4. **Group 2 (a) `main() step 1a seeds the curated 25-row library into Drift (v1.6-κ)`** — Pre-condition `expect(initial, isEmpty)` (the seed-into-empty-Drift invariant per ADR-086 drift lesson (d)); act: `TemplateLibrary.seedBuiltIns(TemplateRepository.instance)` returns 25; assert every built-in id reaches Drift via `TemplateRepository.listAll()`. Pins the wiring at `lib/main.dart` step 1a — the call has been in production since v1.0 Phase B.
+
+5. **Group 2 (b) `main() step 1a is idempotent on a re-init of the singleton (v1.6-κ)`** — Second `seedBuiltIns` call returns 0; pins the `builtInOnly` short-circuit at `template_library.dart:399-400` (re-seed no-ops even if 1 of 25 survived).
+
+6. **Group 2 (c) `main() step 1a populates the templates table even when the restore flow has already populated user-saved rows (v1.6-κ)`** — Pre-save a user template via the new `_userTemplate('t_user_1')` helper (uses `TemplateEntityType.doEntity`, NOT `doIt` which is a Dart reserved keyword); act: seed; assert: user row survives + 25 built-ins present (the `builtInOnly` guard does NOT clobber pre-existing rows — the seed is additive).
+
+**Group 3 — Combined init flow (2 new tests in NEW `group('Combined main() init flow (v1.6-κ)')`):**
+
+7. **Group 3 (a) `init seeds templates + listAll returns the 25 curated rows (v1.6-κ)`** — Full init path step 1a + read-back pins curated order (`createdAtMillis ASC, id ASC`); pins the combined `seedBuiltins` + `TemplateRepository.listAll` read-back contract.
+
+8. **Group 3 (b) `init seeds templates + soft-delete + restore preserves automationsJson on a do with routines (v1.6-κ)`** — The cross-cutting bug pin: combined contract of init + seed + save do with routine + soft-delete + restore → routine survives (`automationsJson` round-trips). This test is the closest a unit test can get to the "two latent bugs in one cycle" framing without an end-to-end integration test.
+
+### Drift lessons (per ADR-086)
+
+1. **Verify wiring exists before assuming it's missing** — both "bugs" were documentation-only; the actual production code was correct. Before scheduling a production-code fix, ALWAYS verify the assumption via `grep` on call sites (the plan's "Fix A" — wire `TemplateLibrary.seedBuiltins` — was a documentation bug; the call has been in `lib/main.dart:49-55` step 1a since v1.0 Phase B).
+2. **`restoreById` preserves `automationsJson` by construction** — the v1.4l path is a single UPDATE on `deletedAtMillis` only; the comment in `home_tile_delete.dart:75` was a vestige of v1.4h; always cross-check stale comments against current production code (the plan's "Fix B" — fix `automationsJson` restore — was also a documentation bug; the comment referenced a v1.4h `_toRow` path that no longer exists).
+3. **The `builtInOnly` short-circuit is the idempotency contract** — `seedBuiltins` returns 0 if ANY built-in exists (re-seed no-ops even if 1 of 25 survived); pin via "first call inserts N, second inserts 0" + "pre-existing user rows are NOT clobbered".
+4. **The seed-into-empty-Drift invariant is worth pinning** — pre-condition `expect(initial, isEmpty)` so a future regression that moves the seed to a different path fails loudly.
+5. **`TemplateEntityType.doEntity` is the enum value, NOT `doIt`** — `do` is a Dart reserved keyword; the enum at `lib/templates/template.dart:22-27` exposes `doEntity('do')`, `event('event')`, `person('person')`, `routine('routine')`; the v1.6-κ `_userTemplate` helper pins the right enum value.
+
+### Post-conditions
+
+- `main` is at the v1.6-κ tip (commit hash for PR #77).
+- 1773/1773 tests pass on the 2 affected files (16+15 = 31); full suite shows 1772/1773 pass (1 fail is the pre-existing `test/perf/widget_rebuild_test.dart` perf-budget flake, unrelated to v1.6-κ; passes in isolation).
+- V-Model artifacts SYS-155 + ADR-086 + WF-083 are committed alongside the code.
+- APK SHA1 stays at H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` (no production-code behavior change).
+
+### Cross-references
+
+SYS-155; ADR-086; v1.6-κ row; CHANGELOG `## v1.6-κ`; feature.md cycle entry.

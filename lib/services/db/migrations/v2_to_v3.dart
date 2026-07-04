@@ -18,11 +18,12 @@
 //
 // The curated library is seeded separately via
 // `TemplateLibrary.seedBuiltIns(...)`, called from `main.dart`
-// or `AppDatabaseService.init()`. The migration only creates
-// the table; it does NOT auto-seed (seeding is idempotent and
-// belongs in the app-init path, not the migration).
-// TODO Phase B PR 2: wire `TemplateLibrary.seedBuiltIns(...)` from
-// `main.dart` / `AppDatabaseService.init()`.
+// after `AppDatabaseService.instance.init()`. The migration
+// only creates the table; it does NOT auto-seed (seeding is
+// idempotent and belongs in the app-init path, not the
+// migration). See `lib/main.dart` step 1a for the wiring
+// (v1.6-κ / SYS-155 / ADR-086 — closed the stale `Phase B
+// PR 2` TODO that originally lived here).
 
 import 'package:drift/drift.dart';
 

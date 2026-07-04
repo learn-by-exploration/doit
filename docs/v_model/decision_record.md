@@ -7517,3 +7517,136 @@ Accepted. All 18 tests land in v1.6-ι (PR #76, squash-merged). The cycle ships 
 
 **SYS-IDs affected:** SYS-154 (new).
 **Cross-references:** SYS-154; ADR-085; WF-082; Milestone 14 `### v1.6-ι`; v1.6-ι row; CHANGELOG `## v1.6-ι`; feature.md cycle entry.
+
+---
+
+## ADR-086 — TemplateLibrary.seedBuiltIns wiring + automationsJson restore (v1.6-κ / Phase 68 / SYS-155 / WF-083)
+
+### Context
+
+Two latent production bugs were discovered via in-code TODO scan during the
+v1.5/v1.6 plan review:
+
+1. **`TemplateLibrary.seedBuiltIns(...)` wiring** — the curated 25-row
+   template library has been shipped in production code since the v1.0
+   reframe (Phase B PR 1), but the function call that pushes it into
+   Drift was never wired. Two stale `/// TODO Phase B PR 2: wire this
+   from main.dart /` comments at `lib/templates/template_library.dart:395`
+   and `lib/services/db/migrations/v2_to_v3.dart:24` referenced the
+   wiring as if it were still outstanding. On closer reading, the
+   wiring already exists — `lib/main.dart` step 1a (between
+   `AppDatabaseService.instance.init()` and the rest of the init
+   sequence) calls `await TemplateLibrary.seedBuiltIns(
+   TemplateRepository.instance);` after the singleton's `_ready`
+   future resolves. The seed path is also reachable from
+   `lib/screens/templates.dart:91-92` as a defensive backfill (called
+   every time the templates screen opens, in case the user wiped the
+   library via a future flow).
+
+2. **`automationsJson` restore gap** — the v1.4l `restoreById` path
+   (`lib/services/do_repository.dart:188-195`) is a single UPDATE
+   statement that only touches `deletedAtMillis`. Drift's UPDATE-
+   without-column semantics leave the `automationsJson` column
+   untouched. So the column IS preserved by construction across a
+   soft-delete + restore round-trip — but the historical
+   documentation in `lib/screens/home_tile_delete.dart:60-77`
+   claimed it was NOT preserved (referencing a v1.4h `_toRow`
+   path that has since been superseded). The stale comment was a
+   vestige of the v1.4h path; the v1.4l path never had the bug.
+
+### Decision
+
+The v1.6-κ cycle retires the stale comments and adds 8 tests that pin
+the actual correct behavior:
+
+- **3 tests in `test/services/do_repository_test.dart`** — the
+  v1.4l restore path preserves the `automations_json` column
+  across a soft-delete + restore round-trip. The tests cover
+  (a) a single-automation round-trip, (b) a multi-trigger
+  round-trip (the `_twoAutomations()` helper exercises both
+  `TriggerBatteryLow` and `TriggerTimeOfDay` discriminators),
+  (c) a direct column-value pin (read `automationsJson` before
+  soft-delete and after restore; assert string-equal).
+- **3 tests in `test/main_test.dart`** — the `main()` step 1a
+  wiring path actually seeds the 25-row library into Drift.
+  The tests cover (a) seed-into-empty-Drift returns 25, (b)
+  re-seed is idempotent (second call returns 0), (c) the seed
+  path coexists with pre-existing user-saved templates
+  (it does NOT clobber or delete them — the `builtInOnly`
+  guard inside `seedBuiltIns` only short-circuits the loop
+  when built-ins exist).
+- **2 tests in `test/main_test.dart`** — the combined init flow:
+  (a) `init()` + `seedBuiltIns()` yields 25 rows in
+  curated order (`createdAtMillis ASC, id ASC`),
+  (b) `init()` + `seedBuiltIns()` + save do with routines +
+  soft-delete + restore preserves the routine.
+
+Production-code edits were limited to comment cleanup (3 stale
+TODOs retired, 0 production behavior changed). The plan's Fix A
+(`seedBuiltIns` wiring) and Fix B (`automationsJson` restore)
+turned out to be documentation bugs, not production bugs.
+
+### Drift lessons
+
+#### Lesson 1 — Verify wiring exists before assuming it's missing
+
+The plan originally listed "Fix A: wire `TemplateLibrary.seedBuiltIns`"
+as a production-code edit. On closer reading, the wiring was already
+in place at `lib/main.dart:49-55`. The cycle therefore retires only
+the stale TODOs; no production code change was needed. **Reusable
+pattern:** before scheduling a production-code fix, ALWAYS verify
+the assumption by `grep`-ing for the call site — stale comments
+often outlive the actual fix.
+
+#### Lesson 2 — `restoreById` preserves `automationsJson` by construction
+
+The plan's "Fix B" was based on a stale comment in
+`lib/screens/home_tile_delete.dart:75` claiming that
+`automationsJson` was lost across a soft-delete + restore. The
+claim was wrong (it referenced a v1.4h `_toRow` path that no
+longer exists; v1.4l replaced it with a single UPDATE on
+`deletedAtMillis` only). The cycle adds tests that pin the
+ACTUAL behavior (the column IS preserved) and updates the
+stale comment to reflect v1.4l. **Reusable pattern:** when
+documenting "TODO" or "follow-up" in a comment, ALWAYS cross-
+check the comment against the current production code — the
+comment may be older than the fix that resolved it.
+
+#### Lesson 3 — The `builtInOnly` short-circuit is the idempotency contract
+
+`TemplateLibrary.seedBuiltIns(...)` calls
+`repo.listAll(builtInOnly: true)` first. If any built-in
+exists, the function returns 0 (no-op). This means the
+function is idempotent on ANY subset of built-ins present —
+the user wiping the library via a future flow (currently no
+such flow exists, but the contract is in place) would NOT
+re-seed the full library if even one built-in survived.
+**Reusable pattern:** idempotency tests should assert "first
+call inserts N, second call inserts 0" — but ALSO assert
+that pre-existing user-saved rows are NOT clobbered by the
+re-seed (the cycle's "main() step 1a populates the templates
+table even when the restore flow has already populated
+user-saved rows" test covers this).
+
+#### Lesson 4 — The seed-into-empty-Drift invariant is worth pinning
+
+The cycle pins "first call inserts 25 rows" with an explicit
+"initial `listAll()` returns empty" pre-condition. This
+catches a future regression where a refactor accidentally
+populates the table via the migration path (instead of the
+init path) — the empty-Drift pre-condition would fail because
+the table is already populated. **Reusable pattern:** for any
+seed path, the test should pre-condition with `expect(initial,
+isEmpty)` so a future regression that moves the seed to a
+different path fails loudly here.
+
+### Status
+
+Accepted. The 8 tests land in v1.6-κ (PR #77, squash-merged).
+3 production-code edits were comment-only (no behavior change).
+1773 tests passing (1765 → 1773, +8 net). APK SHA1 stays at
+H's `25bb7fab` (no release rebuild, no Kotlin changes, no
+`<uses-permission>` changes).
+
+**SYS-IDs affected:** SYS-155 (new).
+**Cross-references:** SYS-155; ADR-086; WF-083; Milestone 14 `### v1.6-κ`; v1.6-κ row; CHANGELOG `## v1.6-κ`; feature.md cycle entry.

@@ -725,4 +725,126 @@ void main() {
       expect(active.map((d) => d.id), <String>['h-active']);
     });
   });
+
+  // ---- v1.6-κ / SYS-155 / ADR-086 / WF-083 ----
+  // The v1.4l restore path is a single UPDATE that ONLY
+  // touches `deletedAtMillis`, so `automationsJson` is
+  // preserved by construction (Drift's UPDATE-without-column
+  // semantics leave the existing column value alone). These
+  // 3 tests pin that contract so a future change to
+  // `restoreById` cannot silently drop the user's routines.
+  group('DoRepository automations survive restoreById (v1.6-κ)', () {
+    test(
+      'automations_survive_a_full_soft_delete_then_restore_round_trip (v1.6-κ)',
+      () async {
+        // Arrange — save a do with a single automation,
+        // soft-delete, then restore.
+        final original = _do(
+          id: 'h1',
+          name: 'With automation',
+          automations: _twoAutomations(),
+        );
+        await DoRepository.instance.save(original);
+
+        // Act.
+        await DoRepository.instance.softDeleteById(
+          'h1',
+          at: DateTime(2026, 6, 27),
+        );
+        final restored = await DoRepository.instance.restoreById('h1');
+
+        // Assert — restore succeeded AND automations
+        // round-trip back through the active `getById` path.
+        expect(restored, isTrue);
+        final afterRestore = await DoRepository.instance.getActiveById('h1');
+        expect(afterRestore, isNotNull);
+        expect(afterRestore!.automations, original.automations);
+        expect(afterRestore.automations.length, 2);
+      },
+    );
+
+    test('automations_chain_with_multiple_automation_types_survives_restore '
+        '(v1.6-κ)', () async {
+      // Arrange — use both TriggerBatteryLow and
+      // TriggerTimeOfDay (the `_twoAutomations()` helper) so
+      // the codec's discriminator handling is exercised
+      // across the round-trip.
+      final original = _do(
+        id: 'h-multi',
+        name: 'Multi-trigger',
+        automations: _twoAutomations(),
+      );
+      await DoRepository.instance.save(original);
+      await DoRepository.instance.softDeleteById(
+        'h-multi',
+        at: DateTime(2026, 6, 27),
+      );
+
+      // Act.
+      final restored = await DoRepository.instance.restoreById('h-multi');
+
+      // Assert — both automations survive with their
+      // discriminator types intact.
+      expect(restored, isTrue);
+      final after = await DoRepository.instance.getActiveById('h-multi');
+      expect(after, isNotNull);
+      expect(after!.automations.length, 2);
+      expect(
+        after.automations[0].trigger,
+        const TriggerBatteryLow(20),
+        reason:
+            'The first automation must keep its '
+            'TriggerBatteryLow discriminator post-restore.',
+      );
+      expect(
+        after.automations[1].trigger,
+        const TriggerTimeOfDay(hour: 7, minute: 30),
+        reason:
+            'The second automation must keep its '
+            'TriggerTimeOfDay discriminator post-restore.',
+      );
+    });
+
+    test(
+      'restoreById_does_not_change_automationsJson_column (v1.6-κ)',
+      () async {
+        // Arrange — save with a known automations list, then
+        // directly inspect the column before soft-delete and
+        // after restore to pin that the column value is
+        // bit-identical (the drift column stores the
+        // JSON-encoded list; a write-through with the same
+        // payload yields the same string).
+        final payload = _twoAutomations();
+        await DoRepository.instance.save(
+          _do(id: 'h-col', name: 'Column-pin', automations: payload),
+        );
+
+        final db = AppDatabaseService.instance.db;
+        Future<String?> readAutomationsJson() async {
+          final row = await (db.select(
+            db.habits,
+          )..where((t) => t.id.equals('h-col'))).getSingleOrNull();
+          return row?.automationsJson;
+        }
+
+        final before = await readAutomationsJson();
+        expect(before, isNotNull);
+        expect(before, isNotEmpty);
+
+        // Act.
+        await DoRepository.instance.softDeleteById(
+          'h-col',
+          at: DateTime(2026, 6, 27),
+        );
+        final restored = await DoRepository.instance.restoreById('h-col');
+        final after = await readAutomationsJson();
+
+        // Assert — the column value is unchanged across the
+        // soft-delete + restore round-trip (Drift's UPDATE-
+        // without-column semantics leave the column alone).
+        expect(restored, isTrue);
+        expect(after, before);
+      },
+    );
+  });
 }
