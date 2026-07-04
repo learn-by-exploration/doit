@@ -7650,3 +7650,143 @@ H's `25bb7fab` (no release rebuild, no Kotlin changes, no
 
 **SYS-IDs affected:** SYS-155 (new).
 **Cross-references:** SYS-155; ADR-086; WF-083; Milestone 14 `### v1.6-κ`; v1.6-κ row; CHANGELOG `## v1.6-κ`; feature.md cycle entry.
+
+## ADR-087 — v1.6 milestone CLOSEOUT — 13 cycles shipped, doc-only cycle λ
+
+### Context
+
+The v1.6 milestone is the second-largest tests-only + 2-bug-fix
+campaign in the project's history (the v1.5 milestone was the
+first). The 13-cycle roadmap was locked at `~/.claude/plans/
+here-now-i-hvae-enumerated-reddy.md` on 2026-07-02 and the
+user pre-authorized all workflow perms via the v1.6 11-cycle
+pre-auth.
+
+This ADR closes out the v1.6 milestone. Cycle 13 (v1.6-λ) is
+the doc-cleanups cycle (PR #78) that updates the stale header
+date in `implementation_status.md` and appends the v1.6
+closeout note to `feature.md`. **No production-code change in
+v1.6-λ.** **No Kotlin change anywhere across v1.6.**
+
+### Decision
+
+The v1.6 milestone is **CLOSED** after 13 cycles (v1.5 ε +
+chain + v1.6 α..λ). End-state:
+
+- **Tests:** 1623 → **1773** (+150 net across 13 cycles).
+- **Coverage:** ~67.4% → **~72.5%** line coverage (~+5.1 pp).
+- **APK SHA1:** stays at H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`
+  (no Kotlin changes, no release rebuilds across all 13 cycles).
+- **V-Model artifact IDs:** SYS-144..SYS-156 (13 IDs),
+  ADR-075..ADR-087 (13 IDs), WF-072..WF-084 (13 IDs).
+- **No new `<uses-permission>`, no new pubspec deps, no Drift
+  migration, no Kotlin changes** — across all 13 cycles.
+
+### Per-cycle reconciliation (plan vs actual)
+
+| # | Cycle | PR | Plan target | Actual | Delta | Notes |
+|---|---|---|---|---:|---:|---|
+| 1 | v1.5-cyc-ε | #66 | +14 | +14 | 0 | Exact |
+| 2 | v1.5-cyc-chain | #67 | +12 | +13 | +1 | Drive-by viewport fix |
+| 3 | v1.6-α | #68 | 0 net | 0 net | 0 | BUG-021 fix (1 hoist + 2 flips) |
+| 4 | v1.6-β | #69 | +20 | +14 | −6 | 2 structural infeasibilities |
+| 5 | v1.6-γ | #70 | +8 | +16 | +8 | Over-deliver (form simpler than plan) |
+| 6 | v1.6-δ | #71 | +14 | +14 | 0 | Exact |
+| 7 | v1.6-ε | #72 | +14 | +19 | +5 | Over-deliver (per-leaf validation) |
+| 8 | v1.6-ζ | #73 | +14 | +14 | 0 | Exact |
+| 9 | v1.6-η | #74 | +10 | +10 | 0 | Exact |
+| 10 | v1.6-θ | #75 | +10 | +10 | 0 | Exact |
+| 11 | v1.6-ι | #76 | +18 | +18 | 0 | Exact |
+| 12 | v1.6-κ | #77 | +8 | +8 | 0 | Exact (both bugs were docs) |
+| 13 | v1.6-λ | #78 | 0 | 0 | 0 | Exact (doc-only closeout) |
+| | **Total** | | **+142** | **+150** | **+8** | **Overshoot driven by γ + ε** |
+
+### Lessons (from the 13-cycle campaign)
+
+#### Lesson 1 — Tests-only + 2-bug-fix is the canonical closeout pattern
+
+The v1.5 + v1.6 milestones are the two highest-fidelity
+examples of a tests-only + small-bug-fix closeout in the
+project's history. **v1.5 = +103 tests in 6 cycles; v1.6 =
++150 tests in 13 cycles.** Both milestones shipped with only
+1-2 Dart-side bug fixes (v1.5 = 0; v1.6 = BUG-021 hoist +
+v1.6-κ documentation-bug comments only). **Reusable pattern:**
+when planning a coverage-closure milestone, default to tests-
+only + 1-2 small bug fixes per ~10-cycle window. Avoid
+bundling Kotlin-paired work, manifest changes, or DB migrations
+into the same milestone — those should be their own dedicated
+PRs (per CLAUDE.md "A migration is its own PR").
+
+#### Lesson 2 — APK SHA1 stability is achievable across a multi-cycle milestone
+
+The H's `25bb7fab` APK from v1.4-stab-H has held through v1.5
+α..ε + chain + v1.6 α..λ (13 cycles + the 6 v1.5 cycles = 19
+cycles) without a single rebuild. **This is because no cycle
+touched the APK surface**: no Kotlin changes, no Drift
+migration, no `<uses-permission>` changes, no new pubspec
+deps, no production-code behavior change. **Reusable pattern:**
+APK stability is a downstream signal of disciplined scope
+control — when a milestone plans to keep the APK stable,
+the test plan must avoid ALL of: Kotlin changes, manifest
+changes, pubspec changes, Drift migrations. The v1.6 plan
+explicitly affirmed all four "no" items in the pre-auth.
+
+#### Lesson 3 — Plan-vs-actual overshoot is healthy when driven by over-delivery
+
+The +8 overshoot (1623 → 1773 vs plan target 1623 → 1765) was
+NOT a planning failure — it was healthy over-delivery on
+v1.6-γ (+8 over target because add_person form is simpler
+than the master plan assumed) and v1.6-ε (+5 over target
+because the sealed-hierarchy sweep surfaced 5 more reachable
+exception paths). **Reusable pattern:** when a cycle discovers
+MORE reachable paths than the master plan assumed, write the
+extra tests in the same cycle. Don't defer to v2.0 — defer
+would mean re-deriving the cycle context later. Both over-
+deliveries were captured as ADR-079 (γ) + ADR-081 (ε) drift
+lessons.
+
+#### Lesson 4 — Both "bugs" in the functional-bug cycle turned out to be documentation bugs
+
+The v1.6-κ functional-bugs cycle (PR #77) was framed as
+"2 latent production bugs". Investigation revealed BOTH were
+**documentation bugs, not behavior bugs**:
+- `TemplateLibrary.seedBuiltIns(...)` was ALREADY wired into
+  `lib/main.dart:49-55` step 1a (had been since v1.0 Phase B).
+  The 2 stale `/// TODO Phase B PR 2: wire this from main.dart /`
+  comments at `lib/templates/template_library.dart:395` +
+  `lib/services/db/migrations/v2_to_v3.dart:24` referenced the
+  wiring as if it were still outstanding.
+- `restoreById` ALREADY preserves `automationsJson` by
+  construction (it's a single Drift UPDATE on `deletedAtMillis`
+  only). The stale comment at
+  `lib/screens/home_tile_delete.dart:75` referenced a v1.4h
+  `_toRow` path that no longer exists.
+
+**Reusable pattern:** before scheduling a production-code fix
+discovered via in-code TODO scan, ALWAYS verify the wiring
+exists via `grep` on call sites. Both bugs were retired as
+comment-only edits in v1.6-κ. ADR-086 captures the 5 drift
+lessons.
+
+#### Lesson 5 — The 13-cycle roadmap is the canonical example of "tests-only + 2 fixes + docs"
+
+The v1.6 milestone is now the highest-fidelity tests-only +
+2-bug-fix closeout in the project's history. The next milestone
+(v1.7 or v2.0) should follow the same template: tests-only
+coverage closure + 1-2 small bug fixes + 1 doc-cleanup cycle.
+**The locked 13-cycle roadmap in `~/.claude/plans/...` is the
+template for future milestones.**
+
+### Status
+
+Accepted. The v1.6 milestone is **CLOSED** at the v1.6-λ
+tip (PR #78). v1.6-λ is doc-only (no production-code change,
+no test change). 1773 tests passing (unchanged from v1.6-κ's
+1773). APK SHA1 stays at H's `25bb7fab` (no release rebuild).
+
+**SYS-IDs affected:** SYS-156 (new); SYS-144..SYS-155
+(implicit, from v1.5 ε + chain + v1.6 α..κ cycles).
+**Cross-references:** SYS-156; ADR-087; WF-084; Milestone 14
+`### v1.6-λ`; v1.6-λ row; CHANGELOG `## v1.6-λ`; feature.md
+cycle entry + v1.6 closeout note; the 13-cycle locked roadmap
+at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`.
