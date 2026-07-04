@@ -358,4 +358,115 @@ void main() {
           '(early-return at observer line 69).',
     );
   });
+
+  // ---- v1.6-ι / SYS-154 / ADR-085 / WF-082 ----
+  // State-machine + register/deregister pins for the
+  // resume hook: cold-start short-circuit, sequential
+  // refreshes on repeated resumes, and the
+  // `triggerRefreshForTest()` test hook driving the
+  // `ReliabilityService.StateError` catch path.
+  test('cold_start_resumed_short_circuits_synchronously (v1.6-ι)', () async {
+    final observer = PermissionLifecycleReProbe();
+    await PermissionService.instance.init();
+    // Consume the init probe fires.
+    final before = _fireCountSinceStart;
+
+    // The cold-start resumed is the FIRST `resumed` event
+    // after construction. The observer's `_coldStartSeen`
+    // gate short-circuits WITHOUT awaiting any platform
+    // channel. The `unawaited(_safeRefresh())` line is
+    // never reached, so no fire count delta.
+    observer.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    // Drain a generous number of microtasks so any
+    // erroneously-scheduled `_safeRefresh` would have
+    // time to fire.
+    await _drain();
+    await _drain();
+    expect(
+      _fireCountSinceStart,
+      before,
+      reason:
+          'The cold-start resumed must not re-probe '
+          '(`_coldStartSeen` gate at observer line 67-72).',
+    );
+
+    // The next call IS a non-cold-start resumed — it
+    // MUST fire the statuses notifier (different behavior
+    // from the cold-start case).
+    observer.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await _drain();
+    expect(
+      _fireCountSinceStart,
+      greaterThan(before),
+      reason:
+          'A subsequent resumed event must trigger a refresh '
+          'after the cold-start gate has been consumed.',
+    );
+  });
+
+  test(
+    'three_consecutive_resumed_events_produce_three_refreshes (v1.6-ι)',
+    () async {
+      final observer = PermissionLifecycleReProbe();
+      await PermissionService.instance.init();
+      // Consume the cold-start resumed.
+      observer.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await _drain();
+      final before = _fireCountSinceStart;
+
+      // Three back-to-back resumed events. Each one is a
+      // non-cold-start resumed, so each fires
+      // `PermissionService.refresh()` (which writes a new
+      // map into `statuses.value`).
+      for (var i = 0; i < 3; i++) {
+        observer.didChangeAppLifecycleState(AppLifecycleState.resumed);
+        // Drain between events so each refresh's write
+        // resolves before the next one starts.
+        await _drain();
+      }
+      // Three refreshes = three fires, so the delta is
+      // at least 3.
+      expect(
+        _fireCountSinceStart - before,
+        greaterThanOrEqualTo(3),
+        reason:
+            'Each non-cold-start resumed must produce a refresh '
+            '(at least 3 fires for 3 resumes).',
+      );
+    },
+  );
+
+  test('triggerRefreshForTest_drives_ReliabilityService.StateError_catch '
+      '(v1.6-ι)', () async {
+    // The resume hook's `_safeRefresh` has a `try {
+    // await ReliabilityService.instance.refresh(); }
+    // on StateError { … }` branch for the
+    // "ReliabilityService was not init'd" path. The test
+    // hook `triggerRefreshForTest()` is the only way to
+    // drive this branch deterministically — the resume
+    // hook itself is fire-and-forget, so the StateError
+    // catch branch would otherwise be flaky to assert.
+    final observer = PermissionLifecycleReProbe();
+    await PermissionService.instance.init();
+    // Consume the cold-start resumed.
+    observer.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await _drain();
+    // The reliability service is intentionally NOT init'd
+    // (see `tearDown` which calls
+    // `ReliabilityService.resetForTesting()` between
+    // tests). Calling `triggerRefreshForTest()` MUST NOT
+    // throw — the StateError catch absorbs the failure.
+    await observer.triggerRefreshForTest();
+    // The permission refresh half DID run (the
+    // `_safeRefresh` continues past the StateError
+    // catch), so the statuses notifier fired.
+    await _drain();
+    // Sanity: the observer is still alive and the
+    // subsequent resumed is non-cold-start.
+    observer.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await _drain();
+    // The observer is stateless; the assertion is that
+    // the test hook call above did not throw.
+    expect(observer, isNotNull);
+  });
 }

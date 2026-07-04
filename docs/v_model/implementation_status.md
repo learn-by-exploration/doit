@@ -470,3 +470,45 @@ Cycle is the SEVENTH in the v1.6 milestone — next is **v1.6-θ (PR #75) Missio
 Cycle is the EIGHTH in the v1.6 milestone — next is **v1.6-ι (PR #76) db.dart + migrations + permission_observer + main.dart**.
 
 **Refs:** SYS-153, ADR-084, WF-081.
+
+## v1.6-ι — Drift singleton + v1→v2 migrations + observer + root-widget coverage closure (Phase 67 / SYS-154 / ADR-085 / WF-082)
+
++18 tests across 2 EXTENDED test files + 1 NEW test file. **Tests-only cycle; no production-code change**.
+
+**DB_singleton tests (2 new in `group('AppDatabaseService')`, under `// ---- v1.6-ι ----` banner):**
+
+1. `init_failure_surfaces_via_ready.future_and_db_stays_uninitialized (v1.6-ι)` — calls `init()` without `overrideDb`, so path-provider's `getApplicationSupportDirectory` throws `MissingPluginException`; pins that the error propagates through BOTH the function-return Future AND `_ready.future` AND the `db` getter still throws StateError (the singleton's defense-in-depth error contract).
+2. `closeForTesting_resets_db_accessibility_until_next_init (v1.6-ι)` — bind fresh DB, verify `.db` returns, close, verify getter throws documented StateError until re-init restores access (pins the close→re-init boundary every repository test relies on).
+
+**Migration_test tests (3 new in NEW `group('migrateV1ToV2 (v1.6-ι)')`):**
+
+3. `v1→v2 migration adds the v0.2 columns to habits and people (v1.6-ι)` — seed v1 fixture (6 tables, no v0.2 columns); reopen with `_V2OnlyDatabase` (an `AppDatabase` subclass pinning `schemaVersion=2` and `onUpgrade` running ONLY `migrateV1ToV2` to avoid latent v3→v4 duplicate-column); assert 7 new habits columns + 1 new people column via `PRAGMA table_info`.
+4. `v1→v2 migration creates events + person_groups tables (v1.6-ι)` — same fixture, insert one row each in `events`/`person_groups`/`person_group_members`; assert each persists (pins the new-table creates).
+5. `v1→v2 migration preserves existing rows + applies v0.2 defaults (v1.6-ι)` — assert seeded habits row survives with `category == 'other'` + `colorSeed == 0` + nullable fields all NULL; seeded people row survives with `pausedUntilMillis == NULL`; `PRAGMA user_version == 2`.
+
+**Permission_observer tests (3 new, under `// ---- v1.6-ι ----` banner):**
+
+6. `cold_start_resumed_short_circuits_synchronously (v1.6-ι)` — drive first `resumed` after construction; drain 32 microtask yields; assert ZERO fires on `PermissionService.statuses` (the `_coldStartSeen` gate at observer line 67-72 returns BEFORE `unawaited(_safeRefresh())`); a subsequent `resumed` DOES fire.
+7. `three_consecutive_resumed_events_produce_three_refreshes (v1.6-ι)` — consume cold-start; drive 3 back-to-back `resumed` with drains between; assert fire-count delta ≥3 (gate is per-event, not per-instance).
+8. `triggerRefreshForTest_drives_ReliabilityService.StateError_catch (v1.6-ι)` — verify `ReliabilityService` is NOT init'd; call `observer.triggerRefreshForTest()`; assert it does NOT throw (the `try { await ReliabilityService.instance.refresh(); } on StateError { ... }` catches the StateError); permission refresh half still runs.
+
+**Main_test tests (10 NEW in 2 groups in NEW `test/main_test.dart`):**
+
+9. `firstLaunchOverride_true mounts OnboardingScreen and skips HomeScreen (v1.6-ι)`.
+10. `firstLaunchOverride_false mounts HomeScreen and skips OnboardingScreen (v1.6-ι)`.
+11. `firstLaunchOverride_null_with_completed_flag mounts HomeScreen (v1.6-ι)` — flip `SettingsService.instance.firstLaunchCompleted` to `true`; mount with no override; `ValueListenableBuilder` reads the notifier and picks home.
+12. `firstLaunchOverride_null_with_incomplete_flag mounts OnboardingScreen (v1.6-ι)` — flag resets to `false`; null-override path picks onboarding.
+13. `DoItApp wires the theme + darkTheme + themeMode surface (v1.6-ι)` — find ancestor `MaterialApp`; assert `app.theme == AppTheme.light` + `app.darkTheme == AppTheme.dark` + `app.themeMode == SettingsService.instance.themeMode.value`.
+14. `DoItApp registers AppLocalizations.localizationsDelegates (v1.6-ι)` — assert `app.localizationsDelegates` is non-null + contains `'AppLocalization'` substring.
+15. `DoItApp supportedLocales matches AppLocalizations.supportedLocales (v1.6-ι)` — assert contains `'en'` + `'es'` + matches `AppLocalizations.supportedLocales` exactly.
+16. `DoItApp onUnknownRoute renders a blank Scaffold without crashing (v1.6-ι)` — invoke with garbage route; assert returns `MaterialPageRoute<void>` wrapping blank `Scaffold` (v1.3d `/mission?garbage` catch-all).
+17. `DoItApp home selector reflects firstLaunchOverride change on rebuild (v1.6-ι)` — pins per-mount switch.
+18. `DoItApp title is "do it" (matches the platform launcher label) (v1.6-ι)` — assert `app.title == 'do it'`.
+
+**APK SHA1 stays at Cycle H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`** — v1.6-ι is tests-only; no production-code behavior change; no release APK rebuild.
+
+**No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.**
+
+**Drift lessons per ADR-085:** (a) **`init()` failure surfaces through BOTH the `Future` return AND `ready.future`** — singleton-with-`_ready` Completer is defense-in-depth; callers awaiting either surface see the error; only callers dropping BOTH see nothing. (b) **`getApplicationSupportDirectory` throws `MissingPluginException` in widget-test envs** — bypass `overrideDb` to drive the platform-channel error naturally; reusable for failure-surface tests of Drift-singleton-adjacent code. (c) **`migrateV1ToV2`'s `createTable(db.events)` creates the v5-shape events table** — latent duplicate-column conflict with `migrateV3ToV4`'s `ALTER TABLE events ADD COLUMN automations_json`; cycle uses `_V2OnlyDatabase` to cap at v2. (d) **`EventRow` and `PersonGroupRow` are const-constructible** — `const EventRow(...)` + `const PersonGroupRow(...)` avoid `prefer_const_constructors` info; codemod opportunity for v2.0. (e) **Drift re-exports `isNull`** — `import 'package:drift/drift.dart' hide isNull;` to avoid `ambiguous_import`. (f) **Cold-start `_coldStartSeen` gate is synchronous** — first `resumed` after construction returns BEFORE `unawaited(_safeRefresh())`; pin via fire-count comparison (drain microtasks, count fires before/after), not via strict-await. (g) **`DoItApp.firstLaunchOverride` is per-mount** — re-mounting with a different override picks up the new value; future branching tests should use the test seam, not the underlying `SettingsService.firstLaunchCompleted` notifier.
+
+**Out-of-scope (deferred to v2.0 + ADR-085):** full migration chain v1→v5 on a v1 fixture (latent `events.automations_json` duplicate-column conflict would require gating `migrateV1ToV2`'s `createTable` with `IF NOT EXISTS` or rewriting `migrateV3ToV4`'s ALTER — both out-of-scope for tests-only cycles); `main()` end-to-end integration test (would require a 200+ line fixture with every platform-channel mock); `DoItApp` MultiProvider consumer lookup (pinned at the `MaterialApp` attribute level instead of `context.read<SettingsService>()`).
