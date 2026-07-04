@@ -392,8 +392,9 @@ class TemplateLibrary {
   /// in the app-init path so the user can wipe the library
   /// without touching the migration history.
   ///
-  /// TODO Phase B PR 2: wire this from `main.dart` /
-  /// `AppDatabaseService.init()`.
+  /// Wired into `main.dart` step 1a (after the v1.6-κ /
+  /// SYS-155 / ADR-086 cleanup that closed the stale
+  /// `Phase B PR 2` TODO that originally lived here).
   static Future<int> seedBuiltIns(TemplateImportRepository repo) async {
     final existing = await repo.listAll(builtInOnly: true);
     if (existing.isNotEmpty) return 0;

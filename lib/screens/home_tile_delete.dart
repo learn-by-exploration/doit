@@ -71,10 +71,15 @@ Future<bool> softDeleteDo({
 /// triggered `DuplicateDoName` if the user had created a
 /// new do with the same name in the SnackBar window, and
 /// the row recreation lost the user's `automations` (a
-/// separate latent bug — the `_toRow` mapping does not
-/// write `automationsJson`, tracked for a v1.4l+ follow-up).
-/// The v1.4l restore path is a single UPDATE so neither
-/// failure mode applies.
+/// separate latent bug — `_toRow` did not write
+/// `automationsJson` at the time). The v1.4l restore path
+/// is a single UPDATE that ONLY touches `deletedAtMillis`,
+/// so the `automationsJson` column is preserved by
+/// construction (the column is not in the UPDATE's set
+/// list — Drift's UPDATE-without-column semantics leave
+/// the existing column value alone). v1.6-κ / SYS-155 /
+/// ADR-086 closed the latent bug by retiring the obsolete
+/// `_toRow` reference in this comment.
 ///
 /// Pure-Dart, no Flutter import.
 Future<bool> restoreDo({
