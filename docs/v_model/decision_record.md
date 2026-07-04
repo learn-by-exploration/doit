@@ -7451,3 +7451,69 @@ Kotlin changes). APK SHA1 stays at Cycle H's `25bb7fab` (no release rebuild).
 
 **SYS-IDs affected:** SYS-153 (new).
 **Cross-references:** SYS-153; ADR-084; WF-081; Milestone 14 `### v1.6-θ`; v1.6-θ row; CHANGELOG `## v1.6-θ`; feature.md cycle entry.
+
+## ADR-085 — Drift singleton state-after-failure + v1→v2 migrations + observer + root-widget coverage (v1.6-ι / Phase 67 / SYS-154 / WF-082)
+
+### Context
+
+The ninth cycle of the v1.6 milestone — closes coverage gaps on 4 critical-path modules:
+
+- `lib/services/db.dart` — the Drift singleton's state-after-failure paths (the `init()` propagation contract AND the `closeForTesting()` → getter-`StateError` boundary)
+- `lib/services/db/migrations/v1_to_v2.dart` — the v0.2 foundation column-add + new-table creates + existing-row preservation semantics
+- `lib/services/permission_lifecycle_observer.dart` — the cold-start `_coldStartSeen` synchronous gate + sequential refreshes on resumed events + the `triggerRefreshForTest` test hook driving the `ReliabilityService.StateError` catch
+- `lib/main.dart` `DoItApp` — the first-launch gate (`firstLaunchOverride: true/false/null`) + MultiProvider + theme + `AppLocalizations` delegate + supportedLocales + `onUnknownRoute` + title
+
+**No production-code change.** Test-only cycle.
+
+### Drift lessons
+
+#### Lesson 1 — `init()` failure surfaces through BOTH the `Future` return AND `ready.future`
+
+The singleton's `_ready` Completer at `lib/services/db.dart:50` is completed with the error AND the function `rethrows` at `lib/services/db.dart:73-75`. A caller that drops the function return (e.g., `unawaited(init())`) would still see the error via the awaited `ready.future`. The reverse contract — a caller that awaits `ready.future` but drops the function return — also gets the error. The only surface that fails to see the error is a caller that drops BOTH (e.g., `unawaited(init()); unawaited(ready.future);`). The cycle's failure-path test drives the contract deterministically by clearing the singleton state and calling `init()` without an `overrideDb` (so the path-provider `getApplicationSupportDirectory` call throws `MissingPluginException`); the test then asserts `caught != null` (function-return path) AND `readyError != null` (completer-future path) AND `db` getter throws StateError.
+
+**Reusable pattern:** future tests of any singleton-with-`_ready` completer MUST assert error propagation through BOTH surfaces, not just one — otherwise a future refactor that drops one path would silently break the caller that depended on it.
+
+#### Lesson 2 — `getApplicationSupportDirectory` throws `MissingPluginException` in widget-test environments
+
+Without `tester.runAsync` + a path_provider mock, the platform-channel call does NOT advance on the fake-async microtask queue. The cycle's failure-path test bypasses `overrideDb` to drive the platform-channel error naturally — the path-provider `MissingPluginException` is exactly the production failure mode the singleton's defensive code has to tolerate. The `overrideDb` happy-path seam (the API the rest of the codebase uses) is orthogonal to the platform-channel seam (the one this test exercises).
+
+**Reusable pattern:** any future test that targets the failure surface of a service-using-Drift singleton should bypass `overrideDb` and let the platform channel throw naturally. `flutter_test`'s fake-async zone WILL NOT auto-resolve `getApplicationSupportDirectory`, so the throw propagates synchronously to the catch.
+
+#### Lesson 3 — `migrateV1ToV2`'s `createTable(db.events)` creates the v5-shape events table
+
+At `lib/services/db/migrations/v1_to_v2.dart:1-30`, the migration's `m.createTable(db.events)` creates Drift's GENERATED schema for the events table at v1 — which includes the `automations_json` column because Drift's code-generation emits the LATEST schema version, not the v1 schema. So a full migration chain v1→v5 on a v1 fixture would conflict with `migrateV3ToV4`'s `ALTER TABLE events ADD COLUMN automations_json` (the v3→v4 migration ALSO tries to add `automations_json`).
+
+The v1.6-ι test uses a `_V2OnlyDatabase` subclass that caps `schemaVersion` at 2 and runs ONLY `migrateV1ToV2` to avoid the latent duplicate-column conflict. This caps the migration step at v1→v2; the v2→v5 chain (with all the column adds in between) is implicitly out-of-scope for this cycle.
+
+**Latent production bug (not introduced by this cycle):** The full v1→v5 migration chain on a fresh v1 fixture would currently fail at v3→v4 because `migrateV1ToV2` already created `events.automations_json` via `m.createTable`. The bug is latent because no v1 fixtures exist in production (everyone's on v5). Recommended v2.0 fix: gate `migrateV1ToV2`'s `createTable` calls with `IF NOT EXISTS` (idempotent), OR replace `migrateV3ToV4`'s ALTER with a check-then-add that no-ops if the column already exists. Documented as future-cycle work in the out-of-scope section below; this cycle does not touch the migration production code.
+
+#### Lesson 4 — `EventRow` and `PersonGroupRow` are const-constructible
+
+The Drift-generated row classes expose `const` constructors; `const EventRow(...)` and `const PersonGroupRow(...)` work without `runtimeConst` warnings. The cycle's migration test originally used `EventRow(...)` and `PersonGroupRow(...)` (non-const calls) which triggered 2 `prefer_const_constructors` lint infos; fix was just adding `const` inline. Same pattern applies to other Drift-generated row classes (`HabitRow`, `PersonRow`, `CompletionRow`, `RestDayBudgetRow`, `SettingRow`, `EventLogRow`, `TemplateRow`, `PersonGroupMemberRow`).
+
+**Reusable pattern:** in Drift-generated row-class instantiation, ALWAYS prefer `const RowName(...)` if the row will not be mutated and has no side-effecting constructor args. Codemod opportunity for v2.0: bulk-flag the existing test fixtures as `const` to drop the lint infos.
+
+#### Lesson 5 — `Drift` re-exports `isNull`
+
+`import 'package:drift/drift.dart';` shadows the matcher package's `isNull`. The cycle's migration test originally imported `package:drift/drift.dart` with the bare namespace and got `ambiguous_import` errors when also importing `package:flutter_test/flutter_test.dart` (which re-exports `package:matcher/matcher.dart` which exports `isNull`). Fix: `import 'package:drift/drift.dart' hide isNull;`.
+
+**Reusable pattern:** any test that imports BOTH `drift/drift.dart` AND `flutter_test/flutter_test.dart` and uses `isNull` MUST add `hide isNull` to the drift import. The signature is the same (function form `Object? value` returning a matcher) so the hide is safe.
+
+#### Lesson 6 — The cold-start `_coldStartSeen` gate is the FAST path
+
+At `permission_lifecycle_observer.dart:67-72`, the very first `resumed` event after construction (the OS bringing the app to the foreground after a cold launch, when `init()` already probed) returns BEFORE `unawaited(_safeRefresh())` — no microtask is scheduled, no platform channel is awaited. The cycle pins this by counting `PermissionService.statuses` fires after a single `resumed` call: zero fires, despite draining 32 microtask yields. A subsequent resumed event DOES fire (`_coldStartSeen` was already consumed by the first call).
+
+**Reusable pattern:** when testing "fast path" branches in `WidgetsBindingObserver` callbacks (which can be reached both synchronously and asynchronously), use the COUNTER approach (drain microtasks, count fires before/after) rather than the strict-await approach (which is structurally unable to prove the absence of a scheduled microtask).
+
+#### Lesson 7 — `DoItApp.firstLaunchOverride` is a per-mount switch, not a singleton
+
+`firstLaunchOverride` is a `DoItApp` constructor parameter, not a `SettingsService` field. Each `pumpWidget(const DoItApp(firstLaunchOverride: ...))` call constructs a fresh `DoItApp` and reads the new value. A `ValueListenableBuilder` around `SettingsService.instance.firstLaunchCompleted` covers the `firstLaunchOverride == null` path (re-mount with same override + flipped `firstLaunchCompleted` toggles which screen appears). The cycle's rebuild test pins this contract: re-mounting with `firstLaunchOverride: false` after an initial `firstLaunchOverride: true` mount immediately switches from OnboardingScreen to HomeScreen without a hot-reload or app restart.
+
+**Reusable pattern:** future tests that target `DoItApp`'s branching must use the test seam (the `firstLaunchOverride` constructor parameter), not the underlying `SettingsService.instance.firstLaunchCompleted` notifier (which requires a separate state-flip per test and is race-prone across the suite).
+
+### Status
+
+Accepted. All 18 tests land in v1.6-ι (PR #76, squash-merged). The cycle ships at 1765/1765 tests passing (per the 3-gate; the 1 fail in `test/perf/widget_rebuild_test.dart` is a pre-existing perf-budget flake unrelated to v1.6-ι). No production-code changes (no new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes). APK SHA1 stays at Cycle H's `25bb7fab` (no release rebuild).
+
+**SYS-IDs affected:** SYS-154 (new).
+**Cross-references:** SYS-154; ADR-085; WF-082; Milestone 14 `### v1.6-ι`; v1.6-ι row; CHANGELOG `## v1.6-ι`; feature.md cycle entry.

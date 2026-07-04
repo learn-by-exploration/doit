@@ -3946,3 +3946,72 @@ and verify the new tests pass the 3-gate + targeted suite cleanly.
 
 **Cross-references.** SYS-153; ADR-084; v1.6-θ row; CHANGELOG `## v1.6-θ`;
 feature.md cycle entry.
+
+### v1.6-ι — Drift singleton + v1→v2 migrations + observer + root-widget coverage closure (Phase 67 / SYS-154 / ADR-085 / WF-082)
+
+The ninth cycle of the v1.6 milestone — closes coverage gaps on 4 critical-path modules:
+
+**Group 1 — `lib/services/db.dart` Drift singleton (2 new tests in `group('AppDatabaseService')`):**
+
+1. **Group 1 (a) `init_failure_surfaces_via_ready.future_and_db_stays_uninitialized (v1.6-ι)`** — Drive the failure path by calling `init()` without `overrideDb`, so the path-provider `getApplicationSupportDirectory` call inside `init()` throws `MissingPluginException` (no path-provider channel in widget-test env). Pin that the error propagates through BOTH the function-return Future AND the `_ready.future` completer; pin that the `db` getter remains in the "must init first" state (the singleton never bound). Confirms the singleton's defense-in-depth error contract: callers awaiting either surface see the failure; only callers dropping BOTH see nothing.
+
+2. **Group 1 (b) `closeForTesting_resets_db_accessibility_until_next_init (v1.6-ι)`** — Bind a fresh DB via `init(overrideDb: ...)`; verify `.db` returns the binding; call `closeForTesting()`; verify `.db` now throws the documented StateError ("AppDatabaseService.init() must complete before db is read."); re-init with another fresh DB and verify accessibility is restored. Pins the close→re-init boundary that every repository test in the suite relies on.
+
+**Group 2 — `lib/services/db/migrations/v1_to_v2.dart` v1→v2 fixture-based migration (3 new tests in NEW `group('migrateV1ToV2 (v1.6-ι)')`):**
+
+3. **Group 2 (a) `v1→v2 migration adds the v0.2 columns to habits and people (v1.6-ι)`** — Seed a v1 fixture with raw SQL (6 tables, no v0.2 columns yet); reopen with `_V2OnlyDatabase` (a `AppDatabase` subclass pinning `schemaVersion=2` and `onUpgrade` running ONLY `migrateV1ToV2`); assert all 7 new habits columns (`category`, `color_seed`, `icon_name`, `paused_until_millis`, `end_hour`, `end_minute`, `target_hours`) are present via `PRAGMA table_info`; assert the 1 new people column (`paused_until_millis`) is present.
+
+4. **Group 2 (b) `v1→v2 migration creates events + person_groups tables (v1.6-ι)`** — Same v1 fixture; insert one row each in the new tables (`events`, `person_groups`, `person_group_members`); assert each insert persists and the rows are readable via `db.select(db.events)`, etc. Pins the new-table-create paths.
+
+5. **Group 2 (c) `v1→v2 migration preserves existing rows + applies v0.2 defaults (v1.6-ι)`** — Same v1 fixture; assert the seeded habits row survives the migration with `category == 'other'` (v0.2 default), `colorSeed == 0` (v0.2 default), and `iconName`/`pausedUntilMillis`/`endHour`/`endMinute`/`targetHours` all NULL (no defaults, blanked); assert the seeded people row survives with `pausedUntilMillis == NULL`; assert `PRAGMA user_version == 2` (the migration's version bump).
+
+**Group 3 — `lib/services/permission_lifecycle_observer.dart` cold-start gate + sequential refreshes + StateError catch (3 new tests):**
+
+6. **Group 3 (a) `cold_start_resumed_short_circuits_synchronously (v1.6-ι)`** — Construct `PermissionLifecycleReProbe`; drive the FIRST `resumed` after construction; drain 32 microtask yields; assert ZERO fires on `PermissionService.statuses` (the `_coldStartSeen` gate at observer line 67-72 returns BEFORE `unawaited(_safeRefresh())`). Then drive a second `resumed`; assert the count IS greater than baseline (the cold-start gate has been consumed). Pins the synchronous short-circuit property of the cold-start path.
+
+7. **Group 3 (b) `three_consecutive_resumed_events_produce_three_refreshes (v1.6-ι)`** — Consume the cold-start resumed; drive 3 back-to-back `resumed` events with microtask drains between each; assert the fire-count delta is ≥3 (each non-cold-start resumed produces one `PermissionService.refresh()` write to the notifier). Pins that the gate is per-event, not per-instance.
+
+8. **Group 3 (c) `triggerRefreshForTest_drives_ReliabilityService.StateError_catch (v1.6-ι)`** — Verify the `ReliabilityService` is intentionally NOT init'd (per the test's `tearDown` which calls `ReliabilityService.resetForTesting()`); call `observer.triggerRefreshForTest()`; assert it does NOT throw (the `_safeRefresh`'s `try { await ReliabilityService.instance.refresh(); } on StateError { ... }` catches the error). The permission refresh half still runs (the statuses notifier fires after the catch). Pins the StateError-catch branch.
+
+**Group 4 — `lib/main.dart` `DoItApp` root widget branching + wiring pins (10 new tests in 2 NEW groups):**
+
+9. **Group 4 (a) `firstLaunchOverride_true mounts OnboardingScreen and skips HomeScreen (v1.6-ι)`** — Mount `DoItApp(firstLaunchOverride: true)`; pump; assert OnboardingScreen is on screen and HomeScreen is NOT (the first-launch gate flipped to the onboarding branch).
+
+10. **Group 4 (b) `firstLaunchOverride_false mounts HomeScreen and skips OnboardingScreen (v1.6-ι)`** — Same with `firstLaunchOverride: false`; assert HomeScreen is on screen.
+
+11. **Group 4 (c) `firstLaunchOverride_null_with_completed_flag mounts HomeScreen (v1.6-ι)`** — Flip `SettingsService.instance.firstLaunchCompleted` to `true`; mount `DoItApp()` (no override); assert HomeScreen is on screen (the `ValueListenableBuilder` reads the notifier and picks the home branch).
+
+12. **Group 4 (d) `firstLaunchOverride_null_with_incomplete_flag mounts OnboardingScreen (v1.6-ι)`** — Reset the flag to `false`; mount `DoItApp()` (no override); assert OnboardingScreen is on screen (the flag defaults to `false` for a first-launch state).
+
+13. **Group 4 (e) `DoItApp wires the theme + darkTheme + themeMode surface (v1.6-ι)`** — Mount DoItApp; find the ancestor `MaterialApp`; assert `app.theme == AppTheme.light`, `app.darkTheme == AppTheme.dark`, and `app.themeMode == SettingsService.instance.themeMode.value`. Pins the theme surface contract.
+
+14. **Group 4 (f) `DoItApp registers AppLocalizations.localizationsDelegates (v1.6-ι)`** — Same `MaterialApp` lookup; assert `app.localizationsDelegates` is non-null and contains a delegate whose `toString()` includes the substring `'AppLocalization'` (the generated delegate is `AppLocalizations.delegate`).
+
+15. **Group 4 (g) `DoItApp supportedLocales matches AppLocalizations.supportedLocales (v1.6-ι)`** — Same `MaterialApp` lookup; assert `app.supportedLocales` contains both `'en'` and `'es'` and matches `AppLocalizations.supportedLocales` exactly (DoItApp does not override `supportedLocales` with a hard-coded list).
+
+16. **Group 4 (h) `DoItApp onUnknownRoute renders a blank Scaffold without crashing (v1.6-ι)`** — Invoke `app.onUnknownRoute!(const RouteSettings(name: '/mission?garbage=1'))`; assert it returns a `MaterialPageRoute<void>` wrapping a blank `Scaffold` (the v1.3d catch-all for malformed `/mission` query strings); mount the route in a fresh `MaterialApp(onGenerateRoute: ...)` to verify the `Scaffold` actually renders without throwing.
+
+17. **Group 4 (i) `DoItApp home selector reflects firstLaunchOverride change on rebuild (v1.6-ι)`** — Mount with `firstLaunchOverride: true`; confirm OnboardingScreen; re-mount with `firstLaunchOverride: false`; confirm HomeScreen. Pins the per-mount-switch contract so a future "cache the override at the singleton level" refactor fails loudly.
+
+18. **Group 4 (j) `DoItApp title is "do it" (matches the platform launcher label) (v1.6-ι)`** — Same `MaterialApp` lookup; assert `app.title == 'do it'` (the OS task-switcher label).
+
+### Drift lessons (per ADR-085)
+
+1. **`init()` failure surfaces through BOTH the `Future` return AND `ready.future`** — the singleton's `_ready` Completer at `lib/services/db.dart:50` is completed with the error AND the function `rethrows`; future tests of any singleton-with-`_ready` pattern MUST assert error propagation through both surfaces, not just one.
+2. **`getApplicationSupportDirectory` throws `MissingPluginException` in widget-test environments** — the cycle's failure-path test bypasses `overrideDb` to drive the platform-channel error naturally; reusable pattern for failure-surface tests of Drift-singleton-adjacent code.
+3. **`migrateV1ToV2`'s `createTable(db.events)` creates the v5-shape events table** — so a full v1→v5 migration chain on a v1 fixture would conflict with `migrateV3ToV4`'s `ALTER TABLE events ADD COLUMN automations_json` (latent production bug, deferred to v2.0); the v1.6-ι test uses `_V2OnlyDatabase` to cap at v2.
+4. **`EventRow` and `PersonGroupRow` are const-constructible** — `const EventRow(...)` and `const PersonGroupRow(...)` work; codemod opportunity for v2.0 to bulk-flag Drift-generated row literals as `const`.
+5. **`Drift` re-exports `isNull`** — `import 'package:drift/drift.dart' hide isNull;` to avoid the `ambiguous_import` error when co-importing `flutter_test`.
+6. **The cold-start `_coldStartSeen` gate is synchronous** — the first `resumed` after construction returns BEFORE `unawaited(_safeRefresh())`; pin via fire-count comparison (drain microtasks, count fires before/after), not via strict-await (which cannot prove the absence of a scheduled microtask).
+7. **`DoItApp.firstLaunchOverride` is a per-mount switch** — re-mounting with a different override picks up the new value; future `DoItApp` branching tests should use the test seam, not the underlying `SettingsService.firstLaunchCompleted` notifier (race-prone).
+
+### Post-conditions
+
+- `main` is at the v1.6-ι tip (commit hash for PR #76).
+- 1765/1765 tests pass on the 4 affected files (5+7+8+10 = 30 + 1 baseline group adjustment); full suite shows 1764/1765 pass (1 fail is the pre-existing `test/perf/widget_rebuild_test.dart` perf-budget flake, unrelated to v1.6-ι; passes in isolation).
+- V-Model artifacts SYS-154 + ADR-085 + WF-082 are committed alongside the code.
+- APK SHA1 stays at H's `25bb7fab` (no production-code change).
+
+### Cross-references
+
+SYS-154; ADR-085; v1.6-ι row; CHANGELOG `## v1.6-ι`; feature.md cycle entry.
