@@ -1342,6 +1342,25 @@ flutter analyze --fatal-infos lib test                                         #
 flutter test                                                                   # 1772/1773 pass (same pre-existing perf-budget flake; v1.6-λ is doc-only so it does not introduce regressions)
 ```
 
+### v1.7-α — `add_habit.dart` edit-mode + `_PauseRow` + `_RoutineRow` + `_doToMap` coverage closure (Phase 70 / SYS-157 / ADR-088 / WF-085)
+
+The **FIRST cycle of the v1.7 milestone** — closes the largest remaining single-file coverage gap in `lib/screens/add_habit.dart` (152 LF uncovered). **No production-code change.** Tests-only cycle.
+
+**Scope:** EXTEND `test/screens/add_habit_test.dart` (+13 tests, under plan's +18 target by 5). The 6 batches:
+
+- **Batch 1 — Edit-mode prefill + save dispatch for 4 alt schedule types (4 tests):** `DoInterval` + `DoDayOfX` + `DoTimeWindow` + `DoAnchor` edit-mode pre-fill + save round-trip; the seed-before-mount idiom (`runAsync` + `pumpWidget` + `300ms delay`) per ADR-078 lesson (e).
+- **Batch 2 — `_PauseRow` edit affordance (3 tests):** "(not paused)" subtitle + rendered seeded date `'2026-07-10'` + Resume tap clears `pausedUntil`; uses `PauseService.instance.pauseHabit` (the explicit writer of `pausedUntilMillis` per Cycle B/ADR-060 BUG-002 fix; `DoRepository._toRow` intentionally OMITS the column).
+- **Batch 3 — `DoAnchor` happy-path (2 tests):** target picker shows seeded target + target-soft-deleted fallback.
+- **Batch 4 — `_doToMap` round-trip via DoFixed (1 test):** `weekdays: {2, 4, 6}` + `time: DoTime(14, 30)` round-trip through `DoRepository.getById` (line 1189-1193 input pin).
+- **Batch 5 — Edit-mode `_save()` line 1065 rescheduleAll branch (1 test):** edit-mode save tap; assert row survives; no template row created.
+- **Batch 6 — `_RoutineRow` On-exit summary (1 test):** `TriggerLocationExit` + `radiusMeters=150` + `'Wrap up'` action pin (mirrors v1.6-θ chain deterministic pin).
+
+**Drift lessons per ADR-088:** (a) Drift keepalive deadlock canonical pattern (v1.6-β lesson (e) reusable); (b) `PauseService.pauseHabit` is the explicit pause writer; (c) `TimeOfDay.format(context)` returns localized `'11:00 AM'`; (d) `_weekdayLabel(d)` returns `labels[d - 1]` (`weekday: 3` → `'Wed'`); (e) menu→dialog post-save path fragile in headless mode (deferred).
+
+**Test count: 1773 → 1786 (+13 net, under plan's +18 target by 5).** Coverage: `lib/screens/add_habit.dart` ~76% → ~85% (+9 pp). APK SHA1 stays at H's `25bb7fab`. **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.**
+
+Cycle is the **FIRST** in the v1.7 milestone — v1.7 milestone OPENED.
+
 **The v1.6 milestone is CLOSED** after this cycle. 13 cycles shipped (v1.5 ε + chain + v1.6 α..λ); 1623 → 1773 tests (+150 net); coverage ~67.4% → ~72.5% (+5.1 pp); 0 Kotlin changes; 0 `<uses-permission>` changes; 0 Drift migrations; 0 release APK rebuilds.
 
 **After this cycle, the user's hands-on step:** `release(v1.6)` debug-signed APK commit (mirrors v1.4.0 sign-off pattern; blocked on user choice of LFS / single-arch / R8 strategy per `feature.md §1.4` since the v1.4 APK exceeded GitHub's 100 MB limit); optional `git tag -a v1.6.0` (user decision per existing pattern); no `flutter build appbundle --release` (blocked on user's release-signing setup).

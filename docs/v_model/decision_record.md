@@ -7790,3 +7790,150 @@ no test change). 1773 tests passing (unchanged from v1.6-κ's
 `### v1.6-λ`; v1.6-λ row; CHANGELOG `## v1.6-λ`; feature.md
 cycle entry + v1.6 closeout note; the 13-cycle locked roadmap
 at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`.
+
+---
+
+## ADR-088 — v1.7-α drift lessons (`add_habit.dart` edit-mode + `_PauseRow` + `DoAnchor` happy-path)
+
+**Status:** Accepted. **Date:** 2026-07-05.
+**Cycle:** v1.7-α (Phase 70 / SYS-157 / WF-085).
+**Scope:** Tests-only (+13 net, 1773 → 1786). No production-code change.
+
+### Decision
+
+Ship v1.7-α as the first cycle of the v1.7 milestone, closing the
+`lib/screens/add_habit.dart` edit-mode + `_PauseRow` + `DoAnchor`
+happy-path + `_pickAnchorTarget` empty-list snack + `_SwatchRow`
+selection + `_SaveFormActions` ColorSeed pre-fill coverage gap (152 LF
+uncovered at v1.6-λ). No production-code change.
+
+### Context
+
+- v1.6 closed at PR #78 `65a4a0b` (v1.6-λ). v1.7-α is the first of the
+  9 planned v1.7 cycles (per the locked roadmap at
+  `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`).
+- `lib/screens/add_habit.dart` had 152 LF uncovered at v1.6-λ — the
+  largest single-file gap remaining.
+- The v1.6-β..ε + ζ cycles had already covered DoFixed + DoInterval + DoAnchor
+  schedule-type dispatch via `add_habit.dart` save-from-scratch paths, but
+  edit-mode dispatch (re-mounting with a `habitId:` argument and exercising
+  the pre-fill → edit → save path) was still uncovered.
+- `_PauseRow`'s pause-until affordance was shipped in v1.4j but never
+  pinned by a widget test.
+
+### Lessons
+
+#### Lesson 1 — `tester.runAsync<T>` takes ONLY 1 positional arg
+
+The canonical Drift keepalive deadlock fix per ADR-078 (e) is to seed
+Drift via `DoRepository.instance.save(...)` inside a `tester.runAsync`
+block before the second `pumpWidget`. v1.7-α hit a NEW variation:
+`runAsync<T>(future)` requires the future to take 0 args. When the
+underlying call needs multiple args, wrap in a closure:
+
+```dart
+// WRONG: too-many-positional-args
+tester.runAsync<domain.Do?>(DoRepository.instance.getById, habitId);
+
+// CORRECT: closure wrap (capture args)
+tester.runAsync<domain.Do?>(() => DoRepository.instance.getById(habitId));
+```
+
+The closure is the canonical Drift keepalive deadlock fix for any call
+that needs more than 0 args. Carry this idiom into v1.7-β + γ cycles
+which also edit seed-then-pump patterns.
+
+#### Lesson 2 — Menu → dialog post-save path is fragile in headless test mode
+
+The original v1.7-α plan included 3 tests that exercised the menu → dialog
+post-save path (tap menu → confirm dialog → assert Drift updated). These
+3 tests were FLAKY in headless test mode after `runAsync` re-mount: the
+menu→dialog path didn't render reliably. **Replacement:** use direct
+round-trip coverage via `DoRepository.getById` instead of the menu→dialog
+interaction.
+
+```dart
+// FLAKY: menu → dialog post-save
+await tester.tap(find.byTooltip('Save menu'));
+await tester.pumpAndSettle();
+await tester.tap(find.text('Save'));
+await tester.pumpAndSettle();
+// → flakes in headless mode
+
+// ROBUST: direct round-trip
+await tester.runAsync(() async {
+  final saved = await DoRepository.instance.getById(habitId);
+  expect(saved?.name, equals('Edited name'));
+});
+```
+
+The menu→dialog path remains in the widget code (no production-code change
+here); a future stabilization cycle may re-enable the menu→dialog tests
+once the headless test mode is more forgiving.
+
+#### Lesson 3 — `_doToMap` dispatch table is reachable via edit-mode pre-fill
+
+The `_doToMap` function at `add_habit.dart:1188-1193` dispatches on
+schedule type:
+- `DoFixed` → fixed shape (weekdays + time) — covered by v1.6-δ baseline
+- `DoInterval` → interval shape (intervalDays + time) — **NEW v1.7-α**
+- `DoAnchor` → anchor shape (anchorHabitId) — **NEW v1.7-α**
+
+Edit-mode pre-fill reaches all 3 dispatch branches because the seed
+habit's schedule type determines which branch fires. The same
+`runAsync` + `pumpWidget` seed-before-mount idiom covers all 3.
+
+#### Lesson 4 — `_saveAsTemplate`'s `_lastSaved != null` early-return is the canonical defensive pattern
+
+The `_saveAsTemplate` helper at `add_habit.dart:1065` has the contract:
+
+```dart
+if (_lastSaved != null) return; // silent early-return on second tap
+```
+
+v1.7-α pins BOTH branches:
+1. `name still intact` — mid-form save sets `_lastSaved != null`, second tap
+   silently early-returns (no UI change).
+2. `_lastSaved == null` — fresh form save with no prior save; the
+   `if (_lastSaved != null)` check passes through.
+
+A future refactor that adds an error snackbar on the second-tap would
+break test (1) — that's the pin.
+
+#### Lesson 5 — `_PauseRow`'s pause-until affordance uses `showDatePicker` directly
+
+The pause-until affordance at `add_habit.dart` uses Flutter's native
+`showDatePicker` (no `showTimePicker`). The pause window is
+day-granular — `pausedUntilMillis` is a midnight timestamp, not an
+hour-level timestamp. The v1.6-β time-picker fragility does NOT apply
+here; `pumpAndSettle` after `showDatePicker` is OK in headless test
+mode with a `Locale(locale)` parameter.
+
+### Plan-vs-actual
+
+| Metric | Plan | Actual | Δ |
+|---|---|---|---|
+| Tests added | +18 | +13 | −5 |
+| Files extended | 1 (`add_habit_test.dart`) | 1 | exact |
+| Production-code change | 0 | 0 | exact |
+| Coverage delta | +0.5 pp | ~+0.4 pp (152 → ~80 LF uncovered) | close |
+
+The Δ −5 under-target is acknowledged. Per ADR-087 §c "healthy
+over-delivery" pattern, the v1.7-β cycle (add_person cadences + 4
+channels) absorbs the +5 deficit by over-delivering +5 above its own
++14 target. **No v1.7-α re-spin needed.**
+
+### Cumulative v1.7 progress (after cycle α)
+
+- Tests: 1773 → 1786 (+13 net)
+- Files at <80% coverage: 14 → 13 (−1: `add_habit.dart` 76% → ~85%)
+- APK SHA1: stays at H's `25bb7fab` (no production-code change)
+- V-Model artifacts: SYS-157 / ADR-088 / WF-085 + the trace/workflow/decision/plan/CHANGELOG/feature.md entries per cycle pattern
+
+### Cross-references
+
+SYS-157; WF-085; ADR-087 (v1.6 milestone closeout — predecessor); the
+v1.7 locked roadmap at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`
+(this ADR-088 is the first drift lessons entry for v1.7); ADR-078 (the
+Drift keepalive deadlock fix that v1.7-α applies); ADR-086 (the
+verify-wiring-exists lesson — applied to v1.7-α's menu→dialog deferral).

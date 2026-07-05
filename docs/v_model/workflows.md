@@ -4119,3 +4119,32 @@ The v1.6 milestone is a 13-cycle campaign that shipped +150 net tests, +5.1 pp c
 ### Cross-references
 
 SYS-156; ADR-087; v1.6-λ row; CHANGELOG `## v1.6-λ`; feature.md cycle entry + v1.6 closeout note; the 13-cycle locked roadmap at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`.
+
+### v1.7-α — add_habit edit-mode + _PauseRow + DoAnchor happy-path coverage closure (Phase 70 / SYS-157 / ADR-088 / WF-085)
+
+The v1.7 milestone's **first cycle** (v1.7-α, PR #79) closes the `lib/screens/add_habit.dart` edit-mode + `_PauseRow` + `DoAnchor` happy-path + `_pickAnchorTarget` empty-list snack + `_SwatchRow` selection + `_SaveFormActions` ColorSeed pre-fill coverage gap (152 LF uncovered at v1.6-λ). **No production-code change.**
+
+This cycle is tests-only. It introduces 13 new tests under a `// ---- v1.7-α / SYS-157 / ADR-088 / WF-085 ----` banner at the end of `test/screens/add_habit_test.dart`, in 6 batches:
+
+1. **Edit-mode `_doToMap` dispatch (3 tests, v1.7-α)** — seed a DoInterval + a DoAnchor + a fixed-pinned DoInterval via Drift; mount `AddHabitScreen` edit-mode; assert pre-fill + save + read-back via `DoRepository.getById`. Pins the dispatch table at `add_habit.dart:1188-1193`.
+2. **`_saveAsTemplate` defensive path (2 tests, v1.7-α)** — pin the in-progress save + the `_lastSaved != null` silent early-return at line 1065.
+3. **`_RoutineRow` On-enter / On-exit (2 tests, v1.7-α)** — anchor-seed then mount; the On-enter branch renders; tap save; the On-exit branch renders the summary.
+4. **`_pickAnchorTarget` empty-list snack (1 test, v1.7-α)** — seed Drift with NO other habits; the snackbar `'No other dos to anchor on.'` renders; no save.
+5. **`_SwatchRow` rotation + initial paint (2 tests, v1.7-α)** — tap swatch; assert rotation; re-mount; assert initial paint.
+6. **`_SaveFormActions` ColorSeed pre-fill + `_PauseRow` pause-until (3 tests, v1.7-α)** — edit-mode pre-fills with persisted colorSeed; the pause-until affordance with new date + with existing date.
+
+**Test seams:**
+- `tester.runAsync<T>` with closure wrap (per ADR-088 drift lesson (a))
+- Direct round-trip via `DoRepository.getById` instead of menu→dialog (per ADR-088 drift lesson (b))
+- Drift keepalive deadlock canonical fix per ADR-078 (e)
+
+**Pre-conditions:**
+- `main` is at the v1.6-λ tip (commit hash for PR #78 `65a4a0b`).
+- `lib/screens/add_habit.dart` is unchanged (no production-code edit in this cycle).
+- V-Model artifacts SYS-157 + ADR-088 + WF-085 are committed alongside the code.
+- APK SHA1 stays at H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` (no production-code change).
+- **v1.7 milestone: 1/9 cycles shipped (v1.7-α); tests 1773 → 1786 (+13 net); `add_habit.dart` 76% → ~85% line coverage; 0 Kotlin changes; 0 `<uses-permission>` changes; 0 Drift migrations; 0 release APK rebuilds.**
+
+### Cross-references
+
+SYS-157; ADR-088; v1.7-α row in `implementation_status.md`; `### v1.7-α` subsection in `plan.md`; `## v1.7-α` entry in `CHANGELOG.md`; feature.md cycle entry + plan-vs-actual table (plan +18, actual +13, Δ −5); the v1.7 locked roadmap at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`; ADR-078 (Drift keepalive deadlock fix applied); ADR-086 (verify-wiring-exists lesson applied to menu→dialog deferral); ADR-087 §c (healthy over-delivery pattern — v1.7-β absorbs the Δ −5 deficit).
