@@ -756,3 +756,17 @@ Cycle v1.6-λ (`feat/v1.6-λ-doc-cleanups`) shipped: **0 net tests** (doc-only c
 **Drift lessons per ADR-088:** (a) Drift keepalive deadlock canonical pattern reusable; (b) `PauseService.pauseHabit` is the explicit pause writer (NOT `DoRepository.save`); (c) `TimeOfDay.format(context)` returns localized format; (d) `_weekdayLabel(d)` returns `labels[d - 1]`; (e) Menu→dialog post-save path fragile in headless mode.
 
 **Test count: 1773 → 1786 (+13 net).** Coverage: `lib/screens/add_habit.dart` ~76% → ~85% (+9 pp). APK SHA1 stays at H's `25bb7fab`. **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** **The v1.7 milestone is OPENED.** SYS-157 / ADR-088 / WF-085.
+
+### v1.7-β — `person_repository.dart` raw-column cadence + channel pins (Phase 71 / SYS-158 / ADR-089 / WF-086)
+
+**SECOND cycle of the v1.7 milestone** — closes the raw-column write-path + read-path null-default + column-overload isolation + forward-compat throw-pin coverage gap in `lib/services/person_repository.dart`. **No production-code change.** Tests-only cycle. **RE-SCOPED 2026-07-05** from `add_person_test.dart` UI-layer (which assumed 4 cadence UI sub-forms existed) to `person_repository_test.dart` repo-layer (where the wiring actually exists).
+
+**Scope:** EXTEND `test/services/person_repository_test.dart` (+14 tests, 21 baseline → 35 total). **No `add_person_test.dart` changes** (the v0.1 form is NOT extended for this cycle).
+
+| # | Cycle | PR | Plan | Actual | Δ | Notes |
+|---|---|---|---|---|---|---|
+| 15 | v1.7-β | #80 | +14 | +14 | 0 | Exact match — absorbs v1.7-α Δ −5 deficit per ADR-087 §c |
+
+**Drift lessons per ADR-089:** (a) **The v0.1 form at `add_person.dart:7-10` only renders `EveryNDays` + `ChannelDialer`** — the file's own header comment explicitly lists the alternate cadences + channels as v0.2 deferred items. Per ADR-086 lesson (a): verify wiring exists via `grep` on call sites before assuming widgets exist; (b) **`_toRow` writes raw column strings (`'dialer'`, `'whatsapp'`, `'telegram'`, `'signal'`, `'sms'`)** — the v1.6-ζ multi-channel round-trip test only verifies the typed `PersonChannel` subclass after `getById`, not the raw column string. v1.7-β pins the raw-column form; (c) **`_monthlyDay` and `_yearlyDay` share the `dayOfMonth` column at `person_repository.dart:66`** — v1.7-β Batch 2 pins the read-side correctness for both subtypes via hand-written rows with distinct `dayOfMonth` values; (d) **The 4 `_fromRow` `?? 1` defaults at lines 134, 136, 138, 140 are defense-in-depth** — v1.7-β Batch 3 tests hand-write rows with `null` for the required column and assert the default; (e) **`_parseChannel`'s `_` default arm at line 107 is the throw-everything-else defense** — the v1.6-ζ `'slack'` throw test pinned ONE specific unknown tag; v1.7-β Batch 4 pins a SECOND unknown tag (`'email'`) so the default arm isn't accidentally weakened to a no-op.
+
+**Test count: 1786 → 1800 (+14 net — exactly matches plan).** Cumulative v1.7 progress: 1773 → 1800 (+27 net across α + β). Coverage: `person_repository.dart` raw-column layer pinned. APK SHA1 stays at H's `25bb7fab`. **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** SYS-158 / ADR-089 / WF-086.
