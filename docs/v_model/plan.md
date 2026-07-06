@@ -1392,8 +1392,26 @@ The **THIRD cycle of the v1.7 milestone** — closes the form-level sub-branch c
 
 - **Batch 1 — `_pickLead` dialog (5 tests):** pin all 4 reachable buckets of `_leadLabel(int m)` at `add_event.dart:228-233` + the Cancel branch. Covers `:189-226` (Dialog + RadioListTile), `:213-215, 225` (Cancel returns null → guard rejects).
 - **Batch 2 — `_applyPayload` defensive branches (6 tests):** pin the 5 typed guards at `:110-118` (name is String, lead is int, day is int, month is int + recurrence switch default arm). The 3 `Event.validate()` throw branches are UNREACHABLE from form input — v1.7-γ does NOT write tests for them.
-- **Batch 3 — `_saveAsTemplate` envelope variants (1 test):** `_saveAsTemplate with _recurrence=annually writes '"recurrence":"annually"' in the envelope` — pin the `'annually'` branch at `:343-344`.'slack'`-tag throw test to a second non-`'slack'` arbitrary string; locks in the `_` default arm at `:107`.
+- **Batch 3 — `_saveAsTemplate` envelope variants (1 test):** `_saveAsTemplate with _recurrence=annually writes '"recurrence":"annually"' in the envelope` — pin the `'annually'` branch at `:343-344`.
 
-**Drift lessons per ADR-089:** (a) The v0.1 form at `add_person.dart:7-10` only renders `EveryNDays` + `ChannelDialer` (the file's own header comment explicitly lists the alternate cadences + channels as v0.2 deferred items); (b) `_toRow` writes raw column strings (the v1.6-ζ multi-channel round-trip test only verifies the typed `PersonChannel` subclass after `getById`, not the raw column string); (c) `_monthlyDay` and `_yearlyDay` share the `dayOfMonth` column at `person_repository.dart:66` (the existing tests do NOT isolate which subtype wins for a given row); (d) The 4 `_fromRow` `?? 1` defaults are defense-in-depth; (e) `_parseChannel`'s `_` default arm is the throw-everything-else defense (the `'slack'` + `'email'` tests form a regression-pair for the forward-compat contract).
+**Drift lessons per ADR-090:** (a) The v0.1 form at `add_event.dart` uses a Dialog with 7 RadioListTile presets for lead time, NOT a Slider; (b) The v0.1 form uses 2 ChoiceChips for recurrence, NOT a RadioListTile group; (c) The v0.1 form has NO end-date picker; (d) The 5 `_applyPayload` typed guards are defense-in-depth; (e) The 3 `Event.validate()` throw branches are UNREACHABLE from form input.
 
-**Test count: 1786 → 1800 (+14 net — exactly matches the v1.7 pre-auth plan target).** Coverage: `person_repository.dart` raw-column layer pinned. APK SHA1 stays at H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` (no production-code change). **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** Cycle is the **SECOND** in the v1.7 milestone (2/9 cycles shipped).
+**Test count: 1800 → 1812 (+12 net — exactly matches the v1.7 pre-auth plan target).** Coverage: `add_event.dart` ~78% → ~88% (+10 pp). APK SHA1 stays at H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` (no production-code change). **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** Cycle is the **THIRD** in the v1.7 milestone (3/9 cycles shipped).
+
+### v1.7-δ — Spanish ARB verbatim-pin coverage closure (Phase 72 / SYS-160 / ADR-091 / WF-088)
+
+The **FOURTH cycle of the v1.7 milestone** — pins the post-v1.3 Spanish ARB catalog (the 129 `String get` entries in `lib/l10n/gen/app_localizations_es.dart`) as the **regression guard for the future translator pass** (B2 in the 3-month launch plan). **No production-code change.** Tests-only cycle.
+
+**Scope:** EXTEND `test/l10n/locale_render_test.dart` (+20 tests, 9 baseline → 29 total). **No production-code change.**
+
+**5 batches grouped by UI surface:**
+
+- **Batch 1 — Sparkline a11y + tooltip copy (4 tests):** pin the v1.4i 14-day sparkline TalkBack label + 3 long-press tooltips.
+- **Batch 2 — Sparkline legend captions (3 tests):** pin the 3 v1.4i inline-legend dot-color captions.
+- **Batch 3 — Widget action copy (2 tests):** pin the v1.4f home-screen widget "Skip today" / "Undo today" actions.
+- **Batch 4 — Home add sheet copy (3 tests):** pin the v1.3c bottom-sheet entry points.
+- **Batch 5 — Settings theme + anchor + permission status (8 tests):** pin the v0.1 settings-screen surface.
+
+**Drift lessons per ADR-091:** (a) The 129 Spanish getters split into 2 shapes — single-line `=> 'literal'` (98 entries) and multi-line `=>\n  'literal';` (31 entries); (b) Parity invariant: `app_en.arb` and `app_es.arb` have the same 129 keys; (c) Spanish em-dash (`—` = U+2014) and opening-question-mark (`¿` = U+00BF) are 2-byte UTF-8 characters; (d) BUG-006 (deferred to v2.0 per W-13 §8) is the canonical example of "Spanish translation drift"; (e) 5-batch grouping is by UI surface, not by ARB key alphabetical order.
+
+**Test count: 1812 → 1832 (+20 net — exactly matches the v1.7 pre-auth plan target).** APK SHA1 stays at H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` (no production-code change). **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** Cycle is the **FOURTH** in the v1.7 milestone (4/9 cycles shipped).
