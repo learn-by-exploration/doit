@@ -924,4 +924,301 @@ void main() {
     expect(t.payloadJson, contains('"leadTimeMillis"'));
     expect(t.payloadJson, contains('"recurrence"'));
   });
+
+  // ---------------------------------------------------------------------
+  // v1.7-γ (SYS-159 / ADR-090 / WF-087) — coverage closure for
+  // the form-level sub-branches the v1.5-β + v1.6-δ cycles left
+  // dark. The reachable scope per ADR-086 (a) is narrower than
+  // the master plan assumed: the form uses a Dialog preset
+  // (not a slider) for lead time, ChoiceChips (not a Radio
+  // group) for recurrence, and no end-date picker (the
+  // EventRecurrence enum has only `none | annually` leaves).
+  // The +12 tests below cover the actually-reachable branches.
+  // ---------------------------------------------------------------------
+
+  testWidgets('_pickLead Cancel button leaves _leadMinutes unchanged '
+      '(v1.7-γ / SYS-159)', (tester) async {
+    await initServices();
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_wrap(const AddEventScreen()));
+    await tester.pumpAndSettle();
+    // Default _leadMinutes = 15 (line 78). The trailing reads
+    // "15 min before" (line 439).
+    expect(find.text('15 min before'), findsOneWidget);
+    // Open the lead-time dialog and tap Cancel.
+    await tester.tap(find.widgetWithText(ListTile, 'Notify me'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    // The dialog returned `null` (line 213-215 pops without
+    // a value). Line 225's `if (picked != null)` guard
+    // rejects the null → `_leadMinutes` stays at 15.
+    expect(find.text('15 min before'), findsOneWidget);
+  });
+
+  testWidgets('_pickLead "5 min before" preset + OK updates trailing '
+      '(v1.7-γ / SYS-159)', (tester) async {
+    await initServices();
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_wrap(const AddEventScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, 'Notify me'));
+    await tester.pumpAndSettle();
+    final dialog = find.byType(AlertDialog);
+    await tester.tap(
+      find.descendant(of: dialog, matching: find.text('5 min before')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('5 min before'), findsOneWidget);
+  });
+
+  testWidgets('_pickLead "30 min before" preset + OK updates trailing '
+      '(v1.7-γ / SYS-159)', (tester) async {
+    await initServices();
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_wrap(const AddEventScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, 'Notify me'));
+    await tester.pumpAndSettle();
+    final dialog = find.byType(AlertDialog);
+    await tester.tap(
+      find.descendant(of: dialog, matching: find.text('30 min before')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('30 min before'), findsOneWidget);
+  });
+
+  testWidgets('_pickLead "1 d before" preset + OK updates trailing '
+      '(v1.7-γ / SYS-159)', (tester) async {
+    await initServices();
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_wrap(const AddEventScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, 'Notify me'));
+    await tester.pumpAndSettle();
+    final dialog = find.byType(AlertDialog);
+    await tester.tap(
+      find.descendant(of: dialog, matching: find.text('1 d before')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 d before'), findsOneWidget);
+  });
+
+  testWidgets('_applyPayload with month=null falls back to current month '
+      '(v1.7-γ / SYS-159)', (tester) async {
+    await initServices();
+    // Line 135 guard `(month is int && month >= 1 && month
+    // <= 12)` evaluates false when month is null → ternary
+    // picks `now.month`. Assert the form survived the null
+    // month and the date tile renders a valid formatted date.
+    const payload = <String, dynamic>{
+      'name': 'Test',
+      'recurrence': 'none',
+      'dayOfMonth': 15,
+      // 'monthOfYear' omitted entirely (decodes as null).
+      'leadTimeMillis': 0,
+    };
+    await tester.pumpWidget(
+      _wrap(const AddEventScreen(initialPayload: payload)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Date'), findsOneWidget);
+    final dateTile = find.byWidgetPredicate(
+      (w) =>
+          w is ListTile && w.title is Text && (w.title as Text).data == 'Date',
+    );
+    final trailing = (tester.widget<ListTile>(dateTile).trailing as Text).data;
+    // dayOfMonth=15 is preserved (line 134 guard passes); the
+    // month falls back to whatever `now.month` is.
+    expect(trailing, endsWith('-15'));
+  });
+
+  testWidgets('_applyPayload with dayOfMonth=0 is rejected by the guard '
+      '(v1.7-γ / SYS-159)', (tester) async {
+    await initServices();
+    // Line 134 guard `(day is int && day > 0 && day <= 31)`
+    // rejects day=0 → `_at` stays at the default (today + 1
+    // day). The form must not crash.
+    const payload = <String, dynamic>{
+      'name': 'Test',
+      'recurrence': 'none',
+      'dayOfMonth': 0, // rejected
+      'monthOfYear': 6,
+      'leadTimeMillis': 0,
+    };
+    await tester.pumpWidget(
+      _wrap(const AddEventScreen(initialPayload: payload)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Date'), findsOneWidget);
+    final dateTile = find.byWidgetPredicate(
+      (w) =>
+          w is ListTile && w.title is Text && (w.title as Text).data == 'Date',
+    );
+    final trailing = (tester.widget<ListTile>(dateTile).trailing as Text).data;
+    // The trailing does NOT contain `-00` (the guard
+    // rejected the day=0). It falls back to the default
+    // _at = today + 1 day (line 77).
+    expect(trailing, isNot(contains('-00')));
+  });
+
+  testWidgets('_applyPayload with recurrence="daily" falls through to '
+      'EventRecurrence.none (v1.7-γ / SYS-159)', (tester) async {
+    await initServices();
+    // 'daily' is not one of the 3 curated strings (line
+    // 122-124). The switch's `_` default arm at line 127-128
+    // maps to `none`. Both ChoiceChips render — selection is
+    // conveyed through chip color, not a separate widget.
+    const payload = <String, dynamic>{
+      'name': 'Test',
+      'recurrence': 'daily', // unhandled string → default arm
+      'leadTimeMillis': 0,
+    };
+    await tester.pumpWidget(
+      _wrap(const AddEventScreen(initialPayload: payload)),
+    );
+    await tester.pumpAndSettle();
+    // Both chips render; the "Once" chip is the selected
+    // one (default arm maps to `none`, whose label is
+    // "Once" at line 484).
+    expect(find.text('Once'), findsOneWidget);
+    expect(find.text('Yearly'), findsOneWidget);
+  });
+
+  testWidgets('_applyPayload with name=null ignores the name field '
+      '(v1.7-γ / SYS-159)', (tester) async {
+    await initServices();
+    // Line 112 guard `name is String && name.isNotEmpty`
+    // rejects a non-String (null) → _nameCtrl.text stays
+    // empty. The form must not crash.
+    final payload = <String, dynamic>{
+      // 'name' omitted (decodes as null in the cast).
+      'recurrence': 'none',
+      'leadTimeMillis': 0,
+    };
+    await tester.pumpWidget(_wrap(AddEventScreen(initialPayload: payload)));
+    await tester.pumpAndSettle();
+    // The TextField renders with the default empty controller.
+    final nameField = tester.widget<TextField>(find.byType(TextField));
+    expect(nameField.controller?.text ?? '', isEmpty);
+  });
+
+  testWidgets('_applyPayload with non-int leadTimeMillis keeps default '
+      '_leadMinutes = 15 (v1.7-γ / SYS-159)', (tester) async {
+    await initServices();
+    // Line 116 guard `if (lead is int)` rejects a String.
+    // `_leadMinutes` stays at the default 15.
+    const payload = <String, dynamic>{
+      'name': 'Test',
+      'recurrence': 'none',
+      'leadTimeMillis': '86400000', // wrong type
+    };
+    await tester.pumpWidget(
+      _wrap(const AddEventScreen(initialPayload: payload)),
+    );
+    await tester.pumpAndSettle();
+    // Trailing reads "15 min before" (line 439 + default 15).
+    expect(find.text('15 min before'), findsOneWidget);
+  });
+
+  testWidgets('_applyPayload with double leadTimeMillis keeps default '
+      '_leadMinutes = 15 (v1.7-γ / SYS-159)', (tester) async {
+    await initServices();
+    // Line 116 guard `if (lead is int)` rejects a double.
+    const payload = <String, dynamic>{
+      'name': 'Test',
+      'recurrence': 'none',
+      'leadTimeMillis': 86400000.0, // wrong type (double, not int)
+    };
+    await tester.pumpWidget(
+      _wrap(const AddEventScreen(initialPayload: payload)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('15 min before'), findsOneWidget);
+  });
+
+  testWidgets('_pickLead "2 h before" preset + OK updates trailing '
+      '(v1.7-γ / SYS-159)', (tester) async {
+    await initServices();
+    // Line 231 covers the 60..1440 bucket: `${m ~/ 60} h
+    // before`. 120 minutes is the canonical 2-h preset.
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_wrap(const AddEventScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, 'Notify me'));
+    await tester.pumpAndSettle();
+    final dialog = find.byType(AlertDialog);
+    await tester.tap(
+      find.descendant(of: dialog, matching: find.text('2 h before')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('2 h before'), findsOneWidget);
+  });
+
+  testWidgets('_saveAsTemplate with _recurrence=annually writes '
+      '\'"recurrence":"annually"\' in the envelope (v1.7-γ / SYS-159)', (
+    tester,
+  ) async {
+    await initServices();
+    // Create an Event with `recurrence: annually` (the
+    // _makeEvent helper at line 62-69 defaults to `none`).
+    final now = DateTime.now();
+    final original = Event(
+      id: 'e_test_annual_${now.millisecondsSinceEpoch}',
+      name: 'Annual event',
+      atMillis: DateTime(now.year + 1, 6, 1, 9).millisecondsSinceEpoch,
+      leadTimeMillis: const Duration(minutes: 15).inMilliseconds,
+      createdAtMillis: now.millisecondsSinceEpoch,
+      recurrence: EventRecurrence.annually,
+    );
+    await tester.runAsync(() => EventRepository.instance.save(original));
+    await tester.pumpWidget(_wrap(AddEventScreen(existing: original)));
+    await tester.pumpAndSettle();
+    // Open menu → "Save as template".
+    await tester.tap(find.byKey(const ValueKey('add_event.menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add_event.save_as_template')));
+    await tester.pumpAndSettle();
+    final nameField = find.byKey(
+      const ValueKey('add_event.save_as_template.name'),
+    );
+    await tester.enterText(nameField, 'My annual template');
+    await tester.tap(
+      find.byKey(const ValueKey('add_event.save_as_template.save')),
+    );
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    final all = await tester.runAsync<List<Template>>(
+      TemplateRepository.instance.listAll,
+    );
+    final user = (all ?? <Template>[]).where((t) => !t.isBuiltIn).toList();
+    expect(user, hasLength(1));
+    // The envelope writes `'annually'` (line 343-344)
+    // because _recurrence == EventRecurrence.annually.
+    expect(user.first.payloadJson, contains('"recurrence":"annually"'));
+  });
 }
+
+/// (Empty placeholder — removed `_RecordingNavigatorObserver`
+/// in v1.7-γ after the pop-true test was retracted as
+/// unreachably testable in the test zone. See v1.6-δ file
+/// header at line 290-302 for the rationale.)

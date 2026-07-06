@@ -1378,7 +1378,21 @@ The **SECOND cycle of the v1.7 milestone** — closes the raw-column write-path 
 - **Batch 1 — Raw-column write-path pins (8 tests):** for each typed leaf, save → read raw `PersonRow` → pin `channel`/`handle` + `cadenceType`/discriminator-column strings. Covers `lib/services/person_repository.dart:60-61, 63-67, 92-96, 114-116, 122-129`.
 - **Batch 2 — Column-overload isolation (1 test):** hand-write 2 rows with distinct `dayOfMonth` values (15 for MonthlyOn, 4 for YearlyOn day); assert each subtype round-trips with its OWN `dayOfMonth`. Covers the column overload at `:66` + `_parseCadence` at `:131-144`. Defense against a future refactor that collapses the overload with a `??` precedence bug.
 - **Batch 3 — Null-default read-path pins (4 tests):** hand-write 4 rows with the relevant nullable column OMITTED (Drift default null); assert the 4 `?? 1` fallbacks at `:134, 136, 138, 140` decode the default. A future refactor that removes any `?? 1` would throw on these tests.
-- **Batch 4 — Forward-compat throw pin (1 test):** `_parseChannel` rejects `'email'` as an unknown tag with `ArgumentError`. Extends the v1.6-ζ `'slack'`-tag throw test to a second non-`'slack'` arbitrary string; locks in the `_` default arm at `:107`.
+- **Batch 4 — Forward-compat throw pin (1 test):** `_parseChannel` rejects `'email'` as an unknown tag with `ArgumentError`. Extends the v1.6-ζ `
+
+### v1.7-γ — `add_event.dart` form-level sub-branch coverage closure (Phase 72 / SYS-159 / ADR-090 / WF-087)
+
+The **THIRD cycle of the v1.7 milestone** — closes the form-level sub-branch coverage gap in `lib/screens/add_event.dart` (`_pickLead` dialog + `_applyPayload` defensive guards + `_saveAsTemplate` envelope variants; ~60 LF reachable through form-level inputs). **No production-code change.** Tests-only cycle.
+
+**RE-SCOPED 2026-07-05** — the original v1.7-γ plan assumed 3 widgets (a leadTime slider, a no-recurrence radio group, an end-date picker) existed on the form. The code-explorer pass discovered the v0.1 form uses (a) a Dialog with 7 RadioListTile presets for lead time, (b) 2 ChoiceChips for recurrence, and (c) NO end-date picker. The `EventRecurrence` enum has only `{none, annually}` leaves. Cycle lands at the form layer where the wiring actually exists.
+
+**Scope:** EXTEND `test/screens/add_event_test.dart` (+12 tests, 28 baseline → 40 total). **No production-code change.**
+
+**3 batches:**
+
+- **Batch 1 — `_pickLead` dialog (5 tests):** pin all 4 reachable buckets of `_leadLabel(int m)` at `add_event.dart:228-233` + the Cancel branch. Covers `:189-226` (Dialog + RadioListTile), `:213-215, 225` (Cancel returns null → guard rejects).
+- **Batch 2 — `_applyPayload` defensive branches (6 tests):** pin the 5 typed guards at `:110-118` (name is String, lead is int, day is int, month is int + recurrence switch default arm). The 3 `Event.validate()` throw branches are UNREACHABLE from form input — v1.7-γ does NOT write tests for them.
+- **Batch 3 — `_saveAsTemplate` envelope variants (1 test):** `_saveAsTemplate with _recurrence=annually writes '"recurrence":"annually"' in the envelope` — pin the `'annually'` branch at `:343-344`.'slack'`-tag throw test to a second non-`'slack'` arbitrary string; locks in the `_` default arm at `:107`.
 
 **Drift lessons per ADR-089:** (a) The v0.1 form at `add_person.dart:7-10` only renders `EveryNDays` + `ChannelDialer` (the file's own header comment explicitly lists the alternate cadences + channels as v0.2 deferred items); (b) `_toRow` writes raw column strings (the v1.6-ζ multi-channel round-trip test only verifies the typed `PersonChannel` subclass after `getById`, not the raw column string); (c) `_monthlyDay` and `_yearlyDay` share the `dayOfMonth` column at `person_repository.dart:66` (the existing tests do NOT isolate which subtype wins for a given row); (d) The 4 `_fromRow` `?? 1` defaults are defense-in-depth; (e) `_parseChannel`'s `_` default arm is the throw-everything-else defense (the `'slack'` + `'email'` tests form a regression-pair for the forward-compat contract).
 
