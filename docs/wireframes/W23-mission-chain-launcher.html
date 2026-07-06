@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>W23 — Mission chain launcher</title>
+<meta name="viewport" content="width=412, initial-scale=1">
+<style>
+  :root {
+    --md-bg: #13141b;
+    --md-surface: #1c1d27;
+    --md-surface-variant: #272834;
+    --md-primary: #a8c7fa;
+    --md-on-primary: #062e6f;
+    --md-on-surface: #e3e3e9;
+    --md-on-surface-variant: #c5c6d0;
+    --md-outline: #44474f;
+    --md-error: #f2b8b5;
+    --md-success: #a3d977;
+    --md-success-container: #1b4d1a;
+    --md-error-container: #5c1f1d;
+    --md-tertiary: #dab8ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #0a0b10; color: var(--md-on-surface); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  .device { width: 412px; min-height: 892px; margin: 24px auto; background: var(--md-bg); border-radius: 36px; border: 1px solid #2a2b35; box-shadow: 0 18px 60px rgba(0,0,0,0.55); overflow: hidden; display: flex; flex-direction: column; position: relative; }
+  .appbar { height: 56px; padding: 0 8px; display: flex; align-items: center; gap: 4px; background: var(--md-bg); border-bottom: 1px solid var(--md-outline); }
+  .icon-btn { width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--md-on-surface); border-radius: 24px; cursor: pointer; }
+  .icon-btn:focus-visible { outline: 2px solid var(--md-primary); }
+  .icon-btn svg { width: 24px; height: 24px; fill: currentColor; }
+  .appbar-title { font-size: 18px; font-weight: 500; margin-left: 8px; }
+  .appbar-spacer { flex: 1; }
+  .stepper { font-size: 14px; color: var(--md-on-surface-variant); padding-right: 16px; }
+  .body { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 24px; }
+  .header-block { display: flex; flex-direction: column; gap: 16px; }
+  .chain-progress { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px; background: var(--md-surface); border-radius: 16px; border: 1px solid var(--md-outline); }
+  .chain-row { display: flex; align-items: center; gap: 12px; }
+  .chain-step { width: 32px; height: 32px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; background: var(--md-surface-variant); color: var(--md-on-surface-variant); border: 1px solid var(--md-outline); flex-shrink: 0; }
+  .chain-step.done { background: var(--md-success-container); color: var(--md-success); border-color: var(--md-success); }
+  .chain-step.current { background: var(--md-primary); color: var(--md-on-primary); border-color: var(--md-primary); box-shadow: 0 0 0 4px rgba(168,199,250,0.18); }
+  .chain-step.failed { background: var(--md-error-container); color: var(--md-error); border-color: var(--md-error); }
+  .chain-step svg { width: 18px; height: 18px; fill: currentColor; }
+  .chain-label { flex: 1; font-size: 14px; }
+  .chain-label small { display: block; color: var(--md-on-surface-variant); font-size: 12px; margin-top: 2px; }
+  .chain-connector { width: 2px; height: 14px; background: var(--md-outline); margin-left: 15px; }
+  .connector.done { background: var(--md-success); }
+  .current-mission { padding: 20px; background: var(--md-surface); border-radius: 16px; border: 1px solid var(--md-primary); display: flex; flex-direction: column; gap: 12px; }
+  .badge { align-self: flex-start; padding: 4px 10px; border-radius: 10px; background: rgba(168,199,250,0.18); color: var(--md-primary); font-size: 12px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; }
+  .prompt { font-size: 20px; font-weight: 600; }
+  .help { font-size: 14px; color: var(--md-on-surface-variant); }
+  .timeout-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--md-on-surface-variant); }
+  .timeout-row svg { width: 16px; height: 16px; fill: currentColor; }
+  .actions { margin-top: auto; display: flex; gap: 12px; }
+  .btn-primary { flex: 1; min-height: 56px; border: 0; border-radius: 28px; background: var(--md-primary); color: var(--md-on-primary); font-size: 16px; font-weight: 600; cursor: pointer; }
+  .btn-secondary { min-height: 56px; padding: 0 20px; border-radius: 28px; background: transparent; color: var(--md-on-surface-variant); border: 1px solid var(--md-outline); font-size: 14px; cursor: pointer; }
+  .snackbar { position: absolute; left: 16px; right: 16px; bottom: 24px; padding: 14px 16px; background: var(--md-error-container); border: 1px solid var(--md-error); color: var(--md-error); border-radius: 12px; display: flex; align-items: center; gap: 12px; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
+  .snackbar svg { width: 20px; height: 20px; fill: currentColor; }
+  .snackbar .action { margin-left: auto; color: var(--md-error); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; font-size: 13px; }
+  .watermark { position: absolute; bottom: 4px; right: 16px; font-size: 11px; color: var(--md-on-surface-variant); opacity: 0.55; letter-spacing: 0.5px; }
+</style>
+</head>
+<body>
+<div class="device" role="application" aria-label="Mission chain launcher screen">
+  <header class="appbar" role="banner">
+    <button class="icon-btn" aria-label="Cancel chain">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+    <div class="appbar-title">Mission chain</div>
+    <div class="appbar-spacer"></div>
+    <div class="stepper" aria-label="Mission progress">2 of 3</div>
+  </header>
+
+  <main class="body" role="main">
+    <section class="chain-progress" aria-label="Chain progress">
+      <div class="chain-row">
+        <div class="chain-step done" aria-label="Mission 1 complete">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 16.2-3.5-3.5a1 1 0 1 0-1.4 1.4L8.3 19a1 1 0 0 0 1.4 0L20.6 8.1a1 1 0 0 0-1.4-1.4L9 16.2z"/></svg>
+        </div>
+        <div class="chain-label">
+          Shake-N (×10)
+          <small>Completed · 1.4s ago</small>
+        </div>
+      </div>
+      <div class="chain-connector done" aria-hidden="true"></div>
+      <div class="chain-row">
+        <div class="chain-step current" aria-label="Mission 2 in progress">2</div>
+        <div class="chain-label">
+          Type phrase
+          <small>Current mission</small>
+        </div>
+      </div>
+      <div class="chain-connector" aria-hidden="true"></div>
+      <div class="chain-row">
+        <div class="chain-step" aria-label="Mission 3 pending">3</div>
+        <div class="chain-label">
+          Hold for 5s
+          <small>Queued</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="current-mission" aria-labelledby="curLabel">
+      <span class="badge" id="curLabel">Mission 2 of 3</span>
+      <div class="prompt">Type this phrase exactly</div>
+      <div class="help">"I am worth the effort today, and tomorrow."</div>
+      <div class="timeout-row" aria-label="Mission timeout">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20a8 8 0 1 1 8-8h-2a6 6 0 1 0-6 6v2zm-1-13h2v6h-2V7zm1 8a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg>
+        <span>Timeout in 02:14</span>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button class="btn-secondary" type="button">Skip mission</button>
+      <button class="btn-primary" type="button">Open mission</button>
+    </div>
+
+    <div class="snackbar" role="alert" aria-live="assertive">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 1 21h22L12 2zm1 15h-2v-2h2v2zm0-4h-2V9h2v4z"/></svg>
+      <span>Mission failed. Try again next time.</span>
+      <span class="action" aria-hidden="true">Dismiss</span>
+    </div>
+  </main>
+
+  <span class="watermark">W-23 · Group D</span>
+</div>
+</body>
+</html>

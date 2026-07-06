@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>W16 — Events list</title>
+<style>
+  :root {
+    --md-bg: #111418;
+    --md-surface: #1a1d22;
+    --md-surface-variant: #272b30;
+    --md-on-surface: #e3e3e3;
+    --md-on-surface-variant: #b0b3b8;
+    --md-outline: #404549;
+    --md-primary: #b8c6ff;
+    --md-on-primary: #1a3065;
+    --md-primary-container: #334479;
+    --md-on-primary-container: #dbe2ff;
+    --md-secondary-container: #3c4a59;
+    --md-on-secondary-container: #d4e3ff;
+
+    --cat-red: #f28b82;
+    --cat-orange: #fbb074;
+    --cat-yellow: #fdd663;
+    --cat-green: #81c995;
+    --cat-teal: #78d5cb;
+    --cat-blue: #7ab3f4;
+    --cat-purple: #c58af9;
+    --cat-pink: #f78fb8;
+
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 24px;
+    --sp-6: 32px;
+    --radius-1: 12px;
+    --radius-2: 16px;
+    --radius-3: 24px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; background: #000;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--md-on-surface);
+    display: flex; justify-content: center; align-items: flex-start;
+  }
+  .phone {
+    width: 412px; min-height: 892px;
+    background: var(--md-bg); position: relative;
+    padding-bottom: 96px; overflow: hidden;
+  }
+  .appbar {
+    height: 64px; padding: 0 var(--sp-3);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--md-bg); color: var(--md-on-surface);
+  }
+  .appbar .left { min-width: 48px; min-height: 48px; display: flex; align-items: center; }
+  .appbar .right { min-width: 48px; min-height: 48px; display: flex; align-items: center; justify-content: flex-end; }
+  .appbar .title { font-size: 22px; font-weight: 500; letter-spacing: 0.2px; flex: 1; text-align: center; }
+  .icon-btn {
+    width: 48px; height: 48px; min-width: 48px; min-height: 48px;
+    border-radius: 24px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: none; color: inherit; cursor: pointer;
+  }
+  .icon-btn:hover { background: rgba(255,255,255,0.06); }
+  .icon-btn .material { width: 24px; height: 24px; fill: currentColor; }
+
+  .body { padding: var(--sp-2) var(--sp-4) var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-5); }
+
+  .section-header {
+    font-size: 14px; font-weight: 600;
+    color: var(--md-on-surface-variant);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; align-items: center; gap: var(--sp-2);
+  }
+  .section-header .count {
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    background: var(--md-surface-variant);
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  .event-card {
+    background: var(--md-surface-variant);
+    border-radius: var(--radius-1);
+    padding: var(--sp-3) var(--sp-4);
+    display: flex; gap: var(--sp-3); align-items: flex-start;
+    min-height: 88px;
+  }
+  .event-card .swatch {
+    width: 8px; align-self: stretch; border-radius: 4px;
+    background: var(--cat-pink); flex-shrink: 0;
+  }
+  .event-card .main { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .event-card .title { font-size: 16px; font-weight: 500; }
+  .event-card .meta { font-size: 14px; color: var(--md-on-surface-variant); }
+  .event-card .caption { font-size: 14px; color: var(--md-on-surface-variant); }
+  .event-card .actions { display: flex; gap: 4px; align-items: center; }
+
+  .divider-row { height: 1px; background: var(--md-outline); margin: var(--sp-2) 0; }
+
+  /* FAB */
+  .fab {
+    position: fixed;
+    bottom: 80px; right: 50%;
+    margin-right: -194px;
+    width: 56px; height: 56px;
+    border-radius: 28px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    display: flex; align-items: center; justify-content: center;
+    border: none; cursor: pointer;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+    z-index: 6;
+  }
+  .fab .material { width: 24px; height: 24px; fill: currentColor; }
+  .watermark {
+    position: absolute; bottom: 8px; right: 12px;
+    font-size: 11px; color: rgba(255,255,255,0.32);
+    letter-spacing: 0.4px; z-index: 9; pointer-events: none;
+  }
+
+  /* Empty-state alternative (shown when no events) */
+  .empty {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: var(--sp-3); padding: 64px 32px; text-align: center;
+  }
+  .empty .icon {
+    width: 96px; height: 96px; border-radius: 48px;
+    background: var(--md-surface-variant);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: var(--sp-3);
+  }
+  .empty .icon .material { width: 48px; height: 48px; fill: var(--md-on-surface-variant); }
+  .empty .title { font-size: 22px; font-weight: 500; }
+  .empty .body { font-size: 16px; color: var(--md-on-surface-variant); max-width: 280px; }
+
+  .archived-section {
+    margin-top: var(--sp-5);
+  }
+
+  .past-card {
+    opacity: 0.72;
+  }
+  .past-card .meta-strike { text-decoration: line-through; }
+
+  /* Bottom nav */
+  .bottom-nav {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 80px;
+    background: var(--md-bg);
+    border-top: 1px solid var(--md-outline);
+    display: flex;
+    align-items: center; justify-content: space-around;
+  }
+  .nav-item {
+    flex: 1;
+    min-height: 48px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px;
+    color: var(--md-on-surface-variant);
+    background: transparent; border: none; cursor: pointer;
+    font: inherit;
+  }
+  .nav-item.active { color: var(--md-on-surface); }
+  .nav-item .material { width: 24px; height: 24px; fill: currentColor; }
+  .nav-item .label { font-size: 12px; }
+</style>
+</head>
+<body>
+<main class="phone" role="main" aria-label="Events list screen">
+  <header class="appbar" role="banner">
+    <div class="left">
+      <button class="icon-btn" aria-label="Back">
+        <svg class="material" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      </button>
+    </div>
+    <div class="title">Events</div>
+    <div class="right">
+      <button class="icon-btn" aria-label="Search">
+        <svg class="material" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5a4.5 4.5 0 0 1-4.5 4.5z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="body">
+    <!-- Upcoming -->
+    <section aria-labelledby="upcoming-header">
+      <div class="section-header" id="upcoming-header">
+        Upcoming
+        <span class="count">3</span>
+      </div>
+
+      <div class="event-card" style="margin-top:12px;">
+        <div class="swatch" style="background:var(--cat-pink);"></div>
+        <div class="main">
+          <div class="title">Mom's birthday</div>
+          <div class="meta">Sep 14, 2026 · Mon · 09:00</div>
+          <div class="caption">Lead time: 5 days before</div>
+        </div>
+        <div class="actions">
+          <button class="icon-btn" aria-label="Archive Mom's birthday">
+            <svg class="material" viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
+          </button>
+          <button class="icon-btn" aria-label="Delete Mom's birthday">
+            <svg class="material" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="event-card" style="margin-top:12px;">
+        <div class="swatch" style="background:var(--cat-blue);"></div>
+        <div class="main">
+          <div class="title">Tax filing deadline</div>
+          <div class="meta">Apr 15, 2027 · Wed · 23:59</div>
+          <div class="caption">Lead time: 14 days before · Repeats annually</div>
+        </div>
+        <div class="actions">
+          <button class="icon-btn" aria-label="Archive Tax filing deadline">
+            <svg class="material" viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
+          </button>
+          <button class="icon-btn" aria-label="Delete Tax filing deadline">
+            <svg class="material" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="event-card" style="margin-top:12px;">
+        <div class="swatch" style="background:var(--cat-green);"></div>
+        <div class="main">
+          <div class="title">Wedding anniversary</div>
+          <div class="meta">Oct 3, 2026 · Fri · 18:00</div>
+          <div class="caption">Lead time: 1 day before · Repeats annually</div>
+        </div>
+        <div class="actions">
+          <button class="icon-btn" aria-label="Archive Wedding anniversary">
+            <svg class="material" viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
+          </button>
+          <button class="icon-btn" aria-label="Delete Wedding anniversary">
+            <svg class="material" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Past -->
+    <section aria-labelledby="past-header">
+      <div class="section-header" id="past-header">
+        Past
+        <span class="count">2</span>
+      </div>
+
+      <div class="event-card past-card" style="margin-top:12px;">
+        <div class="swatch" style="background:var(--cat-purple);"></div>
+        <div class="main">
+          <div class="title meta-strike">Quarterly review</div>
+          <div class="meta">Jun 30, 2026 · Tue · 14:00</div>
+          <div class="caption">Lead time: 3 days before</div>
+        </div>
+        <div class="actions">
+          <button class="icon-btn" aria-label="Archive Quarterly review">
+            <svg class="material" viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
+          </button>
+          <button class="icon-btn" aria-label="Delete Quarterly review">
+            <svg class="material" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Archived -->
+    <section class="archived-section" aria-labelledby="archived-header">
+      <div class="section-header" id="archived-header">
+        Archived
+        <span class="count">1</span>
+      </div>
+
+      <div class="event-card past-card" style="margin-top:12px;">
+        <div class="swatch" style="background:var(--cat-orange);opacity:0.6;"></div>
+        <div class="main">
+          <div class="title meta-strike">Conference talk</div>
+          <div class="meta">May 12, 2026 · Tue · 16:30</div>
+          <div class="caption">Archived · Lead time: 7 days before</div>
+        </div>
+        <div class="actions">
+          <button class="icon-btn" aria-label="Delete Conference talk permanently">
+            <svg class="material" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <button class="fab" aria-label="Add event">
+    <svg class="material" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+  </button>
+
+  <nav class="bottom-nav" aria-label="Primary">
+    <button class="nav-item" aria-label="Home">
+      <svg class="material" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      <span class="label">Home</span>
+    </button>
+    <button class="nav-item active" aria-current="page" aria-label="Events">
+      <svg class="material" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg>
+      <span class="label">Events</span>
+    </button>
+    <button class="nav-item" aria-label="Settings">
+      <svg class="material" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 0 1 8.4 12 3.6 3.6 0 0 1 12 8.4a3.6 3.6 0 0 1 3.6 3.6 3.6 3.6 0 0 1-3.6 3.6z"/></svg>
+      <span class="label">Settings</span>
+    </button>
+  </nav>
+
+  <div class="watermark">W16 · Group C</div>
+</main>
+</body>
+</html>

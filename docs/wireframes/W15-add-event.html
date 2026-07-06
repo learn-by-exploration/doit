@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>W15 — Add / Edit event</title>
+<style>
+  :root {
+    --md-bg: #111418;
+    --md-surface: #1a1d22;
+    --md-surface-variant: #272b30;
+    --md-on-surface: #e3e3e3;
+    --md-on-surface-variant: #b0b3b8;
+    --md-outline: #404549;
+    --md-primary: #b8c6ff;
+    --md-on-primary: #1a3065;
+    --md-primary-container: #334479;
+    --md-on-primary-container: #dbe2ff;
+    --md-secondary-container: #3c4a59;
+    --md-on-secondary-container: #d4e3ff;
+    --md-tertiary-container: #4a3a78;
+    --md-on-tertiary-container: #e8deff;
+    --md-error: #ffb4ab;
+    --md-on-error: #690005;
+    --md-error-container: #93000a;
+    --md-on-error-container: #ffdad6;
+
+    --cat-red: #f28b82;
+    --cat-orange: #fbb074;
+    --cat-yellow: #fdd663;
+    --cat-green: #81c995;
+    --cat-teal: #78d5cb;
+    --cat-blue: #7ab3f4;
+    --cat-purple: #c58af9;
+    --cat-pink: #f78fb8;
+
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 24px;
+    --sp-6: 32px;
+    --radius-1: 12px;
+    --radius-2: 16px;
+    --radius-3: 24px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: #000;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--md-on-surface);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .phone {
+    width: 412px;
+    min-height: 892px;
+    background: var(--md-bg);
+    position: relative;
+    padding-bottom: 96px;
+    overflow: hidden;
+  }
+  .appbar {
+    height: 64px;
+    padding: 0 var(--sp-3);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--md-bg);
+    color: var(--md-on-surface);
+  }
+  .appbar .left, .appbar .right {
+    display: flex; align-items: center; gap: var(--sp-1);
+    min-width: 48px; min-height: 48px;
+  }
+  .appbar .title {
+    font-size: 22px; font-weight: 500; letter-spacing: 0.2px;
+    flex: 1; text-align: center;
+  }
+  .icon-btn {
+    width: 48px; height: 48px; min-width: 48px; min-height: 48px;
+    border-radius: 24px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: none; color: inherit; cursor: pointer;
+  }
+  .icon-btn:hover { background: rgba(255,255,255,0.06); }
+  .icon-btn .material {
+    width: 24px; height: 24px; fill: currentColor;
+  }
+  .body {
+    padding: var(--sp-2) var(--sp-4) var(--sp-6);
+    display: flex; flex-direction: column; gap: var(--sp-5);
+  }
+  .section { display: flex; flex-direction: column; gap: var(--sp-2); }
+  .section-title {
+    font-size: 14px; font-weight: 600;
+    color: var(--md-on-surface-variant);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .field {
+    display: flex; flex-direction: column; gap: var(--sp-2);
+  }
+  .field-label {
+    font-size: 14px;
+    color: var(--md-on-surface-variant);
+  }
+  .field-value {
+    min-height: 56px;
+    background: var(--md-surface-variant);
+    border-radius: var(--radius-1);
+    padding: var(--sp-3) var(--sp-4);
+    display: flex; align-items: center;
+    font-size: 16px;
+  }
+  .field-value.muted { color: var(--md-on-surface-variant); }
+  .field-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);
+  }
+  .segmented {
+    display: flex;
+    background: var(--md-surface-variant);
+    border-radius: var(--radius-1);
+    padding: 4px;
+    gap: 4px;
+  }
+  .segmented button {
+    flex: 1;
+    min-height: 48px;
+    border: none;
+    background: transparent;
+    color: var(--md-on-surface-variant);
+    border-radius: 8px;
+    font: inherit; font-size: 14px; font-weight: 500;
+    cursor: pointer;
+    padding: 0 var(--sp-2);
+  }
+  .segmented button.selected {
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+  }
+  .slider-row {
+    background: var(--md-surface-variant);
+    border-radius: var(--radius-1);
+    padding: var(--sp-3) var(--sp-4);
+    display: flex; flex-direction: column; gap: var(--sp-2);
+  }
+  .slider-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+  }
+  .slider-head .label {
+    font-size: 16px;
+  }
+  .slider-head .value {
+    font-size: 24px; font-weight: 600; color: var(--md-primary);
+  }
+  .slider {
+    height: 32px; position: relative; display: flex; align-items: center;
+  }
+  .slider .track {
+    height: 4px; background: var(--md-outline);
+    border-radius: 2px; flex: 1; position: relative;
+  }
+  .slider .fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 35.7%;
+    background: var(--md-primary); border-radius: 2px;
+  }
+  .slider .thumb {
+    position: absolute; left: 35.7%;
+    width: 32px; height: 32px;
+    background: var(--md-primary); border-radius: 16px;
+    transform: translateX(-50%);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--md-on-primary); font-size: 12px; font-weight: 600;
+  }
+  .card {
+    background: var(--md-surface-variant);
+    border-radius: var(--radius-1);
+    padding: var(--sp-3) var(--sp-4);
+  }
+  .routines-summary {
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer;
+  }
+  .routines-summary .left {
+    display: flex; flex-direction: column;
+  }
+  .routines-summary .title {
+    font-size: 16px; font-weight: 500;
+  }
+  .routines-summary .sub {
+    font-size: 14px; color: var(--md-on-surface-variant);
+    margin-top: 2px;
+  }
+  .divider {
+    height: 1px; background: var(--md-outline); margin: var(--sp-4) 0;
+  }
+  .checkbox-row {
+    display: flex; align-items: center; gap: var(--sp-3);
+    padding: var(--sp-2) 0;
+  }
+  .checkbox {
+    width: 24px; height: 24px;
+    border: 2px solid var(--md-on-surface-variant);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .checkbox.checked {
+    background: var(--md-primary); border-color: var(--md-primary);
+  }
+  .checkbox.checked svg { color: var(--md-on-primary); }
+  .checkbox-row .label { font-size: 16px; }
+  .fab-slot {
+    position: fixed;
+    bottom: 16px; left: 50%; transform: translateX(-50%);
+    width: 412px;
+    padding: 0 var(--sp-4);
+    display: flex; gap: var(--sp-3);
+    z-index: 5;
+  }
+  .btn-primary {
+    flex: 1;
+    min-height: 56px;
+    border: none; border-radius: var(--radius-3);
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+    font: inherit; font-size: 16px; font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  }
+  .btn-secondary {
+    min-width: 96px;
+    min-height: 56px;
+    border: none; border-radius: var(--radius-3);
+    background: var(--md-surface-variant);
+    color: var(--md-on-surface);
+    font: inherit; font-size: 16px; font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .watermark {
+    position: absolute;
+    bottom: 8px; right: 12px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.32);
+    letter-spacing: 0.4px;
+    z-index: 9;
+    pointer-events: none;
+  }
+  .helper {
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    margin-top: -4px;
+  }
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    min-height: 56px;
+    padding: var(--sp-2) 0;
+  }
+  .toggle-row .label { font-size: 16px; }
+  .toggle {
+    width: 52px; height: 32px;
+    background: var(--md-outline);
+    border-radius: 16px; position: relative;
+    cursor: pointer;
+  }
+  .toggle.on { background: var(--md-primary); }
+  .toggle .knob {
+    width: 24px; height: 24px;
+    background: var(--md-bg);
+    border-radius: 12px;
+    position: absolute; top: 4px; left: 4px;
+    transition: left 0.15s ease;
+  }
+  .toggle.on .knob { left: 24px; background: var(--md-on-primary); }
+</style>
+</head>
+<body>
+<main class="phone" role="main" aria-label="Add event screen">
+  <header class="appbar" role="banner">
+    <div class="left">
+      <button class="icon-btn" aria-label="Back">
+        <svg class="material" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      </button>
+    </div>
+    <div class="title">New event</div>
+    <div class="right"></div>
+  </header>
+
+  <div class="body">
+    <!-- Title -->
+    <section class="field">
+      <label class="field-label" for="title-input">Title</label>
+      <div class="field-value">
+        <input id="title-input" type="text" value="Mom's birthday" aria-label="Event title"
+               style="background:transparent;border:none;outline:none;color:var(--md-on-surface);font:inherit;font-size:16px;width:100%;" />
+      </div>
+    </section>
+
+    <!-- Date + Time -->
+    <section class="field">
+      <div class="field-row">
+        <div>
+          <div class="field-label">Date</div>
+          <div class="field-value" role="button" tabindex="0">
+            <svg class="material" viewBox="0 0 24 24" width="20" height="20" style="margin-right:8px;fill:var(--md-on-surface-variant);"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg>
+            <span>Sep 14, 2026</span>
+          </div>
+        </div>
+        <div>
+          <div class="field-label">Time</div>
+          <div class="field-value" role="button" tabindex="0">
+            <svg class="material" viewBox="0 0 24 24" width="20" height="20" style="margin-right:8px;fill:var(--md-on-surface-variant);"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+            <span>09:00</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Lead-time slider -->
+    <section class="field">
+      <div class="slider-row">
+        <div class="slider-head">
+          <span class="label">Remind me</span>
+          <span class="value">5 <span style="font-size:14px;font-weight:500;color:var(--md-on-surface-variant);">days before</span></span>
+        </div>
+        <div class="slider" aria-label="Lead time slider, value 5">
+          <div class="track"><div class="fill"></div></div>
+          <div class="thumb">5</div>
+        </div>
+      </div>
+      <div class="helper">Range: 0–14 days</div>
+    </section>
+
+    <!-- Repeat segmented -->
+    <section class="field">
+      <div class="field-label">Repeat</div>
+      <div class="segmented" role="tablist" aria-label="Repeat">
+        <button class="selected" role="tab" aria-selected="true">Does not repeat</button>
+        <button role="tab" aria-selected="false">Annually</button>
+      </div>
+    </section>
+
+    <!-- Routines summary -->
+    <section class="field">
+      <div class="card">
+        <div class="routines-summary" role="button" tabindex="0" aria-expanded="false">
+          <div class="left">
+            <div class="title">Routines</div>
+            <div class="sub">1 routine attached</div>
+          </div>
+          <svg class="material" viewBox="0 0 24 24" width="24" height="24" style="fill:var(--md-on-surface-variant);"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+        </div>
+        <div class="divider"></div>
+        <div class="checkbox-row">
+          <div class="checkbox checked" aria-checked="true" role="checkbox" tabindex="0">
+            <svg class="material" viewBox="0 0 24 24" width="16" height="16"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          </div>
+          <span class="label">Save as template</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="fab-slot" role="toolbar" aria-label="Actions">
+    <button class="btn-primary" aria-label="Save event">
+      <svg class="material" viewBox="0 0 24 24" width="20" height="20" style="fill:currentColor;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+      Save
+    </button>
+  </div>
+
+  <div class="watermark">W15 · Group C</div>
+</main>
+</body>
+</html>

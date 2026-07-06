@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>W34 — Templates gallery | do it wireframes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --md-bg: #111418;
+    --md-surface: #1a1d22;
+    --md-surface-variant: #2a2e35;
+    --md-primary: #a8c7fa;
+    --md-on-primary: #062e6f;
+    --md-primary-container: #274777;
+    --md-on-primary-container: #d3e3fd;
+    --md-secondary: #c0c6dd;
+    --md-secondary-container: #3a4357;
+    --md-on-secondary-container: #dde2f9;
+    --md-tertiary: #a6c8ff;
+    --md-tertiary-container: #383f57;
+    --md-on-tertiary-container: #d9e3ff;
+    --md-on-surface: #e3e2e6;
+    --md-on-surface-variant: #c5c6d0;
+    --md-outline: #8e9099;
+    --md-outline-variant: #44474f;
+
+    --c-red: #ffb4ab;
+    --c-orange: #ffcf8a;
+    --c-yellow: #ffe169;
+    --c-green: #a4d3a4;
+    --c-teal: #7dd3c0;
+    --c-blue: #a8c7fa;
+    --c-purple: #d0bcff;
+    --c-pink: #f9b9d2;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #0d0f12; color: var(--md-on-surface); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+  .stage {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 32px 16px 64px;
+    flex-wrap: wrap;
+  }
+
+  .phone {
+    width: 412px;
+    height: 892px;
+    background: var(--md-bg);
+    border-radius: 32px;
+    border: 1px solid #2a2e35;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6), inset 0 0 0 4px #000;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .phone-label {
+    text-align: center;
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .status-bar {
+    height: 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px;
+    font-size: 12px;
+    background: var(--md-bg);
+    color: var(--md-on-surface);
+    flex-shrink: 0;
+  }
+  .status-bar .right { display: flex; gap: 6px; align-items: center; }
+
+  .app-bar {
+    height: 56px;
+    display: flex; align-items: center;
+    padding: 0 12px;
+    background: var(--md-bg);
+    color: var(--md-on-surface);
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .app-bar .icon-btn {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    color: var(--md-on-surface);
+    font-size: 22px;
+  }
+  .app-bar .title {
+    font-size: 18px; font-weight: 500;
+  }
+  .app-bar .spacer { flex: 1; }
+
+  .body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 12px 24px;
+    background: var(--md-bg);
+    color: var(--md-on-surface);
+  }
+
+  /* Filter row */
+  .filter-row {
+    display: flex;
+    gap: 8px;
+    padding: 8px 4px 16px;
+    overflow-x: auto;
+  }
+  .filter-chip {
+    flex-shrink: 0;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--md-outline-variant);
+    border-radius: 16px;
+    font-size: 13px;
+    color: var(--md-on-surface-variant);
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .filter-chip.active {
+    background: var(--md-secondary-container);
+    border-color: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+  }
+  .filter-chip .ic { font-size: 14px; }
+
+  /* Search */
+  .search {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    background: var(--md-surface);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: 24px;
+    margin: 0 4px 12px;
+    color: var(--md-on-surface-variant);
+    font-size: 14px;
+  }
+  .search input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--md-on-surface);
+    font-size: 14px;
+    font-family: inherit;
+  }
+
+  /* Section headers */
+  .sect-h {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--md-on-surface);
+    margin: 16px 4px 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sect-h .badge {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--md-on-surface-variant);
+    background: var(--md-surface);
+    padding: 2px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--md-outline-variant);
+  }
+
+  /* Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 0 4px;
+  }
+  .tcard {
+    background: var(--md-surface);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 132px;
+  }
+  .tcard .top {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .tcard .ic {
+    width: 36px; height: 36px;
+    border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .tcard .name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--md-on-surface);
+    line-height: 1.2;
+    flex: 1; min-width: 0;
+  }
+  .tcard .cat {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--md-surface-variant);
+    color: var(--md-on-surface-variant);
+    padding: 2px 8px;
+    border-radius: 8px;
+    width: fit-content;
+  }
+  .tcard .cat .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+  .tcard .desc {
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    line-height: 1.4;
+    flex: 1;
+  }
+  .tcard .cta {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 6px 0;
+    color: var(--md-primary);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* FAB */
+  .fab {
+    position: absolute;
+    bottom: 24px;
+    right: 16px;
+    width: 56px; height: 56px;
+    border-radius: 28px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.4);
+  }
+
+  /* Watermark */
+  .watermark {
+    position: absolute;
+    bottom: 8px;
+    left: 12px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--md-outline);
+    pointer-events: none;
+    z-index: 10;
+    font-family: ui-monospace, monospace;
+  }
+</style>
+</head>
+<body>
+
+<main class="stage" role="main" aria-label="Wireframes">
+
+  <div>
+    <div class="phone-label">Templates — All (25)</div>
+    <div class="phone" role="region" aria-label="Templates gallery all filter">
+      <div class="status-bar">
+        <span class="left">9:30</span>
+        <span class="right"><span>5G</span><span>&#9679;&#9679;&#9679;</span><span>&#9707;</span></span>
+      </div>
+      <div class="app-bar">
+        <span class="icon-btn" aria-hidden="true">&#8592;</span>
+        <span class="title">Templates</span>
+        <span class="spacer"></span>
+        <span class="icon-btn" aria-hidden="true">&#128269;</span>
+      </div>
+
+      <div class="body">
+        <!-- Filter chips -->
+        <div class="filter-row" role="tablist" aria-label="Template filters">
+          <button class="filter-chip active" role="tab" aria-selected="true"><span class="ic">&#10024;</span>All</button>
+          <button class="filter-chip" role="tab"><span class="ic">&#128190;</span>Do</button>
+          <button class="filter-chip" role="tab"><span class="ic">&#128197;</span>Event</button>
+          <button class="filter-chip" role="tab"><span class="ic">&#128101;</span>Person</button>
+          <button class="filter-chip" role="tab"><span class="ic">&#9881;</span>Routine</button>
+        </div>
+
+        <div class="search">
+          <span aria-hidden="true">&#128269;</span>
+          <input placeholder="Search templates" aria-label="Search templates"/>
+        </div>
+
+        <!-- Dos -->
+        <div class="sect-h">
+          <span>Dos</span>
+          <span class="badge">12</span>
+        </div>
+        <div class="grid">
+          <div class="tcard">
+            <div class="top">
+              <div class="ic" style="background:var(--c-green);color:#0a3a0a;" aria-hidden="true">&#127861;</div>
+              <div class="name">Drink water</div>
+            </div>
+            <div class="cat"><span class="dot" style="background:var(--c-green);"></span>Health</div>
+            <div class="desc">8 glasses spread across the day.</div>
+            <div class="cta">Use template &#8594;</div>
+          </div>
+          <div class="tcard">
+            <div class="top">
+              <div class="ic" style="background:var(--c-orange);color:#5a2a0a;" aria-hidden="true">&#127939;</div>
+              <div class="name">Morning run</div>
+            </div>
+            <div class="cat"><span class="dot" style="background:var(--c-orange);"></span>Health</div>
+            <div class="desc">20 minutes, every weekday.</div>
+            <div class="cta">Use template &#8594;</div>
+          </div>
+          <div class="tcard">
+            <div class="top">
+              <div class="ic" style="background:var(--c-purple);color:#3a1a5a;" aria-hidden="true">&#128370;</div>
+              <div class="name">Write journal</div>
+            </div>
+            <div class="cat"><span class="dot" style="background:var(--c-purple);"></span>Mind</div>
+            <div class="desc">3 things, daily at 21:00.</div>
+            <div class="cta">Use template &#8594;</div>
+          </div>
+          <div class="tcard">
+            <div class="top">
+              <div class="ic" style="background:var(--c-blue);color:#0a2a5a;" aria-hidden="true">&#128173;</div>
+              <div class="name">Read 30 minutes</div>
+            </div>
+            <div class="cat"><span class="dot" style="background:var(--c-blue);"></span>Mind</div>
+            <div class="desc">Before bed, every day.</div>
+            <div class="cta">Use template &#8594;</div>
+          </div>
+          <div class="tcard">
+            <div class="top">
+              <div class="ic" style="background:var(--c-teal);color:#0a3a3a;" aria-hidden="true">&#127860;</div>
+              <div class="name">Eat vegetables</div>
+            </div>
+            <div class="cat"><span class="dot" style="background:var(--c-teal);"></span>Health</div>
+            <div class="desc">Two servings at lunch and dinner.</div>
+            <div class="cta">Use template &#8594;</div>
+          </div>
+          <div class="tcard">
+            <div class="top">
+              <div class="ic" style="background:var(--c-pink);color:#5a1a3a;" aria-hidden="true">&#128156;</div>
+              <div class="name">Call a friend</div>
+            </div>
+            <div class="cat"><span class="dot" style="background:var(--c-pink);"></span>Relationships</div>
+            <div class="desc">One call per week.</div>
+            <div class="cta">Use template &#8594;</div>
+          </div>
+        </div>
+
+        <!-- Events -->
+        <div class="sect-h">
+          <span>Events</span>
+          <span class="badge">4</span>
+        </div>
+        <div class="grid">
+          <div class="tcard">
+            <div class="top">
+              <div class="ic" style="background:var(--c-yellow);color:#5a4a0a;" aria-hidden="true">&#127873;</div>
+              <div class="name">Birthday</div>
+            </div>
+            <div class="cat"><span class="dot" style="background:var(--c-yellow);"></span>Event</div>
+            <div class="desc">Annual reminder 7 days before.</div>
+            <div class="cta">Use template &#8594;</div>
+          </div>
+          <div class="tcard">
+            <div class="top">
+              <div class="ic" style="background:var(--c-red);color:#5a0a0a;" aria-hidden="true">&#128197;</div>
+              <div class="name">Anniversary</div>
+            </div>
+            <div class="cat"><span class="dot" style="background:var(--c-red);"></span>Event</div>
+            <div class="desc">Annual, 14-day lead time.</div>
+            <div class="cta">Use template &#8594;</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="watermark" aria-hidden="true">W-34 &middot; Group H</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="phone-label">Templates — Routines filtered</div>
+    <div class="phone" role="region" aria-label="Templates gallery routine filter">
+      <div class="status-bar">
+        <span class="left">9:30</span>
+        <span class="right"><span>5G</span><span>&#9679;&#9679;&#9679;</span><span>&#9707;</span></span>
+      </div>
+      <div class="app-bar">
+        <span class="icon-btn" aria-hidden="true">&#8592;</span>
+        <span class="title">Templates</span>
+        <span class="spacer"></span>
+        <span class="icon-btn" aria-hidden="true">&#128269;</span>
+      </div>
+
+      <div class="body">
+        <div class="filter-row" role="tablist">
+          <button class="filter-chip" role="tab"><span class="ic">&#10024;</span>All</button>
+          <button class="filter-chip" role="tab"><span class="ic">&#128190;</span>Do</button>
+          <button class="filter-chip" role="tab"><span class="ic">&#128197;</span>Event</button>
+          <button class="filter-chip" role="tab"><span class="ic">&#128101;</span>Person</button>
+          <button class="filter-chip active" role="tab" aria-selected="true"><span class="ic">&#9881;</span>Routine</button>
+        </div>
+
+        <div class="sect-h">
+          <span>Routines</span>
+          <span class="badge">6</span>
+        </div>
+        <div class="grid">
+          <div class="tcard">
+            <div class="top">
+              <div class="ic" style="background:var(--c-teal);color:#0a3a3a;" aria-hidden="true">&#128205;</div>
+              <div class="name">At the gym</div>
+            </div>
+            <div class="cat"><span class="dot" style="background:var(--c-teal);"></span>Location</div>
+            <div class="desc">Silence phone, switch to DND.</div>
+            <div class="cta">Use template &#8594;</div>
+          </div>
+          <div class="tcard">
+            <div class="top">
+              <div class="ic" style="background:var(--c-purple);color:#3a1a5a;" aria-hidden="true">&#128197;</div>
+              <div class="name">Calendar event</div>
+            </div>
+            <div class="cat"><span class="dot" style="background:var(--c-purple);"></span>Calendar</div>
+            <div class="desc">Notify on event start.</div>
+            <div class="cta">Use template &#8594;</div>
+          </div>
+          <div class="tcard">
+            <div class="top">
+              <div class="ic" style="background:var(--c-orange);color:#5a2a0a;" aria-hidden="true">&#128267;</div>
+              <div class="name">Headphones in</div>
+            </div>
+            <div class="cat"><span class="dot" style="background:var(--c-orange);"></span>Device state</div>
+            <div class="desc">Launch music + mute notifs.</div>
+            <div class="cta">Use template &#8594;</div>
+          </div>
+          <div class="tcard">
+            <div class="top">
+              <div class="ic" style="background:var(--c-pink);color:#5a1a3a;" aria-hidden="true">&#128222;</div>
+              <div class="name">Japan silent mode</div>
+            </div>
+            <div class="cat"><span class="dot" style="background:var(--c-pink);"></span>Call screening</div>
+            <div class="desc">Mute calls from selected contacts.</div>
+            <div class="cta">Use template &#8594;</div>
+          </div>
+        </div>
+
+        <p style="font-size:12px;color:var(--md-on-surface-variant);margin:16px 8px 0;">
+          Routines attach to a do and fire automatically when a trigger condition matches.
+        </p>
+      </div>
+
+      <div class="watermark" aria-hidden="true">W-34 &middot; Group H</div>
+    </div>
+  </div>
+
+</main>
+
+</body>
+</html>

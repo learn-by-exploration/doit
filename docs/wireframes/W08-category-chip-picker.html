@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=412, initial-scale=1">
+<title>W08 — Category chip + swatch picker</title>
+<style>
+  :root {
+    --md-surface: #14141A;
+    --md-surface-container: #1E1E26;
+    --md-surface-container-high: #28282F;
+    --md-surface-container-highest: #32323A;
+    --md-primary: #D0BCFF;
+    --md-on-primary: #381E72;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-secondary: #CCC2DC;
+    --md-secondary-container: #4A4458;
+    --md-on-secondary-container: #E8DEF8;
+    --md-tertiary: #EFB8C8;
+    --md-tertiary-container: #633B48;
+    --md-on-tertiary-container: #FFD8E4;
+    --md-on-surface: #E6E1E5;
+    --md-on-surface-variant: #CAC4D0;
+    --md-outline: #938F99;
+    --md-outline-variant: #49454F;
+    --cat-red:    #EF5350;
+    --cat-orange: #FF9A3C;
+    --cat-yellow: #FFD479;
+    --cat-green:  #81C995;
+    --cat-teal:   #4DD0E1;
+    --cat-blue:   #64B5F6;
+    --cat-purple: #B39DDB;
+    --cat-pink:   #F48FB1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #0F0F14;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    color: var(--md-on-surface);
+    -webkit-font-smoothing: antialiased;
+  }
+  body { display: flex; justify-content: center; padding: 20px 0; }
+  .viewport {
+    width: 412px;
+    min-height: 892px;
+    background: var(--md-surface);
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+
+  .scrim {
+    flex: 1;
+    background: rgba(15,15,20,.6);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .appbar {
+    display: flex; align-items: center;
+    padding: 12px 16px;
+    min-height: 64px; gap: 8px;
+  }
+  .appbar .title { font-size: 22px; font-weight: 500; flex: 1; }
+
+  .sheet {
+    width: 100%;
+    background: var(--md-surface-container);
+    border-top-left-radius: 28px;
+    border-top-right-radius: 28px;
+    padding: 12px 16px 24px;
+  }
+  .handle {
+    width: 32px;
+    height: 4px;
+    background: var(--md-outline-variant);
+    border-radius: 2px;
+    margin: 8px auto 12px;
+  }
+  .sheet-head {
+    display: flex; align-items: center;
+    margin-bottom: 16px;
+    gap: 8px;
+  }
+  .sheet-head .title {
+    font-size: 22px;
+    font-weight: 500;
+    flex: 1;
+  }
+
+  .section-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--md-primary);
+    padding: 12px 4px 8px;
+    letter-spacing: .3px;
+  }
+
+  /* ChoiceChip row */
+  .chip-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 4px 0 8px;
+  }
+  .chip-row::-webkit-scrollbar { display: none; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 16px;
+    border: 1.5px solid var(--md-outline-variant);
+    color: var(--md-on-surface-variant);
+    font-size: 13px;
+    font-weight: 500;
+    background: transparent;
+    font-family: inherit;
+    cursor: pointer;
+    min-height: 40px;
+    white-space: nowrap;
+  }
+  .chip .dot {
+    width: 10px; height: 10px;
+    border-radius: 5px;
+    flex-shrink: 0;
+  }
+  .chip.selected {
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+    border-color: var(--md-secondary-container);
+  }
+
+  /* Swatch ListView (default + 7 override) */
+  .swatch-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .swatch-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--md-outline-variant);
+    cursor: pointer;
+    min-height: 56px;
+  }
+  .swatch-row:last-child { border-bottom: none; }
+  .swatch {
+    width: 36px; height: 36px;
+    border-radius: 18px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 2px solid transparent;
+    flex-shrink: 0;
+  }
+  .swatch.default {
+    background: linear-gradient(135deg, var(--cat-red), var(--cat-orange), var(--cat-yellow), var(--cat-green), var(--cat-teal), var(--cat-blue), var(--cat-purple), var(--cat-pink));
+  }
+  .swatch.red    { background: var(--cat-red); }
+  .swatch.orange { background: var(--cat-orange); }
+  .swatch.yellow { background: var(--cat-yellow); }
+  .swatch.green  { background: var(--cat-green); }
+  .swatch.teal   { background: var(--cat-teal); }
+  .swatch.blue   { background: var(--cat-blue); }
+  .swatch.purple { background: var(--cat-purple); }
+  .swatch.pink   { background: var(--cat-pink); }
+
+  .swatch.selected {
+    outline: 2px solid var(--md-primary);
+    outline-offset: 2px;
+  }
+
+  .swatch-row .grow { flex: 1; font-size: 14px; }
+  .swatch-row .meta { font-size: 12px; color: var(--md-on-surface-variant); }
+  .swatch-row .check { color: var(--md-primary); }
+
+  .annotation {
+    margin: 16px;
+    padding: 10px 12px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  /* Default-state chip on AddHabit form */
+  .state-title {
+    margin: 12px 16px 6px;
+    font-size: 12px;
+    color: var(--md-primary);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    font-weight: 700;
+  }
+  .form-card {
+    margin: 0 16px;
+    background: var(--md-surface-container);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .form-card .label { font-size: 14px; color: var(--md-on-surface-variant); }
+  .form-card .category-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(129,201,149,.18);
+    color: var(--cat-green);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 12px 6px 10px;
+    border-radius: 14px;
+    border: none;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .form-card .category-chip .dot {
+    width: 10px; height: 10px;
+    border-radius: 5px;
+    background: var(--cat-green);
+  }
+
+  .watermark {
+    position: absolute;
+    bottom: 8px; right: 12px;
+    font-size: 10px;
+    color: var(--md-on-surface-variant);
+    opacity: .55;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    z-index: 10;
+  }
+
+  .material-icons {
+    font-family: "Material Icons", "Material Symbols Outlined", system-ui;
+    font-style: normal; font-weight: 400;
+    line-height: 1;
+    display: inline-block;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+  }
+</style>
+</head>
+<body>
+<div class="viewport" role="application" aria-label="Category chip and swatch picker">
+
+  <div class="appbar" role="banner">
+    <button class="iconbtn" aria-label="Back" style="background:transparent; border:none; color:var(--md-on-surface-variant); width:48px; height:48px; border-radius:24px;">
+      <span class="material-icons">arrow_back</span>
+    </button>
+    <div class="title">New do</div>
+  </div>
+
+  <div class="state-title">In-context · CategoryChip pill on the form</div>
+  <div class="form-card">
+    <div class="label">Category</div>
+    <button class="category-chip" aria-label="Category: Health, green swatch">
+      <span class="dot"></span>
+      Health
+      <span class="material-icons" style="font-size: 16px;">expand_more</span>
+    </button>
+  </div>
+
+  <div class="state-title">Modal sheet · CategoryPickerSheet</div>
+
+  <div class="scrim">
+    <div class="sheet" role="dialog" aria-labelledby="catSheetTitle">
+      <div class="handle" aria-hidden="true"></div>
+      <div class="sheet-head">
+        <div class="title" id="catSheetTitle">Category</div>
+      </div>
+
+      <div class="section-label">Category</div>
+      <div class="chip-row" role="listbox" aria-label="Category">
+        <button class="chip selected" role="option" aria-selected="true">
+          <span class="dot" style="background: var(--cat-green);"></span>Health
+        </button>
+        <button class="chip" role="option">
+          <span class="dot" style="background: var(--cat-teal);"></span>Mind
+        </button>
+        <button class="chip" role="option">
+          <span class="dot" style="background: var(--cat-pink);"></span>Relationships
+        </button>
+        <button class="chip" role="option">
+          <span class="dot" style="background: var(--cat-blue);"></span>Productivity
+        </button>
+        <button class="chip" role="option">
+          <span class="dot" style="background: var(--cat-orange);"></span>Home
+        </button>
+        <button class="chip" role="option">
+          <span class="dot" style="background: var(--md-outline);"></span>Other
+        </button>
+      </div>
+
+      <div class="section-label">Color</div>
+      <div class="swatch-list" role="listbox" aria-label="Color override">
+        <div class="swatch-row" role="option" aria-selected="false">
+          <div class="swatch default"></div>
+          <div class="grow">
+            <div>Default</div>
+            <div class="meta">Uses category's natural color</div>
+          </div>
+        </div>
+        <div class="swatch-row" role="option" aria-selected="false">
+          <div class="swatch red"></div>
+          <div class="grow">
+            <div>Red</div>
+            <div class="meta">Override swatch · 1 of 7</div>
+          </div>
+        </div>
+        <div class="swatch-row" role="option" aria-selected="false">
+          <div class="swatch orange"></div>
+          <div class="grow">
+            <div>Orange</div>
+            <div class="meta">Override swatch · 2 of 7</div>
+          </div>
+        </div>
+        <div class="swatch-row" role="option" aria-selected="false">
+          <div class="swatch yellow"></div>
+          <div class="grow">
+            <div>Yellow</div>
+            <div class="meta">Override swatch · 3 of 7</div>
+          </div>
+        </div>
+        <div class="swatch-row" role="option" aria-selected="true">
+          <div class="swatch green selected"></div>
+          <div class="grow">
+            <div>Green</div>
+            <div class="meta">Override swatch · 4 of 7</div>
+          </div>
+          <span class="material-icons check">check</span>
+        </div>
+        <div class="swatch-row" role="option" aria-selected="false">
+          <div class="swatch teal"></div>
+          <div class="grow">
+            <div>Teal</div>
+            <div class="meta">Override swatch · 5 of 7</div>
+          </div>
+        </div>
+        <div class="swatch-row" role="option" aria-selected="false">
+          <div class="swatch blue"></div>
+          <div class="grow">
+            <div>Blue</div>
+            <div class="meta">Override swatch · 6 of 7</div>
+          </div>
+        </div>
+        <div class="swatch-row" role="option" aria-selected="false">
+          <div class="swatch purple"></div>
+          <div class="grow">
+            <div>Purple</div>
+            <div class="meta">Override swatch · 7 of 7</div>
+          </div>
+        </div>
+        <div class="swatch-row" role="option" aria-selected="false">
+          <div class="swatch pink"></div>
+          <div class="grow">
+            <div>Pink</div>
+            <div class="meta">Override swatch · 8 of 8 (cap at 7 in app — pink hidden)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    The only file in the app that bridges <code>DoCategory</code> (pure Dart enum) to a Flutter <code>Color</code>. <code>colorSeed = 0</code> = default; <code>1..7</code> = override swatch. The visible palette: red · orange · yellow · green · teal · blue · purple · pink (8 swatches total; 1 default + 7 override).
+  </div>
+
+  <div class="watermark">W-08 · Group A</div>
+</div>
+</body>
+</html>

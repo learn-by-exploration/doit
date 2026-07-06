@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>W17 — Calendar-event routine</title>
+<style>
+  :root {
+    --md-bg: #111418;
+    --md-surface: #1a1d22;
+    --md-surface-variant: #272b30;
+    --md-on-surface: #e3e3e3;
+    --md-on-surface-variant: #b0b3b8;
+    --md-outline: #404549;
+    --md-primary: #b8c6ff;
+    --md-on-primary: #1a3065;
+    --md-primary-container: #334479;
+    --md-on-primary-container: #dbe2ff;
+    --md-secondary-container: #3c4a59;
+    --md-on-secondary-container: #d4e3ff;
+    --md-tertiary-container: #4a3a78;
+    --md-on-tertiary-container: #e8deff;
+    --md-error-container: #93000a;
+    --md-on-error-container: #ffdad6;
+
+    --cat-red: #f28b82;
+    --cat-orange: #fbb074;
+    --cat-yellow: #fdd663;
+    --cat-green: #81c995;
+    --cat-teal: #78d5cb;
+    --cat-blue: #7ab3f4;
+    --cat-purple: #c58af9;
+    --cat-pink: #f78fb8;
+
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 24px;
+    --sp-6: 32px;
+    --radius-1: 12px;
+    --radius-2: 16px;
+    --radius-3: 24px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; background: #000;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--md-on-surface);
+    display: flex; justify-content: center; align-items: flex-start;
+  }
+  .phone {
+    width: 412px; min-height: 892px;
+    background: var(--md-bg); position: relative;
+    padding-bottom: 64px;
+    overflow: hidden;
+  }
+  .appbar {
+    height: 64px; padding: 0 var(--sp-3);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--md-bg); color: var(--md-on-surface);
+  }
+  .appbar .left { min-width: 48px; min-height: 48px; display: flex; align-items: center; }
+  .appbar .right { min-width: 48px; min-height: 48px; display: flex; align-items: center; justify-content: flex-end; }
+  .appbar .title { font-size: 22px; font-weight: 500; letter-spacing: 0.2px; flex: 1; text-align: center; }
+  .icon-btn {
+    width: 48px; height: 48px; min-width: 48px; min-height: 48px;
+    border-radius: 24px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: none; color: inherit; cursor: pointer;
+  }
+  .icon-btn:hover { background: rgba(255,255,255,0.06); }
+  .icon-btn .material { width: 24px; height: 24px; fill: currentColor; }
+
+  .body { padding: var(--sp-2) var(--sp-4) var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-5); }
+
+  /* Sheet header (drag handle style) */
+  .sheet-header {
+    display: flex; flex-direction: column; align-items: center; gap: var(--sp-2);
+    padding-top: var(--sp-3); padding-bottom: var(--sp-3);
+  }
+  .handle {
+    width: 32px; height: 4px; border-radius: 2px;
+    background: var(--md-on-surface-variant); opacity: 0.4;
+  }
+  .sheet-title {
+    font-size: 22px; font-weight: 500; padding: var(--sp-2) 0 var(--sp-1);
+  }
+  .sheet-subtitle {
+    font-size: 14px; color: var(--md-on-surface-variant);
+    text-align: center; max-width: 320px;
+  }
+
+  .permission-banner {
+    background: var(--md-error-container);
+    color: var(--md-on-error-container);
+    border-radius: var(--radius-1);
+    padding: var(--sp-3) var(--sp-4);
+    display: flex; gap: var(--sp-3); align-items: flex-start;
+  }
+  .permission-banner .icon {
+    flex-shrink: 0;
+    width: 24px; height: 24px;
+  }
+  .permission-banner .icon .material { width: 24px; height: 24px; fill: currentColor; }
+  .permission-banner .copy {
+    flex: 1;
+    font-size: 14px;
+    display: flex; flex-direction: column; gap: var(--sp-2);
+  }
+  .permission-banner .title { font-weight: 600; font-size: 16px; }
+  .permission-banner button {
+    align-self: flex-start;
+    min-height: 36px;
+    padding: 0 var(--sp-3);
+    border-radius: var(--radius-3);
+    border: 1px solid var(--md-on-error-container);
+    background: transparent;
+    color: var(--md-on-error-container);
+    font: inherit; font-size: 14px; font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Filter row */
+  .filter-row {
+    display: flex; gap: var(--sp-2);
+    overflow-x: auto;
+    padding-bottom: var(--sp-2);
+  }
+  .chip {
+    min-height: 32px;
+    padding: 0 var(--sp-3);
+    border-radius: 16px;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--md-surface-variant);
+    color: var(--md-on-surface);
+    font: inherit; font-size: 14px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .chip.selected {
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+    border-color: var(--md-on-secondary-container);
+  }
+  .chip .dot {
+    width: 10px; height: 10px; border-radius: 5px;
+    background: var(--cat-blue);
+  }
+
+  /* Event rows (multi-select) */
+  .event-row {
+    min-height: 72px;
+    background: var(--md-surface-variant);
+    border-radius: var(--radius-1);
+    padding: var(--sp-3) var(--sp-4);
+    display: flex; gap: var(--sp-3); align-items: center;
+    cursor: pointer;
+    border: 2px solid transparent;
+  }
+  .event-row.selected {
+    border-color: var(--md-primary);
+  }
+  .check {
+    width: 24px; height: 24px;
+    border-radius: 4px;
+    border: 2px solid var(--md-on-surface-variant);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .event-row.selected .check {
+    background: var(--md-primary);
+    border-color: var(--md-primary);
+  }
+  .event-row.selected .check .material {
+    width: 18px; height: 18px; fill: var(--md-on-primary);
+  }
+  .check .material { width: 18px; height: 18px; fill: transparent; }
+  .event-row .main { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .event-row .title { font-size: 16px; font-weight: 500; }
+  .event-row .meta { font-size: 14px; color: var(--md-on-surface-variant); }
+  .event-row .meta .swatch {
+    display: inline-block; width: 8px; height: 8px; border-radius: 4px;
+    background: var(--cat-blue);
+    margin-right: 6px; vertical-align: middle;
+  }
+
+  /* Action row summary */
+  .summary {
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    border-radius: var(--radius-1);
+    padding: var(--sp-3) var(--sp-4);
+    display: flex; justify-content: space-between; align-items: center;
+    min-height: 64px;
+  }
+  .summary .copy { display: flex; flex-direction: column; }
+  .summary .title { font-size: 16px; font-weight: 600; }
+  .summary .sub { font-size: 14px; opacity: 0.85; }
+  .summary button {
+    min-height: 48px;
+    padding: 0 var(--sp-4);
+    border-radius: var(--radius-3);
+    background: var(--md-on-primary-container);
+    color: var(--md-primary-container);
+    border: none;
+    font: inherit; font-size: 14px; font-weight: 600;
+    cursor: pointer;
+  }
+
+  .fab-slot {
+    position: absolute;
+    bottom: 16px; left: 0; right: 0;
+    padding: 0 var(--sp-4);
+    display: flex; gap: var(--sp-3);
+    z-index: 5;
+  }
+  .btn-secondary {
+    min-width: 96px;
+    min-height: 56px;
+    border: none; border-radius: var(--radius-3);
+    background: var(--md-surface-variant);
+    color: var(--md-on-surface);
+    font: inherit; font-size: 16px; font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .btn-primary {
+    flex: 1;
+    min-height: 56px;
+    border: none; border-radius: var(--radius-3);
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+    font: inherit; font-size: 16px; font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  }
+
+  .watermark {
+    position: absolute; bottom: 4px; right: 12px;
+    font-size: 11px; color: rgba(255,255,255,0.32);
+    letter-spacing: 0.4px; z-index: 9; pointer-events: none;
+  }
+
+  .helper {
+    font-size: 12px; color: var(--md-on-surface-variant);
+    text-align: center; padding-top: var(--sp-3);
+  }
+</style>
+</head>
+<body>
+<main class="phone" role="main" aria-label="Pick a calendar event sheet">
+  <header class="appbar" role="banner">
+    <div class="left">
+      <button class="icon-btn" aria-label="Close">
+        <svg class="material" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+    </div>
+    <div class="title">Pick a calendar event</div>
+    <div class="right"></div>
+  </header>
+
+  <div class="body">
+    <div class="sheet-header">
+      <div class="handle" aria-hidden="true"></div>
+      <div class="sheet-title">Calendar event trigger</div>
+      <div class="sheet-subtitle">Pick the calendar events that fire this routine.</div>
+    </div>
+
+    <!-- Permission-denied banner (alternate state) -->
+    <div class="permission-banner" role="alert">
+      <div class="icon" aria-hidden="true">
+        <svg class="material" viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+      </div>
+      <div class="copy">
+        <div class="title">Allow calendar access</div>
+        <div>do it reads calendar events only when this routine needs to fire. Your calendar is never stored or sent off-device.</div>
+        <button>Allow</button>
+      </div>
+    </div>
+
+    <!-- Source filter -->
+    <section aria-label="Filter by calendar">
+      <div class="filter-row">
+        <button class="chip selected" aria-pressed="true"><span class="dot" style="background:var(--cat-blue);"></span>All calendars</button>
+        <button class="chip" aria-pressed="false"><span class="dot" style="background:var(--cat-green);"></span>Personal</button>
+        <button class="chip" aria-pressed="false"><span class="dot" style="background:var(--cat-purple);"></span>Work</button>
+        <button class="chip" aria-pressed="false"><span class="dot" style="background:var(--cat-orange);"></span>Family</button>
+      </div>
+    </section>
+
+    <!-- Event list (multi-select) -->
+    <section aria-label="Upcoming calendar events">
+      <div class="event-row" role="checkbox" aria-checked="false" tabindex="0">
+        <div class="check"><svg class="material" viewBox="0 0 24 24"></svg></div>
+        <div class="main">
+          <div class="title">Quarterly planning meeting</div>
+          <div class="meta"><span class="swatch"></span>Tue Aug 12 · 14:00–15:30 · Work</div>
+        </div>
+      </div>
+
+      <div class="event-row" style="margin-top:8px;" role="checkbox" aria-checked="false" tabindex="0">
+        <div class="check"><svg class="material" viewBox="0 0 24 24"></svg></div>
+        <div class="main">
+          <div class="title">Dentist appointment</div>
+          <div class="meta"><span class="swatch" style="background:var(--cat-green);"></span>Fri Aug 15 · 10:00–11:00 · Personal</div>
+        </div>
+      </div>
+
+      <div class="event-row selected" style="margin-top:8px;" role="checkbox" aria-checked="true" tabindex="0">
+        <div class="check"><svg class="material" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+        <div class="main">
+          <div class="title">Standup</div>
+          <div class="meta"><span class="swatch" style="background:var(--cat-purple);"></span>Mon–Fri · 09:30–09:45 · Work</div>
+        </div>
+      </div>
+
+      <div class="event-row" style="margin-top:8px;" role="checkbox" aria-checked="false" tabindex="0">
+        <div class="check"><svg class="material" viewBox="0 0 24 24"></svg></div>
+        <div class="main">
+          <div class="title">Birthday dinner — Mom</div>
+          <div class="meta"><span class="swatch" style="background:var(--cat-pink);"></span>Mon Aug 25 · 19:00–22:00 · Family</div>
+        </div>
+      </div>
+
+      <div class="event-row selected" style="margin-top:8px;" role="checkbox" aria-checked="true" tabindex="0">
+        <div class="check"><svg class="material" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+        <div class="main">
+          <div class="title">School pickup</div>
+          <div class="meta"><span class="swatch" style="background:var(--cat-orange);"></span>Mon–Fri · 15:00–15:15 · Family</div>
+        </div>
+      </div>
+
+      <div class="event-row" style="margin-top:8px;" role="checkbox" aria-checked="false" tabindex="0">
+        <div class="check"><svg class="material" viewBox="0 0 24 24"></svg></div>
+        <div class="main">
+          <div class="title">Yoga class</div>
+          <div class="meta"><span class="swatch" style="background:var(--cat-teal);"></span>Sat Aug 16 · 08:00–09:00 · Personal</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Selection summary -->
+    <div class="summary" aria-live="polite">
+      <div class="copy">
+        <div class="title">2 selected</div>
+        <div class="sub">Routine will fire when either event starts.</div>
+      </div>
+      <button>Action…</button>
+    </div>
+
+    <!-- Action preview (ActionNotify row) -->
+    <section aria-label="Action">
+      <div style="background:var(--md-surface-variant); border-radius:var(--radius-1); padding:var(--sp-3) var(--sp-4); display:flex; gap:var(--sp-3); align-items:center; min-height:64px;">
+        <div style="width:40px; height:40px; border-radius:20px; background:var(--md-tertiary-container); color:var(--md-on-tertiary-container); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <svg class="material" viewBox="0 0 24 24" width="22" height="22" style="fill:currentColor;"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:16px; font-weight:500;">Action: notify</div>
+          <div style="font-size:14px; color:var(--md-on-surface-variant);">"Standup is starting now"</div>
+        </div>
+        <button class="icon-btn" aria-label="Edit action">
+          <svg class="material" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <div class="helper">Trigger: when any selected event starts · 7-day rolling window</div>
+  </div>
+
+  <div class="fab-slot" role="toolbar" aria-label="Actions">
+    <button class="btn-secondary" aria-label="Cancel">Cancel</button>
+    <button class="btn-primary" aria-label="Apply trigger">
+      <svg class="material" viewBox="0 0 24 24" width="20" height="20" style="fill:currentColor;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+      Use selection
+    </button>
+  </div>
+
+  <div class="watermark">W17 · Group C</div>
+</main>
+</body>
+</html>

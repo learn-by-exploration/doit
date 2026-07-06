@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>W21 — Math mission</title>
+<meta name="viewport" content="width=412, initial-scale=1">
+<style>
+  :root {
+    --md-bg: #13141b;
+    --md-surface: #1c1d27;
+    --md-surface-variant: #272834;
+    --md-primary: #a8c7fa;
+    --md-on-primary: #062e6f;
+    --md-on-surface: #e3e3e9;
+    --md-on-surface-variant: #c5c6d0;
+    --md-outline: #44474f;
+    --md-error: #f2b8b5;
+    --md-error-container: #5c1f1d;
+    --md-tertiary: #dab8ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #0a0b10; color: var(--md-on-surface); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  .device { width: 412px; min-height: 892px; margin: 24px auto; background: var(--md-bg); border-radius: 36px; border: 1px solid #2a2b35; box-shadow: 0 18px 60px rgba(0,0,0,0.55); overflow: hidden; display: flex; flex-direction: column; position: relative; }
+  .appbar { height: 56px; padding: 0 8px; display: flex; align-items: center; gap: 4px; background: var(--md-bg); border-bottom: 1px solid var(--md-outline); }
+  .icon-btn { width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--md-on-surface); border-radius: 24px; cursor: pointer; }
+  .icon-btn:focus-visible { outline: 2px solid var(--md-primary); }
+  .icon-btn svg { width: 24px; height: 24px; fill: currentColor; }
+  .appbar-title { font-size: 18px; font-weight: 500; margin-left: 8px; }
+  .appbar-spacer { flex: 1; }
+  .stepper { font-size: 14px; color: var(--md-on-surface-variant); padding-right: 16px; }
+  .body { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 28px; }
+  .prompt-block { padding: 24px; background: var(--md-surface); border-radius: 20px; border: 1px solid var(--md-outline); display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .label { font-size: 14px; color: var(--md-on-surface-variant); letter-spacing: 0.4px; text-transform: uppercase; }
+  .problem { font-size: 56px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
+  .attempts { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--md-on-surface-variant); align-self: flex-start; }
+  .attempts .dot { width: 14px; height: 14px; border-radius: 7px; background: var(--md-error-container); border: 1px solid var(--md-error); }
+  .attempts .dot.used { background: var(--md-error); }
+  .field { display: flex; flex-direction: column; gap: 8px; }
+  .field-label { font-size: 14px; color: var(--md-on-surface-variant); }
+  .textfield { width: 100%; min-height: 64px; padding: 16px; border-radius: 14px; background: var(--md-surface); border: 1px solid var(--md-outline); color: var(--md-on-surface); font-size: 24px; font-weight: 600; font-family: inherit; outline: none; text-align: center; letter-spacing: 4px; }
+  .textfield:focus { border-color: var(--md-primary); box-shadow: 0 0 0 1px var(--md-primary); }
+  .error-row { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 12px; background: var(--md-error-container); color: var(--md-error); font-size: 14px; }
+  .error-row svg { width: 18px; height: 18px; fill: currentColor; }
+  .actions { margin-top: auto; display: flex; gap: 12px; }
+  .btn-primary { flex: 1; min-height: 56px; border: 0; border-radius: 28px; background: var(--md-primary); color: var(--md-on-primary); font-size: 16px; font-weight: 600; cursor: pointer; }
+  .btn-primary:disabled { opacity: 0.45; }
+  .btn-secondary { min-height: 56px; padding: 0 20px; border-radius: 28px; background: transparent; color: var(--md-on-surface-variant); border: 1px solid var(--md-outline); font-size: 14px; cursor: pointer; }
+  .watermark { position: absolute; bottom: 12px; right: 16px; font-size: 11px; color: var(--md-on-surface-variant); opacity: 0.55; letter-spacing: 0.5px; }
+</style>
+</head>
+<body>
+<div class="device" role="application" aria-label="Math mission screen">
+  <header class="appbar" role="banner">
+    <button class="icon-btn" aria-label="Cancel mission">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+    <div class="appbar-title">Mission</div>
+    <div class="appbar-spacer"></div>
+    <div class="stepper" aria-label="Mission progress">3 of 3</div>
+  </header>
+
+  <main class="body" role="main">
+    <section class="prompt-block" aria-labelledby="probLabel">
+      <div class="label" id="probLabel">What is 12 × 7?</div>
+      <div class="problem" aria-hidden="true">12 × 7 = ?</div>
+      <div class="attempts" aria-label="One of three attempts used">
+        <span class="dot used" aria-hidden="true"></span>
+        <span class="dot" aria-hidden="true"></span>
+        <span class="dot" aria-hidden="true"></span>
+        <span>2 tries left</span>
+      </div>
+    </section>
+
+    <div class="field">
+      <label class="field-label" for="answer">Answer</label>
+      <input id="answer" class="textfield" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" value="74" aria-describedby="ansError" />
+    </div>
+
+    <div class="error-row" id="ansError" role="alert">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 1 21h22L12 2zm1 15h-2v-2h2v2zm0-4h-2V9h2v4z"/></svg>
+      <span>Not quite. 2 tries left.</span>
+    </div>
+
+    <div class="actions">
+      <button class="btn-secondary" type="button">Skip</button>
+      <button class="btn-primary" type="button">Submit answer</button>
+    </div>
+  </main>
+
+  <span class="watermark">W-21 · Group D</span>
+</div>
+</body>
+</html>

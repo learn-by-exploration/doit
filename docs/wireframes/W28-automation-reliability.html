@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=412, initial-scale=1" />
+<title>W28 — Per-automation reliability badge + dialog</title>
+<style>
+  :root {
+    --md-primary: #D0BCFF;
+    --md-on-primary: #381E72;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-secondary: #CCC2DC;
+    --md-on-secondary: #332D41;
+    --md-secondary-container: #4A4458;
+    --md-on-secondary-container: #E8DEF8;
+    --md-tertiary: #EFB8C8;
+    --md-on-tertiary: #492532;
+    --md-tertiary-container: #633B48;
+    --md-on-tertiary-container: #FFD8E4;
+    --md-error: #F2B8B5;
+    --md-on-error: #601410;
+    --md-error-container: #8C1D18;
+    --md-on-error-container: #F9DEDC;
+    --md-background: #1C1B1F;
+    --md-on-background: #E6E1E5;
+    --md-surface: #1C1B1F;
+    --md-surface-1: #262529;
+    --md-surface-2: #312E35;
+    --md-surface-3: #3B383E;
+    --md-surface-variant: #49454F;
+    --md-on-surface: #E6E1E5;
+    --md-on-surface-variant: #CAC4D0;
+    --md-outline: #938F99;
+    --md-outline-variant: #49454F;
+    --md-scrim: rgba(0,0,0,0.55);
+    --swatch-red:    #EF4444;
+    --swatch-orange: #F97316;
+    --swatch-yellow: #EAB308;
+    --swatch-green:  #22C55E;
+    --swatch-teal:   #14B8A6;
+    --swatch-blue:   #3B82F6;
+    --swatch-purple: #A855F7;
+    --swatch-pink:   #EC4899;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #000;
+    color: var(--md-on-background);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  .stage {
+    display: flex; flex-direction: column; align-items: center; padding: 24px; gap: 32px;
+  }
+  .phone {
+    width: 412px;
+    height: 892px;
+    background: var(--md-background);
+    border-radius: 28px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.6);
+    overflow: hidden;
+    position: relative;
+    border: 1px solid #000;
+  }
+  .device-bar {
+    height: 24px;
+    background: #000;
+    color: var(--md-on-surface-variant);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px;
+  }
+
+  /* App bar */
+  .appbar {
+    display: flex; align-items: center; height: 64px;
+    padding: 0 12px; gap: 8px; background: var(--md-surface);
+  }
+  .appbar h1 { font-size: 22px; font-weight: 500; margin: 0 8px; flex: 1; }
+  .appbar button {
+    background: transparent; border: none;
+    color: var(--md-on-surface-variant);
+    padding: 12px; border-radius: 999px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 48px; min-height: 48px;
+  }
+
+  .body {
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  /* Routine row (visible where the badge lives) */
+  .routine-card {
+    background: var(--md-surface-1);
+    border-radius: 16px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 72px;
+    border: 1px solid var(--md-outline-variant);
+  }
+  .routine-card .lead-icon {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .routine-card .col { flex: 1; min-width: 0; }
+  .routine-card .title {
+    font-size: 16px; font-weight: 500; color: var(--md-on-surface);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .routine-card .subtitle {
+    font-size: 13px; color: var(--md-on-surface-variant);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* Reliability badge — 40×40 IconButton */
+  .rel-badge {
+    width: 40px; height: 40px;
+    border-radius: 999px;
+    border: none; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .rel-badge.degraded { background: var(--md-error-container); color: var(--md-on-error-container); }
+  .rel-badge.unknown  { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+  .rel-badge.optimal  { background: transparent; color: transparent; }
+  .rel-badge:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
+
+  /* Switch (toggle) */
+  .switch {
+    width: 52px; height: 32px;
+    border-radius: 16px;
+    background: var(--md-surface-3);
+    position: relative;
+    display: inline-block;
+    flex-shrink: 0;
+    border: 2px solid var(--md-outline);
+  }
+  .switch::after {
+    content: ""; position: absolute;
+    width: 24px; height: 24px;
+    border-radius: 14px;
+    background: var(--md-outline);
+    top: 0; left: 0;
+    transition: left .15s ease;
+  }
+  .switch[aria-checked="true"] { background: var(--md-primary); border-color: var(--md-primary); }
+  .switch[aria-checked="true"]::after { background: var(--md-on-primary); left: 24px; }
+
+  /* Reliability dialog */
+  .scrim {
+    position: absolute; inset: 0;
+    background: var(--md-scrim);
+  }
+  .dialog {
+    position: absolute;
+    left: 16px; right: 16px;
+    top: 50%; transform: translateY(-50%);
+    background: var(--md-surface-2);
+    border-radius: 28px;
+    padding: 24px;
+    max-height: 80%;
+    overflow: auto;
+    border: 1px solid var(--md-outline-variant);
+  }
+  .dialog h2 {
+    margin: 0 0 4px;
+    font-size: 24px; font-weight: 500;
+    color: var(--md-on-surface);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .dialog h2 .icon-bubble {
+    width: 36px; height: 36px;
+    border-radius: 12px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--md-error-container);
+    color: var(--md-on-error-container);
+  }
+  .dialog .sub {
+    color: var(--md-on-surface-variant);
+    font-size: 14px;
+    margin: 0 0 16px;
+  }
+  .dialog .section-label {
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    margin: 16px 0 8px;
+  }
+  .dialog .perm-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid var(--md-outline-variant);
+  }
+  .dialog .perm-row .col { flex: 1; }
+  .dialog .perm-row .label { font-size: 15px; color: var(--md-on-surface); }
+  .dialog .perm-row .meta { font-size: 12px; color: var(--md-on-surface-variant); }
+  .chip {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .chip.warn { background: var(--md-error-container); color: var(--md-on-error-container); }
+  .chip.ok   { background: rgba(34,197,94,0.18); color: #86efac; }
+  .chip.info { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+
+  .dialog .btn-row {
+    display: flex; gap: 8px;
+    margin-top: 24px;
+  }
+  .btn {
+    flex: 1;
+    height: 48px;
+    border-radius: 24px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn-fill { background: var(--md-primary); color: var(--md-on-primary); }
+  .btn-text { background: transparent; color: var(--md-primary); }
+
+  /* Watermark + notes */
+  .wm {
+    position: absolute; right: 6px; bottom: 4px;
+    font-size: 10px; color: var(--md-on-surface-variant); opacity: 0.55;
+  }
+  .note { position: absolute; left: 12px; bottom: 8px; color: var(--md-on-surface-variant); font-size: 11px; opacity: 0.7; }
+
+  .caption {
+    margin: 0; color: #999; font-size: 12px;
+    letter-spacing: 0.4px; text-transform: uppercase;
+  }
+
+  .screen-stack { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+
+  .placeholder-card {
+    background: var(--md-surface-1);
+    border: 1px dashed var(--md-outline);
+    border-radius: 12px;
+    padding: 16px;
+    color: var(--md-on-surface-variant);
+    font-size: 13px;
+  }
+
+  .stack-list { display: flex; flex-direction: column; gap: 8px; }
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <h2 class="caption" style="margin:0 0 8px 8px">W28 — Per-automation reliability badge + dialog (3 states)</h2>
+
+  <div class="screen-stack">
+
+    <!-- A: List view with degraded badge + optimal (hidden) examples -->
+    <div class="phone" aria-label="Routines list — badges" role="region">
+      <div class="device-bar" aria-hidden="true"><span>09:41</span><span>•</span><span>5G  87%</span></div>
+      <div class="appbar" role="banner">
+        <button aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg></button>
+        <h1>Routines</h1>
+      </div>
+      <div class="body">
+        <p class="caption">W28-A · Routines list · badge per row</p>
+
+        <div class="placeholder-card">
+          Tap a routine's badge (right side) to open its reliability dialog. A hidden badge means the routine is healthy.
+        </div>
+
+        <div class="stack-list">
+
+          <div class="routine-card">
+            <span class="lead-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
+            </span>
+            <div class="col">
+              <div class="title">Arrive at home</div>
+              <div class="subtitle">Trigger: Location · Action: Notify</div>
+            </div>
+            <span class="switch" role="switch" aria-checked="true" aria-label="Enabled"></span>
+            <button class="rel-badge degraded"
+                    aria-label="Routine reliability degraded. Tap to fix."
+                    title="Routine reliability degraded; tap to fix">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="routine-card">
+            <span class="lead-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v16c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H5V9h14v12z"/></svg>
+            </span>
+            <div class="col">
+              <div class="title">Calendar event: "Standup"</div>
+              <div class="subtitle">Trigger: Calendar · Action: Silent</div>
+            </div>
+            <span class="switch" role="switch" aria-checked="true" aria-label="Enabled"></span>
+            <button class="rel-badge unknown"
+                    aria-label="Routine reliability unknown. Tap to check."
+                    title="Routine reliability unknown">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M11 17h2v-6h-2v6zm1-15C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM11 9h2V7h-2v2z"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="routine-card">
+            <span class="lead-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+            </span>
+            <div class="col">
+              <div class="title">Plug in charger</div>
+              <div class="subtitle">Trigger: Device state · Action: Notify</div>
+            </div>
+            <span class="switch" role="switch" aria-checked="false" aria-label="Disabled"></span>
+            <!-- Optimal: badge hidden entirely -->
+            <button class="rel-badge optimal" tabindex="-1" aria-hidden="true"></button>
+          </div>
+
+        </div>
+      </div>
+      <div class="wm">W-28A · Group F</div>
+      <div class="note">badge · optimal hidden · degraded = warning · unknown = info</div>
+    </div>
+
+    <!-- B: Dialog open — Trigger / Action breakdown -->
+    <div class="phone" aria-label="Per-automation reliability dialog" role="region">
+      <div class="device-bar" aria-hidden="true"><span>09:41</span><span>•</span><span>5G  87%</span></div>
+
+      <!-- dim underlying -->
+      <div class="appbar" style="opacity:.45" aria-hidden="true">
+        <button><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg></button>
+        <h1 style="opacity:.7">Routines</h1>
+      </div>
+      <div class="body" style="opacity:.45" aria-hidden="true">
+        <div class="routine-card">
+          <span class="lead-icon"></span>
+          <div class="col"><div class="title">Arrive at home</div><div class="subtitle">Trigger: Location · Action: Notify</div></div>
+          <span class="switch" aria-checked="true"></span>
+          <button class="rel-badge degraded"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg></button>
+        </div>
+      </div>
+
+      <div class="scrim" aria-hidden="true"></div>
+
+      <div class="dialog" role="alertdialog" aria-labelledby="dlg-title" aria-describedby="dlg-sub">
+        <h2 id="dlg-title">
+          <span class="icon-bubble" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+          </span>
+          This routine may not fire
+        </h2>
+        <p class="sub" id="dlg-sub">Fix one of the permission checks below so the routine will run reliably.</p>
+
+        <p class="section-label">Trigger</p>
+        <div class="perm-row">
+          <span class="icon-bubble" style="background:var(--md-secondary-container);color:var(--md-on-secondary-container);width:36px;height:36px;border-radius:10px" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
+          </span>
+          <div class="col">
+            <div class="label">Location (precise)</div>
+            <div class="meta">Needed for "arrive at home" geofence</div>
+          </div>
+          <span class="chip warn">Denied</span>
+        </div>
+        <div class="perm-row">
+          <span class="icon-bubble" style="background:var(--md-secondary-container);color:var(--md-on-secondary-container);width:36px;height:36px;border-radius:10px" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 6c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6 8c0 1.1.9 2 2 2s2-.9 2-2-.9-2-2-2-2 .9-2 2zM12 14c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+          </span>
+          <div class="col">
+            <div class="label">Background location</div>
+            <div class="meta">Allows detection when the app is closed</div>
+          </div>
+          <span class="chip warn">Denied</span>
+        </div>
+
+        <p class="section-label">Action</p>
+        <div class="perm-row">
+          <span class="icon-bubble" style="background:var(--md-secondary-container);color:var(--md-on-secondary-container);width:36px;height:36px;border-radius:10px" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+          </span>
+          <div class="col">
+            <div class="label">Notifications</div>
+            <div class="meta">Used to deliver the action alert</div>
+          </div>
+          <span class="chip ok">Allowed</span>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-text">Close</button>
+          <button class="btn btn-fill">Open settings</button>
+        </div>
+      </div>
+      <div class="wm">W-28B · Group F</div>
+      <div class="note">dialog: degraded routine</div>
+    </div>
+
+    <!-- C: Compact badge legend / 3-state reference -->
+    <div class="phone" aria-label="Badge legend" role="region">
+      <div class="device-bar" aria-hidden="true"><span>09:41</span><span>•</span><span>5G  87%</span></div>
+      <div class="appbar" role="banner">
+        <button aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg></button>
+        <h1>Routine</h1>
+      </div>
+      <div class="body">
+        <p class="caption">W28-C · Badge legend · 3 states</p>
+
+        <div class="routine-card">
+          <span class="lead-icon" style="background:var(--swatch-green)" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          </span>
+          <div class="col">
+            <div class="title">Optimal</div>
+            <div class="subtitle">All permissions OK · badge hidden</div>
+          </div>
+          <button class="rel-badge optimal" aria-hidden="true" tabindex="-1"></button>
+        </div>
+
+        <div class="routine-card">
+          <span class="lead-icon" style="background:var(--swatch-yellow)" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+          </span>
+          <div class="col">
+            <div class="title">Degraded</div>
+            <div class="subtitle">Warning icon · badge visible</div>
+          </div>
+          <button class="rel-badge degraded" aria-label="Degraded. Tap to fix.">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="routine-card">
+          <span class="lead-icon" style="background:var(--md-secondary-container);color:var(--md-on-secondary-container)" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M11 17h2v-6h-2v6zm1-15C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>
+          </span>
+          <div class="col">
+            <div class="title">Unknown</div>
+            <div class="subtitle">Info icon · badge visible · first probe pending</div>
+          </div>
+          <button class="rel-badge unknown" aria-label="Unknown reliability. Tap to check.">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M11 17h2v-6h-2v6zm1-15C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM11 9h2V7h-2v2z"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="placeholder-card">
+          The badge is a 40×40 circular IconButton in the routine row trailing slot. Tapping it opens the AlertDialog with separate Trigger / Action permission sections.
+        </div>
+      </div>
+      <div class="wm">W-28C · Group F</div>
+      <div class="note">legend · 3 badge states</div>
+    </div>
+
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=412, initial-scale=1">
+<title>W09 — Completion-log edit section</title>
+<style>
+  :root {
+    --md-surface: #14141A;
+    --md-surface-container: #1E1E26;
+    --md-surface-container-high: #28282F;
+    --md-surface-container-highest: #32323A;
+    --md-primary: #D0BCFF;
+    --md-on-primary: #381E72;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-secondary-container: #4A4458;
+    --md-on-secondary-container: #E8DEF8;
+    --md-error: #F2B8B5;
+    --md-error-container: #8C1D18;
+    --md-on-error-container: #F9DEDC;
+    --md-on-surface: #E6E1E5;
+    --md-on-surface-variant: #CAC4D0;
+    --md-outline: #938F99;
+    --md-outline-variant: #49454F;
+    --cat-green:  #81C995;
+    --cat-yellow: #FFD479;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #0F0F14;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    color: var(--md-on-surface);
+    -webkit-font-smoothing: antialiased;
+  }
+  body { display: flex; justify-content: center; padding: 20px 0; }
+  .viewport {
+    width: 412px;
+    min-height: 892px;
+    background: var(--md-surface);
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+  .appbar {
+    display: flex; align-items: center;
+    padding: 12px 16px;
+    min-height: 64px; gap: 8px;
+  }
+  .appbar .title { font-size: 22px; font-weight: 500; flex: 1; }
+  .appbar .iconbtn {
+    width: 48px; height: 48px;
+    background: transparent; border: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--md-on-surface-variant);
+    border-radius: 24px;
+  }
+
+  .state-title {
+    margin: 12px 16px 6px;
+    font-size: 12px;
+    color: var(--md-primary);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    font-weight: 700;
+  }
+
+  /* Section card (matches lib/widgets/completion_log_section.dart) */
+  .section-card {
+    margin: 8px 16px;
+    background: var(--md-surface-container);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .section-card .head {
+    display: flex; align-items: center;
+    padding: 14px 16px;
+    gap: 8px;
+  }
+  .section-card .head .title {
+    font-size: 16px;
+    font-weight: 600;
+    flex: 1;
+  }
+  .section-card .head .iconbtn {
+    width: 40px; height: 40px;
+    border-radius: 20px;
+    border: none; background: transparent;
+    color: var(--md-on-surface-variant);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .section-card .row {
+    display: flex; align-items: center;
+    padding: 8px 16px;
+    gap: 12px;
+    min-height: 56px;
+    border-top: 1px solid var(--md-outline-variant);
+  }
+  .section-card .row .lead-icon {
+    width: 36px; height: 36px;
+    border-radius: 18px;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .section-card .row .lead-icon.done {
+    background: rgba(129,201,149,.25);
+    color: var(--cat-green);
+  }
+  .section-card .row .lead-icon.skipped {
+    background: rgba(255,212,121,.25);
+    color: var(--cat-yellow);
+  }
+  .section-card .row .lead-icon.auto {
+    background: rgba(208,188,255,.25);
+    color: var(--md-primary);
+  }
+  .section-card .row .grow { flex: 1; min-width: 0; }
+  .section-card .row .title-line {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+  .section-card .row .subtitle {
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    margin-top: 2px;
+    text-transform: capitalize;
+  }
+  .section-card .row .trailing {
+    color: var(--md-on-surface-variant);
+    width: 40px; height: 40px;
+    border-radius: 20px;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    background: transparent; border: none;
+  }
+  .section-card .row .trailing:hover {
+    background: var(--md-error-container);
+    color: var(--md-on-error-container);
+  }
+  .overflow-msg {
+    padding: 12px 16px;
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    text-align: center;
+    border-top: 1px solid var(--md-outline-variant);
+  }
+
+  /* States */
+  .empty-state {
+    margin: 8px 16px;
+    background: var(--md-surface-container);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    color: var(--md-on-surface-variant);
+    font-size: 14px;
+  }
+  .loading-state {
+    margin: 8px 16px;
+    background: var(--md-surface-container);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+  }
+  .spinner {
+    width: 32px; height: 32px;
+    border-radius: 16px;
+    border: 3px solid var(--md-surface-container-highest);
+    border-top-color: var(--md-primary);
+    margin: 0 auto 8px;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* Confirm dialog */
+  .dialog-scrim {
+    margin: 8px 16px;
+    padding: 24px;
+    background: var(--md-surface-container-highest);
+    border-radius: 28px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  }
+  .dialog-scrim .title {
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+  .dialog-scrim .body {
+    font-size: 14px;
+    color: var(--md-on-surface-variant);
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+  .dialog-actions {
+    display: flex; justify-content: flex-end; gap: 8px;
+  }
+  .btn-text {
+    padding: 10px 16px;
+    background: transparent;
+    color: var(--md-primary);
+    border: none;
+    font-family: inherit;
+    font-weight: 600;
+    border-radius: 20px;
+    cursor: pointer;
+  }
+
+  /* SnackBar */
+  .snackbar {
+    margin: 8px 16px;
+    padding: 12px 16px;
+    background: #2D2D34;
+    color: var(--md-on-surface);
+    border-radius: 8px;
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.4);
+    font-size: 14px;
+  }
+  .snackbar .action {
+    margin-left: auto;
+    color: var(--md-primary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    font-size: 13px;
+  }
+  .annotation {
+    margin: 0 16px 8px;
+    padding: 10px 12px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .watermark {
+    position: absolute;
+    bottom: 8px; right: 12px;
+    font-size: 10px;
+    color: var(--md-on-surface-variant);
+    opacity: .55;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  .material-icons {
+    font-family: "Material Icons", "Material Symbols Outlined", system-ui;
+    font-style: normal; font-weight: 400;
+    line-height: 1;
+    display: inline-block;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+  }
+</style>
+</head>
+<body>
+<div class="viewport" role="application" aria-label="Completion log section">
+
+  <div class="appbar" role="banner">
+    <button class="iconbtn" aria-label="Back"><span class="material-icons">arrow_back</span></button>
+    <div class="title">Edit do</div>
+  </div>
+
+  <div class="annotation">
+    Edit-mode only. Mounted inside <code>CompletionLogSection</code> (<code>lib/widgets/completion_log_section.dart</code>). The card rebuilds from <code>CompletionLogService.watchForHabit(id)</code>; up to 30 rows render with a "older entries hidden" overflow.
+  </div>
+
+  <!-- State: Loaded with rows -->
+  <div class="state-title">Loaded · 30 of 57 rows visible</div>
+  <div class="section-card" role="region" aria-label="Recent completions">
+    <div class="head">
+      <div class="title">Recent completions</div>
+      <button class="iconbtn" aria-label="Refresh">
+        <span class="material-icons">refresh</span>
+      </button>
+    </div>
+
+    <div class="row">
+      <div class="lead-icon done" aria-hidden="true">✓</div>
+      <div class="grow">
+        <div class="title-line">2026-07-05 · 09:30</div>
+        <div class="subtitle">manual</div>
+      </div>
+      <button class="trailing" aria-label="Delete completion 2026-07-05 09:30">
+        <span class="material-icons">delete</span>
+      </button>
+    </div>
+
+    <div class="row">
+      <div class="lead-icon done" aria-hidden="true">✓</div>
+      <div class="grow">
+        <div class="title-line">2026-07-04 · 10:12</div>
+        <div class="subtitle">notification</div>
+      </div>
+      <button class="trailing" aria-label="Delete completion 2026-07-04 10:12">
+        <span class="material-icons">delete</span>
+      </button>
+    </div>
+
+    <div class="row">
+      <div class="lead-icon done" aria-hidden="true">✓</div>
+      <div class="grow">
+        <div class="title-line">2026-07-03 · 08:55</div>
+        <div class="subtitle">mission</div>
+      </div>
+      <button class="trailing" aria-label="Delete completion 2026-07-03 08:55">
+        <span class="material-icons">delete</span>
+      </button>
+    </div>
+
+    <div class="row">
+      <div class="lead-icon auto" aria-hidden="true">⚡</div>
+      <div class="grow">
+        <div class="title-line">2026-07-02 · 21:00</div>
+        <div class="subtitle">auto · widget tap</div>
+      </div>
+      <button class="trailing" aria-label="Delete completion 2026-07-02 21:00">
+        <span class="material-icons">delete</span>
+      </button>
+    </div>
+
+    <div class="row">
+      <div class="lead-icon skipped" aria-hidden="true">—</div>
+      <div class="grow">
+        <div class="title-line">2026-07-01 · 08:00</div>
+        <div class="subtitle">rest day</div>
+      </div>
+      <button class="trailing" aria-label="Delete completion 2026-07-01 08:00">
+        <span class="material-icons">delete</span>
+      </button>
+    </div>
+
+    <div class="overflow-msg">27 older entries are hidden</div>
+  </div>
+
+  <!-- Confirm dialog -->
+  <div class="state-title">Delete confirm dialog</div>
+  <div class="dialog-scrim" role="alertdialog" aria-label="Delete completion confirm">
+    <div class="title">Delete this completion?</div>
+    <div class="body">
+      2026-07-05 at 09:30 (manual). This will shorten your streak by one day.
+    </div>
+    <div class="dialog-actions">
+      <button class="btn-text">Cancel</button>
+      <button class="btn-text" style="color: var(--md-error);">Delete</button>
+    </div>
+  </div>
+
+  <!-- Success snackbar -->
+  <div class="state-title">Success SnackBar</div>
+  <div class="snackbar" role="status" aria-live="polite">
+    Completion removed.
+  </div>
+
+  <!-- Empty -->
+  <div class="state-title">Loaded · empty</div>
+  <div class="section-card">
+    <div class="head">
+      <div class="title">Recent completions</div>
+      <button class="iconbtn" aria-label="Refresh"><span class="material-icons">refresh</span></button>
+    </div>
+    <div class="empty-state">
+      No completions yet — tap <strong>Done</strong> on the home tile to record one.
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="state-title">Loading · FutureBuilder pending</div>
+  <div class="section-card">
+    <div class="head">
+      <div class="title">Recent completions</div>
+    </div>
+    <div class="loading-state">
+      <div class="spinner" aria-hidden="true"></div>
+      <div style="font-size: 13px; color: var(--md-on-surface-variant);">Loading completions…</div>
+    </div>
+  </div>
+
+  <div class="watermark">W-09 · Group A</div>
+</div>
+</body>
+</html>

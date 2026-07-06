@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=412,initial-scale=1" />
+<title>W31 — Recently deleted — do it</title>
+<style>
+  :root {
+    --md-surface:               #111318;
+    --md-surface-container:     #1d2024;
+    --md-surface-container-high:#272a2f;
+    --md-on-surface:            #e3e3e6;
+    --md-on-surface-variant:    #c4c6cf;
+    --md-outline:               #44474e;
+    --md-outline-variant:       #2e3135;
+    --md-primary:               #a8c7fa;
+    --md-on-primary:            #062e6f;
+    --md-primary-container:     #284777;
+    --md-on-primary-container:  #d3e3fd;
+    --md-secondary-container:   #3b4759;
+    --md-error:                 #f2b8b5;
+    --md-error-container:       #8c1d18;
+    --md-on-error-container:    #f9dedc;
+    --md-scrim:                 rgba(0,0,0,.55);
+
+    --cat-red:    #ef5350;
+    --cat-orange: #fb8c00;
+    --cat-yellow: #fdd835;
+    --cat-green:  #66bb6a;
+    --cat-teal:   #26a69a;
+    --cat-blue:   #42a5f5;
+    --cat-purple: #ab47bc;
+    --cat-pink:   #ec407a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #000; }
+  body {
+    width: 412px;
+    min-height: 892px;
+    margin: 0 auto;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.45;
+    color: var(--md-on-surface);
+    background: var(--md-surface);
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    overflow-x: hidden;
+  }
+  header[role="banner"] {
+    display: flex;
+    align-items: center;
+    height: 64px;
+    padding: 0 8px;
+    background: var(--md-surface-container);
+    color: var(--md-on-surface);
+    border-bottom: 1px solid var(--md-outline-variant);
+  }
+  header[role="banner"] .back {
+    width: 48px; height: 48px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--md-on-surface);
+  }
+  header[role="banner"] h1 {
+    margin: 0 0 0 8px;
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 0.1px;
+  }
+  main {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  /* Hint banner */
+  .hint {
+    background: var(--md-secondary-container);
+    color: var(--md-on-surface);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .hint b { color: var(--md-on-surface); font-weight: 600; }
+  /* Row card */
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 64px;
+    padding: 10px 14px;
+    background: var(--md-surface-container);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: 12px;
+  }
+  .row .icon-wrap {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.06);
+    font-size: 22px;
+    color: var(--md-on-surface-variant);
+    flex-shrink: 0;
+  }
+  .row .body { flex: 1; min-width: 0; }
+  .row .title { font-size: 16px; font-weight: 500; }
+  .row .sub   { font-size: 13px; color: var(--md-on-surface-variant); margin-top: 2px; }
+  .row .actions { display: inline-flex; gap: 4px; }
+  .iconbtn {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    color: var(--md-on-surface-variant);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .iconbtn.restore { color: var(--md-primary); }
+  .iconbtn.forever { color: var(--md-error); }
+  .iconbtn:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
+  /* Counter / list-meta row */
+  .meta {
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    padding: 4px 4px 0;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+  .safe-bottom { height: 24px; }
+  /* Scrim + dialog overlay */
+  .scrim {
+    position: fixed; inset: 0;
+    background: var(--md-scrim);
+    z-index: 5;
+  }
+  .dialog {
+    position: fixed;
+    left: 16px; right: 16px;
+    top: 220px;
+    background: var(--md-surface-container-high);
+    border-radius: 28px;
+    padding: 24px 24px 12px;
+    z-index: 6;
+    box-shadow: 0 10px 30px rgba(0,0,0,.4);
+  }
+  .dialog h3 {
+    margin: 0 0 8px;
+    font-size: 20px;
+    font-weight: 500;
+  }
+  .dialog p {
+    margin: 0 0 12px;
+    font-size: 14px;
+    color: var(--md-on-surface-variant);
+    line-height: 1.45;
+  }
+  .dialog .name { color: var(--md-on-surface); font-weight: 500; }
+  .dialog .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .dialog .actions button {
+    height: 40px;
+    padding: 0 14px;
+    border: none;
+    background: transparent;
+    color: var(--md-primary);
+    font: 600 14px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    border-radius: 20px;
+    cursor: pointer;
+  }
+  .dialog .actions .danger {
+    color: var(--md-error);
+  }
+  /* Watermark */
+  .watermark {
+    position: fixed;
+    right: 6px;
+    bottom: 4px;
+    font-size: 10px;
+    letter-spacing: 0.4px;
+    color: rgba(255,255,255,0.35);
+    pointer-events: none;
+    z-index: 7;
+  }
+</style>
+</head>
+<body>
+  <header role="banner">
+    <span class="back" aria-label="Back" role="button" tabindex="0">&#x2190;</span>
+    <h1>Recently deleted</h1>
+  </header>
+
+  <main aria-label="Recently deleted tombstones">
+    <div class="hint" role="note">
+      <b>Deleted dos stay for 30 days</b> before being purged.
+      Restore brings the do, its completion history, and its
+      rest-day budget back.
+    </div>
+
+    <div class="meta" aria-label="3 tombstones">3 dos</div>
+
+    <section class="row" aria-label="Drink water, deleted 2026-07-04">
+      <div class="icon-wrap" aria-hidden="true">&#128167;</div>
+      <div class="body">
+        <div class="title">Drink water</div>
+        <div class="sub">Drink water &middot; deleted 2 days ago</div>
+      </div>
+      <div class="actions">
+        <button class="iconbtn restore" type="button" aria-label="Restore Drink water" title="Restore">&#x21BA;</button>
+        <button class="iconbtn forever" type="button" aria-label="Delete Drink water forever" title="Delete forever">&#128465;</button>
+      </div>
+    </section>
+
+    <section class="row" aria-label="Read 20 minutes, deleted 2026-06-29">
+      <div class="icon-wrap" aria-hidden="true">&#128214;</div>
+      <div class="body">
+        <div class="title">Read 20 minutes</div>
+        <div class="sub">Read 20 minutes &middot; deleted 7 days ago</div>
+      </div>
+      <div class="actions">
+        <button class="iconbtn restore" type="button" aria-label="Restore Read 20 minutes" title="Restore">&#x21BA;</button>
+        <button class="iconbtn forever" type="button" aria-label="Delete Read 20 minutes forever" title="Delete forever">&#128465;</button>
+      </div>
+    </section>
+
+    <section class="row" aria-label="Call mom, deleted 2026-06-21">
+      <div class="icon-wrap" aria-hidden="true">&#128222;</div>
+      <div class="body">
+        <div class="title">Call mom</div>
+        <div class="sub">Call mom &middot; deleted 15 days ago</div>
+      </div>
+      <div class="actions">
+        <button class="iconbtn restore" type="button" aria-label="Restore Call mom" title="Restore">&#x21BA;</button>
+        <button class="iconbtn forever" type="button" aria-label="Delete Call mom forever" title="Delete forever">&#128465;</button>
+      </div>
+    </section>
+
+    <div class="safe-bottom"></div>
+  </main>
+
+  <!-- Confirm dialog: "Delete this do forever?" -->
+  <div class="scrim" aria-hidden="false"></div>
+  <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-title" aria-describedby="dlg-body">
+    <h3 id="dlg-title">Delete this do forever?</h3>
+    <p id="dlg-body">
+      <span class="name">Drink water</span>, its completion history, and its
+      rest-day budget will be permanently removed. This cannot be undone.
+    </p>
+    <div class="actions">
+      <button type="button">Cancel</button>
+      <button class="danger" type="button">Delete forever</button>
+    </div>
+  </div>
+
+  <div class="watermark" aria-hidden="true">W-31 &middot; Group G</div>
+</body>
+</html>

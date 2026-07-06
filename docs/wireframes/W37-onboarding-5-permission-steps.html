@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>W37 — Onboarding (5 permission steps)</title>
+<meta name="viewport" content="width=412, initial-scale=1">
+<style>
+  :root {
+    /* Material Design 3 dark palette (per CLAUDE.md: dark-first) */
+    --md-primary: #D0BCFF;
+    --md-on-primary: #381E72;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-secondary: #CCC2DC;
+    --md-on-secondary: #332D41;
+    --md-secondary-container: #4A4458;
+    --md-on-secondary-container: #E8DEF8;
+    --md-tertiary: #EFB8C8;
+    --md-on-tertiary: #492532;
+    --md-tertiary-container: #633B48;
+    --md-on-tertiary-container: #FFD8E4;
+    --md-error: #F2B8B5;
+    --md-on-error: #601410;
+    --md-error-container: #8C1D18;
+    --md-on-error-container: #F9DEDC;
+    --md-background: #1C1B1F;
+    --md-on-background: #E6E1E5;
+    --md-surface: #1C1B1F;
+    --md-on-surface: #E6E1E5;
+    --md-surface-variant: #49454F;
+    --md-on-surface-variant: #CAC4D0;
+    --md-outline: #938F99;
+    --md-outline-variant: #49454F;
+    --md-surface-container: #211F26;
+    --md-surface-container-high: #2B2930;
+    --md-surface-container-highest: #36343B;
+    /* 8-swatch category palette */
+    --cat-red:    #F2B8B5;
+    --cat-orange: #FFB68A;
+    --cat-yellow: #FDE08A;
+    --cat-green:  #9DD89D;
+    --cat-teal:   #7BD7CE;
+    --cat-blue:   #A9C7FF;
+    --cat-purple: #D0BCFF;
+    --cat-pink:   #EFB8C8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2A2A2A;
+    color: var(--md-on-surface);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-size: 16px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+  }
+  .frame {
+    width: 412px;
+    min-height: 892px;
+    margin: 24px auto;
+    background: var(--md-background);
+    border-radius: 28px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.55), 0 0 0 1px #3a3a3a;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ====== Top app bar (onboarding uses "Welcome to do it" per ARB) ====== */
+  header.app-bar {
+    height: 64px;
+    background: var(--md-surface);
+    color: var(--md-on-surface);
+    display: flex;
+    align-items: center;
+    padding: 0 8px 0 8px;
+    position: relative;
+  }
+  header.app-bar .back {
+    width: 48px; height: 48px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--md-on-surface-variant);
+  }
+  header.app-bar .back.disabled { opacity: 0.35; pointer-events: none; }
+  header.app-bar .title {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 0.1px;
+    margin-left: 8px;
+    flex: 1;
+  }
+  header.app-bar .skip {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.1px;
+    color: var(--md-primary);
+    padding: 8px 12px;
+    border-radius: 999px;
+  }
+
+  /* ====== Body ====== */
+  main {
+    padding: 16px 24px 16px 24px;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(892px - 64px - 84px - 28px);
+  }
+
+  /* Step indicator (5 dots) */
+  .step-dots {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    padding: 12px 0 8px 0;
+  }
+  .step-dots .dot {
+    width: 8px; height: 8px;
+    border-radius: 999px;
+    background: var(--md-outline-variant);
+    transition: background 0.2s;
+  }
+  .step-dots .dot.active { background: var(--md-primary); width: 24px; }
+  .step-dots .dot.complete { background: var(--md-primary); }
+  .step-counter {
+    text-align: center;
+    font-size: 14px;
+    color: var(--md-on-surface-variant);
+    margin-bottom: 20px;
+  }
+
+  /* Hero icon circle */
+  .hero {
+    margin: 28px auto 32px auto;
+    width: 128px; height: 128px;
+    border-radius: 999px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+  }
+  .hero.green { background: var(--cat-green); color: #002106; }
+  .hero.blue  { background: var(--cat-blue);  color: #001A41; }
+  .hero.teal  { background: var(--cat-teal);  color: #00201D; }
+  .hero.orange { background: var(--cat-orange); color: #2A1700; }
+  .hero.pink  { background: var(--cat-pink);  color: #31111D; }
+  .hero svg { width: 64px; height: 64px; }
+
+  h1.step-title {
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: 0.1px;
+    text-align: center;
+    margin: 0 8px 16px 8px;
+  }
+  p.step-body {
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--md-on-surface-variant);
+    text-align: center;
+    margin: 0 8px 32px 8px;
+  }
+
+  /* Status row (current permission state) */
+  .status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--md-surface-container);
+    border-radius: 12px;
+    padding: 16px;
+    margin: 0 8px 16px 8px;
+  }
+  .status-row .label {
+    font-size: 14px;
+    color: var(--md-on-surface-variant);
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface-variant);
+  }
+  .chip.granted {
+    background: rgba(157, 216, 157, 0.16);
+    color: var(--cat-green);
+  }
+  .chip.denied {
+    background: rgba(242, 184, 181, 0.16);
+    color: var(--md-error);
+  }
+  .chip.not-asked {
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface-variant);
+  }
+  .chip .dot {
+    width: 8px; height: 8px; border-radius: 999px;
+    background: currentColor;
+  }
+
+  /* Spacer to push CTA down */
+  .spacer { flex: 1; min-height: 24px; }
+
+  /* Bottom action area */
+  .bottom-actions {
+    padding: 12px 24px 28px 24px;
+    background: var(--md-surface);
+    border-top: 1px solid var(--md-outline-variant);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 56px;
+    border-radius: 999px;
+    border: none;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    cursor: pointer;
+  }
+  .btn-filled {
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+  }
+  .btn-text {
+    background: transparent;
+    color: var(--md-primary);
+    height: 48px;
+  }
+
+  /* Watermark */
+  .watermark {
+    position: absolute;
+    right: 12px;
+    bottom: 6px;
+    font-size: 11px;
+    color: var(--md-outline);
+    opacity: 0.7;
+    letter-spacing: 0.5px;
+    pointer-events: none;
+  }
+
+  @media (max-width: 480px) {
+    .frame { margin: 0; border-radius: 0; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="frame" role="application" aria-label="Onboarding 5-step permission walk, step 4 of 5">
+
+  <!-- Top app bar -->
+  <header class="app-bar" role="banner">
+    <button class="back disabled" aria-label="Back disabled on first step" aria-disabled="true">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <div class="title">Welcome to do it</div>
+    <button class="skip" aria-label="Skip onboarding">Skip</button>
+  </header>
+
+  <main role="main">
+    <!-- Step dots: 3 complete, 1 active, 1 pending -->
+    <div class="step-dots" aria-label="Step 4 of 5">
+      <span class="dot complete" aria-hidden="true"></span>
+      <span class="dot complete" aria-hidden="true"></span>
+      <span class="dot complete" aria-hidden="true"></span>
+      <span class="dot active"   aria-hidden="true"></span>
+      <span class="dot"          aria-hidden="true"></span>
+    </div>
+    <div class="step-counter" aria-live="polite">Step 4 of 5</div>
+
+    <!-- Hero icon: folder for backup step -->
+    <div class="hero teal" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.1.89 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.11-.9-2-2-2h-8l-2-2z"/></svg>
+    </div>
+
+    <h1 class="step-title">Backup folder</h1>
+    <p class="step-body">
+      Pick a folder on your phone (or SD card) for nightly
+      auto-backups. do it writes a single encrypted file; the
+      folder stays yours.
+    </p>
+
+    <!-- Current permission state row -->
+    <div class="status-row" role="status" aria-label="Backup folder state">
+      <div class="label">Folder selection</div>
+      <span class="chip not-asked"><span class="dot"></span>Not picked</span>
+    </div>
+
+    <div class="spacer"></div>
+  </main>
+
+  <!-- Bottom action area -->
+  <div class="bottom-actions">
+    <button class="btn btn-filled" aria-label="Pick a backup folder (opens Android Storage Access Framework picker)">
+      Pick folder
+    </button>
+    <button class="btn btn-text" aria-label="Skip this permission step">
+      Remind me later
+    </button>
+  </div>
+
+  <div class="watermark">W-37 · Group I</div>
+</div>
+</body>
+</html>

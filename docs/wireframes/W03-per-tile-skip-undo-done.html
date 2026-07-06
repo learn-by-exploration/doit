@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=412, initial-scale=1">
+<title>W03 — Per-tile Skip / Undo / Done actions</title>
+<style>
+  :root {
+    --md-surface: #14141A;
+    --md-surface-container: #1E1E26;
+    --md-surface-container-high: #28282F;
+    --md-primary: #D0BCFF;
+    --md-on-primary: #381E72;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-secondary-container: #4A4458;
+    --md-on-secondary-container: #E8DEF8;
+    --md-error: #F2B8B5;
+    --md-error-container: #8C1D18;
+    --md-on-error-container: #F9DEDC;
+    --md-on-surface: #E6E1E5;
+    --md-on-surface-variant: #CAC4D0;
+    --md-outline: #938F99;
+    --md-outline-variant: #49454F;
+    --cat-green:  #81C995;
+    --cat-yellow: #FFD479;
+    --cat-orange: #FF9A3C;
+    --cat-teal:   #4DD0E1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #0F0F14;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    color: var(--md-on-surface);
+    -webkit-font-smoothing: antialiased;
+  }
+  body { display: flex; justify-content: center; padding: 20px 0; }
+  .viewport {
+    width: 412px;
+    min-height: 892px;
+    background: var(--md-surface);
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+  .appbar {
+    display: flex; align-items: center;
+    padding: 12px 16px;
+    min-height: 64px; gap: 8px;
+  }
+  .appbar .title { font-size: 22px; font-weight: 500; flex: 1; }
+  .appbar .iconbtn {
+    width: 48px; height: 48px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--md-on-surface-variant);
+    border-radius: 24px;
+  }
+
+  .legend {
+    margin: 8px 16px;
+    padding: 12px 16px;
+    background: var(--md-surface-container);
+    border-radius: 12px;
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    line-height: 1.6;
+  }
+  .legend .row { display: flex; align-items: center; gap: 8px; }
+  .legend .row + .row { margin-top: 4px; }
+  .legend .swatch {
+    width: 14px; height: 14px;
+    border-radius: 7px;
+    border: 1.5px solid var(--md-outline-variant);
+    flex-shrink: 0;
+  }
+  .legend .swatch.done { background: var(--cat-green); border-color: var(--cat-green); }
+  .legend .swatch.skipped { background: var(--cat-yellow); border-color: var(--cat-yellow); }
+  .legend .swatch.missed { background: transparent; }
+  .legend .swatch.today { background: var(--md-primary); border-color: var(--md-primary); }
+
+  .tile {
+    margin: 8px 16px;
+    background: var(--md-surface-container);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .tile-top {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .tile-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .tile-icon.green { background: rgba(129,201,149,.25); color: var(--cat-green); }
+  .tile-icon.orange { background: rgba(255,154,60,.25); color: var(--cat-orange); }
+  .tile-title-block { flex: 1; min-width: 0; }
+  .tile-title { font-size: 16px; font-weight: 600; }
+  .tile-meta { display: flex; gap: 10px; margin-top: 2px; font-size: 13px; }
+  .streak-badge {
+    display: inline-flex; gap: 4px;
+    color: #FFD479;
+    font-weight: 600;
+  }
+  .budget {
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+  }
+
+  .sparkline { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+  .dot {
+    width: 12px; height: 12px;
+    border-radius: 6px;
+    border: 1.5px solid var(--md-outline-variant);
+  }
+  .dot.done { background: var(--cat-green); border-color: var(--cat-green); }
+  .dot.skipped { background: var(--cat-yellow); border-color: var(--cat-yellow); }
+  .dot.today { background: var(--md-primary); border-color: var(--md-primary); box-shadow: 0 0 0 2px rgba(208,188,255,.25); }
+
+  .tile-actions {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 4px;
+  }
+  .tile-actions .group { display: flex; gap: 4px; }
+  .action-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface);
+    border: none;
+    padding: 10px 14px;
+    border-radius: 22px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 48px;
+    cursor: pointer;
+  }
+  .action-btn.primary { background: var(--md-primary); color: var(--md-on-primary); }
+  .action-btn[disabled] { opacity: .35; cursor: not-allowed; }
+  .action-btn:hover:not([disabled]) {
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+  }
+  .action-btn.primary:hover:not([disabled]) {
+    background: #E5D6FF;
+    color: var(--md-on-primary);
+  }
+
+  /* Highlight overlay (selected) */
+  .tile.focused {
+    outline: 2px solid var(--md-primary);
+    outline-offset: -2px;
+  }
+  .annotation {
+    margin: 0 16px 8px;
+    padding: 10px 12px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.4;
+    display: flex; gap: 8px; align-items: flex-start;
+  }
+  .annotation .material-icons { color: var(--md-primary); font-size: 18px; flex-shrink: 0; }
+
+  /* SnackBar */
+  .snackbar {
+    margin: 8px 16px;
+    padding: 12px 16px;
+    background: #2D2D34;
+    color: var(--md-on-surface);
+    border-radius: 8px;
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.4);
+    font-size: 14px;
+  }
+  .snackbar .action {
+    margin-left: auto;
+    color: var(--md-primary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    font-size: 13px;
+  }
+  .snackbar.error { background: var(--md-error-container); color: var(--md-on-error-container); }
+  .snackbar.error .action { color: #FFDAD6; }
+
+  .state-title {
+    margin: 12px 16px 4px;
+    font-size: 12px;
+    color: var(--md-primary);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    font-weight: 700;
+  }
+
+  .watermark {
+    position: absolute;
+    bottom: 8px; right: 12px;
+    font-size: 10px;
+    color: var(--md-on-surface-variant);
+    opacity: .55;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  .material-icons {
+    font-family: "Material Icons", "Material Symbols Outlined", system-ui;
+    font-style: normal; font-weight: 400;
+    line-height: 1;
+    display: inline-block;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+  }
+</style>
+</head>
+<body>
+<div class="viewport" role="application" aria-label="Per-tile Skip, Undo, Done actions">
+
+  <div class="appbar" role="banner">
+    <button class="iconbtn" aria-label="Back"><span class="material-icons">arrow_back</span></button>
+    <div class="title">Tile actions</div>
+  </div>
+
+  <div class="legend">
+    <strong style="color:var(--md-on-surface);">Three actions, one tile row</strong>
+    <div class="row"><div class="swatch done"></div><div>Done — idempotent, snackbar "Marked done. Undo" 4s</div></div>
+    <div class="row"><div class="swatch skipped"></div><div>Skip — consumes one rest-day budget</div></div>
+    <div class="row"><div class="swatch missed"></div><div>Undo — visible only when today is resolved</div></div>
+  </div>
+
+  <!-- State 1: Done snackbar after tap -->
+  <div class="state-title">After Done tap</div>
+  <div class="tile focused" role="article" aria-label="Drink water, 12 day streak, marked done today">
+    <div class="tile-top">
+      <div class="tile-icon green" aria-hidden="true">💧</div>
+      <div class="tile-title-block">
+        <div class="tile-title">Drink water</div>
+        <div class="tile-meta">
+          <span class="streak-badge">🔥 12</span>
+          <span class="budget">1/2 rest days left</span>
+        </div>
+      </div>
+    </div>
+    <div class="sparkline" role="img" aria-label="Last 14 days">
+      <span class="dot done"></span><span class="dot done"></span><span class="dot skipped"></span>
+      <span class="dot done"></span><span class="dot done"></span><span class="dot"></span>
+      <span class="dot done"></span><span class="dot done"></span><span class="dot done"></span>
+      <span class="dot skipped"></span><span class="dot done"></span><span class="dot done"></span>
+      <span class="dot done"></span><span class="dot today"></span>
+    </div>
+    <div class="tile-actions">
+      <div class="group">
+        <button class="action-btn" aria-label="Skip today"><span class="material-icons">skip_next</span></button>
+        <button class="action-btn" aria-label="Undo today's completion"><span class="material-icons">undo</span></button>
+      </div>
+      <button class="action-btn primary" aria-label="Mark done">
+        <span class="material-icons">check_circle</span><span>Done</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="snackbar" role="status" aria-live="polite">
+    Marked done.
+    <span class="action">Undo</span>
+  </div>
+
+  <!-- State 2: Skip exhaustion -->
+  <div class="state-title">Skip · budget exhausted</div>
+  <div class="annotation" role="note">
+    <span class="material-icons">info</span>
+    <div>Tap "Skip today" when <code>RestDayBudget.remaining == 0</code> surfaces a destructive-friendly snackbar instead of writing a row.</div>
+  </div>
+  <div class="tile">
+    <div class="tile-top">
+      <div class="tile-icon orange" aria-hidden="true">🏃</div>
+      <div class="tile-title-block">
+        <div class="tile-title">Morning run</div>
+        <div class="tile-meta">
+          <span class="streak-badge">🔥 4</span>
+          <span class="budget" style="color: var(--md-error);">No rest days left</span>
+        </div>
+      </div>
+    </div>
+    <div class="tile-actions">
+      <div class="group">
+        <button class="action-btn" aria-label="Skip today"><span class="material-icons">skip_next</span></button>
+        <button class="action-btn" disabled aria-label="Undo today's completion"><span class="material-icons">undo</span></button>
+      </div>
+      <button class="action-btn primary" aria-label="Mark done">
+        <span class="material-icons">check_circle</span><span>Done</span>
+      </button>
+    </div>
+  </div>
+  <div class="snackbar error" role="status" aria-live="polite">
+    No rest days left this month.
+  </div>
+
+  <!-- State 3: After Skip tap -->
+  <div class="state-title">After Skip tap</div>
+  <div class="tile">
+    <div class="tile-top">
+      <div class="tile-icon green" aria-hidden="true">💧</div>
+      <div class="tile-title-block">
+        <div class="tile-title">Drink water</div>
+        <div class="tile-meta">
+          <span class="streak-badge">🔥 12</span>
+          <span class="budget">2/2 rest days left</span>
+        </div>
+      </div>
+    </div>
+    <div class="sparkline">
+      <span class="dot done"></span><span class="dot done"></span><span class="dot skipped"></span>
+      <span class="dot done"></span><span class="dot done"></span><span class="dot"></span>
+      <span class="dot done"></span><span class="dot done"></span><span class="dot done"></span>
+      <span class="dot skipped"></span><span class="dot done"></span><span class="dot done"></span>
+      <span class="dot done"></span><span class="dot today"></span>
+    </div>
+    <div class="tile-actions">
+      <div class="group">
+        <button class="action-btn" aria-label="Skip today" disabled><span class="material-icons">skip_next</span></button>
+        <button class="action-btn" aria-label="Undo today's completion"><span class="material-icons">undo</span></button>
+      </div>
+      <button class="action-btn primary" aria-label="Mark done">
+        <span class="material-icons">check_circle</span><span>Done</span>
+      </button>
+    </div>
+  </div>
+  <div class="snackbar" role="status" aria-live="polite">
+    Rest day taken — streak holds.
+  </div>
+
+  <!-- State 4: Undo confirm dialog -->
+  <div class="state-title">Undo confirm dialog</div>
+  <div style="margin: 8px 16px; background: var(--md-surface-container-highest); border-radius: 16px; padding: 24px;">
+    <div style="font-size: 22px; font-weight: 500; margin-bottom: 12px;">Undo today's completion?</div>
+    <div style="font-size: 14px; color: var(--md-on-surface-variant); margin-bottom: 24px; line-height: 1.5;">
+      This will remove today's check-in. The streak will update.
+    </div>
+    <div style="display: flex; gap: 8px; justify-content: flex-end;">
+      <button style="padding: 10px 16px; background: transparent; color: var(--md-primary); border: none; font-family: inherit; font-weight: 600; cursor: pointer;">Cancel</button>
+      <button style="padding: 10px 16px; background: transparent; color: var(--md-primary); border: none; font-family: inherit; font-weight: 600; cursor: pointer;">Undo</button>
+    </div>
+  </div>
+
+  <div class="watermark">W-03 · Group A</div>
+</div>
+</body>
+</html>

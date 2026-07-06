@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=412, initial-scale=1">
+<title>W05 — 14-day Sparkline visualization</title>
+<style>
+  :root {
+    --md-surface: #14141A;
+    --md-surface-container: #1E1E26;
+    --md-surface-container-high: #28282F;
+    --md-surface-container-highest: #32323A;
+    --md-primary: #D0BCFF;
+    --md-on-primary: #381E72;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-secondary-container: #4A4458;
+    --md-on-secondary-container: #E8DEF8;
+    --md-tertiary: #EFB8C8;
+    --md-on-tertiary-container: #FFD8E4;
+    --md-on-surface: #E6E1E5;
+    --md-on-surface-variant: #CAC4D0;
+    --md-outline: #938F99;
+    --md-outline-variant: #49454F;
+    --cat-green:  #81C995;
+    --cat-yellow: #FFD479;
+    --cat-orange: #FF9A3C;
+    --cat-teal:   #4DD0E1;
+    --cat-purple: #B39DDB;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #0F0F14;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    color: var(--md-on-surface);
+    -webkit-font-smoothing: antialiased;
+  }
+  body { display: flex; justify-content: center; padding: 20px 0; }
+  .viewport {
+    width: 412px;
+    min-height: 892px;
+    background: var(--md-surface);
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+  .appbar {
+    display: flex; align-items: center;
+    padding: 12px 16px;
+    min-height: 64px; gap: 8px;
+  }
+  .appbar .title { font-size: 22px; font-weight: 500; flex: 1; }
+  .appbar .iconbtn {
+    width: 48px; height: 48px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--md-on-surface-variant);
+    border-radius: 24px;
+  }
+
+  .state-title {
+    margin: 12px 16px 6px;
+    font-size: 12px;
+    color: var(--md-primary);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    font-weight: 700;
+  }
+
+  /* Sparkline states row */
+  .state-row {
+    margin: 0 16px 16px;
+    background: var(--md-surface-container);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .state-row .label {
+    font-size: 13px;
+    color: var(--md-on-surface-variant);
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+  .sparkline {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+  }
+  .sparkline-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    color: var(--md-on-surface-variant);
+  }
+  .dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    background: transparent;
+    border: 1.5px solid var(--md-outline-variant);
+    flex-shrink: 0;
+    cursor: help;
+  }
+  .dot.done {
+    background: var(--cat-green);
+    border-color: var(--cat-green);
+  }
+  .dot.skipped {
+    background: var(--cat-yellow);
+    border-color: var(--cat-yellow);
+  }
+  .dot.today {
+    background: var(--md-primary);
+    border-color: var(--md-primary);
+    box-shadow: 0 0 0 2px rgba(208,188,255,.25);
+  }
+  .dot.today-empty {
+    background: transparent;
+    border: 1.5px dashed var(--md-primary);
+  }
+
+  /* Legend */
+  .legend {
+    margin: 8px 16px;
+    padding: 12px 16px;
+    background: var(--md-surface-container);
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .legend .row {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .legend .row + .row { margin-top: 6px; }
+  .legend .swatch {
+    width: 16px; height: 16px;
+    border-radius: 8px;
+    border: 1.5px solid var(--md-outline-variant);
+    flex-shrink: 0;
+  }
+  .legend .swatch.done { background: var(--cat-green); border-color: var(--cat-green); }
+  .legend .swatch.skipped { background: var(--cat-yellow); border-color: var(--cat-yellow); }
+  .legend .swatch.missed { background: transparent; border-color: var(--md-outline-variant); }
+  .legend .swatch.today { background: var(--md-primary); border-color: var(--md-primary); }
+  .legend strong { color: var(--md-on-surface); }
+
+  /* Tile integration */
+  .tile {
+    margin: 8px 16px;
+    background: var(--md-surface-container);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .tile-top {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .tile-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .tile-icon.green { background: rgba(129,201,149,.25); color: var(--cat-green); }
+  .tile-icon.purple { background: rgba(179,157,219,.25); color: var(--cat-purple); }
+  .tile-title-block { flex: 1; min-width: 0; }
+  .tile-title { font-size: 16px; font-weight: 600; }
+  .tile-meta { display: flex; gap: 10px; margin-top: 2px; font-size: 13px; }
+  .streak-badge { color: #FFD479; font-weight: 600; }
+  .budget { font-size: 12px; color: var(--md-on-surface-variant); }
+
+  .tile-actions {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .tile-actions .group { display: flex; gap: 4px; }
+  .action-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface);
+    border: none;
+    padding: 10px 14px;
+    border-radius: 22px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 48px;
+    cursor: pointer;
+  }
+  .action-btn.primary { background: var(--md-primary); color: var(--md-on-primary); }
+
+  /* Caption */
+  .caption {
+    margin: 0 16px 16px;
+    padding: 12px 16px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .watermark {
+    position: absolute;
+    bottom: 8px; right: 12px;
+    font-size: 10px;
+    color: var(--md-on-surface-variant);
+    opacity: .55;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  .material-icons {
+    font-family: "Material Icons", "Material Symbols Outlined", system-ui;
+    font-style: normal; font-weight: 400;
+    line-height: 1;
+    display: inline-block;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+  }
+</style>
+</head>
+<body>
+<div class="viewport" role="application" aria-label="14-day Sparkline visualization">
+
+  <div class="appbar" role="banner">
+    <button class="iconbtn" aria-label="Back"><span class="material-icons">arrow_back</span></button>
+    <div class="title">14-day sparkline</div>
+  </div>
+
+  <div class="legend">
+    <strong>Inline row of 14 dots</strong> · SparklineDot sealed: empty / done / skipped / today
+    <div class="row"><div class="swatch done"></div><div>Done — primary green</div></div>
+    <div class="row"><div class="swatch skipped"></div><div>Rest day — amber</div></div>
+    <div class="row"><div class="swatch missed"></div><div>Empty / missed — outline</div></div>
+    <div class="row"><div class="swatch today"></div><div>Today — primary glow</div></div>
+  </div>
+
+  <!-- State A: All done (best case) -->
+  <div class="state-title">All done · 14/14 streak</div>
+  <div class="state-row" role="img" aria-label="Last 14 days, all done except today">
+    <div class="label">Drink water</div>
+    <div class="sparkline">
+      <span class="sparkline-col"><span class="dot done" title="Done"></span><span>14d ago</span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot today"></span><span>today</span></div>
+    </div>
+  </div>
+
+  <!-- State B: Mixed source-aware -->
+  <div class="state-title">Mixed · source-aware colors</div>
+  <div class="state-row" role="img" aria-label="Last 14 days, mixed completion">
+    <div class="label">Morning run</div>
+    <div class="sparkline">
+      <span class="sparkline-col"><span class="dot done" title="Done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot skipped" title="Rest day"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot skipped"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot today"></span><span>today</span></div>
+    </div>
+  </div>
+
+  <!-- State C: Broken streak -->
+  <div class="state-title">Streak broken · mostly missed</div>
+  <div class="state-row" role="img" aria-label="Last 14 days, streak broken">
+    <div class="label">Meditation</div>
+    <div class="sparkline">
+      <span class="sparkline-col"><span class="dot"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot today-empty"></span><span>today</span></div>
+    </div>
+  </div>
+
+  <!-- Tile integration -->
+  <div class="state-title">In-context · home tile</div>
+  <div class="tile" role="article" aria-label="Drink water, 12 day streak">
+    <div class="tile-top">
+      <div class="tile-icon green" aria-hidden="true">💧</div>
+      <div class="tile-title-block">
+        <div class="tile-title">Drink water</div>
+        <div class="tile-meta">
+          <span class="streak-badge">🔥 12</span>
+          <span class="budget">1/2 rest days left</span>
+        </div>
+      </div>
+    </div>
+    <div class="sparkline" role="img" aria-label="Last 14 days">
+      <span class="sparkline-col"><span class="dot done" title="Done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot skipped" title="Rest day"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot" title="Missed"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot skipped"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot done"></span><span></span></div>
+      <span class="sparkline-col"><span class="dot today"></span><span>today</span></div>
+    </div>
+    <div class="tile-actions">
+      <div class="group">
+        <button class="action-btn" aria-label="Skip today"><span class="material-icons">skip_next</span></button>
+        <button class="action-btn" aria-label="Undo today"><span class="material-icons">undo</span></button>
+      </div>
+      <button class="action-btn primary" aria-label="Mark done">
+        <span class="material-icons">check_circle</span><span>Done</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="caption">
+    <strong>Caption:</strong> "Last 14 days" — visible on long-press or in legend. 4 states × 14 days = 16 possible dot renderings per tile. <code>colorScheme.primary</code> for today, <code>colorScheme.tertiary</code> for rest days, <code>colorScheme.outline</code> for missed.
+  </div>
+
+  <div class="watermark">W-05 · Group A</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=412, initial-scale=1" />
+<title>W27 — On-demand permission sheet</title>
+<style>
+  :root {
+    --md-primary: #D0BCFF;
+    --md-on-primary: #381E72;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-secondary: #CCC2DC;
+    --md-on-secondary: #332D41;
+    --md-secondary-container: #4A4458;
+    --md-on-secondary-container: #E8DEF8;
+    --md-tertiary: #EFB8C8;
+    --md-on-tertiary: #492532;
+    --md-tertiary-container: #633B48;
+    --md-on-tertiary-container: #FFD8E4;
+    --md-error: #F2B8B5;
+    --md-on-error: #601410;
+    --md-error-container: #8C1D18;
+    --md-on-error-container: #F9DEDC;
+    --md-background: #1C1B1F;
+    --md-on-background: #E6E1E5;
+    --md-surface: #1C1B1F;
+    --md-surface-1: #262529;
+    --md-surface-2: #312E35;
+    --md-surface-3: #3B383E;
+    --md-surface-variant: #49454F;
+    --md-on-surface: #E6E1E5;
+    --md-on-surface-variant: #CAC4D0;
+    --md-outline: #938F99;
+    --md-outline-variant: #49454F;
+    --md-scrim: rgba(0,0,0,0.55);
+    --swatch-red:    #EF4444;
+    --swatch-orange: #F97316;
+    --swatch-yellow: #EAB308;
+    --swatch-green:  #22C55E;
+    --swatch-teal:   #14B8A6;
+    --swatch-blue:   #3B82F6;
+    --swatch-purple: #A855F7;
+    --swatch-pink:   #EC4899;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #000;
+    color: var(--md-on-background);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  .stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+    gap: 32px;
+  }
+  .phone {
+    width: 412px;
+    height: 892px;
+    background: var(--md-background);
+    border-radius: 28px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.6);
+    overflow: hidden;
+    position: relative;
+    border: 1px solid #000;
+  }
+  .device-bar {
+    height: 24px;
+    background: #000;
+    color: var(--md-on-surface-variant);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px;
+  }
+
+  /* Mock underlying screen */
+  .underlying {
+    padding: 12px 16px;
+    opacity: 0.55;
+    filter: blur(0.4px);
+  }
+  .ul-appbar {
+    display: flex; align-items: center; gap: 8px;
+    height: 56px;
+    color: var(--md-on-surface);
+  }
+  .ul-back {
+    width: 40px; height: 40px;
+    border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--md-on-surface-variant);
+  }
+  .ul-title {
+    flex: 1;
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0;
+  }
+  .ul-field {
+    background: var(--md-surface-1);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .ul-field .label {
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .ul-field .value {
+    font-size: 16px;
+    color: var(--md-on-surface);
+    margin-top: 4px;
+  }
+  .ul-button {
+    height: 48px;
+    border-radius: 24px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    width: 100%;
+    margin-top: 12px;
+  }
+
+  /* Scrim */
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background: var(--md-scrim);
+  }
+
+  /* Bottom sheet */
+  .sheet {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    background: var(--md-surface-2);
+    border-top-left-radius: 28px;
+    border-top-right-radius: 28px;
+    padding: 12px 24px 24px;
+    max-height: 70%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .sheet .drag {
+    width: 32px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--md-on-surface-variant);
+    margin: 8px auto 12px;
+    opacity: 0.5;
+  }
+  .sheet .icon-bubble {
+    width: 56px; height: 56px;
+    border-radius: 16px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 4px 0 16px;
+  }
+  .sheet h2 {
+    font-size: 24px;
+    font-weight: 500;
+    color: var(--md-on-surface);
+    margin: 0 0 8px;
+  }
+  .sheet .body-copy {
+    color: var(--md-on-surface-variant);
+    font-size: 14px;
+    margin: 0 0 20px;
+    line-height: 1.45;
+  }
+  .sheet .btn-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: auto;
+  }
+  .btn {
+    height: 48px;
+    border-radius: 24px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+  }
+  .btn-fill {
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+  }
+  .btn-text {
+    background: transparent;
+    color: var(--md-primary);
+    height: 44px;
+  }
+  .btn-outline {
+    background: transparent;
+    color: var(--md-primary);
+    border: 1px solid var(--md-outline);
+  }
+
+  /* Smaller leaf kbd hint */
+  .kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: var(--md-surface-3);
+    color: var(--md-on-surface-variant);
+    font-size: 11px;
+  }
+
+  /* Notes label */
+  .note {
+    position: absolute;
+    left: 12px; bottom: 8px;
+    color: var(--md-on-surface-variant);
+    font-size: 11px;
+    opacity: 0.7;
+  }
+
+  .wm {
+    position: absolute;
+    right: 6px; bottom: 4px;
+    font-size: 10px;
+    color: var(--md-on-surface-variant);
+    opacity: 0.55;
+  }
+  .caption {
+    margin: 0;
+    color: #999;
+    font-size: 12px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .screen-stack {
+    display: flex; gap: 24px; flex-wrap: wrap; justify-content: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <h2 class="caption" style="margin:0 0 8px 8px">W27 — On-demand permission sheet (4 states)</h2>
+
+  <div class="screen-stack">
+
+    <!-- A: Contacts → denied, one-shot -->
+    <div class="phone" aria-label="Add-person → contacts permission sheet (denied one-shot)" role="region">
+      <div class="device-bar" aria-hidden="true"><span>09:41</span><span>•</span><span>5G  87%</span></div>
+
+      <div class="underlying" aria-hidden="true">
+        <div class="ul-appbar">
+          <span class="ul-back"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg></span>
+          <h1 class="ul-title">New person</h1>
+        </div>
+        <div class="ul-field"><div class="label">Name</div><div class="value">Anika</div></div>
+        <div class="ul-field"><div class="label">Channel</div><div class="value">WhatsApp · @anika</div></div>
+        <div class="ul-field"><div class="label">Cadence</div><div class="value">Every 14 days</div></div>
+        <div class="ul-button">Pick contact</div>
+      </div>
+
+      <div class="scrim" aria-hidden="true"></div>
+
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetA-title">
+        <div class="drag" aria-hidden="true"></div>
+        <span class="icon-bubble">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M20 0H4v2h16V0zM4 24h16v-2H4v2zm16-18H4v14h16V6zM12 7c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm6 11H6v-1c0-2 4-3.1 6-3.1s6 1.1 6 3.1v1z"/>
+          </svg>
+        </span>
+        <h2 id="sheetA-title">Allow contacts?</h2>
+        <p class="body-copy">do it only uses contacts you add to a cadence. We never read or store your contact list.</p>
+        <div class="btn-col">
+          <button class="btn btn-fill">Allow</button>
+          <button class="btn btn-text">Not now</button>
+        </div>
+      </div>
+      <div class="wm">W-27A · Group F</div>
+      <div class="note">state: denied one-shot</div>
+    </div>
+
+    <!-- B: Exact alarm → permanently denied (only Open settings) -->
+    <div class="phone" aria-label="Exact-alarm permission sheet (permanently denied)" role="region">
+      <div class="device-bar" aria-hidden="true"><span>09:41</span><span>•</span><span>5G  87%</span></div>
+
+      <div class="underlying" aria-hidden="true">
+        <div class="ul-appbar">
+          <span class="ul-back"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg></span>
+          <h1 class="ul-title">Settings</h1>
+        </div>
+        <div class="ul-field">
+          <div class="label">Permissions</div>
+          <div class="value">Exact alarms</div>
+        </div>
+        <div class="ul-field">
+          <div class="label">Tap to fix</div>
+          <div class="value">Reminders may be late</div>
+        </div>
+      </div>
+
+      <div class="scrim" aria-hidden="true"></div>
+
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetB-title">
+        <div class="drag" aria-hidden="true"></div>
+        <span class="icon-bubble">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12 4c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7zm-1.5-9h3v6h-3V11z"/>
+          </svg>
+        </span>
+        <h2 id="sheetB-title">Allow exact alarms?</h2>
+        <p class="body-copy">Reminders fire on the minute, not up to 15 minutes late. <span style="color: var(--md-on-surface)">Android blocked this on your device — open system settings to allow it.</span></p>
+        <div class="btn-col">
+          <button class="btn btn-fill">Open settings</button>
+          <button class="btn btn-text">Not now</button>
+        </div>
+      </div>
+      <div class="wm">W-27B · Group F</div>
+      <div class="note">state: permanently denied</div>
+    </div>
+
+    <!-- C: Location (rationale, one-shot) -->
+    <div class="phone" aria-label="Location routine → location permission sheet" role="region">
+      <div class="device-bar" aria-hidden="true"><span>09:41</span><span>•</span><span>5G  87%</span></div>
+
+      <div class="underlying" aria-hidden="true">
+        <div class="ul-appbar">
+          <span class="ul-back"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg></span>
+          <h1 class="ul-title">Routine</h1>
+        </div>
+        <div class="ul-field">
+          <div class="label">Trigger</div>
+          <div class="value">Arrive at home</div>
+        </div>
+        <div class="ul-field">
+          <div class="label">Action</div>
+          <div class="value">Notify "Start dinner routine"</div>
+        </div>
+      </div>
+
+      <div class="scrim" aria-hidden="true"></div>
+
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetC-title">
+        <div class="drag" aria-hidden="true"></div>
+        <span class="icon-bubble">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/>
+          </svg>
+        </span>
+        <h2 id="sheetC-title">Allow location?</h2>
+        <p class="body-copy">Used only to detect when you arrive at the place this routine is tied to. The app never shares your location.</p>
+        <div class="btn-col">
+          <button class="btn btn-fill">Allow</button>
+          <button class="btn btn-text">Not now</button>
+        </div>
+      </div>
+      <div class="wm">W-27C · Group F</div>
+      <div class="note">state: not-yet-asked</div>
+    </div>
+
+    <!-- D: Full-screen intent → one-shot (notif category already allowed) -->
+    <div class="phone" aria-label="FSI permission sheet" role="region">
+      <div class="device-bar" aria-hidden="true"><span>09:41</span><span>•</span><span>5G  87%</span></div>
+
+      <div class="underlying" aria-hidden="true">
+        <div class="ul-appbar">
+          <span class="ul-back"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg></span>
+          <h1 class="ul-title">Settings</h1>
+        </div>
+        <div class="ul-field">
+          <div class="label">Reliability</div>
+          <div class="value">Enable full-screen reminders</div>
+        </div>
+        <div class="ul-field" style="opacity: 0.6">
+          <div class="label">Reminder reliability</div>
+          <div class="value">Degraded — WorkManager fallback</div>
+        </div>
+      </div>
+
+      <div class="scrim" aria-hidden="true"></div>
+
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetD-title">
+        <div class="drag" aria-hidden="true"></div>
+        <span class="icon-bubble">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+          </svg>
+        </span>
+        <h2 id="sheetD-title">Allow full-screen reminders?</h2>
+        <p class="body-copy">Required so a habit reminder can take over the lock screen on time. We only trigger this from the do it scheduler — nothing else.</p>
+        <div class="btn-col">
+          <button class="btn btn-fill">Allow</button>
+          <button class="btn btn-text">Not now</button>
+        </div>
+      </div>
+      <div class="wm">W-27D · Group F</div>
+      <div class="note">state: not-yet-asked</div>
+    </div>
+
+  </div>
+
+  <!-- Underlying - short-circuits -->
+  <div style="max-width: 980px; padding: 24px; background: #111; color: #bbb; border-radius: 12px; font-size: 13px; line-height: 1.6">
+    <strong style="color:#fff">Permission sheet — states</strong><br/>
+    <ul style="margin: 8px 0 0 16px; padding:0">
+      <li><b>Already granted</b> — short-circuits to <code style="background:#222;padding:1px 4px;border-radius:4px">true</code>; sheet never opens.</li>
+      <li><b>Denied (one-shot)</b> — Allow + Open-settings buttons (panel A, C, D).</li>
+      <li><b>Permanently denied</b> — only Open-settings (panel B).</li>
+      <li><b>Dismissed</b> — returns <code style="background:#222;padding:1px 4px;border-radius:4px">false</code>; caller shows SnackBar.</li>
+    </ul>
+  </div>
+
+</div>
+
+</body>
+</html>

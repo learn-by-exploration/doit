@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>W35 — Device-state live row | do it wireframes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --md-bg: #111418;
+    --md-surface: #1a1d22;
+    --md-surface-variant: #2a2e35;
+    --md-primary: #a8c7fa;
+    --md-on-primary: #062e6f;
+    --md-primary-container: #274777;
+    --md-on-primary-container: #d3e3fd;
+    --md-secondary: #c0c6dd;
+    --md-secondary-container: #3a4357;
+    --md-on-secondary-container: #dde2f9;
+    --md-tertiary: #a6c8ff;
+    --md-tertiary-container: #383f57;
+    --md-on-tertiary-container: #d9e3ff;
+    --md-on-surface: #e3e2e6;
+    --md-on-surface-variant: #c5c6d0;
+    --md-outline: #8e9099;
+    --md-outline-variant: #44474f;
+
+    --c-red: #ffb4ab;
+    --c-orange: #ffcf8a;
+    --c-yellow: #ffe169;
+    --c-green: #a4d3a4;
+    --c-teal: #7dd3c0;
+    --c-blue: #a8c7fa;
+    --c-purple: #d0bcff;
+    --c-pink: #f9b9d2;
+
+    --md-sys-success: #a4d3a4;
+    --md-sys-warning: #fbb94c;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #0d0f12; color: var(--md-on-surface); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+  .stage {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 32px 16px 64px;
+    flex-wrap: wrap;
+  }
+
+  .phone {
+    width: 412px;
+    height: 892px;
+    background: var(--md-bg);
+    border-radius: 32px;
+    border: 1px solid #2a2e35;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6), inset 0 0 0 4px #000;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .phone-label {
+    text-align: center;
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .status-bar {
+    height: 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px;
+    font-size: 12px;
+    background: var(--md-bg);
+    color: var(--md-on-surface);
+    flex-shrink: 0;
+  }
+  .status-bar .right { display: flex; gap: 6px; align-items: center; }
+
+  .app-bar {
+    height: 56px;
+    display: flex; align-items: center;
+    padding: 0 12px;
+    background: var(--md-bg);
+    color: var(--md-on-surface);
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .app-bar .icon-btn {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    color: var(--md-on-surface);
+    font-size: 22px;
+  }
+  .app-bar .title {
+    font-size: 18px; font-weight: 500;
+  }
+
+  .body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px 24px;
+    background: var(--md-bg);
+    color: var(--md-on-surface);
+  }
+
+  .section-h {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--md-primary);
+    margin: 16px 4px 8px;
+    font-weight: 500;
+  }
+
+  /* Listtile-like row matching DeviceStateRow source */
+  .device-row {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--md-surface);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+  }
+  .device-row .ic {
+    width: 40px; height: 40px;
+    border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    background: var(--md-tertiary-container);
+    color: var(--md-on-tertiary-container);
+    flex-shrink: 0;
+  }
+  .device-row .ic.live { background: var(--c-green); color:#0a3a0a; }
+  .device-row .ic.waiting { background: var(--md-warning, #fbb94c); color: #5a4a0a; }
+  .device-row .ic.error { background: var(--md-error, #ffb4ab); color: #5a0a0a; }
+  .device-row .meta { flex: 1; min-width: 0; }
+  .device-row .ttl {
+    font-size: 15px; font-weight: 500;
+    color: var(--md-on-surface);
+    margin-bottom: 4px;
+  }
+  .device-row .sub {
+    font-size: 13px;
+    color: var(--md-on-surface-variant);
+    line-height: 1.3;
+  }
+  .device-row .ts {
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .device-row .pulse {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--c-green);
+    margin-right: 6px;
+    display: inline-block;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.4); }
+  }
+
+  /* Info card explaining what this row is */
+  .info-card {
+    background: var(--md-surface);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 24px;
+  }
+  .info-card h4 {
+    margin: 0 0 6px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .info-card p {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: var(--md-on-surface-variant);
+    line-height: 1.4;
+  }
+  .info-card ul {
+    margin: 0;
+    padding-left: 16px;
+    font-size: 13px;
+    color: var(--md-on-surface-variant);
+    line-height: 1.6;
+  }
+
+  /* Diagnostic grid */
+  .diag-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .diag {
+    background: var(--md-surface);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: 10px;
+    padding: 12px;
+  }
+  .diag .lbl {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--md-on-surface-variant);
+    margin-bottom: 4px;
+  }
+  .diag .val {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--md-on-surface);
+  }
+  .diag .val .icon {
+    font-size: 14px;
+    margin-right: 4px;
+  }
+
+  /* Watermark */
+  .watermark {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--md-outline);
+    pointer-events: none;
+    z-index: 10;
+    font-family: ui-monospace, monospace;
+  }
+</style>
+</head>
+<body>
+
+<main class="stage" role="main" aria-label="Wireframes">
+
+  <div>
+    <div class="phone-label">Settings → Device state (live)</div>
+    <div class="phone" role="region" aria-label="Settings device state live">
+      <div class="status-bar">
+        <span class="left">9:30</span>
+        <span class="right"><span>5G</span><span>&#9679;&#9679;&#9679;</span><span>&#9707;</span></span>
+      </div>
+      <div class="app-bar">
+        <span class="icon-btn" aria-hidden="true">&#8592;</span>
+        <span class="title">Settings</span>
+      </div>
+
+      <div class="body">
+        <div class="section-h">Device state</div>
+
+        <div class="device-row" role="status" aria-label="Device state live">
+          <div class="ic live" aria-hidden="true">&#128268;</div>
+          <div class="meta">
+            <div class="ttl">Device state</div>
+            <div class="sub"><span class="pulse"></span>Battery: 80%, charging. Headphones: connected. Screen: on.</div>
+          </div>
+          <div class="ts" aria-label="Last update at 9:30:42">09:30:42</div>
+        </div>
+
+        <!-- Diagnostic detail grid -->
+        <div class="diag-grid" aria-label="Device state breakdown">
+          <div class="diag"><div class="lbl">Battery</div><div class="val"><span class="icon">&#128267;</span>80%</div></div>
+          <div class="diag"><div class="lbl">Charging</div><div class="val"><span class="icon">&#9889;</span>Yes</div></div>
+          <div class="diag"><div class="lbl">Headphones</div><div class="val"><span class="icon">&#127911;</span>Connected</div></div>
+          <div class="diag"><div class="lbl">Screen</div><div class="val"><span class="icon">&#128187;</span>On</div></div>
+          <div class="diag"><div class="lbl">Wi-Fi</div><div class="val"><span class="icon">&#128225;</span>Off</div></div>
+          <div class="diag"><div class="lbl">BT</div><div class="val"><span class="icon">&#128226;</span>On</div></div>
+        </div>
+
+        <div class="info-card">
+          <h4>What this is</h4>
+          <p>
+            A live read of the OS-level signal bits routines can subscribe to. Updates as state changes — not user-visible to other apps.
+          </p>
+          <ul>
+            <li>Used by <strong>Device state</strong> routine triggers.</li>
+            <li>Hidden when no snapshot has arrived yet.</li>
+            <li>Re-emits on every key event &mdash; no rate limit.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="watermark" aria-hidden="true">W-35 &middot; Group H</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="phone-label">Device state — waiting for first snapshot</div>
+    <div class="phone" role="region" aria-label="Settings device state waiting">
+      <div class="status-bar">
+        <span class="left">9:30</span>
+        <span class="right"><span>5G</span><span>&#9679;&#9679;&#9679;</span><span>&#9707;</span></span>
+      </div>
+      <div class="app-bar">
+        <span class="icon-btn" aria-hidden="true">&#8592;</span>
+        <span class="title">Settings</span>
+      </div>
+
+      <div class="body">
+        <div class="section-h">Device state</div>
+
+        <div class="device-row" role="status" aria-label="Waiting for first snapshot">
+          <div class="ic waiting" aria-hidden="true">&#8987;</div>
+          <div class="meta">
+            <div class="ttl">Device state</div>
+            <div class="sub" style="font-style:italic;">Waiting for first snapshot&hellip;</div>
+          </div>
+          <div class="ts">&mdash;</div>
+        </div>
+
+        <div class="info-card">
+          <h4>No snapshot yet</h4>
+          <p>
+            Tap "Update now" below, or wait a few seconds. The row will populate once the stream publishes.
+          </p>
+          <button style="
+            margin-top:8px;
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            padding:8px 16px;
+            background:var(--md-primary);
+            color:var(--md-on-primary);
+            border:none;
+            border-radius:20px;
+            font-size:13px;
+            font-weight:500;
+            cursor:pointer;
+          ">&#8635; Update now</button>
+        </div>
+      </div>
+
+      <div class="watermark" aria-hidden="true">W-35 &middot; Group H</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="phone-label">Device state — error</div>
+    <div class="phone" role="region" aria-label="Settings device state error">
+      <div class="status-bar">
+        <span class="left">9:30</span>
+        <span class="right"><span>5G</span><span>&#9679;&#9679;&#9679;</span><span>&#9707;</span></span>
+      </div>
+      <div class="app-bar">
+        <span class="icon-btn" aria-hidden="true">&#8592;</span>
+        <span class="title">Settings</span>
+      </div>
+
+      <div class="body">
+        <div class="section-h">Device state</div>
+
+        <div class="device-row" role="alert" aria-label="Device state error">
+          <div class="ic error" aria-hidden="true">&#9888;</div>
+          <div class="meta">
+            <div class="ttl">Device state</div>
+            <div class="sub" style="color:var(--c-red);">Could not read sensors. Restart the app to retry.</div>
+          </div>
+          <div class="ts">!</div>
+        </div>
+
+        <div class="info-card">
+          <h4>What this means</h4>
+          <p>
+            The platform stream returned an error. Routines that depend on <strong>Device state</strong> triggers will not fire until this is resolved.
+          </p>
+          <ul>
+            <li>Tap below to retry.</li>
+            <li>If the error repeats, file a report.</li>
+          </ul>
+          <button style="
+            margin-top:8px;
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            padding:8px 16px;
+            background:var(--md-primary);
+            color:var(--md-on-primary);
+            border:none;
+            border-radius:20px;
+            font-size:13px;
+            font-weight:500;
+            cursor:pointer;
+          ">&#8635; Retry</button>
+        </div>
+      </div>
+
+      <div class="watermark" aria-hidden="true">W-35 &middot; Group H</div>
+    </div>
+  </div>
+
+</main>
+
+</body>
+</html>

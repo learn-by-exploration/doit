@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>W36 — DST transition banner | do it wireframes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --md-bg: #111418;
+    --md-surface: #1a1d22;
+    --md-surface-variant: #2a2e35;
+    --md-primary: #a8c7fa;
+    --md-on-primary: #062e6f;
+    --md-primary-container: #274777;
+    --md-on-primary-container: #d3e3fd;
+    --md-secondary: #c0c6dd;
+    --md-secondary-container: #3a4357;
+    --md-on-secondary-container: #dde2f9;
+    --md-tertiary: #a6c8ff;
+    --md-tertiary-container: #383f57;
+    --md-on-tertiary-container: #d9e3ff;
+    --md-on-surface: #e3e2e6;
+    --md-on-surface-variant: #c5c6d0;
+    --md-outline: #8e9099;
+    --md-outline-variant: #44474f;
+
+    --c-red: #ffb4ab;
+    --c-orange: #ffcf8a;
+    --c-yellow: #ffe169;
+    --c-green: #a4d3a4;
+    --c-teal: #7dd3c0;
+    --c-blue: #a8c7fa;
+    --c-purple: #d0bcff;
+    --c-pink: #f9b9d2;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #0d0f12; color: var(--md-on-surface); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+  .stage {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 32px 16px 64px;
+    flex-wrap: wrap;
+  }
+
+  .phone {
+    width: 412px;
+    height: 892px;
+    background: var(--md-bg);
+    border-radius: 32px;
+    border: 1px solid #2a2e35;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6), inset 0 0 0 4px #000;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .phone-label {
+    text-align: center;
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .status-bar {
+    height: 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px;
+    font-size: 12px;
+    background: var(--md-bg);
+    color: var(--md-on-surface);
+    flex-shrink: 0;
+  }
+  .status-bar .right { display: flex; gap: 6px; align-items: center; }
+
+  .app-bar {
+    height: 56px;
+    display: flex; align-items: center;
+    padding: 0 12px;
+    background: var(--md-bg);
+    color: var(--md-on-surface);
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .app-bar .icon-btn {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    color: var(--md-on-surface);
+    font-size: 22px;
+  }
+  .app-bar .title { font-size: 18px; font-weight: 500; }
+  .app-bar .spacer { flex: 1; }
+
+  .body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 0 24px;
+    background: var(--md-bg);
+    color: var(--md-on-surface);
+  }
+
+  /* DST banner — secondaryContainer background */
+  .dst-banner {
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+    padding: 14px 16px 16px;
+    margin: 8px 16px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--md-outline-variant);
+  }
+  .dst-banner .row {
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .dst-banner .ic {
+    font-size: 22px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .dst-banner .head {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--md-on-secondary-container);
+    flex: 1;
+  }
+  .dst-banner .dismiss {
+    width: 32px; height: 32px;
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--md-on-secondary-container);
+    font-size: 18px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .dst-banner .body-txt {
+    font-size: 13px;
+    color: var(--md-on-secondary-container);
+    margin: 10px 0 10px 34px;
+    line-height: 1.4;
+    opacity: 0.92;
+  }
+  .dst-banner ul {
+    margin: 0 0 12px 34px;
+    padding: 0;
+    list-style: none;
+  }
+  .dst-banner ul li {
+    font-size: 13px;
+    color: var(--md-on-secondary-container);
+    line-height: 1.5;
+    padding: 4px 0;
+    display: flex; align-items: center; gap: 6px;
+    opacity: 0.92;
+  }
+  .dst-banner ul li .arrow { color: var(--md-primary); font-weight: 600; }
+  .dst-banner .cta {
+    margin-left: 34px;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px;
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+    border: none;
+    border-radius: 18px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  /* Placeholder habit tiles (just to show the banner in context) */
+  .tile-placeholder {
+    background: var(--md-surface);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: 12px;
+    padding: 14px;
+    margin: 0 16px 8px;
+    display: flex; align-items: center; gap: 12px;
+    color: var(--md-on-surface-variant);
+  }
+  .tile-placeholder .ic {
+    width: 36px; height: 36px;
+    border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+    background: var(--md-surface-variant);
+  }
+  .tile-placeholder .ttl { flex: 1; font-size: 14px; }
+  .tile-placeholder .badge {
+    font-size: 12px;
+    background: var(--md-surface-variant);
+    padding: 2px 8px;
+    border-radius: 8px;
+  }
+
+  /* Banner states legend */
+  .state-card {
+    background: var(--md-surface);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: 12px;
+    margin: 16px;
+    padding: 16px;
+  }
+  .state-card h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--md-on-surface-variant);
+  }
+  .state-card .state-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--md-outline-variant);
+    font-size: 13px;
+  }
+  .state-card .state-row:last-child { border-bottom: none; }
+  .state-card .pill {
+    flex-shrink: 0;
+    width: 56px;
+    text-align: center;
+    padding: 2px 0;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .state-card .pill.hidden { background: var(--md-surface-variant); color: var(--md-on-surface-variant); }
+  .state-card .pill.shown { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+  .state-card .pill.dismissed { background: var(--md-primary); color: var(--md-on-primary); }
+
+  /* Watermark */
+  .watermark {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--md-outline);
+    pointer-events: none;
+    z-index: 10;
+    font-family: ui-monospace, monospace;
+  }
+</style>
+</head>
+<body>
+
+<main class="stage" role="main" aria-label="Wireframes">
+
+  <div>
+    <div class="phone-label">Home — DST banner visible (2 drops)</div>
+    <div class="phone" role="region" aria-label="DST transition banner visible">
+      <div class="status-bar">
+        <span class="left">9:30</span>
+        <span class="right"><span>5G</span><span>&#9679;&#9679;&#9679;</span><span>&#9707;</span></span>
+      </div>
+      <div class="app-bar">
+        <span class="icon-btn" aria-hidden="true">&#9881;</span>
+        <span class="title">do it</span>
+        <span class="spacer"></span>
+        <span class="icon-btn" aria-hidden="true">&#128200;</span>
+      </div>
+
+      <div class="body">
+        <!-- DST transition banner — visible state -->
+        <div class="dst-banner" role="alert" aria-label="Daylight saving time changed. 2 habit times were rescheduled.">
+          <div class="row">
+            <span class="ic" aria-hidden="true">&#128339;</span>
+            <div class="head">Daylight saving changed</div>
+            <button class="dismiss" aria-label="Dismiss">&times;</button>
+          </div>
+          <div class="body-txt">2 habit times were silently rescheduled.</div>
+          <ul>
+            <li><span>&bull;</span> Read 30 minutes <span class="arrow">&rarr;</span> <strong>21:30</strong> <small style="opacity:0.7;">(was 22:30)</small></li>
+            <li><span>&bull;</span> Write journal <span class="arrow">&rarr;</span> <strong>10:30</strong> <small style="opacity:0.7;">(was 09:30)</small></li>
+          </ul>
+          <button class="cta">Reschedule now</button>
+        </div>
+
+        <div class="tile-placeholder">
+          <div class="ic" style="background:var(--c-blue);color:#0a2a5a;" aria-hidden="true">&#128173;</div>
+          <div class="ttl">Read 30 minutes</div>
+          <div class="badge">21:30</div>
+        </div>
+        <div class="tile-placeholder">
+          <div class="ic" style="background:var(--c-purple);color:#3a1a5a;" aria-hidden="true">&#128370;</div>
+          <div class="ttl">Write journal</div>
+          <div class="badge">10:30</div>
+        </div>
+        <div class="tile-placeholder">
+          <div class="ic" style="background:var(--c-green);color:#0a3a0a;" aria-hidden="true">&#127861;</div>
+          <div class="ttl">Drink water</div>
+          <div class="badge">&mdash;</div>
+        </div>
+      </div>
+
+      <div class="watermark" aria-hidden="true">W-36 &middot; Group H</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="phone-label">DST — single drop</div>
+    <div class="phone" role="region" aria-label="DST transition banner single drop">
+      <div class="status-bar">
+        <span class="left">9:30</span>
+        <span class="right"><span>5G</span><span>&#9679;&#9679;&#9679;</span><span>&#9707;</span></span>
+      </div>
+      <div class="app-bar">
+        <span class="icon-btn" aria-hidden="true">&#9881;</span>
+        <span class="title">do it</span>
+        <span class="spacer"></span>
+        <span class="icon-btn" aria-hidden="true">&#128200;</span>
+      </div>
+
+      <div class="body">
+        <!-- DST single drop variant -->
+        <div class="dst-banner" role="alert" aria-label="Daylight saving time changed. 1 habit time was rescheduled.">
+          <div class="row">
+            <span class="ic" aria-hidden="true">&#128339;</span>
+            <div class="head">Daylight saving changed</div>
+            <button class="dismiss" aria-label="Dismiss">&times;</button>
+          </div>
+          <div class="body-txt">1 habit time was silently rescheduled.</div>
+          <ul>
+            <li><span>&bull;</span> Morning run <span class="arrow">&rarr;</span> <strong>07:00</strong> <small style="opacity:0.7;">(was 06:00)</small></li>
+          </ul>
+          <button class="cta">Reschedule now</button>
+        </div>
+
+        <div class="tile-placeholder">
+          <div class="ic" style="background:var(--c-orange);color:#5a2a0a;" aria-hidden="true">&#127939;</div>
+          <div class="ttl">Morning run</div>
+          <div class="badge">07:00</div>
+        </div>
+      </div>
+
+      <div class="watermark" aria-hidden="true">W-36 &middot; Group H</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="phone-label">Home — banner hidden (drops empty)</div>
+    <div class="phone" role="region" aria-label="No DST drops so banner hidden">
+      <div class="status-bar">
+        <span class="left">9:30</span>
+        <span class="right"><span>5G</span><span>&#9679;&#9679;&#9679;</span><span>&#9707;</span></span>
+      </div>
+      <div class="app-bar">
+        <span class="icon-btn" aria-hidden="true">&#9881;</span>
+        <span class="title">do it</span>
+        <span class="spacer"></span>
+        <span class="icon-btn" aria-hidden="true">&#128200;</span>
+      </div>
+
+      <div class="body">
+        <div class="tile-placeholder">
+          <div class="ic" style="background:var(--c-green);color:#0a3a0a;" aria-hidden="true">&#127861;</div>
+          <div class="ttl">Drink water</div>
+          <div class="badge">&mdash;</div>
+        </div>
+        <div class="tile-placeholder">
+          <div class="ic" style="background:var(--c-blue);color:#0a2a5a;" aria-hidden="true">&#128173;</div>
+          <div class="ttl">Read 30 minutes</div>
+          <div class="badge">22:30</div>
+        </div>
+        <div class="tile-placeholder">
+          <div class="ic" style="background:var(--c-purple);color:#3a1a5a;" aria-hidden="true">&#128370;</div>
+          <div class="ttl">Write journal</div>
+          <div class="badge">10:30</div>
+        </div>
+        <div class="tile-placeholder">
+          <div class="ic" style="background:var(--c-orange);color:#5a2a0a;" aria-hidden="true">&#127939;</div>
+          <div class="ttl">Morning run</div>
+          <div class="badge">06:00</div>
+        </div>
+
+        <div class="state-card" aria-label="Banner state legend">
+          <h4>Banner state</h4>
+          <div class="state-row">
+            <span class="pill hidden">HIDDEN</span>
+            <span><strong>Today, before DST:</strong> drops list is empty. The Material banner is not rendered.</span>
+          </div>
+          <div class="state-row">
+            <span class="pill shown">SHOWN</span>
+            <span><strong>Just after DST switch:</strong> a non-empty drops list publishes &mdash; banner appears with one entry per changed habit time.</span>
+          </div>
+          <div class="state-row">
+            <span class="pill dismissed">DISMISSED</span>
+            <span><strong>User taps &times;:</strong> dismisses for the session. Reappears only if a future DST event lands.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="watermark" aria-hidden="true">W-36 &middot; Group H</div>
+    </div>
+  </div>
+
+</main>
+
+</body>
+</html>

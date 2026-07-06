@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=412, initial-scale=1">
+<title>W01 — Home (populated)</title>
+<style>
+  :root {
+    --md-surface: #14141A;
+    --md-surface-container: #1E1E26;
+    --md-surface-container-high: #28282F;
+    --md-surface-container-highest: #32323A;
+    --md-primary: #D0BCFF;
+    --md-on-primary: #381E72;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-secondary: #CCC2DC;
+    --md-on-secondary: #332D41;
+    --md-secondary-container: #4A4458;
+    --md-on-secondary-container: #E8DEF8;
+    --md-tertiary: #EFB8C8;
+    --md-on-tertiary: #492532;
+    --md-tertiary-container: #633B48;
+    --md-on-tertiary-container: #FFD8E4;
+    --md-error: #F2B8B5;
+    --md-on-error: #601410;
+    --md-error-container: #8C1D18;
+    --md-on-error-container: #F9DEDC;
+    --md-on-surface: #E6E1E5;
+    --md-on-surface-variant: #CAC4D0;
+    --md-outline: #938F99;
+    --md-outline-variant: #49454F;
+    --md-success: #81C995;
+    --md-warn: #FFD479;
+
+    --cat-red:    #EF5350;
+    --cat-orange: #FF9A3C;
+    --cat-yellow: #FFD479;
+    --cat-green:  #81C995;
+    --cat-teal:   #4DD0E1;
+    --cat-blue:   #64B5F6;
+    --cat-purple: #B39DDB;
+    --cat-pink:   #F48FB1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #0F0F14;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    color: var(--md-on-surface);
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    display: flex;
+    justify-content: center;
+    padding: 20px 0;
+  }
+  .viewport {
+    width: 412px;
+    min-height: 892px;
+    background: var(--md-surface);
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .appbar {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--md-surface);
+    min-height: 64px;
+    gap: 8px;
+  }
+  .appbar .title {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: .2px;
+    flex: 1;
+    color: var(--md-on-surface);
+  }
+  .appbar .iconbtn {
+    width: 48px; height: 48px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--md-on-surface-variant);
+    border-radius: 24px;
+  }
+
+  /* Reliability banner */
+  .banner-error {
+    margin: 0 16px 8px;
+    background: var(--md-error-container);
+    color: var(--md-on-error-container);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+  }
+  .banner-error .icon {
+    width: 24px; height: 24px;
+    color: var(--md-error);
+    flex-shrink: 0;
+  }
+  .banner-error .chev {
+    margin-left: auto;
+    color: var(--md-on-error-container);
+  }
+
+  /* DST transition banner */
+  .banner-secondary {
+    margin: 0 16px 8px;
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 14px;
+  }
+  .banner-secondary .icon { color: var(--md-secondary); flex-shrink: 0; }
+  .banner-secondary .body { flex: 1; line-height: 1.4; }
+  .banner-secondary .title { font-weight: 600; margin-bottom: 2px; }
+  .banner-secondary .close {
+    color: var(--md-on-secondary-container);
+    width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 16px;
+  }
+
+  /* Streak recovery card */
+  .streak-recovery {
+    margin: 0 16px 8px;
+    background: var(--md-tertiary-container);
+    color: var(--md-on-tertiary-container);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .streak-recovery .head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .streak-recovery .head .icon { color: var(--md-tertiary); }
+  .streak-recovery .head .text { flex: 1; font-weight: 600; font-size: 14px; }
+  .streak-recovery .body { font-size: 14px; line-height: 1.4; }
+  .streak-recovery .cta {
+    align-self: flex-start;
+    background: var(--md-tertiary);
+    color: var(--md-on-tertiary);
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+  }
+
+  /* Habit tile card */
+  .tile {
+    margin: 8px 16px;
+    background: var(--md-surface-container);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .tile-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .tile-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .tile-icon.green { background: rgba(129,201,149,.25); color: var(--cat-green); }
+  .tile-icon.orange { background: rgba(255,154,60,.25); color: var(--cat-orange); }
+  .tile-icon.teal { background: rgba(77,208,225,.25); color: var(--cat-teal); }
+  .tile-icon.pink { background: rgba(244,143,177,.25); color: var(--cat-pink); }
+  .tile-title-block { flex: 1; min-width: 0; }
+  .tile-title {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tile-chip-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+  .category-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(129,201,149,.18);
+    color: var(--cat-green);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px 3px 8px;
+    border-radius: 10px;
+  }
+  .category-chip .dot {
+    width: 8px; height: 8px;
+    border-radius: 4px;
+    background: var(--cat-green);
+  }
+  .streak-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--md-warn);
+  }
+  .budget-caption {
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+  }
+  .tile-leadactions {
+    display: flex;
+    gap: 4px;
+  }
+  .tile-leadactions .iconbtn {
+    width: 40px; height: 40px;
+    border-radius: 20px;
+    color: var(--md-on-surface-variant);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+
+  /* Sparkline */
+  .sparkline {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 4px 0 2px;
+  }
+  .dot {
+    width: 12px; height: 12px;
+    border-radius: 6px;
+    background: transparent;
+    border: 1.5px solid var(--md-outline-variant);
+    flex-shrink: 0;
+  }
+  .dot.done {
+    background: var(--cat-green);
+    border-color: var(--cat-green);
+  }
+  .dot.skipped {
+    background: var(--cat-yellow);
+    border-color: var(--cat-yellow);
+  }
+  .dot.today {
+    background: var(--md-primary);
+    border-color: var(--md-primary);
+    box-shadow: 0 0 0 2px rgba(208,188,255,.25);
+  }
+  .sparkline-label {
+    margin-left: 8px;
+    font-size: 11px;
+    color: var(--md-on-surface-variant);
+  }
+
+  /* Action row */
+  .tile-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+  .tile-actions .group {
+    display: flex;
+    gap: 4px;
+  }
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface);
+    border: none;
+    padding: 10px 14px;
+    border-radius: 22px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 48px;
+    min-width: 48px;
+    cursor: pointer;
+  }
+  .action-btn.primary {
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+  }
+  .action-btn.skip {
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface-variant);
+  }
+  .action-btn.undo {
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface-variant);
+  }
+  .action-btn .material-icons {
+    font-size: 18px;
+  }
+
+  /* Anchor paused badge */
+  .anchor-paused-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--md-error-container);
+    color: var(--md-on-error-container);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px 3px 8px;
+    border-radius: 10px;
+  }
+
+  /* FAB */
+  .fab {
+    position: absolute;
+    bottom: 92px;
+    right: 16px;
+    width: 56px; height: 56px;
+    border-radius: 16px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    border: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,.35);
+    cursor: pointer;
+  }
+
+  /* Bottom nav */
+  .bottomnav {
+    margin-top: auto;
+    background: var(--md-surface-container);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 12px 8px 16px;
+  }
+  .navbtn {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    color: var(--md-on-surface-variant);
+    font-size: 11px;
+    font-weight: 500;
+    min-width: 64px;
+    min-height: 48px;
+    padding: 4px 0;
+    background: none; border: none; font-family: inherit;
+    cursor: pointer;
+  }
+  .navbtn.active { color: var(--md-on-surface); }
+  .navbtn .material-icons { font-size: 24px; }
+
+  /* Watermark */
+  .watermark {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    font-size: 10px;
+    color: var(--md-on-surface-variant);
+    opacity: .55;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  .material-icons {
+    font-family: "Material Icons", "Material Symbols Outlined", system-ui;
+    font-style: normal; font-weight: 400;
+    line-height: 1;
+    display: inline-block;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+  }
+  /* Glyph fallback for offline rendering */
+  .glyph { font-family: system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<div class="viewport" role="application" aria-label="do it home screen">
+
+  <div class="appbar" role="banner">
+    <div class="title">do it</div>
+    <button class="iconbtn" aria-label="Select">
+      <span class="material-icons">checklist</span>
+    </button>
+  </div>
+
+  <!-- Reliability banner (degraded state) -->
+  <div class="banner-error" role="status" aria-label="Reminder reliability degraded">
+    <span class="material-icons icon">warning_amber</span>
+    <div>Reminders may be late. Tap to fix.</div>
+    <span class="material-icons chev">chevron_right</span>
+  </div>
+
+  <!-- DST transition banner (one-shot) -->
+  <div class="banner-secondary" role="status" aria-label="Daylight saving time changed">
+    <span class="material-icons icon">schedule</span>
+    <div class="body">
+      <div class="title">Daylight saving changed</div>
+      3 habit times were silently rescheduled
+    </div>
+    <button class="close" aria-label="Dismiss">
+      <span class="material-icons">close</span>
+    </button>
+  </div>
+
+  <!-- Streak recovery card (one-shot) -->
+  <div class="streak-recovery" role="region" aria-label="Streak broken: Drink water missed 5 days in a row">
+    <div class="head">
+      <span class="material-icons icon">calendar_month</span>
+      <div class="text">Streak broken on Drink water</div>
+      <button class="close" aria-label="Dismiss" style="color: var(--md-on-tertiary-container);">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+    <div class="body">5 days missed. Jump back in at tomorrow 8:00 AM.</div>
+    <button class="cta">I'm back</button>
+  </div>
+
+  <!-- Habit tile #1: Drink water (Health) -->
+  <div class="tile" role="article" aria-label="Drink water, 12 day streak">
+    <div class="tile-top">
+      <div class="tile-icon green" aria-hidden="true">💧</div>
+      <div class="tile-title-block">
+        <div class="tile-title">Drink water</div>
+        <div class="tile-chip-row">
+          <span class="category-chip"><span class="dot"></span>Health</span>
+          <span class="streak-badge">🔥 12</span>
+        </div>
+      </div>
+      <div class="tile-leadactions">
+        <button class="iconbtn" aria-label="Edit habit">
+          <span class="material-icons">edit</span>
+        </button>
+        <button class="iconbtn" aria-label="Delete habit">
+          <span class="material-icons">delete</span>
+        </button>
+      </div>
+    </div>
+    <div class="sparkline" role="img" aria-label="Last 14 days">
+      <span class="dot done" title="Done"></span>
+      <span class="dot done"></span>
+      <span class="dot skipped" title="Rest day"></span>
+      <span class="dot done"></span>
+      <span class="dot done"></span>
+      <span class="dot"></span>
+      <span class="dot done"></span>
+      <span class="dot done"></span>
+      <span class="dot done"></span>
+      <span class="dot skipped"></span>
+      <span class="dot done"></span>
+      <span class="dot done"></span>
+      <span class="dot done"></span>
+      <span class="dot today"></span>
+      <span class="sparkline-label">14d</span>
+    </div>
+    <div class="budget-caption">1/2 rest days left</div>
+    <div class="tile-actions">
+      <div class="group">
+        <button class="action-btn skip" aria-label="Skip today">
+          <span class="material-icons">skip_next</span>
+        </button>
+        <button class="action-btn undo" aria-label="Undo today">
+          <span class="material-icons">undo</span>
+        </button>
+      </div>
+      <button class="action-btn primary" aria-label="Mark done">
+        <span class="material-icons">check_circle</span>
+        <span>Done</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Habit tile #2: Morning run -->
+  <div class="tile" role="article" aria-label="Morning run, 4 day streak">
+    <div class="tile-top">
+      <div class="tile-icon orange" aria-hidden="true">🏃</div>
+      <div class="tile-title-block">
+        <div class="tile-title">Morning run</div>
+        <div class="tile-chip-row">
+          <span class="category-chip" style="background: rgba(255,154,60,.18); color: var(--cat-orange);">
+            <span class="dot" style="background: var(--cat-orange);"></span>Exercise
+          </span>
+          <span class="streak-badge">🔥 4</span>
+        </div>
+      </div>
+      <div class="tile-leadactions">
+        <button class="iconbtn" aria-label="Edit habit">
+          <span class="material-icons">edit</span>
+        </button>
+        <button class="iconbtn" aria-label="Delete habit">
+          <span class="material-icons">delete</span>
+        </button>
+      </div>
+    </div>
+    <div class="sparkline" role="img" aria-label="Last 14 days">
+      <span class="dot done"></span>
+      <span class="dot"></span>
+      <span class="dot done"></span>
+      <span class="dot done"></span>
+      <span class="dot"></span>
+      <span class="dot done"></span>
+      <span class="dot"></span>
+      <span class="dot done"></span>
+      <span class="dot done"></span>
+      <span class="dot"></span>
+      <span class="dot done"></span>
+      <span class="dot done"></span>
+      <span class="dot"></span>
+      <span class="dot today"></span>
+      <span class="sparkline-label">14d</span>
+    </div>
+    <div class="budget-caption">2/2 rest days left</div>
+    <div class="tile-actions">
+      <div class="group">
+        <button class="action-btn skip" aria-label="Skip today">
+          <span class="material-icons">skip_next</span>
+        </button>
+        <button class="action-btn undo" aria-label="Undo today" disabled style="opacity:.5">
+          <span class="material-icons">undo</span>
+        </button>
+      </div>
+      <button class="action-btn primary" aria-label="Mark done">
+        <span class="material-icons">check_circle</span>
+        <span>Done</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Habit tile #3: Meditate (anchor target paused) -->
+  <div class="tile" role="article" aria-label="Morning meditation, 0 day streak, anchor target paused">
+    <div class="tile-top">
+      <div class="tile-icon teal" aria-hidden="true">🧘</div>
+      <div class="tile-title-block">
+        <div class="tile-title">Morning meditation</div>
+        <div class="tile-chip-row">
+          <span class="category-chip" style="background: rgba(77,208,225,.18); color: var(--cat-teal);">
+            <span class="dot" style="background: var(--cat-teal);"></span>Mind
+          </span>
+          <span class="streak-badge">🔥 0</span>
+          <span class="anchor-paused-badge" aria-label="Target paused">
+            <span class="material-icons" style="font-size:13px">pause_circle</span>
+            Target paused
+          </span>
+        </div>
+      </div>
+      <div class="tile-leadactions">
+        <button class="iconbtn" aria-label="Edit habit">
+          <span class="material-icons">edit</span>
+        </button>
+        <button class="iconbtn" aria-label="Delete habit">
+          <span class="material-icons">delete</span>
+        </button>
+      </div>
+    </div>
+    <div class="sparkline" role="img" aria-label="Last 14 days">
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot today"></span>
+      <span class="sparkline-label">14d</span>
+    </div>
+    <div class="budget-caption">No rest days configured</div>
+    <div class="tile-actions">
+      <div class="group">
+        <button class="action-btn skip" aria-label="Skip today">
+          <span class="material-icons">skip_next</span>
+        </button>
+        <button class="action-btn undo" aria-label="Undo today" disabled style="opacity:.5">
+          <span class="material-icons">undo</span>
+        </button>
+      </div>
+      <button class="action-btn primary" aria-label="Mark done">
+        <span class="material-icons">check_circle</span>
+        <span>Done</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" aria-label="Add habit">
+    <span class="material-icons" style="font-size:24px">add</span>
+  </button>
+
+  <!-- Bottom nav -->
+  <nav class="bottomnav" aria-label="Primary">
+    <button class="navbtn active" aria-current="page">
+      <span class="material-icons">home</span>
+      <span>Home</span>
+    </button>
+    <button class="navbtn">
+      <span class="material-icons">bar_chart</span>
+      <span>Stats</span>
+    </button>
+    <button class="navbtn">
+      <span class="material-icons">settings</span>
+      <span>Settings</span>
+    </button>
+  </nav>
+
+  <div class="watermark">W-01 · Group A</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=412, initial-scale=1">
+<title>W02 — Add / Edit habit</title>
+<style>
+  :root {
+    --md-surface: #14141A;
+    --md-surface-container: #1E1E26;
+    --md-surface-container-high: #28282F;
+    --md-surface-container-highest: #32323A;
+    --md-primary: #D0BCFF;
+    --md-on-primary: #381E72;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-secondary: #CCC2DC;
+    --md-secondary-container: #4A4458;
+    --md-on-secondary-container: #E8DEF8;
+    --md-tertiary: #EFB8C8;
+    --md-tertiary-container: #633B48;
+    --md-on-tertiary-container: #FFD8E4;
+    --md-error: #F2B8B5;
+    --md-error-container: #8C1D18;
+    --md-on-error-container: #F9DEDC;
+    --md-on-surface: #E6E1E5;
+    --md-on-surface-variant: #CAC4D0;
+    --md-outline: #938F99;
+    --md-outline-variant: #49454F;
+    --cat-red:    #EF5350;
+    --cat-orange: #FF9A3C;
+    --cat-yellow: #FFD479;
+    --cat-green:  #81C995;
+    --cat-teal:   #4DD0E1;
+    --cat-blue:   #64B5F6;
+    --cat-purple: #B39DDB;
+    --cat-pink:   #F48FB1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #0F0F14;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    color: var(--md-on-surface);
+    -webkit-font-smoothing: antialiased;
+  }
+  body { display: flex; justify-content: center; padding: 20px 0; }
+  .viewport {
+    width: 412px;
+    min-height: 892px;
+    background: var(--md-surface);
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+  .appbar {
+    display: flex; align-items: center;
+    padding: 12px 16px;
+    background: var(--md-surface);
+    min-height: 64px; gap: 8px;
+  }
+  .appbar .iconbtn {
+    width: 48px; height: 48px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--md-on-surface-variant);
+    border-radius: 24px;
+  }
+  .appbar .title {
+    font-size: 22px; font-weight: 500;
+    flex: 1;
+  }
+
+  .scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 120px;
+  }
+
+  .section {
+    padding: 8px 16px 4px;
+  }
+  .section-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--md-primary);
+    padding: 14px 4px 8px;
+    letter-spacing: .3px;
+  }
+  .field-card {
+    background: var(--md-surface-container);
+    border-radius: 12px;
+    padding: 4px 16px;
+  }
+  .field {
+    display: flex; align-items: center;
+    min-height: 56px;
+    border-bottom: 1px solid var(--md-outline-variant);
+    padding: 8px 0;
+  }
+  .field:last-child { border-bottom: none; }
+  .field .label {
+    width: 96px;
+    font-size: 14px;
+    color: var(--md-on-surface-variant);
+  }
+  .field .value {
+    flex: 1;
+    font-size: 16px;
+    color: var(--md-on-surface);
+  }
+  .field .value.placeholder { color: var(--md-outline); }
+  .field .trailing {
+    color: var(--md-on-surface-variant);
+  }
+
+  .input-card {
+    background: var(--md-surface-container);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 4px;
+  }
+  .text-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid var(--md-outline);
+    color: var(--md-on-surface);
+    font-family: inherit;
+    font-size: 16px;
+    padding: 8px 0;
+    outline: none;
+  }
+  .text-input:focus { border-bottom-color: var(--md-primary); }
+
+  .seg-group {
+    display: flex;
+    background: var(--md-surface-container);
+    border-radius: 12px;
+    padding: 4px;
+    gap: 2px;
+    flex-wrap: wrap;
+  }
+  .seg {
+    flex: 1 1 calc(33% - 4px);
+    text-align: center;
+    padding: 10px 8px;
+    font-size: 13px;
+    color: var(--md-on-surface-variant);
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    cursor: pointer;
+    min-height: 40px;
+  }
+  .seg.active {
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+  }
+
+  .picker-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--md-outline-variant);
+    cursor: pointer;
+  }
+  .picker-row:last-child { border-bottom: none; }
+  .picker-icon {
+    width: 36px; height: 36px;
+    border-radius: 18px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--md-surface-container-highest);
+    color: var(--md-on-surface);
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .picker-icon.green { background: rgba(129,201,149,.25); color: var(--cat-green); }
+  .picker-icon.purple { background: rgba(179,157,219,.25); color: var(--cat-purple); }
+  .picker-row .grow { flex: 1; }
+  .picker-row .grow .t { font-size: 14px; }
+  .picker-row .grow .s { font-size: 12px; color: var(--md-on-surface-variant); margin-top: 2px; }
+  .picker-row .chev { color: var(--md-on-surface-variant); }
+
+  /* Rest day slider */
+  .rest-card {
+    background: var(--md-surface-container);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .rest-card .row {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+  .rest-card .label { font-size: 14px; }
+  .rest-card .value { font-size: 16px; font-weight: 600; color: var(--md-primary); }
+  .slider {
+    position: relative;
+    height: 24px;
+    display: flex; align-items: center;
+  }
+  .slider .track {
+    flex: 1; height: 8px;
+    background: var(--md-surface-container-highest);
+    border-radius: 4px;
+    position: relative;
+  }
+  .slider .fill {
+    position: absolute;
+    left: 0; top: 0; height: 100%;
+    width: 25%;
+    background: var(--md-primary);
+    border-radius: 4px;
+  }
+  .slider .thumb {
+    position: absolute;
+    left: 25%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 24px; height: 24px;
+    background: var(--md-primary);
+    border-radius: 12px;
+    border: 3px solid var(--md-surface);
+    box-shadow: 0 2px 6px rgba(0,0,0,.4);
+  }
+  .slider .ticks {
+    display: flex; justify-content: space-between;
+    margin-top: 4px;
+    font-size: 10px; color: var(--md-on-surface-variant);
+  }
+
+  /* Pause row */
+  .pause-row {
+    display: flex; align-items: center;
+    background: var(--md-surface-container);
+    padding: 12px 16px;
+    border-radius: 12px;
+    gap: 12px;
+  }
+  .pause-row .grow { flex: 1; }
+  .pause-row .t { font-size: 14px; }
+  .pause-row .s { font-size: 12px; color: var(--md-on-surface-variant); margin-top: 2px; }
+  .switch {
+    width: 52px; height: 32px;
+    background: var(--md-surface-container-highest);
+    border-radius: 16px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .switch::after {
+    content: "";
+    position: absolute;
+    width: 24px; height: 24px;
+    background: var(--md-outline);
+    border-radius: 12px;
+    top: 4px; left: 4px;
+  }
+  .switch.on {
+    background: var(--md-primary);
+  }
+  .switch.on::after {
+    background: var(--md-on-primary);
+    left: 24px;
+  }
+
+  /* Templates */
+  .checkbox-row {
+    display: flex; align-items: center;
+    padding: 14px 0;
+    gap: 12px;
+  }
+  .checkbox {
+    width: 20px; height: 20px;
+    border: 2px solid var(--md-outline);
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .checkbox.checked {
+    background: var(--md-primary);
+    border-color: var(--md-primary);
+  }
+  .checkbox.checked::after {
+    content: "✓";
+    color: var(--md-on-primary);
+    display: block;
+    text-align: center;
+    line-height: 16px;
+    font-size: 14px;
+    font-weight: 800;
+  }
+  .checkbox-row .label { font-size: 14px; }
+
+  /* Bottom action */
+  .footer {
+    background: var(--md-surface-container);
+    padding: 12px 16px;
+    border-top: 1px solid var(--md-outline-variant);
+    display: flex; gap: 12px;
+    align-items: center;
+  }
+  .save-btn {
+    flex: 1;
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+    border: none;
+    padding: 14px;
+    border-radius: 24px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    min-height: 48px;
+    cursor: pointer;
+  }
+  .save-btn.outline {
+    background: transparent;
+    border: 1px solid var(--md-outline);
+    color: var(--md-on-surface);
+  }
+
+  .watermark {
+    position: absolute;
+    bottom: 8px; right: 12px;
+    font-size: 10px;
+    color: var(--md-on-surface-variant);
+    opacity: .55;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    pointer-events: none;
+  }
+
+  .material-icons {
+    font-family: "Material Icons", "Material Symbols Outlined", system-ui;
+    font-style: normal; font-weight: 400;
+    line-height: 1;
+    display: inline-block;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+  }
+</style>
+</head>
+<body>
+<div class="viewport" role="application" aria-label="Add or edit habit screen">
+
+  <div class="appbar" role="banner">
+    <button class="iconbtn" aria-label="Back">
+      <span class="material-icons">arrow_back</span>
+    </button>
+    <div class="title">New do</div>
+    <button class="iconbtn" aria-label="Save">
+      <span class="material-icons">check</span>
+    </button>
+  </div>
+
+  <div class="scroll">
+    <!-- Name -->
+    <div class="section">
+      <div class="section-label">Name</div>
+      <div class="input-card">
+        <input class="text-input" value="Drink water" aria-label="Habit name">
+      </div>
+    </div>
+
+    <!-- Category -->
+    <div class="section">
+      <div class="section-label">Category</div>
+      <div class="input-card">
+        <div class="picker-row">
+          <div class="picker-icon green" aria-hidden="true">●</div>
+          <div class="grow">
+            <div class="t">Health</div>
+            <div class="s">Green swatch · category 1 of 6</div>
+          </div>
+          <span class="material-icons chev">chevron_right</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Icon -->
+    <div class="section">
+      <div class="section-label">Icon</div>
+      <div class="input-card">
+        <div class="picker-row">
+          <div class="picker-icon purple" aria-hidden="true">💧</div>
+          <div class="grow">
+            <div class="t">water_drop</div>
+            <div class="s">Pick from 64 icons · 8 categories</div>
+          </div>
+          <button class="action-btn" style="background: var(--md-surface-container-highest); color: var(--md-on-surface-variant); border:none; padding: 6px 12px; border-radius: 12px; font-size:12px; cursor:pointer;">Use default</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Schedule -->
+    <div class="section">
+      <div class="section-label">When? · How often?</div>
+      <div class="seg-group" role="tablist" aria-label="Schedule kind">
+        <button class="seg active" role="tab" aria-selected="true">Fixed</button>
+        <button class="seg" role="tab">Interval</button>
+        <button class="seg" role="tab">Anchor</button>
+        <button class="seg" role="tab">Day-of-X</button>
+        <button class="seg" role="tab">Time-Window</button>
+      </div>
+
+      <div class="input-card" style="margin-top: 12px;">
+        <div class="picker-row">
+          <div class="picker-icon" aria-hidden="true">🕗</div>
+          <div class="grow">
+            <div class="t">Daily at 8:00 AM</div>
+            <div class="s">Fixed time · every day</div>
+          </div>
+          <span class="material-icons chev">chevron_right</span>
+        </div>
+        <div class="picker-row">
+          <div class="picker-icon" aria-hidden="true">📋</div>
+          <div class="grow">
+            <div class="t">Pick a template…</div>
+            <div class="s">Start from a curated schedule</div>
+          </div>
+          <span class="material-icons chev">chevron_right</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Anchor target (if Anchor selected) -->
+    <div class="section">
+      <div class="section-label">Anchor target</div>
+      <div class="input-card">
+        <div class="picker-row">
+          <div class="picker-icon" style="background: rgba(77,208,225,.25); color: var(--cat-teal);" aria-hidden="true">🧘</div>
+          <div class="grow">
+            <div class="t">I want this to follow: <strong>Morning meditation</strong></div>
+            <div class="s">Fires 30 min after target's Done</div>
+          </div>
+          <span class="material-icons chev">chevron_right</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Routines -->
+    <div class="section">
+      <div class="section-label">Routines</div>
+      <div class="input-card">
+        <div class="picker-row">
+          <div class="picker-icon" aria-hidden="true">⚙️</div>
+          <div class="grow">
+            <div class="t">2 routines attached</div>
+            <div class="s">Silent at home · Notify at 8:00 AM</div>
+          </div>
+          <span class="material-icons chev">expand_more</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rest day budget -->
+    <div class="section">
+      <div class="rest-card" role="group" aria-label="Rest days per month">
+        <div class="row">
+          <div class="label">Rest days per month</div>
+          <div class="value">2</div>
+        </div>
+        <div class="slider" aria-label="Rest days slider">
+          <div class="track"><div class="fill"></div></div>
+          <div class="thumb"></div>
+        </div>
+        <div class="slider .ticks" style="margin-top:6px; font-size: 10px; color: var(--md-on-surface-variant); display:flex; justify-content:space-between;">
+          <span>0</span><span>8</span><span>16</span><span>24</span><span>31</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause row -->
+    <div class="section">
+      <div class="pause-row">
+        <div class="grow">
+          <div class="t">Pause this do</div>
+          <div class="s">Reminders and missions stop until you resume.</div>
+        </div>
+        <div class="switch" role="switch" aria-checked="false"></div>
+      </div>
+    </div>
+
+    <!-- Save as template -->
+    <div class="section">
+      <div class="input-card">
+        <div class="checkbox-row">
+          <div class="checkbox" aria-hidden="true"></div>
+          <div class="label">Save as template</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Completion log (edit mode only) -->
+    <div class="section">
+      <div class="section-label">Recent completions</div>
+      <div class="input-card" role="region" aria-label="Completion log">
+        <div class="picker-row">
+          <div class="picker-icon" style="background: rgba(129,201,149,.25); color: var(--cat-green);" aria-hidden="true">✓</div>
+          <div class="grow">
+            <div class="t">2026-07-05 · 09:30</div>
+            <div class="s">manual</div>
+          </div>
+          <span class="material-icons" style="color: var(--md-on-surface-variant);">delete</span>
+        </div>
+        <div class="picker-row">
+          <div class="picker-icon" style="background: rgba(129,201,149,.25); color: var(--cat-green);" aria-hidden="true">✓</div>
+          <div class="grow">
+            <div class="t">2026-07-04 · 10:12</div>
+            <div class="s">notification</div>
+          </div>
+          <span class="material-icons" style="color: var(--md-on-surface-variant);">delete</span>
+        </div>
+        <div class="picker-row">
+          <div class="picker-icon" style="background: rgba(129,201,149,.25); color: var(--cat-green);" aria-hidden="true">✓</div>
+          <div class="grow">
+            <div class="t">2026-07-03 · 08:55</div>
+            <div class="s">mission</div>
+          </div>
+          <span class="material-icons" style="color: var(--md-on-surface-variant);">delete</span>
+        </div>
+        <div style="padding: 8px 4px; font-size: 12px; color: var(--md-on-surface-variant);">27 older entries are hidden</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <button class="save-btn outline" style="flex:0 0 auto; padding: 14px 18px;">Cancel</button>
+    <button class="save-btn">Save</button>
+  </div>
+
+  <div class="watermark">W-02 · Group A</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>W22 — Memory mission</title>
+<meta name="viewport" content="width=412, initial-scale=1">
+<style>
+  :root {
+    --md-bg: #13141b;
+    --md-surface: #1c1d27;
+    --md-surface-variant: #272834;
+    --md-primary: #a8c7fa;
+    --md-on-primary: #062e6f;
+    --md-on-surface: #e3e3e9;
+    --md-on-surface-variant: #c5c6d0;
+    --md-outline: #44474f;
+    --md-success: #a3d977;
+    --md-tertiary: #dab8ff;
+    --card-back: #2d2e3a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #0a0b10; color: var(--md-on-surface); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  .device { width: 412px; min-height: 892px; margin: 24px auto; background: var(--md-bg); border-radius: 36px; border: 1px solid #2a2b35; box-shadow: 0 18px 60px rgba(0,0,0,0.55); overflow: hidden; display: flex; flex-direction: column; position: relative; }
+  .appbar { height: 56px; padding: 0 8px; display: flex; align-items: center; gap: 4px; background: var(--md-bg); border-bottom: 1px solid var(--md-outline); }
+  .icon-btn { width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--md-on-surface); border-radius: 24px; cursor: pointer; }
+  .icon-btn:focus-visible { outline: 2px solid var(--md-primary); }
+  .icon-btn svg { width: 24px; height: 24px; fill: currentColor; }
+  .appbar-title { font-size: 18px; font-weight: 500; margin-left: 8px; }
+  .appbar-spacer { flex: 1; }
+  .stepper { font-size: 14px; color: var(--md-on-surface-variant); padding-right: 16px; }
+  .body { flex: 1; padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 16px; }
+  .headline { font-size: 22px; font-weight: 600; text-align: center; margin: 0; }
+  .sub { font-size: 14px; color: var(--md-on-surface-variant); text-align: center; margin: 0; }
+  .stats-row { display: flex; gap: 12px; justify-content: center; }
+  .stat { padding: 8px 14px; border-radius: 12px; background: var(--md-surface); border: 1px solid var(--md-outline); font-size: 14px; }
+  .stat strong { font-weight: 600; color: var(--md-primary); margin-right: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 8px auto 0; }
+  .card { aspect-ratio: 1 / 1; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 36px; cursor: pointer; user-select: none; transition: transform 0.18s ease; }
+  .card.back { background: var(--card-back); border: 1px solid var(--md-outline); color: var(--md-on-surface-variant); }
+  .card.face { background: var(--md-primary); color: var(--md-on-primary); border: 1px solid var(--md-primary); }
+  .card.matched { background: rgba(163,217,119,0.18); border: 1px solid var(--md-success); color: var(--md-success); }
+  .card.face svg { width: 36px; height: 36px; fill: currentColor; }
+  .card.back svg { width: 28px; height: 28px; fill: currentColor; opacity: 0.55; }
+  .legend { display: flex; gap: 16px; justify-content: center; margin-top: 4px; font-size: 12px; color: var(--md-on-surface-variant); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 6px; }
+  .swatch.back { background: var(--card-back); border: 1px solid var(--md-outline); }
+  .swatch.face { background: var(--md-primary); }
+  .swatch.match { background: rgba(163,217,119,0.3); border: 1px solid var(--md-success); }
+  .actions { margin-top: auto; display: flex; justify-content: center; }
+  .cancel { padding: 12px 24px; background: transparent; color: var(--md-on-surface-variant); border: 1px solid var(--md-outline); border-radius: 24px; font-size: 14px; min-height: 48px; cursor: pointer; }
+  .watermark { position: absolute; bottom: 12px; right: 16px; font-size: 11px; color: var(--md-on-surface-variant); opacity: 0.55; letter-spacing: 0.5px; }
+</style>
+</head>
+<body>
+<div class="device" role="application" aria-label="Memory mission screen">
+  <header class="appbar" role="banner">
+    <button class="icon-btn" aria-label="Cancel mission">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+    <div class="appbar-title">Mission</div>
+    <div class="appbar-spacer"></div>
+    <div class="stepper" aria-label="Mission progress">2 of 3</div>
+  </header>
+
+  <main class="body" role="main">
+    <h1 class="headline">Match 6 pairs</h1>
+    <p class="sub" id="status" aria-live="polite">3 of 6 pairs matched · 2 cards face up</p>
+
+    <div class="stats-row" aria-hidden="true">
+      <span class="stat"><strong>3</strong>pairs</span>
+      <span class="stat"><strong>9</strong>tries</span>
+      <span class="stat"><strong>00:42</strong></span>
+    </div>
+
+    <div class="grid" role="grid" aria-label="Memory card grid">
+      <div class="card matched" role="gridcell" aria-label="Matched card">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 6v6c0 5 3.4 9.5 8 10 4.6-.5 8-5 8-10V6l-8-4z"/></svg>
+      </div>
+      <div class="card matched" role="gridcell" aria-label="Matched card">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 6v6c0 5 3.4 9.5 8 10 4.6-.5 8-5 8-10V6l-8-4z"/></svg>
+      </div>
+      <div class="card matched" role="gridcell" aria-label="Matched card">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 6v6c0 5 3.4 9.5 8 10 4.6-.5 8-5 8-10V6l-8-4z"/></svg>
+      </div>
+      <div class="card matched" role="gridcell" aria-label="Matched card">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 6v6c0 5 3.4 9.5 8 10 4.6-.5 8-10V6l-8-4z"/></svg>
+      </div>
+
+      <div class="card face" role="gridcell" aria-label="Face up card 1">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C7 2 3 6 3 11s4 9 9 9 9-4 9-9-4-9-9-9zm0 4a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3zm0 13c-2.7 0-5-1.4-6.4-3.5.1-2.1 4.3-3.3 6.4-3.3s6.3 1.2 6.4 3.3C17 17.6 14.7 19 12 19z"/></svg>
+      </div>
+      <div class="card face" role="gridcell" aria-label="Face up card 2">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C7 2 3 6 3 11s4 9 9 9 9-4 9-9-4-9-9-9zm0 4a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3zm0 13c-2.7 0-5-1.4-6.4-3.5.1-2.1 4.3-3.3 6.4-3.3s6.3 1.2 6.4 3.3C17 17.6 14.7 19 12 19z"/></svg>
+      </div>
+      <div class="card back" role="gridcell" aria-label="Face down card" tabindex="0">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 6v6c0 5 3.4 9.5 8 10 4.6-.5 8-5 8-10V6l-8-4z"/></svg>
+      </div>
+      <div class="card back" role="gridcell" aria-label="Face down card" tabindex="0">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 6v6c0 5 3.4 9.5 8 10 4.6-.5 8-5 8-10V6l-8-4z"/></svg>
+      </div>
+    </div>
+
+    <div class="legend" aria-hidden="true">
+      <span><span class="swatch back"></span>Facedown</span>
+      <span><span class="swatch face"></span>Face up</span>
+      <span><span class="swatch match"></span>Matched</span>
+    </div>
+
+    <div class="actions">
+      <button class="cancel" type="button">Cancel mission</button>
+    </div>
+  </main>
+
+  <span class="watermark">W-22 · Group D</span>
+</div>
+</body>
+</html>

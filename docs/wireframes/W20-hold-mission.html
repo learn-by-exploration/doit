@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>W20 — Hold-tap mission</title>
+<meta name="viewport" content="width=412, initial-scale=1">
+<style>
+  :root {
+    --md-bg: #13141b;
+    --md-surface: #1c1d27;
+    --md-surface-variant: #272834;
+    --md-primary: #a8c7fa;
+    --md-on-primary: #062e6f;
+    --md-on-surface: #e3e3e9;
+    --md-on-surface-variant: #c5c6d0;
+    --md-outline: #44474f;
+    --md-error: #f2b8b5;
+    --md-success: #a3d977;
+    --md-tertiary: #dab8ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #0a0b10; color: var(--md-on-surface); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  .device { width: 412px; min-height: 892px; margin: 24px auto; background: var(--md-bg); border-radius: 36px; border: 1px solid #2a2b35; box-shadow: 0 18px 60px rgba(0,0,0,0.55); overflow: hidden; display: flex; flex-direction: column; position: relative; }
+  .appbar { height: 56px; padding: 0 8px; display: flex; align-items: center; gap: 4px; background: var(--md-bg); border-bottom: 1px solid var(--md-outline); }
+  .icon-btn { width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--md-on-surface); border-radius: 24px; cursor: pointer; }
+  .icon-btn:focus-visible { outline: 2px solid var(--md-primary); }
+  .icon-btn svg { width: 24px; height: 24px; fill: currentColor; }
+  .appbar-title { font-size: 18px; font-weight: 500; margin-left: 8px; }
+  .appbar-spacer { flex: 1; }
+  .stepper { font-size: 14px; color: var(--md-on-surface-variant); padding-right: 16px; }
+  .body { flex: 1; padding: 24px; display: flex; flex-direction: column; align-items: center; gap: 32px; }
+  .headline { font-size: 24px; font-weight: 600; text-align: center; line-height: 1.3; }
+  .sub { font-size: 16px; color: var(--md-on-surface-variant); text-align: center; }
+  .ring-wrap { width: 240px; height: 240px; position: relative; display: flex; align-items: center; justify-content: center; margin-top: 16px; }
+  .ring { transform: rotate(-90deg); }
+  .ring-bg { fill: none; stroke: var(--md-surface-variant); stroke-width: 12; }
+  .ring-fg { fill: none; stroke: var(--md-primary); stroke-width: 12; stroke-linecap: round; transition: stroke-dashoffset 0.15s linear; }
+  .ring-inner { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .ring-num { font-variant-numeric: tabular-nums; font-size: 56px; font-weight: 700; }
+  .ring-num span { font-size: 22px; color: var(--md-on-surface-variant); font-weight: 400; }
+  .hold-area { width: 220px; min-height: 64px; border-radius: 32px; background: var(--md-primary); color: var(--md-on-primary); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 600; cursor: pointer; user-select: none; box-shadow: 0 6px 24px rgba(168,199,250,0.35); }
+  .hold-area.holding { transform: scale(0.97); box-shadow: 0 2px 12px rgba(168,199,250,0.4); }
+  .hint { font-size: 14px; color: var(--md-on-surface-variant); }
+  .cancel { margin-top: auto; padding: 12px 24px; background: transparent; color: var(--md-on-surface-variant); border: 1px solid var(--md-outline); border-radius: 24px; font-size: 14px; min-height: 48px; cursor: pointer; }
+  .watermark { position: absolute; bottom: 12px; right: 16px; font-size: 11px; color: var(--md-on-surface-variant); opacity: 0.55; letter-spacing: 0.5px; }
+</style>
+</head>
+<body>
+<div class="device" role="application" aria-label="Hold-tap mission screen">
+  <header class="appbar" role="banner">
+    <button class="icon-btn" aria-label="Cancel mission">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+    <div class="appbar-title">Mission</div>
+    <div class="appbar-spacer"></div>
+    <div class="stepper" aria-label="Mission progress">1 of 1</div>
+  </header>
+
+  <main class="body" role="main">
+    <h1 class="headline">Hold for 5 seconds</h1>
+    <p class="sub">Don't release early — your streak counts on it.</p>
+
+    <div class="ring-wrap" role="progressbar" aria-valuemin="0" aria-valuemax="5" aria-valuenow="2" aria-label="Hold progress">
+      <svg class="ring" width="240" height="240" viewBox="0 0 240 240">
+        <circle class="ring-bg" cx="120" cy="120" r="108" />
+        <circle class="ring-fg" cx="120" cy="120" r="108"
+          stroke-dasharray="678.58"
+          stroke-dashoffset="407.15" />
+      </svg>
+      <div class="ring-inner" aria-hidden="true">
+        <div class="ring-num">2<span>/5</span></div>
+        <div class="sub">seconds</div>
+      </div>
+    </div>
+
+    <button class="hold-area holding" type="button" aria-pressed="true">
+      Hold to confirm
+    </button>
+
+    <p class="hint">Release to cancel this attempt.</p>
+
+    <button class="cancel" type="button">Cancel mission</button>
+  </main>
+
+  <span class="watermark">W-20 · Group D</span>
+</div>
+</body>
+</html>

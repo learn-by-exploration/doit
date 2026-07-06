@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=412, initial-scale=1" />
+<title>W12 · Person groups</title>
+<style>
+  :root {
+    --md-primary: #D0BCFF;
+    --md-on-primary: #371E73;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-secondary: #CCC2DC;
+    --md-on-secondary: #332D41;
+    --md-secondary-container: #4A4458;
+    --md-on-secondary-container: #E8DEF8;
+    --md-tertiary: #EFB8C8;
+    --md-on-tertiary: #492532;
+    --md-tertiary-container: #633B48;
+    --md-on-tertiary-container: #FFD8E4;
+    --md-background: #1C1B1F;
+    --md-on-background: #E6E1E5;
+    --md-surface: #1C1B1F;
+    --md-on-surface: #E6E1E5;
+    --md-surface-variant: #49454F;
+    --md-on-surface-variant: #CAC4D0;
+    --md-outline: #938F99;
+    --md-outline-variant: #49454F;
+    --md-surface-container: #211F26;
+    --md-surface-container-high: #2B2930;
+    --md-surface-container-highest: #36343B;
+    --md-error: #F2B8B5;
+    --md-on-error-container: #F9DEDC;
+    --md-error-container: #8C1D18;
+    --cat-red:    #F2B8B5;
+    --cat-orange: #FFB68A;
+    --cat-yellow: #FFE082;
+    --cat-green:  #A8D5A2;
+    --cat-teal:   #80CBC4;
+    --cat-blue:   #90CAF9;
+    --cat-purple: #CE93D8;
+    --cat-pink:   #F8BBD0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: #000;
+    color: var(--md-on-background);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+  }
+  .device {
+    width: 412px;
+    min-height: 892px;
+    margin: 24px auto;
+    background: var(--md-background);
+    position: relative;
+    border: 1px solid #333;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0,0,0,.6);
+  }
+  .appbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 64px;
+    padding: 12px 8px 12px 12px;
+    background: var(--md-surface);
+    color: var(--md-on-surface);
+  }
+  .appbar .icon-btn {
+    width: 48px; height: 48px;
+    display: grid; place-items: center;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--md-on-surface);
+    border: 0;
+    cursor: pointer;
+  }
+  .appbar .title {
+    flex: 1;
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: .15px;
+  }
+
+  main {
+    padding: 8px 16px 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Group card */
+  .group {
+    background: var(--md-surface-container);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .group .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .group .name {
+    flex: 1;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--md-on-surface);
+  }
+  .group .meta {
+    color: var(--md-on-surface-variant);
+    font-size: 13px;
+  }
+  .group .chev {
+    color: var(--md-on-surface-variant);
+    font-size: 18px;
+  }
+  /* Member avatars */
+  .avatars {
+    display: flex;
+    align-items: center;
+    gap: -8px;
+  }
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: var(--md-on-primary);
+    font-size: 13px;
+    font-weight: 600;
+    border: 2px solid var(--md-surface-container);
+    margin-right: -8px;
+  }
+  .avatar.more {
+    background: var(--md-surface-container-highest);
+    color: var(--md-on-surface);
+  }
+
+  /* Chip */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: .3px;
+  }
+  .chip.rotation { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+  .chip.any      { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+  .chip.all      { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
+  .chip.cadence  { background: var(--md-surface-container-highest); color: var(--md-on-surface); }
+  .chip .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: currentColor;
+  }
+
+  .chips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* FAB */
+  .fab {
+    position: absolute;
+    right: 16px;
+    bottom: 24px;
+    width: 56px; height: 56px;
+    border-radius: 16px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    display: grid;
+    place-items: center;
+    border: 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,.5);
+    cursor: pointer;
+  }
+
+  /* Bottom nav hint */
+  .nav {
+    height: 16px;
+    background: var(--md-surface);
+  }
+
+  /* Empty state */
+  .empty {
+    text-align: center;
+    padding: 64px 24px;
+    color: var(--md-on-surface-variant);
+  }
+  .empty .glyph {
+    width: 64px; height: 64px;
+    margin: 0 auto 16px;
+    border-radius: 32px;
+    background: var(--md-surface-container-high);
+    display: grid;
+    place-items: center;
+    color: var(--md-on-surface-variant);
+  }
+  .empty .t { font-size: 18px; color: var(--md-on-surface); margin-bottom: 8px; }
+
+  /* Watermark */
+  .wm {
+    position: absolute;
+    right: 12px;
+    bottom: 4px;
+    color: var(--md-outline);
+    font-size: 11px;
+    letter-spacing: .8px;
+    opacity: .65;
+    z-index: -1;
+  }
+</style>
+</head>
+<body>
+<main class="device" role="application" aria-label="Person groups screen">
+  <header class="appbar" role="banner">
+    <button class="icon-btn" aria-label="Back">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <div class="title">Groups</div>
+    <button class="icon-btn" aria-label="Search">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+    </button>
+  </header>
+
+  <main role="list" aria-label="Groups">
+
+    <!-- Group 1: rotation -->
+    <div class="group" role="listitem">
+      <div class="row">
+        <div class="name">Weekly call rotation</div>
+        <span class="chev" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+        </span>
+      </div>
+      <div class="row" style="gap: 0;">
+        <div class="avatars" aria-label="4 people">
+          <span class="avatar" style="background: var(--cat-blue)">M</span>
+          <span class="avatar" style="background: var(--cat-pink)">S</span>
+          <span class="avatar" style="background: var(--cat-green)">D</span>
+          <span class="avatar" style="background: var(--cat-orange)">A</span>
+        </div>
+        <span class="meta" style="margin-left: 16px;">4 people</span>
+      </div>
+      <div class="chips">
+        <span class="chip rotation"><span class="dot"></span>rotation</span>
+        <span class="chip cadence">Weekly · Sunday</span>
+      </div>
+    </div>
+
+    <!-- Group 2: any -->
+    <div class="group" role="listitem">
+      <div class="row">
+        <div class="name">Birthday cluster</div>
+        <span class="chev" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+        </span>
+      </div>
+      <div class="row" style="gap: 0;">
+        <div class="avatars" aria-label="6 people">
+          <span class="avatar" style="background: var(--cat-purple)">J</span>
+          <span class="avatar" style="background: var(--cat-teal)">R</span>
+          <span class="avatar" style="background: var(--cat-yellow); color:#3a2e00">K</span>
+          <span class="avatar" style="background: var(--cat-red)">N</span>
+          <span class="avatar" style="background: var(--cat-pink)">L</span>
+          <span class="avatar" style="background: var(--cat-blue)">T</span>
+        </div>
+        <span class="meta" style="margin-left: 16px;">6 people</span>
+      </div>
+      <div class="chips">
+        <span class="chip any"><span class="dot"></span>any</span>
+        <span class="chip cadence">Yearly</span>
+      </div>
+    </div>
+
+    <!-- Group 3: all -->
+    <div class="group" role="listitem">
+      <div class="row">
+        <div class="name">Team check-in</div>
+        <span class="chev" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+        </span>
+      </div>
+      <div class="row" style="gap: 0;">
+        <div class="avatars" aria-label="3 people">
+          <span class="avatar" style="background: var(--cat-green)">P</span>
+          <span class="avatar" style="background: var(--cat-orange)">H</span>
+          <span class="avatar" style="background: var(--cat-purple)">V</span>
+        </div>
+        <span class="meta" style="margin-left: 16px;">3 people</span>
+      </div>
+      <div class="chips">
+        <span class="chip all"><span class="dot"></span>all</span>
+        <span class="chip cadence">Monthly · 1st</span>
+      </div>
+    </div>
+
+    <!-- Group 4: rotation, paused -->
+    <div class="group" role="listitem" style="opacity:.7">
+      <div class="row">
+        <div class="name">Siblings catch-up</div>
+        <span class="chev" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+        </span>
+      </div>
+      <div class="row" style="gap: 0;">
+        <div class="avatars" aria-label="5 people">
+          <span class="avatar" style="background: var(--cat-yellow); color:#3a2e00">E</span>
+          <span class="avatar" style="background: var(--cat-pink)">B</span>
+          <span class="avatar" style="background: var(--cat-blue)">C</span>
+          <span class="avatar" style="background: var(--cat-teal)">O</span>
+          <span class="avatar more">+1</span>
+        </div>
+        <span class="meta" style="margin-left: 16px;">5 people · paused</span>
+      </div>
+      <div class="chips">
+        <span class="chip rotation"><span class="dot"></span>rotation</span>
+        <span class="chip cadence">Every 14 days</span>
+      </div>
+    </div>
+
+    <div class="nav"></div>
+  </main>
+
+  <button class="fab" aria-label="Create group">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+  </button>
+
+  <div class="wm">W12 · Group B</div>
+</main>
+</body>
+</html>

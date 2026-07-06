@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=412, initial-scale=1">
+<title>W07 — Icon picker (8×8 grid)</title>
+<style>
+  :root {
+    --md-surface: #14141A;
+    --md-surface-container: #1E1E26;
+    --md-surface-container-high: #28282F;
+    --md-surface-container-highest: #32323A;
+    --md-primary: #D0BCFF;
+    --md-on-primary: #381E72;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-secondary: #CCC2DC;
+    --md-secondary-container: #4A4458;
+    --md-on-secondary-container: #E8DEF8;
+    --md-tertiary: #EFB8C8;
+    --md-tertiary-container: #633B48;
+    --md-on-tertiary-container: #FFD8E4;
+    --md-on-surface: #E6E1E5;
+    --md-on-surface-variant: #CAC4D0;
+    --md-outline: #938F99;
+    --md-outline-variant: #49454F;
+    --cat-red:    #EF5350;
+    --cat-orange: #FF9A3C;
+    --cat-yellow: #FFD479;
+    --cat-green:  #81C995;
+    --cat-teal:   #4DD0E1;
+    --cat-blue:   #64B5F6;
+    --cat-purple: #B39DDB;
+    --cat-pink:   #F48FB1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #0F0F14;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    color: var(--md-on-surface);
+    -webkit-font-smoothing: antialiased;
+  }
+  body { display: flex; justify-content: center; padding: 20px 0; }
+  .viewport {
+    width: 412px;
+    min-height: 892px;
+    background: var(--md-surface);
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+
+  /* Backdrop / scrim */
+  .scrim {
+    flex: 1;
+    background: rgba(15,15,20,.6);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  /* Bottom sheet (DraggableScrollableSheet 70% → 90%) */
+  .sheet {
+    width: 100%;
+    background: var(--md-surface-container);
+    border-top-left-radius: 28px;
+    border-top-right-radius: 28px;
+    padding: 12px 16px 24px;
+    max-height: 90%;
+  }
+  .handle {
+    width: 32px;
+    height: 4px;
+    background: var(--md-outline-variant);
+    border-radius: 2px;
+    margin: 8px auto 12px;
+  }
+  .sheet-head {
+    display: flex; align-items: center;
+    margin-bottom: 12px;
+    gap: 8px;
+  }
+  .sheet-head .title {
+    font-size: 22px;
+    font-weight: 500;
+    flex: 1;
+  }
+  .sheet-head .iconbtn {
+    width: 48px; height: 48px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--md-on-surface-variant);
+    border-radius: 24px;
+  }
+  .sub-btn {
+    background: transparent;
+    color: var(--md-primary);
+    border: none;
+    font-family: inherit;
+    font-weight: 600;
+    padding: 10px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    min-height: 40px;
+  }
+
+  .row-label {
+    font-size: 11px;
+    color: var(--md-primary);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    font-weight: 700;
+    margin: 14px 4px 8px;
+  }
+
+  /* 4-col icon grid */
+  .icon-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .icon-cell {
+    aspect-ratio: 1;
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: background .15s;
+    min-height: 56px;
+    min-width: 56px;
+  }
+  .icon-cell:hover { background: var(--md-secondary-container); }
+  .icon-cell.selected {
+    background: var(--md-primary-container);
+    border-color: var(--md-primary);
+    color: var(--md-on-primary-container);
+  }
+
+  .watermark {
+    position: absolute;
+    bottom: 8px; right: 12px;
+    font-size: 10px;
+    color: var(--md-on-surface-variant);
+    opacity: .55;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    z-index: 10;
+  }
+
+  .material-icons {
+    font-family: "Material Icons", "Material Symbols Outlined", system-ui;
+    font-style: normal; font-weight: 400;
+    line-height: 1;
+    display: inline-block;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+  }
+  .glyph { font-family: system-ui, "Apple Color Emoji", "Segoe UI Emoji"; }
+</style>
+</head>
+<body>
+<div class="viewport" role="application" aria-label="Icon picker bottom sheet">
+
+  <div class="scrim">
+    <div class="sheet" role="dialog" aria-labelledby="iconPickerTitle">
+      <div class="handle" aria-hidden="true"></div>
+      <div class="sheet-head">
+        <div class="title" id="iconPickerTitle">Icon</div>
+        <button class="sub-btn">Use default</button>
+        <button class="iconbtn" aria-label="Close">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+
+      <div class="row-label">Physical</div>
+      <div class="icon-grid" role="listbox" aria-label="Physical icons">
+        <div class="icon-cell" role="option" aria-label="water_drop">💧</div>
+        <div class="icon-cell selected" role="option" aria-selected="true" aria-label="fitness_center">🏋</div>
+        <div class="icon-cell" role="option" aria-label="directions_run">🏃</div>
+        <div class="icon-cell" role="option" aria-label="self_improvement">🧘</div>
+      </div>
+
+      <div class="row-label">Mind</div>
+      <div class="icon-grid" role="listbox" aria-label="Mind icons">
+        <div class="icon-cell" role="option" aria-label="book">📚</div>
+        <div class="icon-cell" role="option" aria-label="menu_book">📖</div>
+        <div class="icon-cell" role="option" aria-label="psychology">🧠</div>
+        <div class="icon-cell" role="option" aria-label="lightbulb">💡</div>
+      </div>
+
+      <div class="row-label">Relational</div>
+      <div class="icon-grid" role="listbox" aria-label="Relational icons">
+        <div class="icon-cell" role="option" aria-label="call">📞</div>
+        <div class="icon-cell" role="option" aria-label="chat">💬</div>
+        <div class="icon-cell" role="option" aria-label="mail">✉️</div>
+        <div class="icon-cell" role="option" aria-label="group">👥</div>
+      </div>
+
+      <div class="row-label">Productivity</div>
+      <div class="icon-grid" role="listbox" aria-label="Productivity icons">
+        <div class="icon-cell" role="option" aria-label="check">✓</div>
+        <div class="icon-cell" role="option" aria-label="checklist">☑</div>
+        <div class="icon-cell" role="option" aria-label="event">📅</div>
+        <div class="icon-cell" role="option" aria-label="timer">⏱</div>
+      </div>
+
+      <div class="row-label">Home</div>
+      <div class="icon-grid" role="listbox" aria-label="Home icons">
+        <div class="icon-cell" role="option" aria-label="home">🏠</div>
+        <div class="icon-cell" role="option" aria-label="cleaning_services">🧹</div>
+        <div class="icon-cell" role="option" aria-label="laundry">🧺</div>
+        <div class="icon-cell" role="option" aria-label="kitchen">🍳</div>
+      </div>
+
+      <div class="row-label">Discipline / recovery</div>
+      <div class="icon-grid" role="listbox" aria-label="Discipline icons">
+        <div class="icon-cell" role="option" aria-label="do_not_disturb">🌙</div>
+        <div class="icon-cell" role="option" aria-label="block">🚫</div>
+        <div class="icon-cell" role="option" aria-label="bedtime">🛌</div>
+        <div class="icon-cell" role="option" aria-label="smoke_free">🚭</div>
+      </div>
+
+      <div class="row-label">Food</div>
+      <div class="icon-grid" role="listbox" aria-label="Food icons">
+        <div class="icon-cell" role="option" aria-label="restaurant">🍽</div>
+        <div class="icon-cell" role="option" aria-label="local_cafe">☕</div>
+        <div class="icon-cell" role="option" aria-label="set_meal">🥗</div>
+        <div class="icon-cell" role="option" aria-label="no_food">🥦</div>
+      </div>
+
+      <div class="row-label">Exercise</div>
+      <div class="icon-grid" role="listbox" aria-label="Exercise icons">
+        <div class="icon-cell" role="option" aria-label="directions_bike">🚴</div>
+        <div class="icon-cell" role="option" aria-label="pool">🏊</div>
+        <div class="icon-cell" role="option" aria-label="hiking">🥾</div>
+        <div class="icon-cell" role="option" aria-label="sports">⚽</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="watermark">W-07 · Group A</div>
+</div>
+</body>
+</html>

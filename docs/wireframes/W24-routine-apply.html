@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W24 — Routine apply (templates #17–#21)</title>
+<style>
+  :root {
+    --md-primary: #d0bcff;
+    --md-on-primary: #381e72;
+    --md-primary-container: #4f378b;
+    --md-on-primary-container: #eaddff;
+    --md-secondary: #ccc2dc;
+    --md-on-secondary: #332d41;
+    --md-secondary-container: #4a4458;
+    --md-on-secondary-container: #e8def8;
+    --md-tertiary: #efb8c8;
+    --md-on-tertiary: #492532;
+    --md-tertiary-container: #633b48;
+    --md-on-tertiary-container: #ffd8e4;
+    --md-error: #f2b8b5;
+    --md-on-error: #601410;
+    --md-error-container: #8c1d18;
+    --md-on-error-container: #f9dedc;
+    --md-background: #1c1b1e;
+    --md-on-background: #e6e1e5;
+    --md-surface: #1c1b1e;
+    --md-surface-variant: #49454f;
+    --md-on-surface: #e6e1e5;
+    --md-on-surface-variant: #cac4d0;
+    --md-outline: #938f99;
+    --md-outline-variant: #49454f;
+    --cat-red: #f2b8b5;
+    --cat-orange: #ffb77a;
+    --cat-yellow: #ffd95c;
+    --cat-green: #a8d48f;
+    --cat-teal: #7bd9c5;
+    --cat-blue: #9ec5ff;
+    --cat-purple: #c5b3ff;
+    --cat-pink: #f5b8d6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2a2a2e;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--md-on-background);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px 0;
+  }
+  .phone {
+    width: 412px;
+    height: 892px;
+    background: var(--md-background);
+    border-radius: 36px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid #000;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+  /* App bar */
+  .app-bar {
+    height: 64px;
+    background: var(--md-surface);
+    display: flex;
+    align-items: center;
+    padding: 0 8px 0 4px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .app-bar .icon-btn {
+    width: 48px; height: 48px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--md-on-surface);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .app-bar .title {
+    flex: 1;
+    font-size: 22px;
+    font-weight: 500;
+    padding-left: 8px;
+  }
+  /* Body */
+  .body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+  /* Section card */
+  .card {
+    background: #2b2a2e;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .section-header {
+    font-size: 14px;
+    color: var(--md-on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px 8px 8px 8px;
+    font-weight: 500;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    padding: 8px 4px;
+    border-radius: 8px;
+  }
+  .row + .row { border-top: 1px solid var(--md-outline-variant); }
+  .row .leading-icon {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .row .main { flex: 1; min-width: 0; }
+  .row .title { font-size: 16px; color: var(--md-on-surface); font-weight: 500; }
+  .row .sub {
+    font-size: 14px;
+    color: var(--md-on-surface-variant);
+    margin-top: 2px;
+  }
+  /* Toggle */
+  .toggle {
+    width: 52px; height: 32px;
+    background: var(--md-primary);
+    border-radius: 16px;
+    position: relative;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .toggle::after {
+    content: "";
+    position: absolute;
+    top: 4px; left: 24px;
+    width: 24px; height: 24px;
+    background: var(--md-on-primary);
+    border-radius: 50%;
+    transition: left 200ms;
+  }
+  .toggle.off { background: var(--md-surface-variant); }
+  .toggle.off::after { left: 4px; background: var(--md-outline); }
+  /* Segmented button */
+  .segmented {
+    display: flex;
+    border: 1px solid var(--md-outline);
+    border-radius: 999px;
+    padding: 2px;
+    background: transparent;
+  }
+  .segmented .seg {
+    flex: 1;
+    padding: 10px 8px;
+    font-size: 14px;
+    border-radius: 999px;
+    text-align: center;
+    color: var(--md-on-surface-variant);
+    cursor: pointer;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .segmented .seg.active {
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+  }
+  /* Text field */
+  .text-field {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--md-outline);
+    padding: 12px 4px;
+    font-size: 16px;
+    color: var(--md-on-surface);
+    width: 100%;
+    font-family: inherit;
+    outline: none;
+  }
+  .field-label {
+    font-size: 14px;
+    color: var(--md-on-surface-variant);
+    margin-bottom: 4px;
+  }
+  /* Reliability badge row */
+  .reliability-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .reliability-pill.degraded {
+    background: var(--md-error-container);
+    color: var(--md-on-error-container);
+  }
+  .reliability-pill.optimal {
+    background: rgba(168,212,143,0.15);
+    color: var(--cat-green);
+  }
+  .reliability-pill.unknown {
+    background: rgba(158,197,255,0.15);
+    color: var(--cat-blue);
+  }
+  /* Chips for trigger kind */
+  .kind-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  /* Map preview */
+  .map {
+    height: 140px;
+    border-radius: 12px;
+    background:
+      linear-gradient(135deg, #3a4256 0%, #2a3548 100%);
+    position: relative;
+    overflow: hidden;
+    margin-top: 12px;
+  }
+  .map::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .map-pin {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -100%);
+    width: 36px; height: 36px;
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    border: 3px solid #fff;
+  }
+  .map-radius {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100px; height: 100px;
+    border: 2px dashed var(--md-primary);
+    border-radius: 50%;
+    opacity: 0.5;
+  }
+  /* Slider */
+  .slider-row { margin-top: 12px; }
+  .slider-head {
+    display: flex; justify-content: space-between;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  .slider-head .v {
+    color: var(--md-primary);
+    font-weight: 600;
+  }
+  .slider {
+    height: 4px;
+    background: var(--md-outline-variant);
+    border-radius: 2px;
+    position: relative;
+  }
+  .slider .track {
+    position: absolute;
+    top: 0; left: 0; height: 100%;
+    background: var(--md-primary);
+    border-radius: 2px;
+    width: 50%;
+  }
+  .slider .thumb {
+    width: 20px; height: 20px;
+    background: var(--md-primary);
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  /* Calendar */
+  .cal-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    overflow-x: auto;
+  }
+  .cal-day {
+    flex-shrink: 0;
+    width: 56px;
+    height: 72px;
+    border-radius: 12px;
+    background: #35333a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+  }
+  .cal-day .d { font-size: 22px; font-weight: 600; color: var(--md-on-surface); margin-top: 2px; }
+  .cal-day.selected {
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+  }
+  .cal-day.selected .d { color: var(--md-on-primary); }
+  /* Time row */
+  .time-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: #35333a;
+    border-radius: 12px;
+    margin-top: 12px;
+  }
+  .time-row .value {
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--md-on-surface);
+  }
+  /* Action row at bottom */
+  .action-row {
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px 24px 16px;
+    background: var(--md-surface);
+    flex-shrink: 0;
+  }
+  .btn {
+    flex: 1;
+    min-height: 48px;
+    border-radius: 999px;
+    border: none;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn.filled {
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+  }
+  .btn.tonal {
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+  }
+  .btn.outlined {
+    background: transparent;
+    color: var(--md-error);
+    border: 1px solid var(--md-error);
+  }
+  /* Watermark */
+  .wm {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.25);
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    pointer-events: none;
+  }
+  /* SVG icon sizing */
+  svg { width: 22px; height: 22px; }
+  .sm { width: 18px; height: 18px; }
+  .xs { width: 16px; height: 16px; }
+</style>
+</head>
+<body>
+
+<div class="phone" role="application" aria-label="Apply routine wireframe">
+  <header class="app-bar" role="banner">
+    <div class="icon-btn" aria-label="Back">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </div>
+    <div class="title">Routine</div>
+    <div class="icon-btn" aria-label="More options">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+    </div>
+  </header>
+
+  <main class="body" role="main">
+
+    <div class="section-header" style="padding-top: 0;">Template · Arrive at gym</div>
+
+    <!-- Enable toggle -->
+    <div class="card">
+      <div class="row" style="border: none;">
+        <div class="leading-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3v8h8V3h-2v6h-4V3h-2zm-2 18v-8H3v8h2v-6h4v6h2zm2 0h8v-8h-8v8z"/></svg>
+        </div>
+        <div class="main">
+          <div class="title">Enabled</div>
+          <div class="sub">This routine will fire when triggered</div>
+        </div>
+        <div class="toggle" role="switch" aria-checked="true"></div>
+      </div>
+    </div>
+
+    <!-- Trigger section -->
+    <div class="section-header">When? <span style="margin-left: 8px; font-size: 12px; text-transform: none; letter-spacing: 0; color: var(--md-on-surface-variant);">— Location</span></div>
+    <div class="card">
+      <span class="kind-chip">
+        <svg class="xs" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
+        Location · Arrive
+      </span>
+      <div class="map" aria-label="Map preview of trigger location">
+        <div class="map-radius"></div>
+        <div class="map-pin">
+          <svg class="sm" viewBox="0 0 24 24" fill="currentColor"><path d="M13 3v8h8V3h-2v6h-4V3h-2zm-2 18v-8H3v8h2v-6h4v6h2zm2 0h8v-8h-8v8z"/></svg>
+        </div>
+      </div>
+      <div class="slider-row">
+        <div class="slider-head">
+          <span>Trigger radius</span>
+          <span class="v">150 m</span>
+        </div>
+        <div class="slider"><div class="track"></div><div class="thumb"></div></div>
+      </div>
+    </div>
+
+    <!-- Do this section -->
+    <div class="section-header">Do this · Notify me</div>
+    <div class="card">
+      <div class="row">
+        <div class="leading-icon">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+        </div>
+        <div class="main">
+          <div class="title">Action: Notify</div>
+          <div class="sub">Show full-screen notification</div>
+        </div>
+      </div>
+
+      <div class="field-label" style="margin-top: 8px;">Notification title</div>
+      <input class="text-field" type="text" value="Workout time">
+
+      <div class="field-label" style="margin-top: 12px;">Message</div>
+      <input class="text-field" type="text" value="You're at the gym. Let's crush it.">
+    </div>
+
+    <!-- Attach to do -->
+    <div class="section-header">Attach to do</div>
+    <div class="card">
+      <div class="row">
+        <div class="leading-icon">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z"/></svg>
+        </div>
+        <div class="main">
+          <div class="title">Daily workout</div>
+          <div class="sub">12-day streak · Fitness · orange</div>
+        </div>
+        <svg class="sm" viewBox="0 0 24 24" fill="var(--md-on-surface-variant)" style="flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
+    </div>
+
+    <!-- Reliability -->
+    <div class="section-header">Reliability</div>
+    <div class="card">
+      <div class="row">
+        <div class="main">
+          <div class="title">This routine's reliability</div>
+          <div style="margin-top: 8px;">
+            <span class="reliability-pill degraded">
+              <svg class="xs" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+              Degraded — location permission required
+            </span>
+          </div>
+        </div>
+        <svg class="sm" viewBox="0 0 24 24" fill="var(--md-on-surface-variant)" style="flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="action-row" role="contentinfo">
+    <button class="btn tonal" type="button">Save</button>
+    <button class="btn filled" type="button">Update</button>
+    <button class="btn outlined" type="button">Delete</button>
+  </footer>
+
+  <div class="wm">W24 · Group E</div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=412, initial-scale=1">
+<title>W06 — Rest-day budget picker dialog</title>
+<style>
+  :root {
+    --md-surface: #14141A;
+    --md-surface-container: #1E1E26;
+    --md-surface-container-high: #28282F;
+    --md-surface-container-highest: #32323A;
+    --md-primary: #D0BCFF;
+    --md-on-primary: #381E72;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-secondary: #CCC2DC;
+    --md-on-surface: #E6E1E5;
+    --md-on-surface-variant: #CAC4D0;
+    --md-outline: #938F99;
+    --md-outline-variant: #49454F;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #0F0F14;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    color: var(--md-on-surface);
+    -webkit-font-smoothing: antialiased;
+  }
+  body { display: flex; justify-content: center; padding: 20px 0; }
+  .viewport {
+    width: 412px;
+    min-height: 892px;
+    background: var(--md-surface);
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+
+  /* Backdrop dim — simulates scrim under an AlertDialog */
+  .backdrop {
+    flex: 1;
+    background: rgba(15,15,20,.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+  }
+  .appbar {
+    display: flex; align-items: center;
+    padding: 12px 16px;
+    min-height: 64px; gap: 8px;
+  }
+  .appbar .title { font-size: 22px; font-weight: 500; flex: 1; }
+  .appbar .iconbtn {
+    width: 48px; height: 48px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--md-on-surface-variant);
+    border-radius: 24px;
+  }
+
+  /* Dialog */
+  .dialog {
+    background: var(--md-surface-container-highest);
+    border-radius: 28px;
+    padding: 24px;
+    width: 100%;
+    max-width: 360px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  }
+  .dialog .title {
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+  .dialog .description {
+    font-size: 14px;
+    color: var(--md-on-surface-variant);
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+  .dialog .slider-block { margin: 24px 0 16px; }
+  .dialog .slider-label {
+    text-align: center;
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--md-primary);
+    margin-bottom: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .dialog .slider-label .unit {
+    font-size: 14px;
+    color: var(--md-on-surface-variant);
+    margin-left: 6px;
+    font-weight: 400;
+  }
+  .slider {
+    position: relative;
+    height: 40px;
+    display: flex; align-items: center;
+  }
+  .slider .track {
+    flex: 1; height: 8px;
+    background: var(--md-surface-container-high);
+    border-radius: 4px;
+    position: relative;
+  }
+  .slider .fill {
+    position: absolute;
+    left: 0; top: 0; height: 100%;
+    background: var(--md-primary);
+    border-radius: 4px;
+  }
+  .slider .thumb {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 28px; height: 28px;
+    background: var(--md-primary);
+    border-radius: 14px;
+    border: 4px solid var(--md-surface-container-highest);
+    box-shadow: 0 2px 8px rgba(0,0,0,.4);
+  }
+  .dialog .ticks {
+    display: flex; justify-content: space-between;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--md-on-surface-variant);
+  }
+  .dialog .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 24px;
+  }
+  .btn-text {
+    padding: 10px 18px;
+    background: transparent;
+    color: var(--md-primary);
+    border: none;
+    font-family: inherit;
+    font-weight: 600;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  /* Underneath surface (rest of Add Habit) */
+  .under {
+    padding: 16px;
+    background: var(--md-surface);
+  }
+  .under-card {
+    background: var(--md-surface-container);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 8px;
+  }
+  .under .row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 14px;
+  }
+  .under .row .value { color: var(--md-primary); font-weight: 600; }
+  .state-title {
+    margin: 16px;
+    font-size: 12px;
+    color: var(--md-primary);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    font-weight: 700;
+  }
+  .annotation {
+    margin: 0 16px 16px;
+    padding: 10px 12px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .watermark {
+    position: absolute;
+    bottom: 8px; right: 12px;
+    font-size: 10px;
+    color: var(--md-on-surface-variant);
+    opacity: .55;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    z-index: 10;
+  }
+
+  .material-icons {
+    font-family: "Material Icons", "Material Symbols Outlined", system-ui;
+    font-style: normal; font-weight: 400;
+    line-height: 1;
+    display: inline-block;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+  }
+</style>
+</head>
+<body>
+<div class="viewport" role="application" aria-label="Rest-day budget picker dialog">
+
+  <div class="appbar" role="banner">
+    <button class="iconbtn" aria-label="Back"><span class="material-icons">arrow_back</span></button>
+    <div class="title">New do</div>
+    <button class="iconbtn" aria-label="Save"><span class="material-icons">check</span></button>
+  </div>
+
+  <div class="state-title">Default value: 2 (idle)</div>
+  <div class="under">
+    <div class="under-card">
+      <div class="row">
+        <span>Rest days per month</span>
+        <span class="value">2</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    The picker is shared by both the home tile budget caption (tap) and the AddHabitScreen form row. Single source of truth via the shared picker helper.
+  </div>
+
+  <div class="backdrop" role="presentation">
+    <div class="dialog" role="alertdialog" aria-labelledby="restDayTitle" aria-describedby="restDayDesc">
+      <div class="title" id="restDayTitle">Rest days per month</div>
+      <div class="description" id="restDayDesc">
+        How many rest days you can take each month. Resets on the 1st.
+      </div>
+      <div class="slider-block">
+        <div class="slider-label" aria-live="polite">2<span class="unit">/ 31</span></div>
+        <div class="slider" role="slider" aria-valuemin="0" aria-valuemax="31" aria-valuenow="2" aria-label="Rest days per month">
+          <div class="track">
+            <div class="fill" style="width: 6.5%;"></div>
+          </div>
+          <div class="thumb" style="left: 6.5%;"></div>
+        </div>
+        <div class="ticks">
+          <span>0</span><span>8</span><span>16</span><span>24</span><span>31</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn-text">Cancel</button>
+        <button class="btn-text">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dragging state -->
+  <div class="state-title">Dragging — live label updates</div>
+  <div class="backdrop" role="presentation">
+    <div class="dialog" role="alertdialog" aria-labelledby="restDayTitle2" aria-describedby="restDayDesc2">
+      <div class="title" id="restDayTitle2">Rest days per month</div>
+      <div class="description" id="restDayDesc2">
+        How many rest days you can take each month. Resets on the 1st.
+      </div>
+      <div class="slider-block">
+        <div class="slider-label" aria-live="polite">7<span class="unit">/ 31</span></div>
+        <div class="slider" role="slider" aria-valuemin="0" aria-valuemax="31" aria-valuenow="7" aria-label="Rest days per month">
+          <div class="track">
+            <div class="fill" style="width: 22.5%;"></div>
+          </div>
+          <div class="thumb" style="left: 22.5%;"></div>
+        </div>
+        <div class="ticks">
+          <span>0</span><span>8</span><span>16</span><span>24</span><span>31</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn-text">Cancel</button>
+        <button class="btn-text">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Max state -->
+  <div class="state-title">Max · 31</div>
+  <div class="backdrop" role="presentation">
+    <div class="dialog" role="alertdialog" aria-labelledby="restDayTitle3">
+      <div class="title" id="restDayTitle3">Rest days per month</div>
+      <div class="description">
+        How many rest days you can take each month. Resets on the 1st.
+      </div>
+      <div class="slider-block">
+        <div class="slider-label" aria-live="polite">31<span class="unit">/ 31</span></div>
+        <div class="slider" role="slider" aria-valuemin="0" aria-valuemax="31" aria-valuenow="31" aria-label="Rest days per month">
+          <div class="track">
+            <div class="fill" style="width: 100%;"></div>
+          </div>
+          <div class="thumb" style="left: 100%;"></div>
+        </div>
+        <div class="ticks">
+          <span>0</span><span>8</span><span>16</span><span>24</span><span>31</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn-text">Cancel</button>
+        <button class="btn-text">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save snackbar -->
+  <div class="annotation" style="margin: 0 16px 32px;">
+    After Save tap → SnackBar: "Rest-day budget set to {newValue}." Failure path: "Could not update budget. Try again."
+  </div>
+
+  <div class="watermark">W-06 · Group A</div>
+</div>
+</body>
+</html>

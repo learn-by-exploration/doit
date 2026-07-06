@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=412, initial-scale=1">
+<title>W04 — Per-tile Edit / Delete actions</title>
+<style>
+  :root {
+    --md-surface: #14141A;
+    --md-surface-container: #1E1E26;
+    --md-surface-container-high: #28282F;
+    --md-surface-container-highest: #32323A;
+    --md-primary: #D0BCFF;
+    --md-on-primary: #381E72;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-secondary-container: #4A4458;
+    --md-on-secondary-container: #E8DEF8;
+    --md-error: #F2B8B5;
+    --md-error-container: #8C1D18;
+    --md-on-error-container: #F9DEDC;
+    --md-on-surface: #E6E1E5;
+    --md-on-surface-variant: #CAC4D0;
+    --md-outline: #938F99;
+    --md-outline-variant: #49454F;
+    --cat-green:  #81C995;
+    --cat-yellow: #FFD479;
+    --cat-orange: #FF9A3C;
+    --cat-teal:   #4DD0E1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #0F0F14;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    color: var(--md-on-surface);
+    -webkit-font-smoothing: antialiased;
+  }
+  body { display: flex; justify-content: center; padding: 20px 0; }
+  .viewport {
+    width: 412px;
+    min-height: 892px;
+    background: var(--md-surface);
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+  .appbar {
+    display: flex; align-items: center;
+    padding: 12px 16px;
+    min-height: 64px; gap: 8px;
+  }
+  .appbar .title { font-size: 22px; font-weight: 500; flex: 1; }
+  .appbar .iconbtn {
+    width: 48px; height: 48px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--md-on-surface-variant);
+    border-radius: 24px;
+  }
+
+  .state-title {
+    margin: 12px 16px 4px;
+    font-size: 12px;
+    color: var(--md-primary);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    font-weight: 700;
+  }
+  .annotation {
+    margin: 0 16px 8px;
+    padding: 10px 12px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .tile {
+    margin: 8px 16px;
+    background: var(--md-surface-container);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .tile-top {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .tile-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .tile-icon.green { background: rgba(129,201,149,.25); color: var(--cat-green); }
+  .tile-icon.orange { background: rgba(255,154,60,.25); color: var(--cat-orange); }
+  .tile-icon.teal { background: rgba(77,208,225,.25); color: var(--cat-teal); }
+  .tile-title-block { flex: 1; min-width: 0; }
+  .tile-title { font-size: 16px; font-weight: 600; }
+  .tile-meta { display: flex; gap: 10px; margin-top: 2px; font-size: 13px; }
+  .streak-badge { color: #FFD479; font-weight: 600; }
+  .budget { font-size: 12px; color: var(--md-on-surface-variant); }
+
+  .tile-leadactions {
+    display: flex; gap: 4px;
+  }
+  .tile-leadactions .iconbtn {
+    width: 40px; height: 40px;
+    border-radius: 20px;
+    color: var(--md-on-surface-variant);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+  }
+  .tile-leadactions .iconbtn:hover {
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface);
+  }
+  .tile-leadactions .iconbtn.danger:hover {
+    color: var(--md-error);
+    background: var(--md-error-container);
+  }
+
+  .tile.focused {
+    outline: 2px solid var(--md-primary);
+    outline-offset: -2px;
+  }
+  .callout {
+    margin-left: 4px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid var(--md-primary);
+    align-self: center;
+  }
+
+  /* Highlight ring around leading buttons */
+  .tile.focused .tile-leadactions .iconbtn {
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface);
+  }
+
+  .sparkline { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+  .dot {
+    width: 12px; height: 12px;
+    border-radius: 6px;
+    border: 1.5px solid var(--md-outline-variant);
+  }
+  .dot.done { background: var(--cat-green); border-color: var(--cat-green); }
+  .dot.skipped { background: var(--cat-yellow); border-color: var(--cat-yellow); }
+  .dot.today { background: var(--md-primary); border-color: var(--md-primary); box-shadow: 0 0 0 2px rgba(208,188,255,.25); }
+
+  .tile-actions {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .tile-actions .group { display: flex; gap: 4px; }
+  .action-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface);
+    border: none;
+    padding: 10px 14px;
+    border-radius: 22px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 48px;
+    cursor: pointer;
+  }
+  .action-btn.primary { background: var(--md-primary); color: var(--md-on-primary); }
+
+  /* Confirm dialog */
+  .dialog-scrim {
+    margin: 8px 16px;
+    padding: 24px;
+    background: var(--md-surface-container-highest);
+    border-radius: 28px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  }
+  .dialog-scrim .title {
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+  .dialog-scrim .body {
+    font-size: 14px;
+    color: var(--md-on-surface-variant);
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+  .dialog-actions {
+    display: flex; justify-content: flex-end; gap: 8px;
+  }
+  .btn-text {
+    padding: 10px 16px;
+    background: transparent;
+    color: var(--md-primary);
+    border: none;
+    font-family: inherit;
+    font-weight: 600;
+    border-radius: 20px;
+    cursor: pointer;
+  }
+
+  /* SnackBar */
+  .snackbar {
+    margin: 8px 16px;
+    padding: 12px 16px;
+    background: #2D2D34;
+    color: var(--md-on-surface);
+    border-radius: 8px;
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.4);
+    font-size: 14px;
+  }
+  .snackbar .action {
+    margin-left: auto;
+    color: var(--md-primary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    font-size: 13px;
+  }
+
+  .watermark {
+    position: absolute;
+    bottom: 8px; right: 12px;
+    font-size: 10px;
+    color: var(--md-on-surface-variant);
+    opacity: .55;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  .material-icons {
+    font-family: "Material Icons", "Material Symbols Outlined", system-ui;
+    font-style: normal; font-weight: 400;
+    line-height: 1;
+    display: inline-block;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+  }
+</style>
+</head>
+<body>
+<div class="viewport" role="application" aria-label="Per-tile Edit and Delete actions">
+
+  <div class="appbar" role="banner">
+    <button class="iconbtn" aria-label="Back"><span class="material-icons">arrow_back</span></button>
+    <div class="title">Tile leading actions</div>
+  </div>
+
+  <div class="state-title">Default — leading actions visible</div>
+  <div class="annotation">
+    v1.4h: per-tile Edit + Delete <code>IconButton</code>s live in the leading row alongside the title block. Tapping Delete opens the confirm dialog. Confirm fires a soft-delete (v1.4l tombstone) — the SnackBar offers an Undo affordance.
+  </div>
+
+  <div class="tile focused" role="article" aria-label="Drink water, 12 day streak">
+    <div class="tile-top">
+      <div class="tile-icon green" aria-hidden="true">💧</div>
+      <div class="tile-title-block">
+        <div class="tile-title">Drink water</div>
+        <div class="tile-meta">
+          <span class="streak-badge">🔥 12</span>
+          <span class="budget">1/2 rest days left</span>
+        </div>
+      </div>
+      <div class="tile-leadactions">
+        <button class="iconbtn" aria-label="Edit habit">
+          <span class="material-icons">edit</span>
+        </button>
+        <button class="iconbtn danger" aria-label="Delete habit">
+          <span class="material-icons">delete</span>
+        </button>
+      </div>
+    </div>
+    <div class="sparkline" role="img" aria-label="Last 14 days">
+      <span class="dot done"></span><span class="dot done"></span><span class="dot skipped"></span>
+      <span class="dot done"></span><span class="dot done"></span><span class="dot"></span>
+      <span class="dot done"></span><span class="dot done"></span><span class="dot done"></span>
+      <span class="dot skipped"></span><span class="dot done"></span><span class="dot done"></span>
+      <span class="dot done"></span><span class="dot today"></span>
+    </div>
+    <div class="tile-actions">
+      <div class="group">
+        <button class="action-btn" aria-label="Skip today"><span class="material-icons">skip_next</span></button>
+        <button class="action-btn" aria-label="Undo today"><span class="material-icons">undo</span></button>
+      </div>
+      <button class="action-btn primary" aria-label="Mark done">
+        <span class="material-icons">check_circle</span><span>Done</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="state-title">Delete confirm dialog</div>
+  <div class="dialog-scrim" role="alertdialog" aria-label="Delete confirm">
+    <div class="title">Delete "Drink water"?</div>
+    <div class="body">
+      This will remove the do and all of its completions. You can undo for a few seconds after.
+    </div>
+    <div class="dialog-actions">
+      <button class="btn-text">Cancel</button>
+      <button class="btn-text" style="color: var(--md-error);">Delete</button>
+    </div>
+  </div>
+
+  <div class="state-title">After Delete — Undo SnackBar (4 s window)</div>
+  <div class="snackbar" role="status" aria-live="polite">
+    Deleted "Drink water".
+    <span class="action">Undo</span>
+  </div>
+
+  <div class="annotation" style="margin-top: 16px;">
+    On Undo tap, the captured do is re-saved via <code>DoRepository.save</code>; its completion history is intact (the streak calculator re-derives from the surviving completions). Restoration is idempotent. The tombstone column (<code>deleted_at</code>, ADR-056) is cleared.
+  </div>
+
+  <div class="state-title">Tombstoned do — routed to Recently deleted (W31)</div>
+  <div class="tile" style="opacity: .55;">
+    <div class="tile-top">
+      <div class="tile-icon" style="background: var(--md-surface-container-highest); color: var(--md-outline);" aria-hidden="true">💧</div>
+      <div class="tile-title-block">
+        <div class="tile-title" style="text-decoration: line-through; color: var(--md-on-surface-variant);">Drink water</div>
+        <div class="tile-meta">
+          <span class="budget">deleted 2 hours ago</span>
+        </div>
+      </div>
+      <div class="tile-leadactions">
+        <button class="iconbtn" aria-label="Restore"><span class="material-icons">restore</span></button>
+        <button class="iconbtn danger" aria-label="Delete forever"><span class="material-icons">delete_forever</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="watermark">W-04 · Group A</div>
+</div>
+</body>
+</html>

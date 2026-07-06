@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=412, initial-scale=1">
+<title>W10 — Streak recovery card</title>
+<style>
+  :root {
+    --md-surface: #14141A;
+    --md-surface-container: #1E1E26;
+    --md-surface-container-high: #28282F;
+    --md-surface-container-highest: #32323A;
+    --md-primary: #D0BCFF;
+    --md-on-primary: #381E72;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-tertiary: #EFB8C8;
+    --md-on-tertiary: #492532;
+    --md-tertiary-container: #633B48;
+    --md-on-tertiary-container: #FFD8E4;
+    --md-on-surface: #E6E1E5;
+    --md-on-surface-variant: #CAC4D0;
+    --md-outline: #938F99;
+    --md-outline-variant: #49454F;
+    --cat-green:  #81C995;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #0F0F14;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    color: var(--md-on-surface);
+    -webkit-font-smoothing: antialiased;
+  }
+  body { display: flex; justify-content: center; padding: 20px 0; }
+  .viewport {
+    width: 412px;
+    min-height: 892px;
+    background: var(--md-surface);
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+  .appbar {
+    display: flex; align-items: center;
+    padding: 12px 16px;
+    min-height: 64px; gap: 8px;
+  }
+  .appbar .title { font-size: 22px; font-weight: 500; flex: 1; }
+  .appbar .iconbtn {
+    width: 48px; height: 48px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--md-on-surface-variant);
+    border-radius: 24px;
+    background: transparent; border: none;
+  }
+
+  .state-title {
+    margin: 12px 16px 6px;
+    font-size: 12px;
+    color: var(--md-primary);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    font-weight: 700;
+  }
+
+  /* StreakRecoveryCard (Material banner w/ tertiaryContainer) */
+  .streak-recovery {
+    margin: 8px 16px;
+    background: var(--md-tertiary-container);
+    color: var(--md-on-tertiary-container);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .streak-recovery .head {
+    display: flex; align-items: center;
+    gap: 12px;
+  }
+  .streak-recovery .head .icon {
+    color: var(--md-tertiary);
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .streak-recovery .head .text {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .streak-recovery .head .close {
+    width: 40px; height: 40px;
+    border-radius: 20px;
+    background: transparent;
+    border: none;
+    color: var(--md-on-tertiary-container);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .streak-recovery .head .close:hover {
+    background: rgba(255,216,228,.12);
+  }
+  .streak-recovery .body {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .streak-recovery .cta {
+    align-self: flex-start;
+    background: var(--md-tertiary);
+    color: var(--md-on-tertiary);
+    border: none;
+    padding: 12px 24px;
+    border-radius: 22px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    min-height: 48px;
+    min-width: 48px;
+  }
+  .streak-recovery .cta:hover {
+    background: #FFD0DD;
+  }
+
+  /* Annotation */
+  .annotation {
+    margin: 0 16px 8px;
+    padding: 10px 12px;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  /* Home tile representation underneath */
+  .tile {
+    margin: 8px 16px;
+    background: var(--md-surface-container);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .tile-top {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .tile-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: rgba(129,201,149,.25);
+    color: var(--cat-green);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .tile-title-block { flex: 1; min-width: 0; }
+  .tile-title { font-size: 16px; font-weight: 600; }
+  .tile-meta { display: flex; gap: 10px; margin-top: 2px; font-size: 13px; }
+  .streak-badge { color: #FFD479; font-weight: 600; }
+
+  .sparkline { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+  .dot {
+    width: 12px; height: 12px;
+    border-radius: 6px;
+    border: 1.5px solid var(--md-outline-variant);
+  }
+  .dot.done { background: var(--cat-green); border-color: var(--cat-green); }
+  .dot.today { background: var(--md-primary); border-color: var(--md-primary); box-shadow: 0 0 0 2px rgba(208,188,255,.25); }
+
+  .tile-actions {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .tile-actions .group { display: flex; gap: 4px; }
+  .action-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface);
+    border: none;
+    padding: 10px 14px;
+    border-radius: 22px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 48px;
+    cursor: pointer;
+  }
+  .action-btn.primary { background: var(--md-primary); color: var(--md-on-primary); }
+
+  /* Different intensity states */
+  .state-info {
+    margin: 8px 16px;
+    padding: 12px;
+    background: var(--md-surface-container);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+  }
+  .state-info code {
+    color: var(--md-primary);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  .watermark {
+    position: absolute;
+    bottom: 8px; right: 12px;
+    font-size: 10px;
+    color: var(--md-on-surface-variant);
+    opacity: .55;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  .material-icons {
+    font-family: "Material Icons", "Material Symbols Outlined", system-ui;
+    font-style: normal; font-weight: 400;
+    line-height: 1;
+    display: inline-block;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+  }
+</style>
+</head>
+<body>
+<div class="viewport" role="application" aria-label="Streak recovery card">
+
+  <div class="appbar" role="banner">
+    <div class="title">do it</div>
+  </div>
+
+  <div class="state-title">Default · 5 missed days</div>
+
+  <div class="streak-recovery" role="region" aria-label="Streak broken: Drink water missed 5 days in a row">
+    <div class="head">
+      <div class="icon" aria-hidden="true">
+        <span class="material-icons">calendar_month</span>
+      </div>
+      <div class="text">Streak broken on Drink water</div>
+      <button class="close" aria-label="Dismiss recovery">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+    <div class="body">
+      5 days missed. Jump back in at tomorrow 8:00 AM.
+    </div>
+    <button class="cta">I'm back</button>
+  </div>
+
+  <div class="state-info">
+    <code>StreakRecoveryCard</code> · <code>lib/widgets/streak_recovery_card.dart:1-146</code><br>
+    One-shot home surface for 3+ missed days. <code>state == null</code> = hidden; <code>state != null</code> = visible. Triggered from the home screen's <code>Consumer&lt;StreakService&gt;</code> when the streak calculator detects a &gt;3-day gap.
+  </div>
+
+  <!-- In-context home tile after recovery dismissal -->
+  <div class="state-title">After "I'm back" tap · fresh streak starts at 1</div>
+  <div class="tile" role="article" aria-label="Drink water, 1 day streak after recovery">
+    <div class="tile-top">
+      <div class="tile-icon" aria-hidden="true">💧</div>
+      <div class="tile-title-block">
+        <div class="tile-title">Drink water</div>
+        <div class="tile-meta">
+          <span class="streak-badge">🔥 1</span>
+          <span style="color: var(--md-on-surface-variant); font-size: 12px;">Started over — keep it going</span>
+        </div>
+      </div>
+    </div>
+    <div class="sparkline" role="img" aria-label="Last 14 days, fresh streak">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="dot"></span><span class="dot today"></span>
+    </div>
+    <div class="tile-actions">
+      <div class="group">
+        <button class="action-btn" aria-label="Skip today"><span class="material-icons">skip_next</span></button>
+        <button class="action-btn" aria-label="Undo today" disabled style="opacity:.5"><span class="material-icons">undo</span></button>
+      </div>
+      <button class="action-btn primary" aria-label="Mark done">
+        <span class="material-icons">check_circle</span><span>Done</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Different intensity examples -->
+  <div class="state-title">Variant · 7 missed days (intense recovery)</div>
+  <div class="streak-recovery" role="region" aria-label="Streak broken: Morning run missed 7 days in a row">
+    <div class="head">
+      <div class="icon" aria-hidden="true">
+        <span class="material-icons">calendar_month</span>
+      </div>
+      <div class="text">Streak broken on Morning run</div>
+      <button class="close" aria-label="Dismiss">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+    <div class="body">
+      7 days missed. The 21-day streak is gone — but tomorrow at 6:30 AM is a fresh start.
+    </div>
+    <button class="cta">I'm back</button>
+  </div>
+
+  <!-- 3-day minimum -->
+  <div class="state-title">Variant · 3 missed days (threshold)</div>
+  <div class="streak-recovery" role="region" aria-label="Streak broken: Read 20 minutes missed 3 days in a row">
+    <div class="head">
+      <div class="icon" aria-hidden="true">
+        <span class="material-icons">calendar_month</span>
+      </div>
+      <div class="text">Streak broken on Read 20 minutes</div>
+      <button class="close" aria-label="Dismiss">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+    <div class="body">
+      3 days missed. Jump back in at tonight 9:00 PM.
+    </div>
+    <button class="cta">I'm back</button>
+  </div>
+
+  <div class="watermark">W-10 · Group A</div>
+</div>
+</body>
+</html>

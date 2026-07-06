@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>do it — Wireframe Slideshow</title>
+<style>
+  :root {
+    --bg: #0f1014;
+    --surface: #1a1b22;
+    --surface-2: #24262f;
+    --surface-3: #2e303a;
+    --border: #383b46;
+    --text: #e6e1e5;
+    --text-dim: #a8aab5;
+    --text-faint: #6e7080;
+    --primary: #d0bcff;
+    --primary-container: #4f378b;
+    --on-primary-container: #eaddff;
+    --error: #f2b8b5;
+    --error-container: #8c1d18;
+    --shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+    gap: 16px;
+  }
+
+  /* === Header === */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 980px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .brand h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    color: var(--text);
+  }
+
+  .brand .sub {
+    font-size: 13px;
+    color: var(--text-faint);
+  }
+
+  /* === Top controls === */
+  .controls-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    padding: 6px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+
+  .btn {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.05s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: inherit;
+    line-height: 1;
+    min-height: 36px;
+  }
+
+  .btn:hover { background: var(--surface-3); border-color: #4a4d59; }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-icon {
+    padding: 8px 10px;
+    min-width: 36px;
+    justify-content: center;
+  }
+
+  .btn-play {
+    background: var(--primary-container);
+    color: var(--on-primary-container);
+    border-color: var(--primary-container);
+    font-weight: 600;
+  }
+  .btn-play:hover {
+    background: #5d44a0;
+    border-color: #5d44a0;
+  }
+
+  .counter {
+    background: var(--surface);
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.3px;
+    min-width: 110px;
+    text-align: center;
+  }
+  .counter .current { color: var(--text); font-weight: 600; }
+
+  /* === Stage === */
+  .stage {
+    position: relative;
+    width: 412px;
+    max-width: 100%;
+    background: var(--surface);
+    border-radius: 24px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+
+  .phone-frame {
+    width: 412px;
+    height: 892px;
+    margin: 0 auto;
+    background: #000;
+    border-radius: 32px;
+    overflow: hidden;
+    position: relative;
+    border: 6px solid #0a0a0d;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+  }
+
+  .phone-frame iframe {
+    width: 412px;
+    height: 892px;
+    border: 0;
+    display: block;
+    background: #14141a;
+  }
+
+  .phone-frame iframe.wide-mode {
+    /* Fallback for wireframes that aren't 412px-aligned */
+    transform-origin: top left;
+  }
+
+  /* Caption */
+  .caption {
+    width: 412px;
+    max-width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 20px;
+  }
+
+  .caption-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0 0 6px 0;
+    line-height: 1.3;
+  }
+
+  .caption-body {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--text-dim);
+    margin: 0;
+  }
+
+  .caption-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .caption-meta .chip {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px 9px;
+  }
+
+  /* === Progress bar === */
+  .progress-wrap {
+    width: 412px;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .progress-track {
+    height: 4px;
+    background: var(--surface-2);
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: var(--primary);
+    width: 0%;
+    border-radius: 999px;
+    transition: width 0.18s linear;
+  }
+
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* === Bottom controls === */
+  .controls-bottom {
+    width: 412px;
+    max-width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 6px;
+  }
+
+  .speed-group {
+    display: inline-flex;
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 2px;
+    border: 1px solid var(--border);
+  }
+
+  .speed-btn {
+    background: transparent;
+    border: 0;
+    color: var(--text-dim);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s;
+    min-width: 38px;
+  }
+  .speed-btn:hover { color: var(--text); }
+  .speed-btn.active {
+    background: var(--primary-container);
+    color: var(--on-primary-container);
+  }
+  .speed-btn:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
+  }
+
+  /* === Help / shortcuts === */
+  .help {
+    width: 412px;
+    max-width: 100%;
+    font-size: 11px;
+    color: var(--text-faint);
+    text-align: center;
+    line-height: 1.6;
+  }
+  .help kbd {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10.5px;
+    color: var(--text-dim);
+  }
+
+  /* === Status pill === */
+  .status {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text);
+    font-size: 11px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-weight: 500;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .status.show { opacity: 1; }
+
+  /* === Loading shimmer === */
+  .loading {
+    position: absolute;
+    inset: 0;
+    background: var(--surface-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-faint);
+    font-size: 13px;
+    opacity: 1;
+    transition: opacity 0.25s;
+    pointer-events: none;
+  }
+  .loading.hide { opacity: 0; }
+
+  /* === Wide layouts === */
+  @media (max-width: 460px) {
+    .header { flex-direction: column; align-items: stretch; }
+    .brand { justify-content: center; }
+    .controls-top { justify-content: center; flex-wrap: wrap; }
+    .controls-bottom { flex-wrap: wrap; justify-content: center; }
+    .phone-frame { width: 100%; max-width: 360px; height: auto; aspect-ratio: 412 / 892; }
+    .phone-frame iframe { width: 100%; height: 100%; }
+  }
+
+  /* === A11y === */
+  @media (prefers-reduced-motion: reduce) {
+    .progress-bar, .btn, .speed-btn, .status { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="brand">
+    <h1>do it — Wireframes</h1>
+    <span class="sub">v1.4-stab · 38 surfaces</span>
+  </div>
+  <div class="controls-top" role="toolbar" aria-label="Slideshow controls">
+    <button class="btn btn-icon" id="btn-prev" title="Previous (←)" aria-label="Previous wireframe">&#9664;</button>
+    <button class="btn btn-play" id="btn-play" title="Play / Pause (Space)" aria-label="Play or pause slideshow">
+      <span id="play-icon">&#9658;</span>
+      <span id="play-label">Play</span>
+    </button>
+    <button class="btn btn-icon" id="btn-next" title="Next (→)" aria-label="Next wireframe">&#9654;</button>
+    <div class="counter" aria-live="polite" aria-atomic="true">
+      <span class="current" id="cur">01</span> / <span id="total">38</span>
+    </div>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="phone-frame" id="phone">
+    <iframe id="viewer" title="Wireframe viewer"
+            sandbox="allow-same-origin allow-scripts"
+            loading="eager"></iframe>
+    <div class="loading" id="loading">Loading…</div>
+    <div class="status" id="status"></div>
+  </div>
+</div>
+
+<div class="caption" id="caption">
+  <h2 class="caption-title" id="cap-title">—</h2>
+  <p class="caption-body" id="cap-body">—</p>
+  <div class="caption-meta" id="cap-meta"></div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-track" id="progress-track" role="progressbar"
+       aria-label="Slideshow progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div class="progress-bar" id="progress-bar"></div>
+  </div>
+  <div class="progress-meta">
+    <span id="time-remaining">8s</span>
+    <span id="time-elapsed">0s</span>
+  </div>
+</div>
+
+<div class="controls-bottom">
+  <button class="btn" id="btn-restart" title="Restart" aria-label="Restart slideshow">
+    &#8634; Restart
+  </button>
+  <div class="speed-group" role="group" aria-label="Playback speed">
+    <button class="speed-btn" data-speed="0.5">0.5x</button>
+    <button class="speed-btn active" data-speed="1">1x</button>
+    <button class="speed-btn" data-speed="2">2x</button>
+  </div>
+  <button class="btn" id="btn-fullscreen" title="Fullscreen" aria-label="Open fullscreen view">
+    &#9974; Full
+  </button>
+</div>
+
+<div class="help">
+  <kbd>Space</kbd> play/pause &nbsp;·&nbsp;
+  <kbd>&#8592;</kbd> prev &nbsp;·&nbsp;
+  <kbd>&#8594;</kbd> next &nbsp;·&nbsp;
+  <kbd>R</kbd> restart &nbsp;·&nbsp;
+  <kbd>F</kbd> fullscreen
+</div>
+
+<script>
+'use strict';
+
+/* ============================================================
+   WIREFRAME REGISTRY
+   Titles read from each W*.html <title>.
+   Captions paraphrased from INVENTORY.md.
+   ============================================================ */
+const WIREFRAMES = [
+  { id: 'W01', file: 'W01-home-populated.html',
+    title: 'Home (populated)',
+    group: 'A · Habit lifecycle',
+    caption: 'One screen per active habit; the home tile is the canonical unit of habit interaction. Shows reliability banner, routine drainer, DST banner, streak-recovery card, and per-tile Skip / Undo / Done / Edit / Delete actions.' },
+  { id: 'W02', file: 'W02-add-edit-habit.html',
+    title: 'Add / Edit habit',
+    group: 'A · Habit lifecycle',
+    caption: 'The single source of truth for the habit schedule engine + automation wiring. Form sections cover name, category, icon, schedule (Fixed / Interval / Anchor / Day-of-X / Time-Window), routines, rest-day budget, pause, and the edit-only completion-log section.' },
+  { id: 'W03', file: 'W03-per-tile-skip-undo-done.html',
+    title: 'Per-tile Skip / Undo / Done actions',
+    group: 'A · Habit lifecycle',
+    caption: 'Three trailing-row actions that mutate the completion log and the rest-day budget on a single tile. Done is idempotent; Skip consumes from the rest-day budget and shows a SnackBar on exhaustion; Undo reverses today’s completion within a 4-second window.' },
+  { id: 'W04', file: 'W04-per-tile-edit-delete.html',
+    title: 'Per-tile Edit / Delete actions',
+    group: 'A · Habit lifecycle',
+    caption: 'Per-tile discoverability gap closure. Edit opens the habit form pre-populated; Delete soft-deletes to a tombstone with an Undo SnackBar so completion history survives a Restore.' },
+  { id: 'W05', file: 'W05-sparkline.html',
+    title: '14-day Sparkline visualization',
+    group: 'A · Habit lifecycle',
+    caption: 'At-a-glance completion rhythm per habit. 14 color-coded dots (emerald done, grey empty, amber skipped, primary today) rendered inline on every home tile.' },
+  { id: 'W06', file: 'W06-rest-day-picker.html',
+    title: 'Rest-day budget picker dialog',
+    group: 'A · Habit lifecycle',
+    caption: 'Shared slider dialog (0..31) used by both the home tile budget caption and the add-habit form row. Per-habit, default 2 per calendar month.' },
+  { id: 'W07', file: 'W07-icon-picker.html',
+    title: 'Icon picker (8×8 grid)',
+    group: 'A · Habit lifecycle',
+    caption: 'Draggable bottom sheet with 64 Material icons across 8 thematic rows (physical, mind, relational, productivity, home, discipline-recovery, food, exercise). Single source of truth for which icon represents a habit.' },
+  { id: 'W08', file: 'W08-category-chip-picker.html',
+    title: 'Category chip + swatch picker',
+    group: 'A · Habit lifecycle',
+    caption: 'Rounded category chip with color swatch override. The only file in the app that bridges the pure-Dart `DoCategory` enum to a Flutter `Color`.' },
+  { id: 'W09', file: 'W09-completion-log-section.html',
+    title: 'Completion-log edit section',
+    group: 'A · Habit lifecycle',
+    caption: 'Edit-screen recovery path — undo an accidental completion without leaving the form. Up to 30 rows of date / time / source with per-row delete and an overflow message for hidden entries.' },
+  { id: 'W10', file: 'W10-streak-recovery-card.html',
+    title: 'Streak recovery card',
+    group: 'A · Habit lifecycle',
+    caption: 'One-shot home surface for 3+ missed days. Tertiary-container banner with a “I’m back” CTA that fast-paths the user back into the habit on the next slot.' },
+  { id: 'W11', file: 'W11-add-person.html',
+    title: 'Add / Edit person',
+    group: 'B · People + Cadence',
+    caption: 'A person is the cadence habit anchor for relational triggers. Form covers name, channel (Phone / WhatsApp / Telegram / Signal / SMS), handle, cadence shape, routines, pause, and a contact picker gated by the on-demand permission sheet.' },
+  { id: 'W12', file: 'W12-person-groups.html',
+    title: 'Person groups (rotation)',
+    group: 'B · People + Cadence',
+    caption: 'Multi-person cadence (e.g. “call one of these 4 every Sunday”). Each group has a semantic (rotation / any / all) and a per-group cadence chip; tap to drill into members.' },
+  { id: 'W13', file: 'W13-person-routines.html',
+    title: 'Per-person routines section',
+    group: 'B · People + Cadence',
+    caption: 'Same routine wiring as habit routines, scoped to person triggers (e.g. inbound call → silent). Per-automation row shows an AutomationReliabilityBadge trailing.' },
+  { id: 'W14', file: 'W14-contact-picker.html',
+    title: 'Contact picker bottom sheet',
+    group: 'B · People + Cadence',
+    caption: 'Bridge from the Add-person form to the OS-level contact list. Single-select result returns a PersonResolver snapshot (display name, lookup key, channel handle).' },
+  { id: 'W15', file: 'W15-add-event.html',
+    title: 'Add / Edit event',
+    group: 'C · Events',
+    caption: 'An event is a date-anchored cadence habit with optional calendar triggers. Form: title, date, time, lead-time slider (0..14 days), repeat (None / Annually), routines summary.' },
+  { id: 'W16', file: 'W16-events-list.html',
+    title: 'Events list (upcoming + past)',
+    group: 'C · Events',
+    caption: 'Surface for date-anchored reminders. Two sections (Upcoming / Past) plus an archived tier. Per-row archive and delete IconButtons.' },
+  { id: 'W17', file: 'W17-calendar-event-routine.html',
+    title: 'Calendar-event routine',
+    group: 'C · Events',
+    caption: 'Routine trigger that fires on inbound Android calendar events (READ_CALENDAR permission gate). Bottom sheet with multi-select of upcoming events.' },
+  { id: 'W18', file: 'W18-shake-mission.html',
+    title: 'Shake-N mission',
+    group: 'D · Missions',
+    caption: 'Strong-mode proof that requires physical motion. Consumes the sensors_plus accelerometer stream; debounced shake detector advances a live counter toward N.' },
+  { id: 'W19', file: 'W19-type-mission.html',
+    title: 'Type-phrase mission',
+    group: 'D · Missions',
+    caption: 'Strong-mode proof that requires cognitive engagement. User must type a target phrase exactly; 3 wrong attempts lock out the mission.' },
+  { id: 'W20', file: 'W20-hold-mission.html',
+    title: 'Hold-tap mission',
+    group: 'D · Missions',
+    caption: 'Strong-mode proof that requires sustained attention. Circular timer fills over N seconds; releasing early resets the progress.' },
+  { id: 'W21', file: 'W21-math-mission.html',
+    title: 'Math mission',
+    group: 'D · Missions',
+    caption: 'Strong-mode proof that requires arithmetic. Numeric answer field against a seeded problem; 3 wrong attempts lock out the mission.' },
+  { id: 'W22', file: 'W22-memory-mission.html',
+    title: 'Memory mission',
+    group: 'D · Missions',
+    caption: 'Strong-mode proof that requires working memory. Tap-to-flip grid of cards; matched pairs stay face-up; win when all pairs are matched.' },
+  { id: 'W23', file: 'W23-mission-chain-launcher.html',
+    title: 'Mission chain launcher',
+    group: 'D · Missions',
+    caption: 'Routes to the 5 mission UIs via the sealed `Mission` switch and runs the chain executor. Stepper (“Step 2 of 3”), per-mission timeout honored by the chain, failed-at aborts the rest.' },
+  { id: 'W24', file: 'W24-routine-apply.html',
+    title: 'Routine apply (templates #17–#21)',
+    group: 'E · Routines',
+    caption: 'Generic apply UX for the 5 routine templates (location / calendar / device-state / time-of-day / usage-stats). Form sections scoped to the trigger kind with Enable toggle and Save / Update / Delete action row.' },
+  { id: 'W25', file: 'W25-japan-silent-mode.html',
+    title: 'Japan silent-mode call-screening routine (#16)',
+    group: 'E · Routines',
+    caption: 'Specialised template #16 — the canonical Phase F reference template. When a selected contact calls, switch to Normal / Vibrate / Silent.' },
+  { id: 'W26', file: 'W26-reliability-banner.html',
+    title: 'Reliability banner (home + settings)',
+    group: 'F · Reliability + Permissions',
+    caption: 'App-wide alarm-system reliability banner. errorContainer strip with “Reminders may be late. Tap to fix.” Hidden when reliability is optimal.' },
+  { id: 'W27', file: 'W27-permission-sheet.html',
+    title: 'On-demand permission sheet',
+    group: 'F · Reliability + Permissions',
+    caption: 'Single on-demand permission gate. Every feature that requires a runtime permission calls `PermissionSheet.show(context, kind)` first. Handles 9 PermissionKind cases with rationale + Allow + Open-settings.' },
+  { id: 'W28', file: 'W28-automation-reliability.html',
+    title: 'Per-automation reliability badge + dialog',
+    group: 'F · Reliability + Permissions',
+    caption: 'Per-routine reliability diagnostic. Visual sibling of the ReliabilityBanner but scoped to one automation; dialog surfaces Trigger-side and Action-side permission sections.' },
+  { id: 'W29', file: 'W29-settings.html',
+    title: 'Settings',
+    group: 'G · Settings + Backup',
+    caption: 'The catch-all system-preferences surface. Sections: Appearance, Anchor, Permissions, Reliability, DeviceState, Stats, Backup (restore + recently-deleted entries), About.' },
+  { id: 'W30', file: 'W30-restore-from-backup.html',
+    title: 'Restore from backup',
+    group: 'G · Settings + Backup',
+    caption: 'SAF-backed destructive restore. 5-state machine: idle / picking / picked / restoring / restored. Confirms with a replace-all dialog before clobbering local data.' },
+  { id: 'W31', file: 'W31-recently-deleted.html',
+    title: 'Recently deleted (tombstones)',
+    group: 'G · Settings + Backup',
+    caption: 'v1.4-stab-H deferred UI surface for the v1.4l tombstone column. List of soft-deleted habits with title + deletion date + restore + delete-forever trailing.' },
+  { id: 'W32', file: 'W32-android-widget.html',
+    title: 'Android home-screen widget',
+    group: 'H · Widget + Stats + Templates',
+    caption: 'Widget-side Kotlin ↔ Dart round-trip plus per-instance widget config and body-tap deep-link. RemoteViews tile shows name, streak, and Done / Skip actions.' },
+  { id: 'W33', file: 'W33-stats.html',
+    title: 'Stats screen',
+    group: 'H · Widget + Stats + Templates',
+    caption: 'Materialised stats queries cached for 5 seconds. Per-category bucket with 30-day completion rate, 7-day bars chart, and per-habit streak badge.' },
+  { id: 'W34', file: 'W34-templates.html',
+    title: 'Templates gallery (25 templates)',
+    group: 'H · Widget + Stats + Templates',
+    caption: 'Curated templates the user can clone: 12 do + 3 person + 4 event + 6 routine. 5 filter chips (All / Do / Event / Person / Routine) over a 2-column GridView of Cards.' },
+  { id: 'W35', file: 'W35-device-state-row.html',
+    title: 'Device-state live row',
+    group: 'H · Widget + Stats + Templates',
+    caption: 'Diagnostic ListTile that reflects the current `DeviceStateSnapshot` published by `DeviceStateService`. Battery / headphones / screen state with HH:MM:SS trailing timestamp.' },
+  { id: 'W36', file: 'W36-dst-transition-banner.html',
+    title: 'DST transition banner',
+    group: 'H · Widget + Stats + Templates',
+    caption: 'One-shot surface for clock-change drops. Lists each habit whose `nextOccurrence` silently rescheduled (e.g. “Meditate → 07:00”) with a “Reschedule now” CTA.' },
+  { id: 'W37', file: 'W37-onboarding-5-permission-steps.html',
+    title: 'Onboarding (5 permission steps)',
+    group: 'I · Onboarding',
+    caption: 'First-launch 5-step permission walk: Notifications, Contacts, ExactAlarms, BackupFolder, CallScreening. Step indicator dots; Skip link top-right; Allow FilledButton per step.' },
+  { id: 'W38', file: 'W38-anchor-mode-theme.html',
+    title: 'Anchor mode + theme (final onboarding)',
+    group: 'I · Onboarding',
+    caption: 'The two preference picks that close onboarding. Anchor mode (Manual / First unlock / Either) and theme (Dark / Light / System) via SegmentedButtons with a Get-started FilledButton CTA.' },
+];
+
+/* ============================================================
+   PLAYER STATE
+   ============================================================ */
+const BASE_INTERVAL_MS = 8000;
+const state = {
+  index: 0,
+  playing: false,
+  speed: 1,
+  remaining: BASE_INTERVAL_MS,
+  lastTick: 0,
+  rafId: null,
+  userNavigated: false,
+};
+
+const els = {
+  viewer: document.getElementById('viewer'),
+  loading: document.getElementById('loading'),
+  status: document.getElementById('status'),
+  cur: document.getElementById('cur'),
+  total: document.getElementById('total'),
+  capTitle: document.getElementById('cap-title'),
+  capBody: document.getElementById('cap-body'),
+  capMeta: document.getElementById('cap-meta'),
+  btnPrev: document.getElementById('btn-prev'),
+  btnNext: document.getElementById('btn-next'),
+  btnPlay: document.getElementById('btn-play'),
+  playIcon: document.getElementById('play-icon'),
+  playLabel: document.getElementById('play-label'),
+  btnRestart: document.getElementById('btn-restart'),
+  btnFullscreen: document.getElementById('btn-fullscreen'),
+  progressTrack: document.getElementById('progress-track'),
+  progressBar: document.getElementById('progress-bar'),
+  progressWrap: document.querySelector('.progress-wrap'),
+  timeRemaining: document.getElementById('time-remaining'),
+  timeElapsed: document.getElementById('time-elapsed'),
+  speedBtns: document.querySelectorAll('.speed-btn'),
+  phone: document.getElementById('phone'),
+};
+
+els.total.textContent = String(WIREFRAMES.length).padStart(2, '0');
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+function go(delta) {
+  const next = (state.index + delta + WIREFRAMES.length) % WIREFRAMES.length;
+  show(next, { user: true });
+}
+
+function show(idx, opts) {
+  opts = opts || {};
+  state.index = idx;
+  state.remaining = BASE_INTERVAL_MS;
+  state.userNavigated = !!opts.user;
+
+  const w = WIREFRAMES[idx];
+  els.viewer.src = w.file;
+  els.viewer.onload = () => {
+    els.loading.classList.add('hide');
+    setTimeout(() => els.loading.classList.remove('hide'), 200);
+  };
+  els.loading.classList.remove('hide');
+
+  els.cur.textContent = String(idx + 1).padStart(2, '0');
+  els.capTitle.textContent = w.id + ' — ' + w.title;
+  els.capBody.textContent = w.caption;
+  els.capMeta.innerHTML = '';
+  const groupChip = document.createElement('span');
+  groupChip.className = 'chip';
+  groupChip.textContent = w.group;
+  els.capMeta.appendChild(groupChip);
+  const fileChip = document.createElement('span');
+  fileChip.className = 'chip';
+  fileChip.textContent = w.file;
+  els.capMeta.appendChild(fileChip);
+
+  // Pause auto-advance when the user navigates.
+  if (state.userNavigated && state.playing) {
+    pause();
+    flashStatus('Auto-advance paused');
+  }
+
+  // If looping back from end, restart autoplay when on index 0.
+  if (state.playing === false && opts.user !== true) {
+    // No-op: keep manual control.
+  }
+
+  updateProgress();
+}
+
+function next() { go(1); }
+function prev() { go(-1); }
+function restart() {
+  show(0);
+  if (state.playing) {
+    // Continue playing from W01.
+    state.remaining = BASE_INTERVAL_MS;
+    flashStatus('Restarted');
+  }
+}
+
+/* ============================================================
+   PLAY / PAUSE
+   ============================================================ */
+function play() {
+  if (state.playing) return;
+  state.playing = true;
+  state.remaining = BASE_INTERVAL_MS;
+  state.lastTick = performance.now();
+  els.playIcon.innerHTML = '&#10074;&#10074;';
+  els.playLabel.textContent = 'Pause';
+  tick();
+}
+
+function pause() {
+  if (!state.playing) return;
+  state.playing = false;
+  if (state.rafId) cancelAnimationFrame(state.rafId);
+  state.rafId = null;
+  els.playIcon.innerHTML = '&#9658;';
+  els.playLabel.textContent = 'Play';
+}
+
+function togglePlay() {
+  if (state.playing) pause(); else play();
+}
+
+function tick() {
+  if (!state.playing) return;
+  const now = performance.now();
+  const dt = (now - state.lastTick) * state.speed;
+  state.lastTick = now;
+  state.remaining -= dt;
+
+  if (state.remaining <= 0) {
+    const wasLast = state.index === WIREFRAMES.length - 1;
+    if (wasLast) {
+      // Loop back to W01.
+      show(0);
+      state.userNavigated = false;
+      flashStatus('Looping back to W01');
+    } else {
+      state.index += 1;
+      show(state.index);
+    }
+    state.remaining = BASE_INTERVAL_MS;
+    updateProgress();
+  } else {
+    updateProgress();
+  }
+  state.rafId = requestAnimationFrame(tick);
+}
+
+function updateProgress() {
+  const elapsed = BASE_INTERVAL_MS - state.remaining;
+  const pct = Math.max(0, Math.min(100, (elapsed / BASE_INTERVAL_MS) * 100));
+  els.progressBar.style.width = pct.toFixed(2) + '%';
+  els.progressTrack.setAttribute('aria-valuenow', Math.round(pct));
+
+  els.timeRemaining.textContent = (state.remaining / 1000).toFixed(1) + 's';
+  els.timeElapsed.textContent = (elapsed / 1000).toFixed(1) + 's';
+}
+
+/* ============================================================
+   SPEED
+   ============================================================ */
+function setSpeed(s) {
+  state.speed = s;
+  // Reset the tick anchor so the new speed doesn't create a jump.
+  state.lastTick = performance.now();
+  els.speedBtns.forEach(b => {
+    b.classList.toggle('active', parseFloat(b.dataset.speed) === s);
+  });
+}
+
+/* ============================================================
+   FULLSCREEN
+   ============================================================ */
+function toggleFullscreen() {
+  const el = document.documentElement;
+  if (!document.fullscreenElement) {
+    (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el);
+  } else {
+    (document.exitFullscreen || document.webkitExitFullscreen || (() => {})).call(document);
+  }
+}
+
+/* ============================================================
+   STATUS FLASH
+   ============================================================ */
+let statusTimer = null;
+function flashStatus(text) {
+  els.status.textContent = text;
+  els.status.classList.add('show');
+  if (statusTimer) clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => els.status.classList.remove('show'), 1400);
+}
+
+/* ============================================================
+   PROGRESS-BAR SEEK
+   ============================================================ */
+function seekFromEvent(e) {
+  const rect = els.progressTrack.getBoundingClientRect();
+  const x = (e.clientX || (e.touches && e.touches[0].clientX) || 0) - rect.left;
+  const ratio = Math.max(0, Math.min(1, x / rect.width));
+  const targetIdx = Math.floor(ratio * WIREFRAMES.length);
+  show(Math.min(targetIdx, WIREFRAMES.length - 1), { user: true });
+}
+
+/* ============================================================
+   WIRING
+   ============================================================ */
+els.btnPrev.addEventListener('click', prev);
+els.btnNext.addEventListener('click', next);
+els.btnPlay.addEventListener('click', togglePlay);
+els.btnRestart.addEventListener('click', restart);
+els.btnFullscreen.addEventListener('click', toggleFullscreen);
+els.progressTrack.addEventListener('click', seekFromEvent);
+
+els.speedBtns.forEach(b => {
+  b.addEventListener('click', () => setSpeed(parseFloat(b.dataset.speed)));
+});
+
+/* Keyboard */
+window.addEventListener('keydown', (e) => {
+  // Ignore if focus is in a text input.
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+  switch (e.key) {
+    case ' ':
+    case 'Spacebar':
+      e.preventDefault();
+      togglePlay();
+      break;
+    case 'ArrowLeft':
+      e.preventDefault();
+      prev();
+      break;
+    case 'ArrowRight':
+      e.preventDefault();
+      next();
+      break;
+    case 'r':
+    case 'R':
+      restart();
+      break;
+    case 'f':
+    case 'F':
+      toggleFullscreen();
+      break;
+  }
+});
+
+/* Iframe load handling */
+els.viewer.addEventListener('load', () => {
+  els.loading.classList.add('hide');
+});
+
+/* Iframe error */
+els.viewer.addEventListener('error', () => {
+  els.loading.textContent = 'Failed to load ' + WIREFRAMES[state.index].file;
+});
+
+/* ============================================================
+   INIT
+   ============================================================ */
+show(0, { user: false });
+// Stay paused on load. Press Space (or click Play) to start.
+pause();
+updateProgress();
+
+// Expose for debugging.
+window.__slideshow = { state, show, next, prev, play, pause, setSpeed };
+</script>
+
+</body>
+</html>
