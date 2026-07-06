@@ -4186,7 +4186,25 @@ SYS-157; ADR-088; v1.7-α row in `implementation_status.md`; `### v1.7-α` subse
 - `lib/screens/add_person.dart` is unchanged (the v0.1 form is NOT extended for v1.7-β; the repo-layer wiring exists independently).
 - V-Model artifacts SYS-158 + ADR-089 + WF-086 are committed alongside the code.
 - APK SHA1 stays at H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` (no production-code change).
-- **v1.7 milestone: 2/9 cycles shipped (α + β); tests 1773 → 1800 (+27 net across α + β; +14 exactly on target for β); `add_habit.dart` 76% → ~85% + `person_repository.dart` raw-column layer pinned; 0 Kotlin changes; 0 `<uses-permission>` changes; 0 Drift migrations; 0 release APK rebuilds.**
+- **v1.7 milestone: 3/9 cycles shipped (α + β + γ); tests 1773 → 1812 (+39 net across α + β + γ; +12 exactly on target for γ); `add_habit.dart` 76% → ~85% + `person_repository.dart` raw-column layer pinned + `add_event.dart` ~78% → ~88% form-level sub-branches pinned; 0 Kotlin changes; 0 `<uses-permission>` changes; 0 Drift migrations; 0 release APK rebuilds.**
+
+### v1.7-γ — add_event.dart form-level sub-branch coverage closure (RE-SCOPED 2026-07-05) / WF-087
+
+**Scope:** EXTEND `test/screens/add_event_test.dart` (+12 tests, 28 baseline → 40 total). **No production-code change.** Tests-only cycle.
+
+**RE-SCOPED 2026-07-05** — the original v1.7-γ plan assumed 3 widgets (a leadTime slider, a no-recurrence radio group, an end-date picker) existed on the form. The code-explorer pass discovered the v0.1 form uses (a) a Dialog with 7 RadioListTile presets for lead time, (b) 2 ChoiceChips for recurrence, and (c) NO end-date picker. Cycle lands at the form layer where the wiring actually exists (in `_pickLead` + `_applyPayload` + `_saveAsTemplate` per ADR-086 lesson (a)).
+
+**3 batches:**
+
+- **Batch 1 — `_pickLead` dialog (5 tests):** pin all 4 reachable buckets of `_leadLabel(int m)` at `add_event.dart:228-233` + the Cancel branch. Covers `:189-226` (Dialog + RadioListTile), `:213-215, 225` (Cancel returns null → guard rejects). 1 existing v1.6-δ test covered the "At the time" (m=0) bucket; v1.7-γ fills the remaining 3 buckets (5/30/120/1440 min) + the Cancel branch.
+- **Batch 2 — `_applyPayload` defensive branches (6 tests):** pin the 5 typed guards at `:110-118` (name is String, lead is int, day is int, month is int + recurrence switch default arm). The 3 `Event.validate()` throw branches at `event.dart:128-138` are UNREACHABLE from form input per ADR-090 lesson (e) — v1.7-γ does NOT write tests for them.
+- **Batch 3 — `_saveAsTemplate` envelope variants (1 test):** `_saveAsTemplate with _recurrence=annually writes '"recurrence":"annually"' in the envelope` — pin the `'annually'` branch at `:343-344`. 1 existing v1.6-δ test covered the `'none'` branch.
+
+**Drift lessons per ADR-090:** (a) **The v0.1 form uses a Dialog with 7 RadioListTile presets for lead time, NOT a Slider** — the original v1.7-γ plan assumed a slider; (b) **The v0.1 form uses 2 ChoiceChips for recurrence, NOT a RadioListTile group** — the `EventRecurrence` enum has only `{none, annually}` leaves; (c) **The v0.1 form has NO end-date picker** — the `annually` leaf is open-ended; (d) **The 5 `_applyPayload` typed guards are defense-in-depth** — the form never sends non-typed input; v1.7-γ Batch 2 pins the guards so a future cast-widening refactor fails loudly; (e) **The 3 `Event.validate()` throw branches are UNREACHABLE from form input** — per the v1.6-ζ "unreachable throw = no test" lesson (DRY for defense-in-depth), v1.7-γ does NOT write tests for them.
+
+**Out-of-scope (deferred to v2.0 + ADR-090):** A lead-time slider (NOT in v0.1 form); a 3-leaf `RadioListTile` recurrence group (v0.1 supports only 2 leaves); a recurring-end-date picker (NOT in v0.1); a wider type cast in `_applyPayload` (a future refactor that removes the typed guards is a BREAKING change).
+
+**Cross-references:** SYS-159; ADR-090; v1.7-γ row in `implementation_status.md`; `### v1.7-γ` subsection in `plan.md`; `## v1.7-γ` entry in `CHANGELOG.md`; feature.md cycle entry; the v1.7 locked roadmap at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`; ADR-086 lesson (a) verify-wiring-exists applied to re-scope this cycle from "slider + radio + end-date" to "Dialog presets + ChoiceChips + no end-date"; ADR-089 (v1.7-β drift lessons — `grep` wiring check pattern carried forward); ADR-088 (v1.7-α drift lessons — `runAsync` closure wrap pattern carried forward).
 
 ### Cross-references
 

@@ -8152,3 +8152,87 @@ v1.7-β in the Drift keepalive-deadlock-aware test seams); ADR-079
 UI-form-is-much-simpler-than-master-plan-assumed pattern; v1.7-β is
 the SECOND instance of this pattern, paired with v1.6-γ to establish
 the v1.8+ rule).
+
+## ADR-090 — v1.7-γ drift lessons (add_event.dart form-level sub-branch coverage closure)
+
+The v1.7-γ cycle targets `lib/screens/add_event.dart` form-level
+sub-branches that the v1.5-β + v1.6-δ cycles left dark. The
+original v1.7-γ plan (3 widgets: slider + radio + end-date
+picker) was WRONG for the v0.1 form. The 5 drift lessons:
+
+### Lesson (a) — The v0.1 form uses a Dialog with 7 RadioListTile presets for lead time, NOT a Slider
+
+The code at `lib/screens/add_event.dart:189-226` opens an
+`AlertDialog` with a `ListView` of 7 `RadioListTile<int>`
+leaves mapping to `[0, 5, 15, 30, 60, 120, 1440]` minutes.
+There is no `Slider` widget. The `_leadLabel(int m)` helper
+at `:228-233` formats the picked value as one of 4 buckets:
+`"At the time"`, `"$m min before"`, `"${m ~/ 60} h before"`,
+or `"${m ~/ 1440} d before"`. The v0.1 form contract is
+"pick from a fixed list of 7 presets" — not "drag a slider".
+
+### Lesson (b) — The v0.1 form uses 2 ChoiceChips for recurrence, NOT a RadioListTile group
+
+The code at `lib/screens/add_event.dart:480-499` renders
+`Once` + `Yearly` as `ChoiceChip`s in a `Wrap(spacing: 8)`.
+The `EventRecurrence` enum at
+`lib/events/event.dart:30-33` has only 2 leaves: `none` and
+`annually`. There is no 3rd `monthly` / `weekly` / `daily`
+leaf. The labels are mapped from the enum at `:449-460`:
+`none → "Once"`, `annually → "Yearly"`.
+
+### Lesson (c) — The v0.1 form has NO end-date picker
+
+The form has no `_endAt` / `_endDate` state field. The
+`EventRecurrence.annually` leaf is OPEN-ENDED — it fires
+on the same month+day every year until the user deletes
+the event. The original v1.7-γ plan assumed a `showDatePicker`
+for the recurring-end date; the cycle does NOT write tests
+for end-date branches (none exist).
+
+### Lesson (d) — The 5 `_applyPayload` typed guards at `add_event.dart:110-118` are defense-in-depth
+
+The form never calls `_applyPayload` with a non-typed input
+in production — the catalog apply path (the only caller)
+always sends a `Map<String, dynamic>` with `String` / `int` /
+`double` / `null` values. The 5 typed guards
+(`name is String && name.isNotEmpty`,
+`lead is int`,
+`day is int && day > 0 && day <= 31`,
+`month is int && month >= 1 && month <= 12`)
+are defense-in-depth. v1.7-γ Batch 2 pins the guards with
+6 new tests (month=null, day=0, recurrence="daily",
+name=null, lead=String, lead=double) so a future refactor
+that widens the cast (e.g., `name as String`) fails loudly.
+
+### Lesson (e) — The 3 `Event.validate()` throw branches at `event.dart:128-138` are UNREACHABLE from form input
+
+Per the v1.6-ζ "unreachable throw = no test" lesson (DRY for
+defense-in-depth): the form checks name empty at `:237-240`
+BEFORE `validate()`; `_at = DateTime.now().add(1 day)` at
+`:77` ensures `atMillis > 0`; the 7 Dialog presets are all
+`>= 0` so `leadTimeMillis` is never negative. The 3 throw
+branches (`EventNameEmpty`, `EventInvalidAtMillis`,
+`EventInvalidLeadTime`) cannot fire from form input. v1.7-γ
+does NOT write tests for these branches — the v1.5-β
+happy-path test at `add_event_test.dart:277-304` already
+exercises the `_save` path that calls `validate()`, and a
+green test means `validate()` returned without throwing.
+
+### Cross-references
+
+- V-Model artifacts: SYS-159 + WF-087 + the
+  trace/workflow/decision/plan/CHANGELOG/feature.md entries
+  per cycle pattern.
+- Test count: 1800 → 1812 (+12 net; matches v1.7 pre-auth
+  plan target exactly).
+- APK SHA1 stays at H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`.
+- Related ADRs: ADR-086 (a) verify-wiring-exists lesson
+  applied to re-scope from "slider + radio + end-date" to
+  "Dialog presets + ChoiceChips + no end-date"; ADR-088
+  (v1.7-α drift lessons — `runAsync` closure wrap pattern
+  carried forward); ADR-089 (v1.7-β drift lessons — paired
+  with v1.7-γ to establish the v1.8+ "always verify the
+  form scope via `grep`" rule as a 3-time pattern); ADR-087
+  §c (healthy over-delivery — v1.7-γ delivers +12 exact,
+  matching plan target).
