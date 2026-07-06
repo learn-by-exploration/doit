@@ -236,4 +236,147 @@ void main() {
       expect(find.text('Ajustes'), findsNothing);
     },
   );
+
+  // ---- v1.7-δ / SYS-160 / ADR-091 / WF-088 ----
+  //
+  // Verbatim pins of the Spanish ARB catalog. The plan
+  // (per `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`)
+  // calls for 20 pins across the post-v1.3 surface
+  // (sparkline copy, widget action copy, home add sheet,
+  // settings theme + anchor, permission status). These
+  // pins are the **regression guard for the future
+  // translator pass** (B2 in the 3-month launch plan):
+  // when the native-Spanish translator updates any
+  // string, the corresponding pin flips to RED and the
+  // translator's edit must be re-asserted in the .arb +
+  // the test in the same change.
+  //
+  // The 5 batches group by UI surface (not by ARB key
+  // alphabetical order) so a translator reviewing a
+  // single surface can find all related pins in one
+  // place. Each test is AAA: arrange (load the es
+  // delegate), act (read the getter), assert (equals
+  // the pinned string).
+
+  // Batch 1: sparkline a11y + tooltip copy (4 tests)
+  // Surface: the v1.4i 14-day sparkline on each home
+  // tile. The semantics label drives TalkBack; the
+  // tooltips drive long-press affordance. Both must
+  // resolve in es to match the en copy.
+  testWidgets('es verbatim pin: homeTileSparklineSemantics', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.homeTileSparklineSemantics, equals('Últimos 14 días'));
+  });
+  testWidgets('es verbatim pin: homeTileSparklineRestDayTooltip', (
+    tester,
+  ) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.homeTileSparklineRestDayTooltip, equals('Día de descanso'));
+  });
+  testWidgets('es verbatim pin: homeTileSparklineDoneTooltip', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.homeTileSparklineDoneTooltip, equals('Hecho'));
+  });
+  testWidgets('es verbatim pin: homeTileSparklineMissedTooltip', (
+    tester,
+  ) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.homeTileSparklineMissedTooltip, equals('Perdido'));
+  });
+
+  // Batch 2: sparkline legend captions (3 tests)
+  // Surface: the v1.4i inline legend below the
+  // sparkline. 3 captions, one per dot color.
+  testWidgets('es verbatim pin: homeTileSparklineLegendDone', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.homeTileSparklineLegendDone, equals('Hecho'));
+  });
+  testWidgets('es verbatim pin: homeTileSparklineLegendRestDay', (
+    tester,
+  ) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.homeTileSparklineLegendRestDay, equals('Día de descanso'));
+  });
+  testWidgets('es verbatim pin: homeTileSparklineLegendMissed', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.homeTileSparklineLegendMissed, equals('Perdido'));
+  });
+
+  // Batch 3: widget action copy (2 tests)
+  // Surface: the v1.4f home-screen widget. The
+  // "Skip today" / "Undo today" actions are the
+  // primary widget affordance and must match the
+  // home tile copy exactly.
+  testWidgets('es verbatim pin: widgetSkipToday', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.widgetSkipToday, equals('Saltar hoy'));
+  });
+  testWidgets('es verbatim pin: widgetUndoToday', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.widgetUndoToday, equals('Deshacer hoy'));
+  });
+
+  // Batch 4: home add sheet copy (3 tests)
+  // Surface: the v1.3c bottom-sheet that lets the
+  // user pick "New task" / "New person" / "From
+  // template" without leaving the home screen.
+  testWidgets('es verbatim pin: homeAddSheetNewDo', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.homeAddSheetNewDo, equals('Nueva tarea'));
+  });
+  testWidgets('es verbatim pin: homeAddSheetNewPerson', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.homeAddSheetNewPerson, equals('Nueva persona'));
+  });
+  testWidgets('es verbatim pin: homeAddSheetFromTemplate', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.homeAddSheetFromTemplate, equals('Desde plantilla'));
+  });
+
+  // Batch 5: settings theme + anchor + permission
+  // status (8 tests) — bundled because these are
+  // the v0.1 settings-screen surface that was
+  // translated early and is the most user-facing
+  // copy. BUG-006 (deferred to v2.0 per W-13 §8)
+  // is exactly this surface: when the native
+  // translator updates a string here, the pin
+  // flips RED.
+  testWidgets('es verbatim pin: settingsThemeDark', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.settingsThemeDark, equals('Oscuro'));
+  });
+  testWidgets('es verbatim pin: settingsThemeLight', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.settingsThemeLight, equals('Claro'));
+  });
+  testWidgets('es verbatim pin: settingsThemeSystem', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.settingsThemeSystem, equals('Sistema'));
+  });
+  testWidgets('es verbatim pin: settingsAnchorFirstUnlock', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.settingsAnchorFirstUnlock, equals('Primer desbloqueo del día'));
+  });
+  testWidgets('es verbatim pin: settingsAnchorEither', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.settingsAnchorEither, equals('Cualquiera, con confirmación'));
+  });
+  testWidgets('es verbatim pin: permissionStatusGranted', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(l.permissionStatusGranted, equals('Concedido'));
+  });
+  testWidgets('es verbatim pin: permissionStatusNotAsked', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(
+      l.permissionStatusNotAsked,
+      equals('Aún no se ha pedido — toca para pedir'),
+    );
+  });
+  testWidgets('es verbatim pin: permissionStatusDenied', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(
+      l.permissionStatusDenied,
+      equals('No concedido — toca para pedir de nuevo'),
+    );
+  });
 }

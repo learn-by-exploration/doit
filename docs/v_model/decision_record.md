@@ -8236,3 +8236,47 @@ green test means `validate()` returned without throwing.
   form scope via `grep`" rule as a 3-time pattern); ADR-087
   §c (healthy over-delivery — v1.7-γ delivers +12 exact,
   matching plan target).
+
+## ADR-091 — v1.7-δ drift lessons (Spanish ARB verbatim-pin coverage closure)
+
+**Phase 70 / v1.7-δ / SYS-160 / WF-088 / PR #82.** The
+fourth cycle of the v1.7 milestone closed the Spanish ARB
+verbatim-pin coverage gap for the post-v1.3 surface (the
+129 `String get` entries in `lib/l10n/gen/app_localizations_es.dart`
+that the v1.1h + v1.3e scaffolding shipped unverified).
+20 verbatim pins added in 5 batches grouped by UI surface.
+
+### Drift lessons
+
+(a) **The 129 Spanish getters split into 2 shapes — single-line `=> 'literal'` (98 entries) and multi-line `=>\n  'literal';` (31 entries with embedded plural / placeholder / em-dash).** Verbatim pins work cleanly only for the single-line shape. The multi-line shape is tested via placeholder / plural mechanics at `test/l10n/app_localizations_test.dart`. v1.7-δ picks 20 single-line keys across 5 UI surfaces. Future v1.8+ translator cycles can extend with multi-line pins once the translator's edits land.
+
+(b) **Parity invariant: `app_en.arb` and `app_es.arb` have the same 129 keys** (verified by the `every non-template ARB has the same key set as the template` test at `app_localizations_test.dart:71`). The gen-l10n contract enforces parity at build time. The verbatim pin does NOT need to assert the en copy (the en copy is the source of truth; the es copy is the translation). Future translator cycles must keep parity — adding a key to en.arb without es.arb fails the structural test.
+
+(c) **Spanish em-dash (`—` = U+2014) and opening-question-mark (`¿` = U+00BF) are 2-byte UTF-8 characters.** The verbatim pin must use the same 2-byte sequences as the `.arb` source. A typo in the test would silently pass on a coincidentally-matching ASCII equivalent (Dart's `==` on `String` is byte-exact, so a mismatched dash fails loudly, but a coincidentally-matching ASCII `-` could be missed). The 8 settings/anchor/permission pins include 5 em-dashes + 1 opening-question-mark; the pins use the exact 2-byte UTF-8 sequences from the `.arb`. Future translator cycles must preserve the em-dash style (not substitute ASCII `-`).
+
+(d) **BUG-006 (deferred to v2.0 per the v1.4-stab-W13 §8 retrospective) is the canonical example of "Spanish translation drift".** The user's native-Spanish translator updated a string in `app_es.arb` but the test still pinned the OLD translated string, surfacing as RED. v1.7-δ pins the CURRENT (unverified) strings verbatim, so the translator's pass will surface as `failed: expected X, got Y` for each updated string; the translator's PR must update both `.arb` and the pin in the same change. This is the **regression guard** for the future B2 cycle (native-Spanish translator review).
+
+(e) **5-batch grouping is by UI surface, not by ARB key alphabetical order** — this lets a translator reviewing the sparkline surface (Batch 1+2, 7 tests) find all 7 sparkline pins in adjacent tests; same for the home add sheet (Batch 4, 3 tests) and settings/anchor/permission (Batch 5, 8 tests). Future v1.8+ translator cycles can extend each batch with NEW keys without renumbering the batches. The grouping is a readability affordance for the human translator, not a structural property of the ARB catalog.
+
+### Plan-vs-actual
+
+- **Target:** +20 tests for Spanish ARB verbatim pins in `test/l10n/locale_render_test.dart`.
+- **Actual:** +20 tests (4 sparkline a11y + 3 sparkline legend + 2 widget action + 3 home add sheet + 8 settings/anchor/permission).
+- **Match:** exact. 1812 → 1832 tests. Test count after v1.7-δ: 1832.
+
+### Constraint adherence
+
+- No production-code change (no Drift migration, no Kotlin
+  change, no new `<uses-permission>`, no new pubspec dep).
+- APK SHA1 stays at H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d`.
+- 5 batches grouped by UI surface; 20 tests in 5 batches = 4+3+2+3+8.
+- 3-gate: `dart format --output=none --set-exit-if-changed .` (clean after auto-format of 1 file) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1832/1832 pass).
+- Targeted: `flutter test test/l10n/locale_render_test.dart` (29/29 pass: 9 baseline + 20 new v1.7-δ).
+- No `Co-Authored-By: Claude` in commit; no `key.properties` / `*.jks` / `*.der` / `ANDROID_*` env values / `google-services.json` in commit.
+- Related ADRs: ADR-086 (a) verify-wiring-exists lesson (not needed for v1.7-δ — the ARB catalog is the catalog, no "form scope" to grep); ADR-087 §c (healthy over-delivery — v1.7-δ delivers +20 exact, matching plan target); ADR-088 + ADR-089 + ADR-090 (paired v1.7-α/β/γ lessons, all using the "verify form scope via grep before writing tests" pattern; v1.7-δ does not need it because the ARB surface is the catalog itself, not a form).
+
+### Cross-references
+
+- v1.7-δ PR #82 commit (will be created at end of cycle)
+- BUG-006 (deferred to v2.0 per W-13 §8) is exactly the surface v1.7-δ pins
+- B2 in the 3-month launch plan (native-Spanish translator review) will use these pins as the regression guard

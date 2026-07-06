@@ -610,3 +610,23 @@ Cycle is the **SECOND** in the v1.7 milestone — v1.7 milestone OPENED (2/9 cyc
 **Out-of-scope (deferred to v2.0 + ADR-090):** A lead-time slider (NOT in v0.1 form; deferred to v2.0 per the file's own structure); a 3-leaf `RadioListTile` recurrence group (v0.1 supports only 2 leaves; a 3rd `monthly` / `weekly` / `daily` leaf is v0.2+ per the `EventRecurrence` enum); a recurring-end-date picker (NOT in v0.1; the `annually` leaf is open-ended per the v0.1 form contract); a wider type cast in `_applyPayload` (a future refactor that removes the typed guards is a BREAKING change and would need a separate stabilization cycle).
 
 Cycle is the **THIRD** in the v1.7 milestone — v1.7 milestone OPENED (3/9 cycles shipped).
+
+## v1.7-δ — Spanish ARB verbatim-pin coverage closure (Phase 72 / SYS-160 / ADR-091 / WF-088)
+
+**Scope:** EXTEND `test/l10n/locale_render_test.dart` (+20 tests, 9 baseline → 29 total). **No production-code change.** Tests-only cycle.
+
+**5 batches grouped by UI surface** (not by ARB key alphabetical order, so a translator reviewing one surface can find all related pins in one place):
+
+- **Batch 1 — Sparkline a11y + tooltip copy (4 tests):** pin the v1.4i 14-day sparkline TalkBack label + 3 long-press tooltips — `homeTileSparklineSemantics` ('Últimos 14 días') + `homeTileSparklineRestDayTooltip` ('Día de descanso') + `homeTileSparklineDoneTooltip` ('Hecho') + `homeTileSparklineMissedTooltip` ('Perdido').
+- **Batch 2 — Sparkline legend captions (3 tests):** pin the 3 v1.4i inline-legend dot-color captions — `homeTileSparklineLegendDone` + `homeTileSparklineLegendRestDay` + `homeTileSparklineLegendMissed`.
+- **Batch 3 — Widget action copy (2 tests):** pin the v1.4f home-screen widget "Skip today" / "Undo today" actions — `widgetSkipToday` ('Saltar hoy') + `widgetUndoToday` ('Deshacer hoy').
+- **Batch 4 — Home add sheet copy (3 tests):** pin the v1.3c bottom-sheet entry points — `homeAddSheetNewDo` ('Nueva tarea') + `homeAddSheetNewPerson` ('Nueva persona') + `homeAddSheetFromTemplate` ('Desde plantilla').
+- **Batch 5 — Settings theme + anchor + permission status (8 tests):** pin the v0.1 settings-screen surface — `settingsThemeDark` ('Oscuro') + `settingsThemeLight` ('Claro') + `settingsThemeSystem` ('Sistema') + `settingsAnchorFirstUnlock` ('Primer desbloqueo del día') + `settingsAnchorEither' ('Cualquiera, con confirmación') + `permissionStatusGranted` ('Concedido') + `permissionStatusNotAsked` ('Aún no se ha pedido — toca para pedir') + `permissionStatusDenied` ('No concedido — toca para pedir de nuevo').
+
+**Test count: 1812 → 1832 (+20 net — exactly matches the v1.7 pre-auth plan target).** Cumulative v1.7 progress: 1773 → 1832 (+59 net across α + β + γ + δ). **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** Full suite shows 1832/1832 pass.
+
+**Drift lessons per ADR-091:** (a) **The 129 Spanish getters split into 2 shapes — single-line `=> 'literal'` (98 entries) and multi-line `=>\n  'literal';` (31 entries with embedded plural / placeholder / em-dash).** Verbatim pins work cleanly only for the single-line shape; (b) **Parity invariant: `app_en.arb` and `app_es.arb` have the same 129 keys** — the gen-l10n contract enforces parity at build time; (c) **Spanish em-dash (`—` = U+2014) and opening-question-mark (`¿` = U+00BF) are 2-byte UTF-8 characters** — the pins use the exact 2-byte UTF-8 sequences from the `.arb`; (d) **BUG-006 (deferred to v2.0 per W-13 §8) is the canonical example of "Spanish translation drift"** — v1.7-δ pins the CURRENT (unverified) strings verbatim, so the translator's pass surfaces as `failed: expected X, got Y`; (e) **5-batch grouping is by UI surface, not by ARB key alphabetical order** — a readability affordance for the human translator, not a structural property.
+
+**Out-of-scope (deferred to B2 / v2.0 + ADR-091):** The 31 multi-line `String get` entries (plural / placeholder / em-dash) — already tested via `isNotEmpty` + placeholder-interpolation tests at `app_localizations_test.dart`; the `app_en.arb` verbatim pins (the en copy is the source of truth); the unsupported-locale fallback (`Locale('fr')`) — already tested at `app_localizations_test.dart:162-181`; the v1.3e + v1.4i + v1.4-stab-H new-key check — already covered at `app_localizations_test.dart:313-330`.
+
+Cycle is the **FOURTH** in the v1.7 milestone — v1.7 milestone OPENED (4/9 cycles shipped).

@@ -4188,6 +4188,26 @@ SYS-157; ADR-088; v1.7-α row in `implementation_status.md`; `### v1.7-α` subse
 - APK SHA1 stays at H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` (no production-code change).
 - **v1.7 milestone: 3/9 cycles shipped (α + β + γ); tests 1773 → 1812 (+39 net across α + β + γ; +12 exactly on target for γ); `add_habit.dart` 76% → ~85% + `person_repository.dart` raw-column layer pinned + `add_event.dart` ~78% → ~88% form-level sub-branches pinned; 0 Kotlin changes; 0 `<uses-permission>` changes; 0 Drift migrations; 0 release APK rebuilds.**
 
+### v1.7-δ — Spanish ARB verbatim-pin coverage closure (Phase 70 / SYS-160 / ADR-091 / WF-088)
+
+**Scope:** EXTEND `test/l10n/locale_render_test.dart` (+20 tests, 9 baseline → 29 total). **No production-code change.** Tests-only cycle.
+
+**5 batches grouped by UI surface** (not by ARB key alphabetical order, so a translator reviewing one surface can find all related pins in one place):
+
+- **Batch 1 — Sparkline a11y + tooltip copy (4 tests):** pin the v1.4i 14-day sparkline TalkBack label + 3 long-press tooltips — `homeTileSparklineSemantics` + `homeTileSparklineRestDayTooltip` + `homeTileSparklineDoneTooltip` + `homeTileSparklineMissedTooltip`.
+- **Batch 2 — Sparkline legend captions (3 tests):** pin the 3 v1.4i inline-legend dot-color captions — `homeTileSparklineLegendDone` + `homeTileSparklineLegendRestDay` + `homeTileSparklineLegendMissed`.
+- **Batch 3 — Widget action copy (2 tests):** pin the v1.4f home-screen widget "Skip today" / "Undo today" actions — `widgetSkipToday` + `widgetUndoToday`.
+- **Batch 4 — Home add sheet copy (3 tests):** pin the v1.3c bottom-sheet entry points — `homeAddSheetNewDo` + `homeAddSheetNewPerson` + `homeAddSheetFromTemplate`.
+- **Batch 5 — Settings theme + anchor + permission status (8 tests):** pin the v0.1 settings-screen surface that was translated early and is the most user-facing — `settingsThemeDark` + `settingsThemeLight` + `settingsThemeSystem` + `settingsAnchorFirstUnlock` + `settingsAnchorEither` + `permissionStatusGranted` + `permissionStatusNotAsked` + `permissionStatusDenied`.
+
+**Drift lessons per ADR-091:** (a) **The 129 Spanish getters split into 2 shapes — single-line `=> 'literal'` (98 entries) and multi-line `=>\n  'literal';` (31 entries with embedded plural / placeholder / em-dash).** Verbatim pins work cleanly only for the single-line shape; (b) **Parity invariant: `app_en.arb` and `app_es.arb` have the same 129 keys** — the gen-l10n contract enforces parity at build time; (c) **Spanish em-dash (`—` = U+2014) and opening-question-mark (`¿` = U+00BF) are 2-byte UTF-8 characters** — the pins use the exact 2-byte UTF-8 sequences from the `.arb`; (d) **BUG-006 (deferred to v2.0 per W-13 §8) is the canonical example of "Spanish translation drift"** — v1.7-δ pins the CURRENT (unverified) strings verbatim, so the translator's pass surfaces as `failed: expected X, got Y`; (e) **5-batch grouping is by UI surface, not by ARB key alphabetical order** — a readability affordance for the human translator, not a structural property.
+
+**Out-of-scope (deferred to B2 / v2.0 + ADR-091):** The 31 multi-line `String get` entries (plural / placeholder / em-dash) — already tested via `isNotEmpty` + placeholder-interpolation tests at `app_localizations_test.dart`; the `app_en.arb` verbatim pins (the en copy is the source of truth); the unsupported-locale fallback (`Locale('fr')`) — already tested at `app_localizations_test.dart:162-181`; the v1.3e + v1.4i + v1.4-stab-H new-key check — already covered at `app_localizations_test.dart:313-330`.
+
+**Cross-references:** SYS-160; ADR-091; v1.7-δ row in `implementation_status.md`; `### v1.7-δ` subsection in `plan.md`; `## v1.7-δ` entry in `CHANGELOG.md`; feature.md cycle entry; the v1.7 locked roadmap at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`; BUG-006 (deferred to v2.0 per W-13 §8 — v1.7-δ pins the current strings as the regression guard for B2 native-Spanish translator review); ADR-090 (v1.7-γ drift lessons — paired; v1.7-δ does NOT need the "verify form scope via grep" pattern because the ARB surface is the catalog itself); ADR-089 (v1.7-β drift lessons); ADR-088 (v1.7-α drift lessons).
+
+- **v1.7 milestone: 4/9 cycles shipped (α + β + γ + δ); tests 1773 → 1832 (+59 net across α + β + γ + δ; +12 exact for γ, +20 exact for δ); `add_habit.dart` 76% → ~85% + `person_repository.dart` raw-column layer pinned + `add_event.dart` ~78% → ~88% + Spanish ARB catalog 20 verbatim pins; 0 Kotlin changes; 0 `<uses-permission>` changes; 0 Drift migrations; 0 release APK rebuilds.**
+
 ### v1.7-γ — add_event.dart form-level sub-branch coverage closure (RE-SCOPED 2026-07-05) / WF-087
 
 **Scope:** EXTEND `test/screens/add_event_test.dart` (+12 tests, 28 baseline → 40 total). **No production-code change.** Tests-only cycle.
