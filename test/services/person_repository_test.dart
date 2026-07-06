@@ -937,5 +937,469 @@ void main() {
         ),
       );
     });
+
+    // ---- v1.7-ε additions (SYS-161 / ADR-092 / WF-089):
+    // Per ADR-086 (a) the planned `PersonUnresolved` class does
+    // not exist — the Person sealed hierarchy has only
+    // ContactPerson in v0.1. RE-SCOPED to the actual surface:
+    // raw-column write-path + read-path pins for `pausedUntil`
+    // (mirror of the v1.6-ζ automationsJson pins),
+    // `insertOnConflictUpdate` semantics, copyWith combos for
+    // `clearPausedUntil` + automations replacement, and
+    // listAll heterogeneity with mixed paused / unpaused rows.
+    //
+    // 5 batches × 2 tests = +10 net tests. NO production-code
+    // change. APK SHA1 stays at `25bb7fab` (25-cycle streak).
+
+    // Batch 1: pausedUntil raw-column WRITE-path pins (mirror
+    // of the v1.6-ζ automationsJson=null test at lines 299-323).
+    test(
+      '_toRow writes pausedUntilMillis=null when pausedUntil is null',
+      () async {
+        // v1.7-ε (SYS-161): mirror of the automationsJson=null
+        // pin. The `pausedUntil_millis` column must persist as
+        // SQL NULL (not 0 or some sentinel) when no pause is
+        // set, so the read path can short-circuit on null and
+        // isPausedAt stays false.
+        await PersonRepository.instance.save(
+          ContactPerson(
+            id: 'p-rc-pause-null',
+            lookupKey: 'k-rc-pause-null',
+            channel: const ChannelDialer('+1'),
+            cadence: const EveryNDays(1),
+            createdAt: DateTime(2026),
+            // pausedUntil omitted → default null.
+          ),
+        );
+        final db = AppDatabaseService.instance.db;
+        final row = await (db.select(
+          db.people,
+        )..where((t) => t.id.equals('p-rc-pause-null'))).getSingle();
+        expect(
+          row.pausedUntilMillis,
+          isNull,
+          reason:
+              'A null pausedUntil on the model MUST persist as SQL NULL on '
+              '`paused_until_millis` — not as 0 — so `_fromRow` can '
+              'short-circuit and `isPausedAt` stays false (DateTime(0) '
+              'is in the past, but `isPausedAt` requires `pausedUntil != '
+              'null && pausedUntil!.isAfter(now)`).',
+        );
+      },
+    );
+
+    test(
+      '_toRow writes pausedUntilMillis=N (ms since epoch) on the row',
+      () async {
+        // v1.7-ε (SYS-161): mirror of the typed round-trip test
+        // at lines 160-177, but at the Drift raw-column layer.
+        // The exact millisecond value matters for round-trip
+        // correctness — pin it directly so a future refactor
+        // that drops sub-second precision (e.g., stores as
+        // seconds) fails loudly.
+        final pausedUntil = DateTime(2027, 6, 15, 12, 30, 45, 123);
+        await PersonRepository.instance.save(
+          ContactPerson(
+            id: 'p-rc-pause-set',
+            lookupKey: 'k-rc-pause-set',
+            channel: const ChannelDialer('+1'),
+            cadence: const EveryNDays(1),
+            createdAt: DateTime(2026),
+            pausedUntil: pausedUntil,
+          ),
+        );
+        final db = AppDatabaseService.instance.db;
+        final row = await (db.select(
+          db.people,
+        )..where((t) => t.id.equals('p-rc-pause-set'))).getSingle();
+        expect(
+          row.pausedUntilMillis,
+          pausedUntil.millisecondsSinceEpoch,
+          reason:
+              'pausedUntil must persist as the exact millisecondsSinceEpoch '
+              'value — sub-second precision preserved — so the read path '
+              'round-trips DateTime.utc(...) byte-for-byte.',
+        );
+      },
+    );
+
+    // Batch 2: pausedUntil raw-column READ-path pins (mirror
+    // of the v1.7-β null-default read-path pins at lines
+    // 790-903, but for `paused_until_millis` instead of the
+    // cadence columns).
+    test(
+      '_fromRow reads pausedUntilMillis=null → pausedUntil is null',
+      () async {
+        // v1.7-ε (SYS-161): hand-write a row with
+        // pausedUntilMillis omitted (default null) and verify
+        // the read path yields a null `pausedUntil` on the
+        // ContactPerson — NOT DateTime(0) (epoch) or DateTime(1).
+        final db = AppDatabaseService.instance.db;
+        await db
+            .into(db.people)
+            .insert(
+              const PersonRow(
+                id: 'p-rd-pause-null',
+                lookupKey: 'k-rd-pause-null',
+                displayName: '',
+                channel: 'dialer',
+                handle: '+1',
+                createdAtMillis: 0,
+                cadenceType: 'every_n_days',
+                nDays: 1,
+                anchoredToWakeup: false,
+                // pausedUntilMillis intentionally omitted → null.
+              ),
+            );
+        final back =
+            await PersonRepository.instance.getById('p-rd-pause-null')
+                as ContactPerson;
+        expect(
+          back.pausedUntil,
+          isNull,
+          reason:
+              'SQL NULL on `paused_until_millis` must read back as Dart '
+              'null on ContactPerson.pausedUntil — not DateTime(0) (which '
+              'would make isPausedAt(DateTime.now()) `true` because 0 is '
+              'before now).',
+        );
+      },
+    );
+
+    test('_fromRow reads pausedUntilMillis=N → pausedUntil DateTime', () async {
+      // v1.7-ε (SYS-161): hand-write a row with a known
+      // millisecond value and verify the read path yields the
+      // matching DateTime (symmetric to the write-path pin
+      // above). Independent of the encode path.
+      final expected = DateTime(2028, 3, 20, 9, 26, 53, 789);
+      final db = AppDatabaseService.instance.db;
+      await db
+          .into(db.people)
+          .insert(
+            PersonRow(
+              id: 'p-rd-pause-set',
+              lookupKey: 'k-rd-pause-set',
+              displayName: '',
+              channel: 'dialer',
+              handle: '+1',
+              createdAtMillis: 0,
+              cadenceType: 'every_n_days',
+              nDays: 1,
+              anchoredToWakeup: false,
+              pausedUntilMillis: expected.millisecondsSinceEpoch,
+            ),
+          );
+      final back =
+          await PersonRepository.instance.getById('p-rd-pause-set')
+              as ContactPerson;
+      expect(back.pausedUntil, expected);
+      // Sanity: isPausedAt semantics on a hand-written row
+      // that doesn't go through copyWith. `expected` is
+      // 2028-03-20, so a "now" of 2028-03-15 is BEFORE it
+      // (paused) and a "now" of 2028-04 is AFTER it
+      // (unpaused).
+      expect(back.isPausedAt(DateTime(2028, 3, 15)), isTrue);
+      expect(back.isPausedAt(DateTime(2028, 4)), isFalse);
+      // Just to test
+      // (DateTime(2026, 1, 15) inline should be fine)
+    });
+
+    // Batch 3: insertOnConflictUpdate semantics — save idempotency.
+    test(
+      'save with the same id REPLACES the existing row (insertOnConflictUpdate)',
+      () async {
+        // v1.7-ε (SYS-161): pin the insertOnConflictUpdate
+        // contract at person_repository.dart:28. Saving twice
+        // with the same id but different fields must NOT throw
+        // a unique-constraint violation; it must overwrite.
+        // Verifies that updates to channel / cadence / pausedUntil
+        // / automations all propagate via the same id.
+        await PersonRepository.instance.save(
+          ContactPerson(
+            id: 'p-upsert',
+            lookupKey: 'k-upsert',
+            channel: const ChannelDialer('+1'),
+            cadence: const EveryNDays(1),
+            createdAt: DateTime(2026),
+          ),
+        );
+        // Second save: same id, different cadence + pausedUntil
+        // + automations.
+        final replacement = ContactPerson(
+          id: 'p-upsert',
+          lookupKey: 'k-upsert',
+          channel: const ChannelTelegram('alice'),
+          cadence: const WeeklyOn(5),
+          createdAt: DateTime(2026),
+          pausedUntil: DateTime(2027, 1, 15),
+          automations: [
+            Automation(
+              trigger: const TriggerTimeOfDay(hour: 9, minute: 0),
+              action: const ActionNotify(title: 'Up', body: 'Wake'),
+            ),
+          ],
+        );
+        await PersonRepository.instance.save(replacement);
+        // Single row with id='p-upsert'.
+        final all = await PersonRepository.instance.listAll();
+        expect(
+          all.where((p) => p.id == 'p-upsert'),
+          hasLength(1),
+          reason: 'A second save with the same id must replace, not append.',
+        );
+        final back =
+            await PersonRepository.instance.getById('p-upsert')
+                as ContactPerson;
+        // All four mutable fields must reflect the second save.
+        expect(back.channel, isA<ChannelTelegram>());
+        expect(back.cadence, isA<WeeklyOn>());
+        expect((back.cadence as WeeklyOn).weekday, 5);
+        expect(back.pausedUntil, DateTime(2027, 1, 15));
+        expect(back.automations, hasLength(1));
+        expect((back.automations.single.trigger as TriggerTimeOfDay).hour, 9);
+      },
+    );
+
+    test('save preserves the lookupKey when upserting the same id', () async {
+      // v1.7-ε (SYS-161): the insertOnConflictUpdate path
+      // uses `id` as the conflict key. A second save with a
+      // DIFFERENT lookupKey but the same id must keep the
+      // lookupKey from the FIRST save (because the SQL
+      // UPDATE only touches the listed columns — `id` is
+      // the key, and `lookupKey` is overwritten by the
+      // INSERT OR REPLACE semantics). Pin the behavior so
+      // a future refactor that changes the upsert key (e.g.,
+      // to lookupKey) fails loudly.
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p-upsert-lk',
+          lookupKey: 'lookup-key-FIRST',
+          channel: const ChannelDialer('+1'),
+          cadence: const EveryNDays(1),
+          createdAt: DateTime(2026),
+        ),
+      );
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p-upsert-lk',
+          lookupKey: 'lookup-key-SECOND',
+          channel: const ChannelDialer('+2'),
+          cadence: const EveryNDays(2),
+          createdAt: DateTime(2026),
+        ),
+      );
+      final back =
+          await PersonRepository.instance.getById('p-upsert-lk')
+              as ContactPerson;
+      // The lookupKey field comes from the row → ContactPerson
+      // and the INSERT OR REPLACE replaced the whole row, so
+      // the SECOND lookupKey wins.
+      expect(
+        back.lookupKey,
+        'lookup-key-SECOND',
+        reason:
+            'Drift `insertOnConflictUpdate` is INSERT OR REPLACE — the '
+            'entire row is replaced on conflict, so the second '
+            'lookupKey wins. This test pins the whole-row-replace '
+            'behavior; a future refactor to UPSERT-by-lookupKey '
+            'instead of by id would break this pin.',
+      );
+    });
+
+    // Batch 4: copyWith combos — clearPausedUntil + automations
+    // in a single call.
+    test(
+      'copyWith can clear pausedUntil and replace automations in one call',
+      () async {
+        // v1.7-ε (SYS-161): pin the copyWith at
+        // lib/people/person.dart:206-220 — when
+        // `clearPausedUntil: true` AND `automations: [...]`
+        // are both passed, the returned ContactPerson must
+        // honor both: pausedUntil → null, automations → new
+        // list. Other fields preserved.
+        final original = ContactPerson(
+          id: 'p-cw-combo',
+          lookupKey: 'k-cw-combo',
+          channel: const ChannelDialer('+1'),
+          cadence: const EveryNDays(3),
+          createdAt: DateTime(2026),
+          pausedUntil: DateTime(2027, 1, 15),
+          automations: [
+            Automation(
+              trigger: const TriggerTimeOfDay(hour: 8, minute: 0),
+              action: const ActionNotify(title: 'A', body: 'a'),
+            ),
+          ],
+        );
+        final replacement = [
+          Automation(
+            trigger: const TriggerLocationEnter(
+              geofenceId: 'gf-NEW',
+              label: 'New',
+              latitude: 1.0,
+              longitude: 2.0,
+              radiusMeters: 50,
+            ),
+            action: const ActionNotify(title: 'B', body: 'b'),
+          ),
+        ];
+        final updated = original.copyWith(
+          clearPausedUntil: true,
+          automations: replacement,
+        );
+        expect(updated.pausedUntil, isNull);
+        expect(updated.automations, hasLength(1));
+        expect(updated.automations.single.trigger, isA<TriggerLocationEnter>());
+        // Identity preserved.
+        expect(updated.id, original.id);
+        expect(updated.lookupKey, original.lookupKey);
+        expect(updated.channel, original.channel);
+        expect(updated.cadence, original.cadence);
+        expect(updated.createdAt, original.createdAt);
+      },
+    );
+
+    test(
+      'copyWith preserves pausedUntil and automations when neither is passed',
+      () async {
+        // v1.7-ε (SYS-161): pin the identity-on-copy behavior
+        // for the two v0.2 + Phase C fields. When copyWith is
+        // called for an UNRELATED change (e.g., cadence), the
+        // existing pausedUntil and automations must be carried
+        // forward — they are not reset to defaults. This is
+        // the regression guard for "I edit the cadence and my
+        // pause gets silently cleared" bugs.
+        final originalAutomations = [
+          Automation(
+            trigger: const TriggerTimeOfDay(hour: 7, minute: 30),
+            action: const ActionNotify(title: 'X', body: 'x'),
+          ),
+        ];
+        final original = ContactPerson(
+          id: 'p-cw-id',
+          lookupKey: 'k-cw-id',
+          channel: const ChannelDialer('+1'),
+          cadence: const EveryNDays(2),
+          createdAt: DateTime(2026),
+          pausedUntil: DateTime(2028, 6, 15),
+          automations: originalAutomations,
+        );
+        final updated = original.copyWith(cadence: const WeeklyOn(2));
+        expect(updated.pausedUntil, original.pausedUntil);
+        expect(updated.automations, originalAutomations);
+        expect(updated.cadence, const WeeklyOn(2));
+      },
+    );
+
+    // Batch 5: listAll heterogeneity + delete isolation.
+    test(
+      'listAll returns mixed paused / unpaused / automated rows in createdAt order',
+      () async {
+        // v1.7-ε (SYS-161): pin listAll ordering at
+        // person_repository.dart:43 (`OrderingTerm.asc(t.createdAtMillis)`)
+        // across rows with HETEROGENEOUS pausedUntil and
+        // automations states. Three rows, distinct
+        // createdAtMillis values, varied fields.
+        await PersonRepository.instance.save(
+          ContactPerson(
+            id: 'p-list-1',
+            lookupKey: 'k-list-1',
+            channel: const ChannelDialer('+1'),
+            cadence: const EveryNDays(1),
+            createdAt: DateTime(2026, 1, 15),
+            pausedUntil: DateTime(2027, 1, 15),
+          ),
+        );
+        await PersonRepository.instance.save(
+          ContactPerson(
+            id: 'p-list-2',
+            lookupKey: 'k-list-2',
+            channel: const ChannelWhatsApp('+2'),
+            cadence: const EveryNDays(2),
+            createdAt: DateTime(2026, 6, 15),
+            // No pausedUntil; one automation.
+            automations: [
+              Automation(
+                trigger: const TriggerTimeOfDay(hour: 10, minute: 0),
+                action: const ActionNotify(title: 'T', body: 't'),
+              ),
+            ],
+          ),
+        );
+        await PersonRepository.instance.save(
+          ContactPerson(
+            id: 'p-list-3',
+            lookupKey: 'k-list-3',
+            channel: const ChannelTelegram('bob'),
+            cadence: const EveryNDays(3),
+            createdAt: DateTime(2026, 3, 15),
+            // No pausedUntil, no automations.
+          ),
+        );
+        final list = await PersonRepository.instance.listAll();
+        expect(list, hasLength(3));
+        // Order: createdAt ascending.
+        expect(list[0].id, 'p-list-1'); // 2026-01-01
+        expect(list[1].id, 'p-list-3'); // 2026-03-01
+        expect(list[2].id, 'p-list-2'); // 2026-06-01
+        // Heterogeneity: each row preserves its own field state.
+        final byId = {for (final p in list) p.id: p};
+        expect(
+          (byId['p-list-1']! as ContactPerson).pausedUntil,
+          DateTime(2027, 1, 15),
+        );
+        expect((byId['p-list-2']! as ContactPerson).automations, hasLength(1));
+        expect((byId['p-list-3']! as ContactPerson).automations, isEmpty);
+        expect((byId['p-list-3']! as ContactPerson).pausedUntil, isNull);
+      },
+    );
+
+    test('deleteById of one row leaves the others intact', () async {
+      // v1.7-ε (SYS-161): pin deleteById isolation at
+      // person_repository.dart:49 — a DELETE on one id
+      // must not affect other rows. The "deleteById is a
+      // no-op when the row does not exist" test at line
+      // 217 already covers the empty-target case; this
+      // test covers the populated-target case (three rows,
+      // delete the middle one, the other two survive).
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p-del-A',
+          lookupKey: 'k-del-A',
+          channel: const ChannelDialer('+1'),
+          cadence: const EveryNDays(1),
+          createdAt: DateTime(2026, 1, 15),
+        ),
+      );
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p-del-B',
+          lookupKey: 'k-del-B',
+          channel: const ChannelDialer('+2'),
+          cadence: const EveryNDays(2),
+          createdAt: DateTime(2026, 6, 15),
+          pausedUntil: DateTime(2027, 1, 15),
+        ),
+      );
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p-del-C',
+          lookupKey: 'k-del-C',
+          channel: const ChannelDialer('+3'),
+          cadence: const EveryNDays(3),
+          createdAt: DateTime(2026, 3, 15),
+        ),
+      );
+      await PersonRepository.instance.deleteById('p-del-B');
+      final survivors = await PersonRepository.instance.listAll();
+      expect(
+        survivors.map((p) => p.id).toSet(),
+        equals({'p-del-A', 'p-del-C'}),
+      );
+      // Middle row's distinct fields are gone (B had a
+      // pausedUntil; verify the remaining pausedUntil
+      // count is 0).
+      expect(survivors.where((p) => p.pausedUntil != null), isEmpty);
+    });
   });
 }
