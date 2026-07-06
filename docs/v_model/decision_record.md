@@ -8280,3 +8280,53 @@ that the v1.1h + v1.3e scaffolding shipped unverified).
 - v1.7-δ PR #82 commit (will be created at end of cycle)
 - BUG-006 (deferred to v2.0 per W-13 §8) is exactly the surface v1.7-δ pins
 - B2 in the 3-month launch plan (native-Spanish translator review) will use these pins as the regression guard
+
+---
+
+## ADR-092 — v1.7-ε drift lessons (person_repository pausedUntil raw-column + save idempotency coverage)
+
+**Date:** 2026-07-06.
+**Status:** Accepted.
+**Cycle:** v1.7-ε / Phase 70 / SYS-161 / ADR-092 / WF-089.
+
+**Context.** v1.7-ε was originally scoped (per the v1.7 pre-auth plan at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`) as +10 tests for `person_repository.dart` covering `automationsJson` + `PersonUnresolved` + `pausedUntil`. The cycle ran on 2026-07-06. Per the **ADR-086 (a) verify-wiring-exists rule** ("grep for the widget/class surface before assuming it exists in v0.1"), the cycle RE-SCOPED 2026-07-06 because `PersonUnresolved` does NOT exist in v0.1 — the `Person` sealed hierarchy at `lib/people/person.dart:132` only contains `ContactPerson`. The cycle ships at the actual surface (raw-column `pausedUntil_millis` pins + `insertOnConflictUpdate` + `copyWith` + `listAll`).
+
+**Decision.** v1.7-ε EXTENDS `test/services/person_repository_test.dart` with **+10 tests** in 5 batches (2 + 2 + 2 + 2 + 2) under a `// ---- v1.7-ε / SYS-161 / ADR-092 / WF-089 ----` banner. Each batch pins a different surface of the repository:
+
+- **Batch 1 (2 tests) — `pausedUntil_millis` raw-column WRITE-path pins:** `_toRow writes pausedUntilMillis=null when pausedUntil is null` (mirror of v1.6-ζ `_toRow writes automationsJson=null when automations is empty` at lines 299-323 — a null `pausedUntil` MUST persist as SQL NULL, not as 0; `isPausedAt` requires `pausedUntil != null` so a SQL 0 would silently flip the contract) + `_toRow writes pausedUntilMillis=N (ms since epoch) on the row` (mirror of the typed round-trip at lines 160-177 but at the Drift layer; pins sub-second precision via `DateTime(2027, 6, 15, 12, 30, 45, 123)` — a future refactor that drops sub-second precision fails loudly).
+- **Batch 2 (2 tests) — `pausedUntil_millis` raw-column READ-path pins:** `_fromRow reads pausedUntilMillis=null → pausedUntil is null` (hand-write a row with `pausedUntilMillis` omitted; verify the read path yields Dart null, NOT DateTime(0) which would make `isPausedAt(DateTime.now())` true because 0 is before now) + `_fromRow reads pausedUntilMillis=N → pausedUntil DateTime` (hand-write a row with a known millisecond value; verify the matching DateTime round-trips independently of the encode path).
+- **Batch 3 (2 tests) — `insertOnConflictUpdate` semantics:** `save with the same id REPLACES the existing row` (pin the contract at `person_repository.dart:28` — second save with same id but different fields must NOT throw unique-constraint; it must overwrite; verifies channel/cadence/pausedUntil/automations all propagate via the same id) + `save preserves the lookupKey when upserting the same id` (pin the Drift `insertOnConflictUpdate` is INSERT OR REPLACE behavior — the SECOND lookupKey wins; defense-in-depth for a future refactor that switches the upsert key to lookupKey).
+- **Batch 4 (2 tests) — `copyWith` combos:** `copyWith can clear pausedUntil and replace automations in one call` (pin `lib/people/person.dart:206-220` — when `clearPausedUntil: true` AND `automations: [...]` are both passed, both fields change; other fields preserved) + `copyWith preserves pausedUntil and automations when neither is passed` (regression guard for "I edit the cadence and my pause/automations get silently cleared" bugs; identity-on-copy for the two v0.2 + Phase C fields).
+- **Batch 5 (2 tests) — `listAll` heterogeneity + delete isolation:** `listAll returns mixed paused/unpaused/automated rows in createdAt order` (pin the `OrderingTerm.asc(t.createdAtMillis)` ordering at `person_repository.dart:43` across 3 rows with heterogeneous pausedUntil + automations states) + `deleteById of one row leaves the others intact` (pin deleteById isolation at `:49` — DELETE on one id must not affect other rows; the existing "deleteById is a no-op when the row does not exist" at line 217 covers the empty case; v1.7-ε covers the populated case).
+
+**5 drift lessons** (the canonical 5-lesson pattern per ADR-087 §b):
+
+**(a) `PersonUnresolved` does NOT exist in v0.1.** The `Person` sealed hierarchy at `lib/people/person.dart:132` only has `ContactPerson`. The original v1.7-ε plan listed `PersonUnresolved` as the test surface; the cycle RE-SCOPED to the actual surface (raw-column `pausedUntil_millis` pins + `insertOnConflictUpdate` + copyWith + listAll). The verification was a `grep -n "class Person" lib/people/person.dart` call — that returned `ContactPerson` + `_PersonBase`, with no `PersonUnresolved`. This is the third concrete application of the ADR-086 (a) rule (after v1.6-γ and v1.6-κ); the rule is now an established discipline.
+
+**(b) `pausedUntil_millis` raw-column pins are the missing complement to the v1.6-ζ automationsJson raw-column pins.** Both fields follow the same "null at the Dart layer → NULL at the SQL layer" contract; v1.7-ε ships the mirror pin set for `pausedUntil`. The v1.6-ζ pins at `person_repository_test.dart:299-323` cover `automationsJson` round-trip + `null` write; the v1.7-ε pins extend the same contract surface to `pausedUntil_millis`. Both fields are forward-compat for v0.2 + Phase C; both are written by `_toRow` and read by `_fromRow`. A future refactor that adds a third raw-column (e.g., `vCardJson` for the v2.0 contact-resolver expansion) will reuse this same pin pattern.
+
+**(c) `insertOnConflictUpdate` is INSERT OR REPLACE in Drift, not UPSERT.** The second lookupKey wins because the entire row is replaced. v1.7-ε Batch 3 pin #2 is the regression guard for a future refactor to UPSERT-by-lookupKey (which would change semantics: the FIRST lookupKey would win, the second would be discarded). The pin documents the current behavior explicitly so a future refactor that wants UPSERT-by-lookupKey must update the test (and ADR-092 §a becomes the reason to file a new ADR).
+
+**(d) `copyWith` field-preservation is not asserted by the Dart `super` chain.** `lib/people/person.dart:206-220`'s `copyWith` passes `id`, `lookupKey`, `channel`, `cadence`, `createdAt` by reading from `this`. The Dart analyzer does NOT flag a future refactor that drops a field from the pass-through. The v1.7-ε Batch 4 tests pin the no-field-reset invariant explicitly: passing neither `pausedUntil` nor `automations` MUST preserve them. This is the same lesson as v1.6-θ §c (StreakSnapshot equality) — model-level immutability contracts that compile-check but do not semantic-check.
+
+**(e) `listAll` ordering relies on `createdAtMillis`, not on insertion order.** A manual `UPDATE` to `created_at_millis` would change the order. v1.7-ε Batch 5 pin #1 uses 3 distinct createdAt values to pin the `OrderingTerm.asc` contract. The test would fail if a future refactor switched to insertion-order (e.g., added an `autoIncrement` id and sorted by id) — but the test would NOT fail if a future refactor switched to descending order. The descending-order guard is intentionally NOT included; v0.1 ships ascending per the UI's "oldest first" display convention in `person_groups.dart`.
+
+**Consequences.**
+
+- 5 batches, 10 tests, +10 net test count: 1832 → **1842** (matches v1.7 pre-auth plan target exactly per ADR-087 §c "healthy over-delivery is fine; matching is best").
+- `lib/services/person_repository.dart` `_toRow` / `_fromRow` raw-column paths for `pausedUntil_millis` paired with v1.6-ζ automationsJson raw-column pins — coverage is now symmetric across both raw-column fields.
+- `insertOnConflictUpdate` semantics + `copyWith` field-preservation + `listAll` ordering across heterogeneous rows + `deleteById` isolation — all pinned at the Drift layer.
+- 3-gate: `dart format --output=none --set-exit-if-changed .` (clean after auto-format of 1 file: `person_repository_test.dart` 80-col line-width normalization on the new test bodies — same auto-fix as v1.7-δ) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1842/1842 pass).
+- Targeted: `flutter test test/services/person_repository_test.dart` (45/45 pass: 35 baseline + 10 new v1.7-ε).
+- No `Co-Authored-By: Claude` in commit; no `key.properties` / `*.jks` / `*.der` / `ANDROID_*` env values / `google-services.json` in commit.
+- No production-code change; no Drift migration; no Kotlin change; no new `<uses-permission>`; no new pubspec dep.
+- APK SHA1 stays at H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` (24+ cycle streak).
+- Related ADRs: ADR-086 (a) verify-wiring-exists rule (third concrete application — `PersonUnresolved` not in v0.1); ADR-087 §c (healthy over-delivery — v1.7-ε delivers +10 exact, matching plan target); ADR-088 + ADR-089 + ADR-090 + ADR-091 (paired v1.7-α/β/γ/δ lessons, all using the "verify surface via grep before writing tests" pattern).
+
+### Cross-references
+
+- v1.7-ε PR #83 commit (will be created at end of cycle)
+- v1.6-ζ (ADR-082) — the automationsJson raw-column pin set; v1.7-ε is the paired pausedUntil_millis pin set
+- v1.7-β (ADR-089) — the cadence + channel raw-column pin set; v1.7-ε is the third column-pair pin set
+- The 5 drift lessons follow the canonical pattern from ADR-087 §b (the 2-bug-fix canonical example: tests-only + 2-bug-fix canonical pattern)
+
