@@ -551,5 +551,391 @@ void main() {
             'mapping must funnel it through correctly.',
       );
     });
+
+    // ---- v1.7-β additions (SYS-158 / ADR-089 / WF-086):
+    // Raw-column write-path + read-path default pins +
+    // column-overload isolation + forward-compat throw pin.
+    //
+    // Per ADR-089 lesson (a): the v0.1 form at
+    // lib/screens/add_person.dart:7-10 only renders EveryNDays +
+    // ChannelDialer, so we cannot exercise the alternate cadences /
+    // channels via UI tests. The raw-column tests below pin the
+    // (tag, handle) and (cadenceType, nDays/weekday/dayOfMonth/
+    // monthOfYear) mappings at the Drift layer where the wiring
+    // DOES exist. NO production-code change.
+
+    test(
+      '_toRow writes channel="dialer" and handle=phoneNumber on the row',
+      () async {
+        // v1.7-β (SYS-158): raw-column pin for ChannelDialer. The
+        // existing typed round-trip test exercises the model layer;
+        // this test pins the raw-column string form so a future
+        // refactor that swaps the discriminator string (e.g.,
+        // 'dialer' → 'phone') fails loudly.
+        await PersonRepository.instance.save(
+          ContactPerson(
+            id: 'p-rc-dialer',
+            lookupKey: 'k-rc-dialer',
+            channel: const ChannelDialer('+15555550100'),
+            cadence: const EveryNDays(1),
+            createdAt: DateTime(2026),
+          ),
+        );
+        final db = AppDatabaseService.instance.db;
+        final row = await (db.select(
+          db.people,
+        )..where((t) => t.id.equals('p-rc-dialer'))).getSingle();
+        expect(row.channel, 'dialer');
+        expect(row.handle, '+15555550100');
+      },
+    );
+
+    test(
+      '_toRow writes channel="whatsapp" and handle=phoneNumber on the row',
+      () async {
+        await PersonRepository.instance.save(
+          ContactPerson(
+            id: 'p-rc-whatsapp',
+            lookupKey: 'k-rc-whatsapp',
+            channel: const ChannelWhatsApp('+15555550101'),
+            cadence: const EveryNDays(1),
+            createdAt: DateTime(2026),
+          ),
+        );
+        final db = AppDatabaseService.instance.db;
+        final row = await (db.select(
+          db.people,
+        )..where((t) => t.id.equals('p-rc-whatsapp'))).getSingle();
+        expect(row.channel, 'whatsapp');
+        expect(row.handle, '+15555550101');
+      },
+    );
+
+    test(
+      '_toRow writes channel="telegram" and handle=username on the row',
+      () async {
+        // ChannelTelegram is the only channel with a non-phone
+        // handle. The v1.6-ζ cycle pinned the typed round-trip;
+        // this test pins the raw-column form separately so the
+        // (tag, handle) mapping at person_repository.dart:94 is
+        // also covered.
+        await PersonRepository.instance.save(
+          ContactPerson(
+            id: 'p-rc-telegram',
+            lookupKey: 'k-rc-telegram',
+            channel: const ChannelTelegram('alice'),
+            cadence: const EveryNDays(1),
+            createdAt: DateTime(2026),
+          ),
+        );
+        final db = AppDatabaseService.instance.db;
+        final row = await (db.select(
+          db.people,
+        )..where((t) => t.id.equals('p-rc-telegram'))).getSingle();
+        expect(row.channel, 'telegram');
+        expect(row.handle, 'alice');
+      },
+    );
+
+    test(
+      '_toRow writes channel="signal" and handle=phoneNumber on the row',
+      () async {
+        await PersonRepository.instance.save(
+          ContactPerson(
+            id: 'p-rc-signal',
+            lookupKey: 'k-rc-signal',
+            channel: const ChannelSignal('+15555550102'),
+            cadence: const EveryNDays(1),
+            createdAt: DateTime(2026),
+          ),
+        );
+        final db = AppDatabaseService.instance.db;
+        final row = await (db.select(
+          db.people,
+        )..where((t) => t.id.equals('p-rc-signal'))).getSingle();
+        expect(row.channel, 'signal');
+        expect(row.handle, '+15555550102');
+      },
+    );
+
+    test(
+      '_toRow writes channel="sms" and handle=phoneNumber on the row',
+      () async {
+        await PersonRepository.instance.save(
+          ContactPerson(
+            id: 'p-rc-sms',
+            lookupKey: 'k-rc-sms',
+            channel: const ChannelSms('+15555550103'),
+            cadence: const EveryNDays(1),
+            createdAt: DateTime(2026),
+          ),
+        );
+        final db = AppDatabaseService.instance.db;
+        final row = await (db.select(
+          db.people,
+        )..where((t) => t.id.equals('p-rc-sms'))).getSingle();
+        expect(row.channel, 'sms');
+        expect(row.handle, '+15555550103');
+      },
+    );
+
+    test(
+      '_toRow writes cadenceType="weekly_on" and weekday=N on the row',
+      () async {
+        await PersonRepository.instance.save(
+          ContactPerson(
+            id: 'p-rc-weekly',
+            lookupKey: 'k-rc-weekly',
+            channel: const ChannelDialer('+1'),
+            cadence: const WeeklyOn(3),
+            createdAt: DateTime(2026),
+          ),
+        );
+        final db = AppDatabaseService.instance.db;
+        final row = await (db.select(
+          db.people,
+        )..where((t) => t.id.equals('p-rc-weekly'))).getSingle();
+        expect(row.cadenceType, 'weekly_on');
+        expect(row.weekday, 3);
+      },
+    );
+
+    test(
+      '_toRow writes cadenceType="monthly_on" and dayOfMonth=N on the row',
+      () async {
+        await PersonRepository.instance.save(
+          ContactPerson(
+            id: 'p-rc-monthly',
+            lookupKey: 'k-rc-monthly',
+            channel: const ChannelDialer('+1'),
+            cadence: const MonthlyOn(15),
+            createdAt: DateTime(2026),
+          ),
+        );
+        final db = AppDatabaseService.instance.db;
+        final row = await (db.select(
+          db.people,
+        )..where((t) => t.id.equals('p-rc-monthly'))).getSingle();
+        expect(row.cadenceType, 'monthly_on');
+        expect(row.dayOfMonth, 15);
+      },
+    );
+
+    test('_toRow writes cadenceType="yearly_on" and both monthOfYear=M '
+        'and dayOfMonth=D on the row', () async {
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p-rc-yearly',
+          lookupKey: 'k-rc-yearly',
+          channel: const ChannelDialer('+1'),
+          cadence: const YearlyOn(7, 4),
+          createdAt: DateTime(2026),
+        ),
+      );
+      final db = AppDatabaseService.instance.db;
+      final row = await (db.select(
+        db.people,
+      )..where((t) => t.id.equals('p-rc-yearly'))).getSingle();
+      expect(row.cadenceType, 'yearly_on');
+      expect(row.monthOfYear, 7);
+      expect(row.dayOfMonth, 4);
+    });
+
+    test('_monthlyDay and _yearlyDay share the dayOfMonth column — '
+        'each subtype reads back its own value', () async {
+      // v1.7-β (SYS-158): pin the column overload at
+      // person_repository.dart:66 where `_monthlyDay(p.cadence) ??
+      // _yearlyDay(p.cadence)` decides which subtype's value lands
+      // in the shared `dayOfMonth` column. Insert two rows with
+      // distinct `dayOfMonth` values (15 for MonthlyOn, 4 for
+      // YearlyOn day) and verify each subtype round-trips with
+      // its OWN value, not the other subtype's.
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p-col-monthly',
+          lookupKey: 'k-col-monthly',
+          channel: const ChannelDialer('+1'),
+          cadence: const MonthlyOn(15),
+          createdAt: DateTime(2026),
+        ),
+      );
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p-col-yearly',
+          lookupKey: 'k-col-yearly',
+          channel: const ChannelDialer('+2'),
+          cadence: const YearlyOn(7, 4),
+          createdAt: DateTime(2026),
+        ),
+      );
+      final monthly =
+          await PersonRepository.instance.getById('p-col-monthly')
+              as ContactPerson;
+      final yearly =
+          await PersonRepository.instance.getById('p-col-yearly')
+              as ContactPerson;
+      expect(monthly.cadence, isA<MonthlyOn>());
+      expect((monthly.cadence as MonthlyOn).dayOfMonth, 15);
+      expect(yearly.cadence, isA<YearlyOn>());
+      final y = yearly.cadence as YearlyOn;
+      expect(y.month, 7);
+      expect(y.day, 4);
+      // Sanity: the two values must NOT have been swapped
+      // (defense against a future refactor that collapses the
+      // overload with a `??` precedence bug).
+      expect(y.day, isNot(15));
+      expect((monthly.cadence as MonthlyOn).dayOfMonth, isNot(4));
+    });
+
+    test('_fromRow defaults nDays=1 when cadenceType="every_n_days" '
+        'but nDays is null', () async {
+      // v1.7-β (SYS-158): pin the `?? 1` fallback at
+      // person_repository.dart:134. Hand-write a row whose
+      // `cadenceType` is `every_n_days` but whose `nDays`
+      // column is null (defense-in-depth for partial writes
+      // from older app versions or hand-imported rows).
+      final db = AppDatabaseService.instance.db;
+      await db
+          .into(db.people)
+          .insert(
+            const PersonRow(
+              id: 'p-null-ndays',
+              lookupKey: 'k-null-ndays',
+              displayName: '',
+              channel: 'dialer',
+              handle: '+1',
+              createdAtMillis: 0,
+              cadenceType: 'every_n_days',
+              // nDays omitted → null → exercises the `?? 1` fallback at
+              // person_repository.dart:134.
+              anchoredToWakeup: false,
+            ),
+          );
+      final back =
+          await PersonRepository.instance.getById('p-null-ndays')
+              as ContactPerson;
+      expect(back.cadence, isA<EveryNDays>());
+      expect((back.cadence as EveryNDays).nDays, 1);
+    });
+
+    test('_fromRow defaults weekday=1 when cadenceType="weekly_on" '
+        'but weekday is null', () async {
+      final db = AppDatabaseService.instance.db;
+      await db
+          .into(db.people)
+          .insert(
+            const PersonRow(
+              id: 'p-null-weekday',
+              lookupKey: 'k-null-weekday',
+              displayName: '',
+              channel: 'dialer',
+              handle: '+1',
+              createdAtMillis: 0,
+              cadenceType: 'weekly_on',
+              // weekday omitted → null → exercises the `?? 1` fallback at
+              // person_repository.dart:136.
+              anchoredToWakeup: false,
+            ),
+          );
+      final back =
+          await PersonRepository.instance.getById('p-null-weekday')
+              as ContactPerson;
+      expect(back.cadence, isA<WeeklyOn>());
+      expect((back.cadence as WeeklyOn).weekday, 1);
+    });
+
+    test('_fromRow defaults dayOfMonth=1 when cadenceType="monthly_on" '
+        'but dayOfMonth is null', () async {
+      final db = AppDatabaseService.instance.db;
+      await db
+          .into(db.people)
+          .insert(
+            const PersonRow(
+              id: 'p-null-monthly',
+              lookupKey: 'k-null-monthly',
+              displayName: '',
+              channel: 'dialer',
+              handle: '+1',
+              createdAtMillis: 0,
+              cadenceType: 'monthly_on',
+              // dayOfMonth omitted → null → exercises the `?? 1`
+              // fallback at person_repository.dart:138.
+              anchoredToWakeup: false,
+            ),
+          );
+      final back =
+          await PersonRepository.instance.getById('p-null-monthly')
+              as ContactPerson;
+      expect(back.cadence, isA<MonthlyOn>());
+      expect((back.cadence as MonthlyOn).dayOfMonth, 1);
+    });
+
+    test('_fromRow defaults monthOfYear=1 and dayOfMonth=1 when '
+        'cadenceType="yearly_on" but both columns are null', () async {
+      // v1.7-β (SYS-158): the yearly case has TWO null-defaults
+      // (monthOfYear and dayOfMonth). Pin both at
+      // person_repository.dart:140 in a single test.
+      final db = AppDatabaseService.instance.db;
+      await db
+          .into(db.people)
+          .insert(
+            const PersonRow(
+              id: 'p-null-yearly',
+              lookupKey: 'k-null-yearly',
+              displayName: '',
+              channel: 'dialer',
+              handle: '+1',
+              createdAtMillis: 0,
+              cadenceType: 'yearly_on',
+              // monthOfYear + dayOfMonth omitted → both null →
+              // exercises the two `?? 1` fallbacks at
+              // person_repository.dart:140.
+              anchoredToWakeup: false,
+            ),
+          );
+      final back =
+          await PersonRepository.instance.getById('p-null-yearly')
+              as ContactPerson;
+      expect(back.cadence, isA<YearlyOn>());
+      final y = back.cadence as YearlyOn;
+      expect(y.month, 1);
+      expect(y.day, 1);
+    });
+
+    test('_parseChannel rejects "email" as an unknown tag with '
+        'ArgumentError', () async {
+      // v1.7-β (SYS-158): the v1.6-ζ 'slack'-tag throw test pinned
+      // the `_` default arm at person_repository.dart:107 for one
+      // specific unknown tag. Pin a SECOND unknown tag here so the
+      // default arm isn't accidentally weakened to a no-op (e.g.,
+      // a future refactor that adds `if (tag == 'email') return
+      // ChannelEmail(...)`).
+      final db = AppDatabaseService.instance.db;
+      await db
+          .into(db.people)
+          .insert(
+            const PersonRow(
+              id: 'p-unknown-email',
+              lookupKey: 'k-unknown-email',
+              displayName: '',
+              channel: 'email', // not in the v0.1 set
+              handle: 'alice@example.com',
+              createdAtMillis: 0,
+              cadenceType: 'every_n_days',
+              nDays: 1,
+              anchoredToWakeup: false,
+            ),
+          );
+      await expectLater(
+        PersonRepository.instance.getById('p-unknown-email'),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message?.toString() ?? '',
+            'message',
+            contains('channel'),
+          ),
+        ),
+      );
+    });
   });
 }

@@ -1364,3 +1364,22 @@ Cycle is the **FIRST** in the v1.7 milestone — v1.7 milestone OPENED.
 **The v1.6 milestone is CLOSED** after this cycle. 13 cycles shipped (v1.5 ε + chain + v1.6 α..λ); 1623 → 1773 tests (+150 net); coverage ~67.4% → ~72.5% (+5.1 pp); 0 Kotlin changes; 0 `<uses-permission>` changes; 0 Drift migrations; 0 release APK rebuilds.
 
 **After this cycle, the user's hands-on step:** `release(v1.6)` debug-signed APK commit (mirrors v1.4.0 sign-off pattern; blocked on user choice of LFS / single-arch / R8 strategy per `feature.md §1.4` since the v1.4 APK exceeded GitHub's 100 MB limit); optional `git tag -a v1.6.0` (user decision per existing pattern); no `flutter build appbundle --release` (blocked on user's release-signing setup).
+
+### v1.7-β — `person_repository.dart` raw-column cadence + channel pins (Phase 71 / SYS-158 / ADR-089 / WF-086)
+
+The **SECOND cycle of the v1.7 milestone** — closes the raw-column write-path + read-path null-default + column-overload isolation + forward-compat throw-pin coverage gap in `lib/services/person_repository.dart` (130 LF uncovered at v1.6-λ). **No production-code change.** Tests-only cycle.
+
+**RE-SCOPED 2026-07-05** — the original plan assumed 4 cadence UI sub-forms existed at `add_person.dart`; the code-explorer pass discovered the v0.1 form does NOT expose them. Per ADR-086 lesson (a): verify wiring exists via `grep` on call sites before assuming widgets exist. Cycle lands at the repository layer where the wiring DOES exist (in `_toRow` / `_fromRow` / `_parseChannel` / `_parseCadence`).
+
+**Scope:** EXTEND `test/services/person_repository_test.dart` (+14 tests, 21 baseline → 35 total). **No `add_person_test.dart` changes for v1.7-β** (the v0.1 form is NOT extended for this cycle).
+
+**4 batches:**
+
+- **Batch 1 — Raw-column write-path pins (8 tests):** for each typed leaf, save → read raw `PersonRow` → pin `channel`/`handle` + `cadenceType`/discriminator-column strings. Covers `lib/services/person_repository.dart:60-61, 63-67, 92-96, 114-116, 122-129`.
+- **Batch 2 — Column-overload isolation (1 test):** hand-write 2 rows with distinct `dayOfMonth` values (15 for MonthlyOn, 4 for YearlyOn day); assert each subtype round-trips with its OWN `dayOfMonth`. Covers the column overload at `:66` + `_parseCadence` at `:131-144`. Defense against a future refactor that collapses the overload with a `??` precedence bug.
+- **Batch 3 — Null-default read-path pins (4 tests):** hand-write 4 rows with the relevant nullable column OMITTED (Drift default null); assert the 4 `?? 1` fallbacks at `:134, 136, 138, 140` decode the default. A future refactor that removes any `?? 1` would throw on these tests.
+- **Batch 4 — Forward-compat throw pin (1 test):** `_parseChannel` rejects `'email'` as an unknown tag with `ArgumentError`. Extends the v1.6-ζ `'slack'`-tag throw test to a second non-`'slack'` arbitrary string; locks in the `_` default arm at `:107`.
+
+**Drift lessons per ADR-089:** (a) The v0.1 form at `add_person.dart:7-10` only renders `EveryNDays` + `ChannelDialer` (the file's own header comment explicitly lists the alternate cadences + channels as v0.2 deferred items); (b) `_toRow` writes raw column strings (the v1.6-ζ multi-channel round-trip test only verifies the typed `PersonChannel` subclass after `getById`, not the raw column string); (c) `_monthlyDay` and `_yearlyDay` share the `dayOfMonth` column at `person_repository.dart:66` (the existing tests do NOT isolate which subtype wins for a given row); (d) The 4 `_fromRow` `?? 1` defaults are defense-in-depth; (e) `_parseChannel`'s `_` default arm is the throw-everything-else defense (the `'slack'` + `'email'` tests form a regression-pair for the forward-compat contract).
+
+**Test count: 1786 → 1800 (+14 net — exactly matches the v1.7 pre-auth plan target).** Coverage: `person_repository.dart` raw-column layer pinned. APK SHA1 stays at H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` (no production-code change). **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** Cycle is the **SECOND** in the v1.7 milestone (2/9 cycles shipped).

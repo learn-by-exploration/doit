@@ -7937,3 +7937,218 @@ v1.7 locked roadmap at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`
 (this ADR-088 is the first drift lessons entry for v1.7); ADR-078 (the
 Drift keepalive deadlock fix that v1.7-α applies); ADR-086 (the
 verify-wiring-exists lesson — applied to v1.7-α's menu→dialog deferral).
+
+## ADR-089 — v1.7-β drift lessons (person_repository raw-column cadence + channel pins)
+
+### Context
+
+The v1.7-β cycle targets `lib/services/person_repository.dart` raw-column
+write-path + read-path null-default + column-overload isolation +
+forward-compat throw-pin coverage. The cycle was RE-SCOPED 2026-07-05
+from `test/screens/add_person_test.dart` UI-layer coverage (which the
+master plan assumed existed for all 4 cadences + 5 channels) to
+`test/services/person_repository_test.dart` repository-layer coverage
+after the code-explorer pass discovered that the v0.1 form at
+`lib/screens/add_person.dart:7-10` only renders `EveryNDays` cadence +
+`ChannelDialer` channel — the alternate cadences/channels are explicit
+v0.2 deferred items per the file's own header comment.
+
+End-state contract: tests 1786 → 1800 (+14 net, exactly matches v1.7
+pre-auth plan target; absorbs the v1.7-α Δ −5 deficit per ADR-087 §c
+healthy over-delivery pattern); APK SHA1 stable at `25bb7fab`; no
+production-code change; no Drift migration; no Kotlin change; no
+`<uses-permission>` change; no new pubspec dep.
+
+### Decisions
+
+#### Decision 1 — Repository-layer scope (not UI-layer)
+
+The original v1.7-β scope assumed `add_person.dart` exposes 4 cadence
+shapes + 5 channel leaves. The code-explorer pass (via
+`code-explorer` subagent, 2026-07-05) verified via `grep` that the
+form's header comment at lines 7-10 explicitly lists the alternate
+cadences + channels as v0.2 deferred items. The cycle re-scoped to
+land at the repository layer where the wiring DOES exist (in `_toRow`
+/ `_fromRow` / `_parseChannel` / `_parseCadence`).
+
+This decision is an application of **ADR-086 lesson (a) — verify
+wiring exists via `grep` on call sites before assuming widgets exist.**
+The v1.6-κ "verify wiring exists before assuming it's missing" lesson
+applies symmetrically: verify widgets exist via `grep` on call sites
+before assuming UI is reachable.
+
+#### Decision 2 — Raw-column write-path pin for all 5 channels + 3 alt cadences
+
+The v1.6-ζ multi-channel round-trip test pins the TYPED
+`PersonChannel` subclass after `getById`, but does NOT pin the raw
+column string written by `_toRow`. v1.7-β Batch 1 adds 8 raw-column
+write-path tests that pin:
+
+- `channel: 'dialer' | 'whatsapp' | 'telegram' | 'signal' | 'sms'`
+- `handle: phoneNumber | username` (per the channel leaf's named field)
+- `cadenceType: 'every_n_days' | 'weekly_on' | 'monthly_on' | 'yearly_on'`
+- `weekday | dayOfMonth | monthOfYear | dayOfMonth` (per the cadence leaf's
+  discriminator-column mapping)
+
+This pins the discriminator mapping at `person_repository.dart:60-67,
+92-96, 114-116, 122-129` so a future refactor that changes the
+mapping (e.g., swaps `'sms'` to `'text_message'`, or drops the
+`dayOfMonth` overload in favor of two separate columns) fails
+loudly on these tests.
+
+#### Decision 3 — Column-overload isolation pin (1 test)
+
+`_monthlyDay` and `_yearlyDay` share the `dayOfMonth` column at
+`person_repository.dart:66` via the `??` operator (MonthlyOn.dayOfMonth
+first, YearlyOn.dayOfMonth second). The existing tests do NOT
+isolate which subtype wins for a given row. v1.7-β Batch 2 hand-writes
+2 rows with distinct `dayOfMonth` values (15 for MonthlyOn, 4 for
+YearlyOn day) and asserts each subtype round-trips with its OWN
+value, NOT swapped. This is defense against a future refactor that
+collapses the overload with a `??` precedence bug.
+
+The test mirrors the existing hand-written-row pattern at
+`person_repository_test.dart:232-268` (the v1.6-ζ unknown-channel-tag
+throw test).
+
+#### Decision 4 — Null-default read-path pin for all 4 `?? 1` fallbacks
+
+`_fromRow` has 4 defense-in-depth fallbacks at lines 134, 136, 138,
+140 — a row missing a discriminator's required column falls back to
+`EveryNDays(1)`, `WeeklyOn(1)`, `MonthlyOn(1)`, `YearlyOn(1, 1)`
+respectively. v1.7-β Batch 3 hand-writes 4 rows with the relevant
+nullable column OMITTED (Drift default null) and asserts the default
+decodes. A future refactor that removes any `?? 1` would throw on
+these tests.
+
+The pattern used is `db.into(db.people).insert(const PersonRow(...))`
+with the column omitted, then `PersonRepository.getById(...)` returns
+the Person with the default-decoded cadence. Drift's nullable int
+columns default to `null`; passing `null` explicitly triggers
+`avoid_redundant_argument_values` lint, so the tests use comments
+like `// nDays omitted → null → exercises the \`?? 1\` fallback at
+person_repository.dart:134.` instead of explicit `null`.
+
+#### Decision 5 — Forward-compat throw pin extension (`'email'` tag)
+
+The v1.6-ζ `'slack'`-tag throw test pins ONE specific unknown tag.
+v1.7-β Batch 4 hand-writes a row with `channel: 'email'` and asserts
+`_parseChannel`'s `_` default arm at line 107 throws `ArgumentError`.
+A second unknown tag is necessary because a future refactor could
+short-circuit the default arm with `if (tag == 'email') return
+ChannelEmail(...)` — the `'slack'` test wouldn't catch this; the
+`'email'` test does.
+
+The two tests (`'slack'` + `'email'`) form a regression-pair for the
+forward-compat contract: any unknown tag throws, not just the ones
+explicitly tested.
+
+### Drift lessons
+
+#### Lesson (a) — The v0.1 form at `add_person.dart:7-10` only renders `EveryNDays` + `ChannelDialer`
+
+The file's own header comment at lines 7-10 explicitly lists the
+alternate cadences + channels as v0.2 deferred items. The master-plan
+assumption that "4 cadence UI sub-forms exist" was wrong. Per
+ADR-086 lesson (a): verify wiring exists via `grep` on call sites
+before assuming widgets exist. The cycle ships at the repository
+layer where the wiring DOES exist (in `_toRow` / `_fromRow` /
+`_parseChannel` / `_parseCadence`).
+
+This lesson applies symmetrically to the v1.6-γ cycle (which had the
+same UI-form-is-much-simpler-than-master-plan-assumed pattern for
+`add_person.dart` cadence TextFormField validation tests per ADR-079
+(a)). The v1.7-β cycle is the SECOND instance of this pattern; the
+v1.6-γ + v1.7-β pair establishes a "always verify the form scope via
+`grep` on `_toRow` + `personId` + `widget.personId` references before
+scheduling UI coverage" rule for v1.8+ cycles.
+
+#### Lesson (b) — `_toRow` writes raw column strings
+
+The 5 channel tag strings (`'dialer'`, `'whatsapp'`, `'telegram'`,
+`'signal'`, `'sms'`) are the raw column form written by `_toRow`. The
+v1.6-ζ multi-channel round-trip test only verifies the typed
+`PersonChannel` subclass after `getById`, not the raw column string.
+v1.7-β pins the raw-column form via `(db.select(db.people)
+..where((t) => t.id.equals(personId))).getSingle()` + `expect(row.channel,
+'...')` + `expect(row.handle, '...')`. A future refactor that changes
+the discriminator mapping (e.g., swaps `'sms'` to `'text_message'`)
+fails loudly on these tests.
+
+This lesson applies to the v1.7-ε cycle (which now has a MORE FOCUSED
+scope for `person_repository.dart` because v1.7-β absorbs the
+column-overhead + null-default coverage; v1.7-ε will target
+`automationsJson` round-trip + `PersonUnresolved` + `pausedUntil`
+filter, NOT the column layer).
+
+#### Lesson (c) — `_monthlyDay` and `_yearlyDay` share the `dayOfMonth` column
+
+The `??` operator at `person_repository.dart:66` pulls
+`MonthlyOn.dayOfMonth` first, then `YearlyOn.dayOfMonth`. The
+existing tests do NOT isolate which subtype wins for a given row;
+v1.7-β Batch 2 pins the read-side correctness for both subtypes via
+hand-written rows with distinct `dayOfMonth` values. This is
+defense-in-depth: a future refactor that collapses the overload
+(e.g., swaps the `??` operands) or that adds a third subtype that
+also writes `dayOfMonth` (e.g., `QuarterlyOn`) would break the
+isolation test.
+
+The isolation test is structurally identical to the v1.6-ζ
+unknown-channel-tag throw test pattern at `person_repository_test.dart:
+232-268`, with the addition of the multi-row sanity check (each
+subtype reads back its OWN value, NOT the other subtype's).
+
+#### Lesson (d) — The 4 `_fromRow` `?? 1` defaults are defense-in-depth
+
+The 4 fallbacks at lines 134, 136, 138, 140 ensure that a row missing
+a discriminator's required column decodes to a sensible default
+(`EveryNDays(1)`, `WeeklyOn(1)`, `MonthlyOn(1)`, `YearlyOn(1, 1)`).
+The v1.7-β Batch 3 tests hand-write rows with `null` for the required
+column and assert the default. A future refactor that removes any
+`?? 1` would throw on these tests (since `null.dayOfMonth` would be
+illegal for the typed `MonthlyOn` constructor).
+
+This lesson applies to any future `_fromRow`-style decode that uses
+defaults. The pattern is: hand-write a row with the relevant column
+omitted → assert the default decodes. Reusable for any nullable
+column with a typed-discriminator mapping.
+
+#### Lesson (e) — `_parseChannel`'s `_` default arm is the throw-everything-else defense
+
+The v1.6-ζ cycle pinned the `'slack'` throw path (one specific
+unknown tag). v1.7-β Batch 4 pins a SECOND unknown tag (`'email'`)
+so the default arm isn't accidentally weakened to a no-op (e.g., a
+future refactor that adds `if (tag == 'email') return ChannelEmail(...)`
+shortcut). The two tests (`'slack'` + `'email'`) form a
+regression-pair for the forward-compat contract: any unknown tag
+throws.
+
+This lesson applies to the v1.7-ε cycle's `PersonUnresolved` path
+(which uses a similar default-throw pattern for unmappable contact
+lookups). The pair-pinning pattern (two distinct unknown values) is
+the canonical defensive test for any `_` default arm in a sealed
+hierarchy decode.
+
+### Cumulative v1.7 progress (after cycle β)
+
+- Tests: 1773 → 1800 (+27 net across α + β)
+- Files at <80% coverage: 14 → 12 (−2: `add_habit.dart` + `person_repository.dart`)
+- APK SHA1: stays at H's `25bb7fab` (no production-code change)
+- V-Model artifacts: SYS-157..SYS-158 + ADR-088..ADR-089 + WF-085..WF-086 + the trace/workflow/decision/plan/CHANGELOG/feature.md entries per cycle pattern
+
+### Cross-references
+
+SYS-158; WF-086; ADR-087 (v1.6 milestone closeout — predecessor); the
+v1.7 locked roadmap at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`
+(this ADR-089 is the second drift lessons entry for v1.7); ADR-086
+lesson (a) verify-wiring-exists applied to re-scope this cycle from
+`add_person_test.dart` UI to `person_repository_test.dart`
+repo-layer; ADR-087 §c (healthy over-delivery pattern — v1.7-β
+delivers +14 exact, absorbing the v1.7-α Δ −5 deficit per the
+canonical pattern); ADR-088 (v1.7-α drift lessons — `runAsync`
+closure wrap + menu→dialog fragility patterns carried forward to
+v1.7-β in the Drift keepalive-deadlock-aware test seams); ADR-079
+(v1.6-γ add_person cadence validation lessons — same
+UI-form-is-much-simpler-than-master-plan-assumed pattern; v1.7-β is
+the SECOND instance of this pattern, paired with v1.6-γ to establish
+the v1.8+ rule).
