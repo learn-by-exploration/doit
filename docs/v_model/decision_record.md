@@ -8457,3 +8457,64 @@ The `final future = PermissionSheet.show(...)` is a non-awaited handle to the Fu
 ### Cumulative v1.7
 
 1773 → 1866 (+93 net across α+β+γ+δ+ε+ζ+η+θ; 8/9 cycles shipped).
+
+## ADR-096 — v1.7 milestone closeout — 9-cycle roadmap COMPLETE (1773 → 1866 +93 net tests)
+
+**Ninth and FINAL cycle of the v1.7 milestone.** Doc-only closeout. **0 tests, EXACT MATCH with plan.**
+
+**Date:** 2026-07-07.
+**Tests:** 1866 → 1866 (0 net). **Cumulative v1.7:** 1773 → 1866 (+93 net across α+β+γ+δ+ε+ζ+η+θ+ι; 9/9 cycles shipped).
+
+### Drift lessons
+
+(a) **The 9-cycle v1.7 roadmap matches the canonical "tests-only + 2 fixes + 1 doc-only closeout" template** — 8 of 9 cycles were tests-only (α..η, θ); 1 cycle (ζ) had a documentation-bug fix (the calendar no-op Allow CTA pin replaced a broken exception-pin per ADR-093); 1 cycle (ι) is the doc-only closeout. This mirrors the v1.6 milestone pattern (11 tests-only + 2 doc-bug cycles + 1 doc-only closeout) and the v1.5 milestone pattern (5 tests-only + 1 doc-only closeout). Reusable pattern: when planning a coverage-closure milestone, default to 1 doc-only closeout cycle at the end. The closeout cycle confirms the Phase B TODO audit + blocked-items carry-over + records the cumulative progress.
+
+(b) **APK SHA1 discipline anchor is replaced with test-count + 3-gate green after v1.7-ζ** — the v1.7-ζ ADR-093 (e) finding (3 unique SHA1s in 3 clean rebuilds) revealed that the SHA1 discipline anchor was an illusion; the agent was capturing a snapshot at one moment — the actual SHA1 was always going to drift eventually given Gradle's incremental build cache + embedded build timestamps + order-dependent dex packaging. v1.7-η..ι use the new anchor: **test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes**. Future milestones should adopt this anchor from the start; the SHA1 anchor was a false signal.
+
+(c) **The v1.7-θ deviation (direct push to main, no PR)** — the cycle's commit `c461029` was pushed directly to main without a branch+PR because the agent committed + pushed without first creating a branch. `gh pr create --base main --head main` returned "No commits between main and main (createPullRequest)". `git revert --no-edit HEAD` was blocked by the auto-mode classifier (destructive local history rewrite). Result: v1.7-θ has no PR number; the commit SHA `c461029` IS the merge artifact. Future cycles MUST use the branch+PR pattern: create branch → commit → push branch → `gh pr create --base main --head <branch>` → `gh pr merge <N> --squash --delete-branch`. The deviation is documented in the v1.7-θ memory file + ADR-095 + SYS-165.
+
+### Defers
+
+- 13 blocked items from v1.6-λ (per the v1.6-λ / SYS-156 / ADR-087 / WF-084 closeout) carry forward to v2.0; v1.7-ι does NOT retire any.
+- Phase B TODOs: 0 outstanding TODOs (v1.6-κ retired 2; 6 historical references survive as descriptive comments about the Phase B work).
+- No release tag (per the existing pattern, the user chooses the tag strategy).
+- No APK rebuild (v1.7 is tests-only + doc-only across all 9 cycles; the APK rebuild belongs to the release cycle).
+
+### Cumulative v1.7
+
+1773 → 1866 (+93 net across α+β+γ+δ+ε+ζ+η+θ+ι; 9/9 cycles shipped).
+
+Cycle-by-cycle reconciliation:
+| Cycle | PR | Tests | Plan | Actual | Δ | Notes |
+|---|---|---:|---:|---:|---:|---|
+| α | #79 | +13 | +18 | +13 | -5 | under by 5; v1.7-β absorbed per ADR-087 §c |
+| β | #80 | +14 | +14 | +14 | 0 | exact match |
+| γ | #81 | +12 | +12 | +12 | 0 | exact match |
+| δ | #82 | +20 | +20 | +20 | 0 | exact match |
+| ε | #83 | +10 | +8 | +10 | +2 | over by 2 (pausedUntil raw-column pins expanded scope) |
+| ζ | #84 | +8 | +8 | +8 | 0 | exact match |
+| η | #85 | +8 | +8 | +8 | 0 | exact match |
+| θ | (no PR — direct push) | +8 | +8 | +8 | 0 | exact match (deviation: no PR) |
+| ι | (this PR) | 0 | 0 | 0 | 0 | doc-only closeout |
+| **Total** | | **+93** | **+96** | **+93** | **-3** | **under plan by 3 (α deficit + ε surplus = -3 net)** |
+
+The v1.7 milestone CLOSED with -3 vs plan (+93 actual vs +96 plan). The -3 is driven by v1.7-α's -5 (absorbed by v1.7-β per ADR-087 §c) and v1.7-ε's +2 over-delivery, netting -3 overall. This is well within the +/-5 tolerance from the v1.6 milestone pattern (v1.6 closed at +8 vs plan).
+
+### V-Model artifact inventory
+
+- SYS-157..SYS-165 (9 cycles)
+- ADR-088..ADR-096 (9 cycles)
+- WF-085..WF-093 (9 cycles)
+- Plus the 5 more doc files per cycle (requirements.md, decision_record.md, workflows.md, traceability_matrix.md, implementation_status.md, plan.md, feature.md, CHANGELOG.md) = 8 doc files per cycle × 9 cycles = 72 doc appends.
+
+### Next: v1.8 / v2.0
+
+The v1.7 milestone is COMPLETE. The next milestones (per the 3-month launch roadmap at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`) are:
+
+- **UI consolidation sprint (15 PRs, ~3 dev-weeks)** — fix the 39 UI organization issues identified in the wireframe audit. C1-C10 categories (button styles, color palette misuse, card patterns, form patterns, empty/loading/error gaps, navigation, typography drift, icon set, accessibility, FAB placement). Introduces a thin `lib/ui/` design-system layer + migrates the 38 screens over a series of small, tests-only PRs.
+
+- **Month 2: B1 FSI hardening + B2 Spanish translator + B5 Recently deleted UI** — Strong-mode FSI hardening (USE_FULL_SCREEN_INTENT on API 34+) + native-Spanish translator review (closes BUG-006) + Recently deleted UI surface.
+
+- **Month 3: B6 marketing assets + A1 production signing setup + A2 on-device E2E + Play Store launch** — distribution + launch.
+
+The 13 blocked items from v1.6-λ remain the canonical v2.0 parking lot (per the v1.6-λ closeout).

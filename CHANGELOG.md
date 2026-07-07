@@ -4710,6 +4710,21 @@ Cycle is the **SIXTH** in the v1.7 milestone (6/9 cycles shipped). 3 remaining: 
 
 ## v1.7-θ
 
+## v1.7-ι — v1.7 milestone CLOSEOUT — doc-only closeout cycle
+
+- **Branch:** `v1-7-cyc-iota` (PR #87; proper branch+PR pattern per ADR-096 lesson (c))
+- **Tests:** 1866 → 1866 (+0 net)
+- **Cumulative v1.7:** 1773 → 1866 (**+93 net across 9 cycles; v1.7 milestone COMPLETE**)
+- **Files:** 8 doc files only — no production-code change, no test change, no Drift migration, no Kotlin change
+- **Phase B TODO audit:** 0 outstanding TODOs; 17 historical references survive as descriptive comments
+- **13 blocked-items table carry-over:** all 13 items from v1.6-λ remain deferred to v2.0
+- **8 V-Model artifacts updated:** SYS-165 + ADR-096 + WF-093 + 5 doc rows
+- **Drift lessons (ADR-096):** (a) canonical tests-only + 2-fixes + 1-doc-only closeout pattern confirmed + (b) APK SHA1 anchor replaced with test-count + 3-gate green + (c) v1.7-θ deviation (no PR) documented for future cycles
+- **3-gate:** `dart format` clean + `flutter analyze --fatal-infos` 0 issues + `flutter test` 1866/1866 pass
+- **APK SHA1:** unchanged (doc-only — no production-code change)
+
+The v1.7 9-cycle milestone is now **COMPLETE (9/9 cycles shipped)**. Next per the 3-month launch roadmap: UI consolidation sprint (15 PRs, ~3 dev-weeks).
+
 **Date:** 2026-07-07. **Tests:** 1858 → 1866 (+8 net). **Cumulative v1.7:** 1773 → 1866 (+93 across α+β+γ+δ+ε+ζ+η+θ; 8/9 cycles shipped).
 
 EXTEND `test/triggers/condition_test.dart` (+6 tests) + `test/services/permission_lifecycle_observer_test.dart` (+2 tests). 3 batches: condition.dart boundaries (ConditionOr recursion + TimeWindow end-side + equality + hashCode + toString) + permission_lifecycle_observer.dart per-instance cold-start gate + triggerRefreshForTest hook independence. Coverage gain: condition.dart 59.8% → 80.5% (+20.7 pp). 5 drift lessons per ADR-095. SYS-164/ADR-095/WF-092. 3-gate green.

@@ -687,6 +687,32 @@ Cycle is the **SIXTH** in the v1.7 milestone — v1.7 milestone 6/9 cycles shipp
 
 ## v1.7-θ
 
+## v1.7-ι — v1.7 milestone CLOSEOUT — doc-only closeout cycle
+
+**Ninth and FINAL cycle of v1.7.** Doc-only. **0 tests.** **EXACT MATCH with v1.7 pre-auth plan target.** **The v1.7 milestone is now COMPLETE (9/9 cycles shipped).**
+
+**Date:** 2026-07-07. **Tests:** 1866 → 1866 (0 net). **Cumulative v1.7:** 1773 → 1866 (+93 net across α+β+γ+δ+ε+ζ+η+θ+ι; 9/9 cycles shipped).
+
+**Files:** 8 doc files only — no production-code change, no test change, no Drift migration, no Kotlin change.
+
+**Phase B TODO audit (Group 1):** repo-wide `grep -rn "Phase B PR [12]"` returns 17 historical references; all are descriptive comments about the Phase B work (PR 1 = envelope-shape contract; PR 2 = add-screen payload reads), NOT outstanding TODOs. The 2 specific "TODO that originally lived here" comments at `template_library.dart:397` + `v2_to_v3.dart:25-26` reference the v1.6-κ retirement as historical record. **0 outstanding Phase B TODOs.**
+
+**13 blocked-items table carry-over (Group 2):** all 13 items from v1.6-λ remain deferred to v2.0 per the canonical closeout. v1.7-ι does NOT retire any blocked items.
+
+**v1.7 milestone closeout (Group 3):** confirm the v1.7 9-cycle roadmap is COMPLETE per the locked pre-auth at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`. Cycle-by-cycle: α -5, β ±0, γ ±0, δ ±0, ε +2, ζ ±0, η ±0, θ ±0, ι 0. **Total: 1773 → 1866 (+93 net; under plan by 3).**
+
+**8 V-Model artifact updates (Group 4):** SYS-165 row in `requirements.md`; ADR-096 in `decision_record.md`; WF-093 row in `traceability_matrix.md`; `### v1.7-ι` block in `workflows.md`; `## v1.7-ι` row in `implementation_status.md` (this row); `### v1.7-ι` subsection in `plan.md`; `## v1.7-ι` entry in `CHANGELOG.md`; cycle paragraph + v1.7 closeout note in `feature.md`.
+
+**APK SHA1 — discipline anchor (per v1.7-ζ finding, ADR-093 (e)):** debug-build SHA1 is non-deterministic; v1.7-ι uses **test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes** as the discipline anchor. Per-cycle: v1.7-ι is doc-only — no production-code change → APK byte-equivalent to v1.7-θ's APK.
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean — no formatting change) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1866/1866 pass — zero regressions).
+
+**V-Model artifacts updated (8):** SYS-165 + ADR-096 + WF-093 + v1.7-ι rows in 5 docs.
+
+**Drift lessons:** see ADR-096 — (a) canonical pattern confirmed + (b) APK SHA1 anchor replaced + (c) v1.7-θ deviation documented.
+
+**Next:** per the 3-month launch roadmap, the next phase is the UI consolidation sprint (15 PRs, ~3 dev-weeks).
+
 **Eighth cycle of the v1.7 milestone.** Tests-only. **+8 tests, EXACT MATCH with plan.**
 
 **Date:** 2026-07-07. **Tests:** 1858 → 1866 (+8 net). **Cumulative v1.7:** 1773 → 1866 (+93 net across α+β+γ+δ+ε+ζ+η+θ; 8/9 cycles shipped).

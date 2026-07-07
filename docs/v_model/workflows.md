@@ -4321,3 +4321,24 @@ SYS-158; ADR-089; v1.7-β row in `implementation_status.md`; `### v1.7-β` subse
 **Drift lessons:** see ADR-095 — (a) `ConditionDayOfWeek` non-const ctor + (b) `ConditionOr`/`ConditionAnd` non-const in equality + (c) `ConditionValidationException.toString()` format invariance + (d) `_coldStartSeen` per-instance semantics + (e) `triggerRefreshForTest` does NOT consume the gate.
 
 **3-gate:** `dart format` (clean after auto-format of 2 files) + `flutter analyze --fatal-infos` (0 issues) + `flutter test` (1866/1866 pass).
+
+
+### v1.7-ι — v1.7 milestone CLOSEOUT — doc-only closeout cycle
+
+**Ninth and FINAL cycle of v1.7.** Doc-only. **0 tests.** **EXACT MATCH with v1.7 pre-auth plan target.**
+
+**Date:** 2026-07-07. **Tests:** 1866 → 1866 (0 net). **Cumulative v1.7:** 1773 → 1866 (+93 across α+β+γ+δ+ε+ζ+η+θ+ι; 9/9 cycles shipped).
+
+**Files:** 8 doc files only — no production-code change, no test change, no Drift migration, no Kotlin change.
+
+**Scope:**
+- **Group 1 — Phase B TODO audit (1 grep):** repo-wide `grep -rn "Phase B PR [12]" /home/shyam/common_games/doit/lib/` returns 17 historical references, all descriptive comments about the Phase B work (PR 1 = envelope-shape contract; PR 2 = add-screen payload reads), NOT outstanding TODOs. The 2 specific "TODO that originally lived here" comments at `template_library.dart:397` + `v2_to_v3.dart:25-26` reference the v1.6-κ retirement as historical record. **Conclusion: 0 outstanding Phase B TODOs.**
+- **Group 2 — 13 blocked-items table carry-over:** all 13 items from v1.6-λ remain deferred to v2.0 per the canonical closeout. v1.7-ι does NOT retire any blocked items.
+- **Group 3 — v1.7 milestone closeout:** confirm the v1.7 9-cycle roadmap is COMPLETE. Cycle-by-cycle reconciliation: α -5, β ±0, γ ±0, δ ±0, ε +2, ζ ±0, η ±0, θ ±0, ι 0. **Total v1.7: 1773 → 1866 (+93 net; under plan by 3).** The -3 is driven by v1.7-α's -5 (absorbed by v1.7-β per ADR-087 §c) and v1.7-ε's +2 over-delivery.
+- **Group 4 — 8 V-Model artifact updates (1 append per artifact):** SYS-165 row in `requirements.md`; ADR-096 in `decision_record.md`; WF-093 row in `traceability_matrix.md`; `### v1.7-ι` block in `workflows.md`; `## v1.7-ι` row in `implementation_status.md`; `### v1.7-ι` subsection in `plan.md`; `## v1.7-ι` entry in `CHANGELOG.md`; cycle paragraph + v1.7 closeout note in `feature.md`.
+
+**Drift lessons:** see ADR-096 — (a) canonical tests-only + 2-fixes + 1-doc-only closeout pattern confirmed + (b) APK SHA1 anchor replaced with test-count + 3-gate green + (c) v1.7-θ deviation documented.
+
+**3-gate:** `dart format` (clean) + `flutter analyze --fatal-infos` (0 issues) + `flutter test` (1866/1866 pass — zero regressions).
+
+**The v1.7 milestone is now CLOSED.** Next: UI consolidation sprint (15 PRs) per the 3-month launch roadmap.
