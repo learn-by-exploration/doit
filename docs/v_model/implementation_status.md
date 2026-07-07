@@ -837,4 +837,31 @@ Cycle is the **SIXTH** in the v1.7 milestone — v1.7 milestone 6/9 cycles shipp
 
 **APK discipline anchor (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)):** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes.
 
-**Next:** PR4 of 15 (C2 colors — color palette misuse consolidation: 3 issues → 1 PR).
+## PR4 of 15
+
+**Surface (12 files, +483/-9):**
+
+- NEW `lib/ui/app_palette.dart` (~108 lines; `AppPalette` class with private constructor `AppPalette._()` + 3 `static` helpers + 5 `static const` canonical constants)
+- NEW `test/ui/app_palette_test.dart` (~360 lines; 11 widget tests in 4 groups)
+- MIGRATE 3 color-palette-misuse sites (preserves visuals byte-for-byte):
+  - `lib/widget/widget_config_screen.dart:156` (`Colors.grey` → `AppPalette.iconMuted(context)`; drops `const`)
+  - `lib/screens/home.dart:_TileIcon:1270` (`color.withValues(alpha: 0.20)` → `AppPalette.mutedTileBackground(context, color)`)
+  - `lib/widgets/do_anchor_paused_badge.dart:68-75` (inline `BoxDecoration` (6 lines) → `AppPalette.mutedPillDecoration(context, color)` (1 line))
+- 8 V-Model artifacts: SYS-170 + ADR-101 + WF-098 + 5 doc rows
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean — formatted upfront per PR1 deviation lesson) + `flutter analyze --fatal-infos lib test` (0 issues — 15 deprecation warnings fixed via `.r/.g/.b/.a` per ADR-101 lessons (b)+(c)) + `flutter test` (1910/1910 pass). Targeted: `flutter test test/ui/app_palette_test.dart` (11/11 pass).
+
+**Discipline anchor (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)):** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes. No `<uses-permission>` additions, no new pubspec deps, no Drift migration, no Kotlin changes.
+
+**5 drift lessons in ADR-101 (5 NEW for PR4):**
+- (a) **`AppPalette` helpers require `BuildContext`** (NEW for PR4 — unlike static `Color` constants, every helper takes `BuildContext` so it can read the active `ColorScheme`. Canonical pattern for semantic-color helpers in a theme-driven app: pass the context, derive from `Theme.of(context).colorScheme`)
+- (b) **`Color.red/green/blue` accessors are deprecated in Flutter 3.31+** (NEW for PR4 — `analyzer --fatal-infos` flags `deprecated_member_use`. Use `.r/.g/.b` (double 0..1). 12 lint hits in the RGB-preservation test caught + fixed)
+- (c) **`Color.opacity` is deprecated in Flutter 3.31+** (NEW for PR4 — use `.a` (double 0..1). 3 lint hits in the alpha-math tests caught + fixed)
+- (d) **`withValues(alpha: 0.5)` rounds to 128/255 ≈ 0.5020** (NEW for PR4 — alpha byte carries only 256 discrete values; the 0.5-border-alpha test tolerance raised from `0.001` to `0.01` to absorb the +0.0020 quantization)
+- (e) **Two sequential `pumpWidget` calls in the same `testWidgets` need distinct `ValueKey`s** (NEW for PR4 — distinct `ValueKey('dark')` + `ValueKey('light')` on `MaterialApp` so the framework cannot optimize them into the same Element; the second `Builder.builder` then fires with the new context)
+
+**Cumulative v1.7 + UI sprint:** 1773 → 1910 (+137 net across 9 v1.7 cycles + 4/15 UI sprint cycles).
+
+**Next:** PR5 of 15 (C3 cards — card / surface pattern consolidation: 5 issues → 2 PRs).
+
+**Next:** PR5 of 15 (C3 cards — card / surface pattern consolidation: 5 issues → 2 PRs).

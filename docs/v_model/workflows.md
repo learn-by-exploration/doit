@@ -4433,4 +4433,12 @@ SYS-158; ADR-089; v1.7-β row in `implementation_status.md`; `### v1.7-β` subse
 
 **Cumulative v1.7 + UI sprint:** 1773 → 1899 (+126 net across 9 v1.7 cycles + 3/15 UI sprint cycles; 3/15 UI sprint cycles shipped).
 
-**Next:** PR4 of 15 (C2 colors — color palette misuse consolidation: 3 issues → 1 PR).
+### PR4 of 15
+
+PR4 (color palette misuse consolidation, C2 category) extracted `AppPalette` as the canonical semantic-color helper primitive and migrated 3 sites: (a) `lib/widget/widget_config_screen.dart:156` (`Colors.grey` → `AppPalette.iconMuted(context)`); (b) `lib/screens/home.dart:_TileIcon:1270` (`color.withValues(alpha: 0.20)` → `AppPalette.mutedTileBackground(context, color)`); (c) `lib/widgets/do_anchor_paused_badge.dart:68-75` (inline `BoxDecoration` → `AppPalette.mutedPillDecoration(context, color)`). All 3 migrations preserve visuals byte-for-byte via 5 canonical constants (`_tileAlpha=0.20`, `_pillFillAlpha=0.15`, `_pillBorderAlpha=0.5`, `_pillBorderWidth=0.5`, `_pillRadius=8`). 11 new tests in `test/ui/app_palette_test.dart` (4 groups: iconMuted [3], mutedPillDecoration [5], mutedTileBackground [2], static accessors [1]). Test count: 1899 → 1910 (+11 net; EXACT match with plan). 3-gate: `dart format` clean + `flutter analyze --fatal-infos lib test` 0 issues (15 deprecation warnings fixed via `.r/.g/.b/.a` per ADR-101 lessons (b)+(c)) + `flutter test` 1910/1910 pass. V-Model artifacts: SYS-170 + ADR-101 + WF-098 (this row) + 5 doc rows. APK discipline anchor: test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes.
+
+**Cumulative v1.7 + UI sprint:** 1773 → 1910 (+137 net across 9 v1.7 cycles + 4/15 UI sprint cycles; 4/15 UI sprint cycles shipped).
+
+**Next:** PR5 of 15 (C3 cards — card / surface pattern consolidation: 5 issues → 2 PRs).
+
+**Next:** PR5 of 15 (C3 cards — card / surface pattern consolidation: 5 issues → 2 PRs).

@@ -1,5 +1,6 @@
 import 'package:doit/do/do.dart';
 import 'package:doit/l10n/gen/app_localizations.dart';
+import 'package:doit/ui/app_palette.dart';
 import 'package:flutter/material.dart';
 
 /// Compact, accessible badge that surfaces the v1.4l tombstone
@@ -65,14 +66,7 @@ class DoAnchorTargetPausedBadge extends StatelessWidget {
           message: l.doAnchorTargetPausedHelp,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: color.withValues(alpha: 0.5),
-                width: 0.5,
-              ),
-            ),
+            decoration: AppPalette.mutedPillDecoration(context, color),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
