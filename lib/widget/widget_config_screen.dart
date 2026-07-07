@@ -32,6 +32,7 @@ import 'package:flutter/material.dart';
 import 'package:doit/do/do.dart';
 import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/services/do_repository.dart';
+import 'package:doit/ui/app_palette.dart';
 import 'package:doit/widget/widget_service_proxy.dart';
 
 /// A pure-Dart entry point the screen uses to write the
@@ -153,7 +154,11 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.add_task, size: 56, color: Colors.grey),
+            Icon(
+              Icons.add_task,
+              size: 56,
+              color: AppPalette.iconMuted(context),
+            ),
             const SizedBox(height: 16),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),

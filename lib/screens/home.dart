@@ -47,6 +47,7 @@ import 'package:doit/services/db/schema.dart';
 import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/app_palette.dart';
 import 'package:doit/widgets/category_chip.dart';
 import 'package:doit/widgets/reliability_banner.dart';
 import 'package:doit/widgets/routine_banner.dart';
@@ -1267,7 +1268,7 @@ class _TileIcon extends StatelessWidget {
       width: 48,
       height: 48,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.20),
+        color: AppPalette.mutedTileBackground(context, color),
         shape: BoxShape.circle,
       ),
       child: Icon(_iconFor(category, iconName), color: color, size: 24),
