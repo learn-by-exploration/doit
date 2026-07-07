@@ -1470,6 +1470,33 @@ The **FIFTH cycle of the v1.7 milestone** — pins the raw-column `pausedUntil_m
 
 ### v1.7-θ — condition.dart boundaries + permission_lifecycle_observer.dart per-instance cold-start gate + triggerRefreshForTest hook independence
 
+### v1.7-ι — v1.7 milestone CLOSEOUT — doc-only closeout cycle
+
+**Ninth and FINAL cycle of v1.7.** Doc-only. **0 tests.** **EXACT MATCH with v1.7 pre-auth plan target.** **The v1.7 milestone is now COMPLETE (9/9 cycles shipped).**
+
+**Date:** 2026-07-07. **Tests:** 1866 → 1866 (0 net). **Cumulative v1.7:** 1773 → 1866 (+93 net across α+β+γ+δ+ε+ζ+η+θ+ι; 9/9 cycles shipped).
+
+**Files:** 8 doc files only — no production-code change, no test change, no Drift migration, no Kotlin change.
+
+**Cycle-by-cycle reconciliation:**
+- v1.7-α: +13 actual vs +18 plan (Δ -5; absorbed by v1.7-β per ADR-087 §c)
+- v1.7-β: +14 actual vs +14 plan (Δ ±0)
+- v1.7-γ: +12 actual vs +12 plan (Δ ±0)
+- v1.7-δ: +20 actual vs +20 plan (Δ ±0)
+- v1.7-ε: +10 actual vs +10 plan (Δ ±0)
+- v1.7-ζ: +8 actual vs +8 plan (Δ ±0)
+- v1.7-η: +8 actual vs +8 plan (Δ ±0)
+- v1.7-θ: +8 actual vs +8 plan (Δ ±0)
+- v1.7-ι: 0 actual vs 0 plan (Δ ±0; doc-only closeout)
+
+**Total: 1773 → 1866 (+93 net across 9 cycles; under plan by 3).** The -3 is entirely driven by v1.7-α's -5 (absorbed by v1.7-β per ADR-087 §c, *not* by ι itself).
+
+**Drift lessons:** see ADR-096 — (a) canonical tests-only + 2-fixes + 1-doc-only closeout pattern confirmed + (b) APK SHA1 anchor replaced with test-count + 3-gate green + (c) v1.7-θ deviation (no PR) documented.
+
+**Defers (out-of-scope, v1.7-ι):** 13 blocked items from v1.6-λ (carry forward to v2.0); Phase B TODOs (0 outstanding after audit); release tag (user decision); APK rebuild (belongs to the release cycle).
+
+**Next:** per the 3-month launch roadmap at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`, the next phase is the UI consolidation sprint (15 PRs, ~3 dev-weeks).
+
 **Eighth cycle of v1.7.** Tests-only. **+8 tests** (6 condition + 2 permission). **EXACT MATCH with v1.7 pre-auth plan target.**
 
 **Date:** 2026-07-07. **Tests:** 1858 → 1866 (+8 net). **Cumulative v1.7:** 1773 → 1866 (+93 across α+β+γ+δ+ε+ζ+η+θ; 8/9 cycles shipped).

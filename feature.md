@@ -848,4 +848,10 @@ Cycle v1.6-λ (`feat/v1.6-λ-doc-cleanups`) shipped: **0 net tests** (doc-only c
 |---|---|---:|---|---|---|
 | 21 | v1.7-θ | +8 | `test/triggers/condition_test.dart` + `test/services/permission_lifecycle_observer_test.dart` | condition.dart boundaries (ConditionOr recursion + TimeWindow end-side + equality + hashCode + toString) + permission_lifecycle_observer.dart per-instance cold-start gate + triggerRefreshForTest hook independence | 1773 → 1866 (+93 net across 8 cycles) |
 
+| v1.7-ι | doc-only | `plan.md`/`decision_record.md` closeout + 0 tests + 8 V-Model artifacts | 8 doc appends; plan/decision/workflow/trace + status/feature/changelog; 13 blocked-items carry + Phase B TODO audit (0 outstanding) | 1866 → 1866 (+0) |
+
+## v1.7 milestone CLOSED (9/9 cycles shipped)
+
+The v1.7 9-cycle milestone is **COMPLETE** as of v1.7-ι (2026-07-07). Cumulative v1.7: 1773 → 1866 (+93 net tests across 9 cycles; under plan by 3, driven by v1.7-α's -5 absorbed by v1.7-β per ADR-087 §c). See `decision_record.md` ADR-096 for cycle-by-cycle reconciliation + 3 drift lessons. See `CHANGELOG.md` for per-cycle entries. Next phase per the 3-month launch roadmap is the UI consolidation sprint (15 PRs).
+
 **Date:** 2026-07-07. **V-Model:** SYS-164 / ADR-095 / WF-092. **Coverage gain:** `condition.dart` 59.8% → 80.5% (+20.7 pp). **3-gate green.**
