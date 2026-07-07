@@ -49,6 +49,7 @@ import 'package:doit/widgets/automation_reliability_dialog.dart';
 import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/trigger.dart';
+import 'package:doit/ui/primary_button.dart';
 import 'package:doit/widgets/calendar_picker.dart';
 import 'package:doit/widgets/location_picker.dart';
 
@@ -214,9 +215,9 @@ class _AddEventScreenState extends State<AddEventScreen> {
               onPressed: () => Navigator.of(ctx).pop(),
               child: const Text('Cancel'),
             ),
-            FilledButton(
+            PrimaryButton(
               onPressed: () => Navigator.of(ctx).pop(n),
-              child: const Text('OK'),
+              label: const Text('OK'),
             ),
           ],
         );

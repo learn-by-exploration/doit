@@ -850,6 +850,12 @@ Cycle v1.6-λ (`feat/v1.6-λ-doc-cleanups`) shipped: **0 net tests** (doc-only c
 
 | v1.7-ι | doc-only | `plan.md`/`decision_record.md` closeout + 0 tests + 8 V-Model artifacts | 8 doc appends; plan/decision/workflow/trace + status/feature/changelog; 13 blocked-items carry + Phase B TODO audit (0 outstanding) | 1866 → 1866 (+0) |
 
+| PR1 of 15 (UI) | new `lib/ui/primary_button.dart` primitive + tests | `lib/ui/primary_button.dart` (NEW, ~70 lines) + `test/ui/primary_button_test.dart` (NEW, 11 tests, 6 groups) + 3 screen migrations (`add_event.dart:217`, `add_person.dart:548`, `rest_day_picker_dialog.dart:110`) — first file in `lib/ui/` design-system layer | 1866 → 1877 (+11) |
+
+### PR1 of 15 — UI consolidation sprint — PrimaryButton extraction
+
+**First cycle of the 15-PR UI consolidation sprint.** Establishes the `lib/ui/` design-system layer with the canonical `PrimaryButton` primitive (wraps `FilledButton`/`FilledButton.icon`; 48dp minimum inherited from `filledButtonTheme`; supports `label`, `icon`, `tooltip`, `key` parameters) + 11 widget tests (6 groups: plain-text variant, icon variant, disabled state, tooltip wrapper, 48dp touch target, Key + Semantics) + migrates 3 high-traffic form-submit CTAs as the canonical-pattern call. See `decision_record.md` ADR-097 for 5 drift lessons including the `AppTheme.dark` getter-not-Widget constraint + the const-MaterialApp-with-getter-theme limitation + the inherited 48dp sizing. Cumulative v1.7 + UI sprint: 1773 → 1877 (+104 net across 9 v1.7 cycles + PR1 of UI sprint).
+
 ## v1.7 milestone CLOSED (9/9 cycles shipped)
 
 The v1.7 9-cycle milestone is **COMPLETE** as of v1.7-ι (2026-07-07). Cumulative v1.7: 1773 → 1866 (+93 net tests across 9 cycles; under plan by 3, driven by v1.7-α's -5 absorbed by v1.7-β per ADR-087 §c). See `decision_record.md` ADR-096 for cycle-by-cycle reconciliation + 3 drift lessons. See `CHANGELOG.md` for per-cycle entries. Next phase per the 3-month launch roadmap is the UI consolidation sprint (15 PRs).

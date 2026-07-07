@@ -4712,6 +4712,19 @@ Cycle is the **SIXTH** in the v1.7 milestone (6/9 cycles shipped). 3 remaining: 
 
 ## v1.7-ι — v1.7 milestone CLOSEOUT — doc-only closeout cycle
 
+## PR1 of 15 — UI consolidation sprint — PrimaryButton extraction + 3 high-traffic CTAs migration
+
+- **NEW `lib/ui/primary_button.dart`** — canonical "Save" / "OK" / "Add contact" CTA wrapping `FilledButton` / `FilledButton.icon`. 48dp minimum inherited from `lib/theme/app_theme.dart:71-75` `filledButtonTheme`.
+- **NEW `test/ui/primary_button_test.dart`** — 11 widget tests (6 groups): plain-text variant (3) + icon variant (2) + disabled state (1) + tooltip wrapper (2) + 48dp touch target (1) + Key + Semantics (2). All deterministic.
+- **MIGRATE 3 high-traffic CTAs:** `lib/screens/add_event.dart:217` (Save-OK dialog) + `lib/screens/add_person.dart:548` (Save-as-Template, key preserved) + `lib/screens/rest_day_picker_dialog.dart:110` (OK, localized label). All 3 preserve existing keys + onPressed handlers + labels verbatim — no behavior change.
+- **First file in the new `lib/ui/` design-system layer** — subsequent primitives (`secondary_button.dart`, `icon_button.dart`, `fab.dart`, `empty_state_view.dart`, `error_state_view.dart`, `loading_view.dart`, `form_field.dart`, `section_card.dart`, `screen_scaffold.dart`, `reliability_badge.dart`) are the scope of PR2..PR15.
+- **Tests:** 1866 → 1877 (+11 net; EXACT match with plan)
+- **Drift lessons per ADR-097:** (a) `AppTheme.dark` is a `ThemeData` getter, not a Widget constructor → wrap in `MaterialApp(theme: AppTheme.dark, home: ...)` + (b) `const MaterialApp(theme: AppTheme.dark, ...)` fails (Invalid constant value — getter is runtime) → keep `MaterialApp` non-const, const the inner constructors + (c) `FilledButton.onPressed: null` auto-disables + suppresses callback + (d) 48dp minimum inherited from `filledButtonTheme` (PrimaryButton does not re-specify) + (e) `lib/ui/` is the new design-system layer
+- **3-gate:** `dart format` clean + `flutter analyze --fatal-infos` 0 issues + `flutter test` 1877/1877 pass
+- **APK discipline anchor (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)):** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes
+
+The 15-PR UI consolidation sprint (Month 1 / 2026-07-20..08-03 of the 3-month launch roadmap) has shipped 1/15 cycles (PR1). 14 cycles remaining. Next: PR2 (SecondaryButton).
+
 - **Branch:** `v1-7-cyc-iota` (PR #87; proper branch+PR pattern per ADR-096 lesson (c))
 - **Tests:** 1866 → 1866 (+0 net)
 - **Cumulative v1.7:** 1773 → 1866 (**+93 net across 9 cycles; v1.7 milestone COMPLETE**)

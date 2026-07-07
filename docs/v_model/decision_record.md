@@ -8518,3 +8518,55 @@ The v1.7 milestone is COMPLETE. The next milestones (per the 3-month launch road
 - **Month 3: B6 marketing assets + A1 production signing setup + A2 on-device E2E + Play Store launch** — distribution + launch.
 
 The 13 blocked items from v1.6-λ remain the canonical v2.0 parking lot (per the v1.6-λ closeout).
+
+## ADR-097 — PR1 of 15 UI consolidation — `PrimaryButton` primitive design decisions
+
+**Date:** 2026-07-07. **Status:** APPROVED (PR1 of 15 / Phase 76 / SYS-166 / WF-094).
+
+### Context
+
+Per the UI_ORG_AUDIT.md C1 category (6 button-style issues), the screen layer uses raw `FilledButton`/`FilledButton.icon`/`TextButton` in 39 places across 22 screens. Each occurrence repeats the same minimum-size/icon-or-not/onPressed/key/tooltip wiring; deviations make the CTA layer brittle to a11y/theme/size token changes. The `lib/ui/` design-system layer is empty today — PrimaryButton is the first primitive extracted during Month 1 / 2026-07-20..08-03 of the 3-month launch roadmap at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`.
+
+### Decision
+
+Extract `lib/ui/primary_button.dart` as a thin wrapper around `FilledButton` / `FilledButton.icon`. Migrate the 3 highest-traffic form-submit CTAs (`add_event.dart:217` Save-OK dialog, `add_person.dart:548` Save-as-Template dialog, `rest_day_picker_dialog.dart:110` OK) to use it. PR2..PR15 will migrate the remaining 36 occurrences + add the other primitives (SecondaryButton wrapping `TextButton`, IconButton wrapping `IconButton`, FAB wrapping `FloatingActionButton`, EmptyStateView, ErrorStateView, LoadingView, FormField, SectionCard, ScreenScaffold, ReliabilityBadge).
+
+### Design
+
+API: `const PrimaryButton({super.key, required onPressed, required label, this.icon, this.tooltip})` where `label` is a `Widget` (typically `Text('Save' | 'OK' | 'Add contact')`); `icon` is the `Widget?` that decides the `FilledButton` vs `FilledButton.icon` branch; `tooltip` (optional) wraps the button in a `Tooltip(message: ...)` for TalkBack / long-press affordance.
+
+Sizing: 48dp minimum, INHERITED from `filledButtonTheme` in `lib/theme/app_theme.dart:71-75` (the `AppTheme._build()` already sets `FilledButtonThemeData(style: FilledButton.styleFrom(minimumSize: const Size(0, Sizing.tapMin)))` — PrimaryButton does not re-specify it).
+
+### Alternatives considered
+
+**A. Bigger PR migrating all 39 CTAs.** Rejected: the 22-screen blast radius makes review harder; the 3-CTAs-in-one-PR is the canonical-pattern call for PR2..PR15 to mirror.
+
+**B. Use `ButtonStyleButton` directly with `.copyWith`.** Rejected: bypasses the `FilledButton`/`FilledButton.icon` constructors which carry the icon-vs-no-icon Material 3 wiring.
+
+**C. Extract a generic `AppButton` enum-driven primitive.** Rejected: the C1 audit identifies `FilledButton`-family as the primary CTA pattern; `TextButton` is the SecondaryButton pattern (PR2). One primitive per button type, mirroring Material 3's constructors.
+
+### Drift lessons
+
+(a) **`AppTheme.dark` is a `ThemeData` getter, NOT a `Widget` constructor.** First draft of `test/ui/primary_button_test.dart` used `AppTheme.dark(home: ...)` thinking `dark` returned a Widget. Fix: wrap in `MaterialApp(theme: AppTheme.dark, home: ...)` (matches existing tests at `test/l10n/locale_render_test.dart:53`, `test/screens/onboarding_call_screening_step_test.dart:65`).
+
+(b) **`PrimaryButton` cannot be `const` via `const MaterialApp(theme: AppTheme.dark, ...)`** because `AppTheme.dark` is a runtime getter (not a compile-time constant). `const MaterialApp(theme: AppTheme.dark, ...)` fails with `Invalid constant value`. Fix: keep `MaterialApp` non-const, const the inner `Scaffold`/`Center`/`PrimaryButton`/`Text` constructors where params are compile-time constants.
+
+(c) **`FilledButton.onPressed: null` auto-disables + suppresses the callback.** Flutter's `ButtonStyleButton` (which `FilledButton` extends) auto-disables when `onPressed` is null — the disabled tap test confirms zero invocations. This means the `PrimaryButton` widget does not need a separate `enabled` flag; the `onPressed: null` convention is canonical.
+
+(d) **The 48dp minimum is INHERITED from `filledButtonTheme`.** `AppTheme._build()` sets `FilledButtonThemeData(style: FilledButton.styleFrom(minimumSize: const Size(0, Sizing.tapMin)))`, so PrimaryButton gets it for free without re-specifying. The 48dp touch-target test confirms this via `tester.getSize(find.byType(FilledButton)).height >= 48`.
+
+(e) **`lib/ui/` is empty today; PrimaryButton is the first primitive.** The file is the canonical-pattern call for PR2..PR15 (SecondaryButton, IconButton, FAB, EmptyStateView, ErrorStateView, LoadingView, FormField, SectionCard, ScreenScaffold, ReliabilityBadge). PR1 establishes the layer + the patterns (test file structure, Material wrapper, getter-as-theme resolution, const-marker rules).
+
+### Constraint adherence
+
+- **No `AndroidManifest.xml` change** — pure Dart.
+- **No new pubspec deps** — uses existing `package:flutter/material.dart` + `AppTheme.dark` from `lib/theme/app_theme.dart`.
+- **No Drift migration, no Kotlin changes.**
+- **APK discipline anchor (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)):** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes.
+- **48dp touch target retained** (inherited from `filledButtonTheme`).
+
+### Out-of-scope (deferred to PR2..PR15)
+
+- Migrating the remaining 36 occurrences of `FilledButton`/`FilledButton.icon`/`TextButton` across 19 screens.
+- Extracting the 10 remaining primitives (SecondaryButton, IconButton, FAB, EmptyStateView, ErrorStateView, LoadingView, FormField, SectionCard, ScreenScaffold, ReliabilityBadge).
+- The cancel-button pattern (`TextButton` + `'Cancel'` / `'Back'` / `'Discard'`) is scoped to PR2.

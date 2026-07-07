@@ -25,6 +25,7 @@
 // for invariants and is what would catch a programmatic write.
 
 import 'package:doit/l10n/gen/app_localizations.dart';
+import 'package:doit/ui/primary_button.dart';
 import 'package:flutter/material.dart';
 
 /// The integer range of valid rest-day budgets. Exposed as a constant
@@ -107,9 +108,9 @@ class _RestDayPickerDialogState extends State<RestDayPickerDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: Text(l.homeTileBudgetEditCancel),
         ),
-        FilledButton(
+        PrimaryButton(
           onPressed: () => Navigator.of(context).pop(_value),
-          child: Text(l.homeTileBudgetEditOk),
+          label: Text(l.homeTileBudgetEditOk),
         ),
       ],
     );

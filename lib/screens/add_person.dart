@@ -42,6 +42,7 @@ import 'package:doit/templates/template.dart';
 import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/trigger.dart';
+import 'package:doit/ui/primary_button.dart';
 import 'package:doit/widgets/calendar_picker.dart';
 import 'package:doit/widgets/location_picker.dart';
 import 'package:doit/widgets/permission_sheet.dart';
@@ -545,10 +546,10 @@ class _SaveAsTemplateDialogState extends State<_SaveAsTemplateDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(
+        PrimaryButton(
           key: const ValueKey('add_person.save_as_template.save'),
           onPressed: () => Navigator.of(context).pop(_ctrl.text.trim()),
-          child: const Text('Save'),
+          label: const Text('Save'),
         ),
       ],
     );
