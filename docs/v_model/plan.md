@@ -1542,3 +1542,28 @@ The **FIFTH cycle of the v1.7 milestone** — pins the raw-column `pausedUntil_m
 **Drift lessons:** see ADR-095 — 5 lessons covering `ConditionDayOfWeek` non-const + cross-type non-const + `ConditionValidationException.toString()` format + `_coldStartSeen` per-instance + `triggerRefreshForTest` independence.
 
 **3-gate:** `dart format` (clean) + `flutter analyze --fatal-infos` (0 issues) + `flutter test` (1866/1866 pass).
+### PR2 of 15 — UI consolidation sprint — SecondaryButton extraction + 3 dialog Cancel migrations
+
+**PR2 (Phase 77)** of the UI consolidation sprint (Month 1 / 2026-07-20..08-03). **Second file in `lib/ui/`.** **+11 tests (EXACT match with plan).**
+
+**Date:** 2026-07-07. **Tests:** 1877 → 1888 (+11 net).
+
+**What:**
+- `lib/ui/secondary_button.dart` — `StatelessWidget` wrapping `TextButton`/`TextButton.icon`. 48dp minimum via inline `TextButton.styleFrom(minimumSize: const Size(0, 48))`. API mirrors `PrimaryButton`: `const SecondaryButton({super.key, required onPressed, required label, icon, tooltip})`.
+- 3 dialog Cancel migrations: `add_event.dart:213`, `add_person.dart:544`, `rest_day_picker_dialog.dart:106`.
+- 11 widget tests in `test/ui/secondary_button_test.dart` (6 groups).
+
+**Why:** per UI_ORG_AUDIT.md C1 (6 button-style issues), the screen layer uses raw `TextButton` for Cancel CTAs in ~5 dialogs. Each occurrence repeats the same onPressed/key/tooltip wiring. PR2 establishes the Cancel/dismiss primitive that pairs with `PrimaryButton` from PR1.
+
+**Constraint adherence:**
+- No `AndroidManifest.xml` changes (pure Dart).
+- No new pubspec deps (uses existing `package:flutter/material.dart` + `AppTheme.dark`).
+- No Drift migration, no Kotlin changes.
+- APK SHA1 discipline anchor: test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)).
+- 48dp touch target retained (via inline `TextButton.styleFrom`).
+
+**Drift lessons:** see ADR-098 — 5 lessons including the `AppTheme.dark` getter-not-Widget (PR1 mirror) + the const-MaterialApp-with-getter-theme limitation (PR1 mirror) + **`TextButton` does NOT have a theme-level `minimumSize` default** (NEW — explicit inline style required) + the `onPressed: null` auto-disable (PR1 mirror) + the PR1 dart-format deviation lesson applied proactively.
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean — formatted upfront) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1888/1888 pass — zero regressions).
+
+**Next:** PR3 of 15 (IconButton — the canonical icon-only CTA wrapping `Material.IconButton`).

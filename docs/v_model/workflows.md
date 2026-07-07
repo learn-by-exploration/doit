@@ -4373,3 +4373,33 @@ SYS-158; ADR-089; v1.7-β row in `implementation_status.md`; `### v1.7-β` subse
 **3-gate:** `dart format` (clean) + `flutter analyze --fatal-infos` (0 issues) + `flutter test` (1866/1866 pass — zero regressions).
 
 **The v1.7 milestone is now CLOSED.** Next: UI consolidation sprint (15 PRs) per the 3-month launch roadmap.
+### PR2 of 15 — UI consolidation — SecondaryButton extraction + 3 dialog Cancel migrations
+
+**PR2 (Phase 77)** of the UI consolidation sprint. Second file in `lib/ui/`. **+11 tests (EXACT match with plan: 11 widget tests).**
+
+**Date:** 2026-07-07. **Tests:** 1877 → 1888 (+11 net). **Cumulative v1.7 + UI sprint:** 1773 → 1888 (+115 net across 9 v1.7 cycles + PR1 + PR2 of UI sprint).
+
+**Files (4 changed):**
+- NEW `lib/ui/secondary_button.dart` (~62 lines; `StatelessWidget` wrapping `TextButton`/`TextButton.icon`)
+- NEW `test/ui/secondary_button_test.dart` (~245 lines; 11 widget tests, 6 groups)
+- MIGRATE `lib/screens/add_event.dart:213` — Cancel button in time picker dialog (sibling to PR1 PrimaryButton at line 217)
+- MIGRATE `lib/screens/add_person.dart:544` — Cancel button in Save-as-Template dialog (sibling to PR1 PrimaryButton at line 548)
+- MIGRATE `lib/screens/rest_day_picker_dialog.dart:106` — Cancel button in rest day picker (sibling to PR1 PrimaryButton at line 110)
+
+**Batches (3):**
+- **Batch 1 — Primitive extraction:** `SecondaryButton` widget + 48dp inline sizing via `TextButton.styleFrom(minimumSize: const Size(0, 48))`. API mirrors PrimaryButton: `const SecondaryButton({super.key, required onPressed, required label, icon, tooltip})` where `icon` decides `TextButton` vs `TextButton.icon` branch.
+- **Batch 2 — Tests (11 across 6 groups):** plain-text variant (3) + icon variant (2) + disabled state (1) + tooltip wrapper (2) + 48dp touch target (1) + Key + Semantics (2). Same structure as PR1's tests but for TextButton family.
+- **Batch 3 — Dialog Cancel migrations (3 CTAs):** preserved onPressed handlers + labels verbatim. Imports added to each screen file.
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean — formatted upfront per PR1 deviation lesson) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1888/1888 pass — zero regressions).
+
+**Drift lessons per ADR-098:**
+- (a) `AppTheme.dark` getter-not-Widget (same as PR1 ADR-097 (a))
+- (b) `const MaterialApp(theme: AppTheme.dark, ...)` fails (same as PR1 ADR-097 (b))
+- (c) `TextButton` does NOT have a theme-level `minimumSize` default — explicit inline style required (NOT like `FilledButton`)
+- (d) `TextButton.onPressed: null` auto-disables + suppresses callback (mirrors PR1 ADR-097 (c))
+- (e) PR1 dart-format deviation lesson applied proactively → CI passed on the first try
+
+**Cumulative v1.7 + UI sprint:** 1773 → 1888 (+115 net across 9 v1.7 cycles + PR1 + PR2 of UI sprint; 2/15 UI sprint cycles shipped).
+
+**Next:** PR3 of 15 (IconButton — the canonical icon-only CTA wrapping `Material.IconButton`).
