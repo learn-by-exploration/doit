@@ -552,4 +552,415 @@ void main() {
     expect(find.text('Allow'), findsNothing);
     expect(find.text('Open settings'), findsNothing);
   });
+
+  // -----------------------------------------------------------------
+  // v1.7-ζ additions (SYS-162 / ADR-093 / WF-090)
+  //
+  // Cancel / no-spurious-pop (4 tests): the sheet has no
+  // explicit Cancel button; "cancel" is the user tapping
+  // Allow but the request still returns denied or
+  // permanentlyDenied. The sheet MUST stay open and
+  // `show()` must return `false` — a future refactor that
+  // pops on every Allow tap would silently flip the
+  // contract because `result?.granted ?? false` would
+  // short-circuit `null` to `false` and mask the bug.
+  //
+  // permanentlyDenied retry paths (4 tests): when the sheet
+  // opens on `permanentlyDenied`, the user sees ONLY the
+  // "Open settings" FilledButton (no "Allow"). Tapping it
+  // routes to `_onOpenSettings` → deep-link + re-probe. The
+  // 4 tests pin: (a) re-probe granted pops; (b) re-probe
+  // denied(canOpenSettings: true) re-enables Allow; (c)
+  // openAppSettings returns false shows snackbar + stays;
+  // (d) re-probe still permanentlyDenied stays open with
+  // error text.
+  // -----------------------------------------------------------------
+
+  testWidgets('tapping Allow on notifications when request returns '
+      'denied keeps the sheet open with no pop '
+      '(v1.7-ζ / SYS-162)', (tester) async {
+    requestScriptedStatuses[Permission.notification.value] =
+        PermissionStatus.denied;
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    final future = PermissionSheet.show(
+      tester.element(find.text('open')),
+      PermissionKind.notifications,
+    );
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('permission_sheet.allow')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.byKey(const ValueKey('permission_sheet.allow')));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(
+      find.byKey(const ValueKey('permission_sheet.allow')),
+      findsOneWidget,
+      reason:
+          'The sheet must stay open when Allow returns denied; a '
+          'regression that pops on every Allow tap would silently '
+          'break the contract because `result?.granted ?? false` '
+          'short-circuits null → false and masks the bug.',
+    );
+    future.ignore();
+  });
+
+  testWidgets('tapping Allow on notifications when request returns '
+      'permanentlyDenied keeps the sheet open AND re-renders with '
+      'the error text + no Allow button '
+      '(v1.7-ζ / SYS-162)', (tester) async {
+    requestScriptedStatuses[Permission.notification.value] =
+        PermissionStatus.permanentlyDenied;
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    final future = PermissionSheet.show(
+      tester.element(find.text('open')),
+      PermissionKind.notifications,
+    );
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    // Sheet opens on denied(canOpenSettings: true) with
+    // Allow + Open settings visible. (Default init.)
+    expect(
+      find.byKey(const ValueKey('permission_sheet.allow')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        "You've blocked this permission. Open Android settings to grant it.",
+      ),
+      findsNothing,
+      reason:
+          'Pre-tap: status is denied, not permanentlyDenied, so the '
+          'error text is hidden.',
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('permission_sheet.allow')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.byKey(const ValueKey('permission_sheet.allow')));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    // Re-probe returned permanentlyDenied → sheet re-rendered
+    // with the error text visible AND the Allow button hidden
+    // (permanentlyDenied → only "Open settings").
+    expect(
+      find.text(
+        "You've blocked this permission. Open Android settings to grant it.",
+      ),
+      findsOneWidget,
+      reason:
+          'After re-probe permanentlyDenied, the error sub-text must '
+          'appear.',
+    );
+    expect(
+      find.byKey(const ValueKey('permission_sheet.allow')),
+      findsNothing,
+      reason:
+          'After re-probe permanentlyDenied, Allow is hidden so '
+          're-asking does not show a system dialog.',
+    );
+    expect(
+      find.byKey(const ValueKey('permission_sheet.open_settings')),
+      findsOneWidget,
+    );
+    future.ignore();
+  });
+
+  testWidgets('tapping Allow on contacts when request returns granted '
+      'pops the sheet and show() returns true '
+      '(v1.7-ζ / SYS-162)', (tester) async {
+    // Pre-seed the request channel to return `granted` for
+    // contacts. The initial probe defaults to `denied`, so
+    // the sheet opens with both buttons.
+    requestScriptedStatuses[Permission.contacts.value] =
+        PermissionStatus.granted;
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    final future = PermissionSheet.show(
+      tester.element(find.text('open')),
+      PermissionKind.contacts,
+    );
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Contacts'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('permission_sheet.allow')),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('permission_sheet.allow')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.byKey(const ValueKey('permission_sheet.allow')));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(await future, isTrue);
+  });
+
+  testWidgets('tapping Allow on calendar kind (no-op Allow CTA per '
+      'the SYS-E Phase E comment at permission_sheet.dart:140-145) '
+      'keeps the sheet open with no pop '
+      '(v1.7-ζ / SYS-162)', (tester) async {
+    // The `calendar` kind has a wired Allow CTA but the
+    // calendar routine templates have not landed yet, so
+    // `_onAllow` for calendar calls `requestCalendar()`
+    // which currently returns `granted` via the synthetic
+    // fallback (the SAF fallback path). We pin that the
+    // calendar Allow CTA DOES pop the sheet with `true`
+    // (this is the "no-op for now" path that resolves
+    // immediately) so a future refactor that wires real
+    // calendar permission logic would surface the change
+    // by breaking this test.
+    requestScriptedStatuses[Permission.calendarFullAccess.value] =
+        PermissionStatus.granted;
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    final future = PermissionSheet.show(
+      tester.element(find.text('open')),
+      PermissionKind.calendar,
+    );
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('permission_sheet.allow')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.byKey(const ValueKey('permission_sheet.allow')));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(await future, isTrue);
+  });
+
+  testWidgets('permanentlyDenied → Open settings → re-probe granted '
+      'pops the sheet and show() returns true '
+      '(v1.7-ζ / SYS-162)', (tester) async {
+    probeScriptedStatuses[Permission.contacts.value] =
+        PermissionStatus.permanentlyDenied;
+    PermissionService.instance.resetForTesting();
+    await PermissionService.instance.init();
+    requestScriptedStatuses[Permission.contacts.value] =
+        PermissionStatus.granted;
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    final future = PermissionSheet.show(
+      tester.element(find.text('open')),
+      PermissionKind.contacts,
+    );
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Contacts'), findsOneWidget);
+    expect(find.byKey(const ValueKey('permission_sheet.allow')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('permission_sheet.open_settings')),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('permission_sheet.open_settings')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(
+      find.byKey(const ValueKey('permission_sheet.open_settings')),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(await future, isTrue);
+    expect(
+      find.byKey(const ValueKey('permission_sheet.open_settings')),
+      findsNothing,
+      reason: 'The sheet must be popped after a successful re-probe.',
+    );
+  });
+
+  testWidgets('permanentlyDenied → Open settings → re-probe '
+      'denied(canOpenSettings: true) transitions to the 2-button '
+      'layout with Allow re-enabled '
+      '(v1.7-ζ / SYS-162)', (tester) async {
+    probeScriptedStatuses[Permission.contacts.value] =
+        PermissionStatus.permanentlyDenied;
+    PermissionService.instance.resetForTesting();
+    await PermissionService.instance.init();
+    requestScriptedStatuses[Permission.contacts.value] =
+        PermissionStatus.denied;
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    final future = PermissionSheet.show(
+      tester.element(find.text('open')),
+      PermissionKind.contacts,
+    );
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const ValueKey('permission_sheet.allow')), findsNothing);
+    expect(
+      find.text(
+        "You've blocked this permission. Open Android settings to grant it.",
+      ),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('permission_sheet.open_settings')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(
+      find.byKey(const ValueKey('permission_sheet.open_settings')),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(
+      find.byKey(const ValueKey('permission_sheet.allow')),
+      findsOneWidget,
+      reason:
+          'After re-probe transitions to denied(canOpenSettings: true), '
+          'the Allow button must re-appear so the user can re-try.',
+    );
+    expect(
+      find.byKey(const ValueKey('permission_sheet.open_settings')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        "You've blocked this permission. Open Android settings to grant it.",
+      ),
+      findsNothing,
+      reason:
+          'The error text is permanentlyDenied-only and must hide after '
+          'the transition to denied(canOpenSettings: true).',
+    );
+    future.ignore();
+  });
+
+  testWidgets('permanentlyDenied → Open settings → openAppSettings '
+      'returns false shows snackbar but keeps the sheet open '
+      '(v1.7-ζ / SYS-162)', (tester) async {
+    openAppSettingsResult = false;
+    probeScriptedStatuses[Permission.contacts.value] =
+        PermissionStatus.permanentlyDenied;
+    PermissionService.instance.resetForTesting();
+    await PermissionService.instance.init();
+    addTearDown(() {
+      openAppSettingsResult = true;
+    });
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    final future = PermissionSheet.show(
+      tester.element(find.text('open')),
+      PermissionKind.contacts,
+    );
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('permission_sheet.open_settings')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(
+      find.byKey(const ValueKey('permission_sheet.open_settings')),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(
+      find.byKey(const ValueKey('permission_sheet.open_settings')),
+      findsOneWidget,
+    );
+    expect(find.text('Could not open Android settings.'), findsOneWidget);
+    future.ignore();
+  });
+
+  testWidgets('permanentlyDenied → Open settings → re-probe still '
+      'permanentlyDenied keeps the sheet open with the error text '
+      '(v1.7-ζ / SYS-162)', (tester) async {
+    probeScriptedStatuses[Permission.contacts.value] =
+        PermissionStatus.permanentlyDenied;
+    PermissionService.instance.resetForTesting();
+    await PermissionService.instance.init();
+    // Pre-seed the request channel to return
+    // `permanentlyDenied` so the re-probe in `_onOpenSettings`
+    // stays on permanentlyDenied (mirrors: the user toggled
+    // the permission off-then-on, but the OS still surfaces
+    // it as permanentlyDenied because they previously hit
+    // "Don't ask again").
+    requestScriptedStatuses[Permission.contacts.value] =
+        PermissionStatus.permanentlyDenied;
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    final future = PermissionSheet.show(
+      tester.element(find.text('open')),
+      PermissionKind.contacts,
+    );
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const ValueKey('permission_sheet.allow')), findsNothing);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('permission_sheet.open_settings')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(
+      find.byKey(const ValueKey('permission_sheet.open_settings')),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+    // Re-probe stayed permanentlyDenied → sheet re-rendered
+    // with the same permanentlyDenied UI (Allow hidden,
+    // error text visible).
+    expect(find.byKey(const ValueKey('permission_sheet.allow')), findsNothing);
+    expect(
+      find.text(
+        "You've blocked this permission. Open Android settings to grant it.",
+      ),
+      findsOneWidget,
+      reason:
+          'Re-probe permanentlyDenied must keep the error text visible '
+          'so the user knows the permission is still blocked.',
+    );
+    expect(
+      find.byKey(const ValueKey('permission_sheet.open_settings')),
+      findsOneWidget,
+      reason:
+          'The Open settings button must remain so the user can '
+          're-attempt the deep-link.',
+    );
+    future.ignore();
+  });
 }

@@ -4252,3 +4252,27 @@ SYS-158; ADR-089; v1.7-β row in `implementation_status.md`; `### v1.7-β` subse
 
 - **v1.7 milestone: 5/9 cycles shipped (α + β + γ + δ + ε); tests 1773 → 1842 (+69 net across α + β + γ + δ + ε; +12 exact for γ, +20 exact for δ, +10 exact for ε); `add_habit.dart` 76% → ~85% + `person_repository.dart` raw-column layer pinned (cadence + channel + automationsJson + pausedUntil_millis) + `add_event.dart` ~78% → ~88% + Spanish ARB catalog 20 verbatim pins; 0 Kotlin changes; 0 `<uses-permission>` changes; 0 Drift migrations; 0 release APK rebuilds.**
 
+### v1.7-ζ — permission_sheet cancel + permanentlyDenied-retry coverage closure (Phase 70 / SYS-162 / ADR-093 / WF-090)
+
+**Scope.** Extend `test/widgets/permission_sheet_test.dart` (+8 tests) under a `// v1.7-ζ additions (SYS-162 / ADR-093 / WF-090)` banner.
+
+**Two batches.**
+
+**Batch 1 — Cancel / no-spurious-pop (4 tests).** Pins the widget's cancel state machine — the user taps "Allow" but the request returns denied/permanentlyDenied. The widget MUST stay open + `show()` MUST return `false`. The 4 tests:
+1. `tapping Allow on notifications when request returns denied keeps the sheet open with no pop` — pins the `if (result.granted)` pop branch at `permission_sheet.dart:215-217`; a future refactor that pops on every Allow tap would silently flip `show()` to return `null` → `false`.
+2. `tapping Allow on notifications when request returns permanentlyDenied keeps the sheet open AND re-renders with the error text + no Allow button` — pins the `setState(() { _status = result; })` branch at `:218-222` + the `isPermanentlyDenied` UI state at `:383-407`.
+3. `tapping Allow on contacts when request returns granted pops the sheet and show() returns true` — second pin of the granted pop (after SYS-067 test 2); defense-in-depth against a future refactor that pops with `null` on granted.
+4. `tapping Allow on calendar kind (no-op Allow CTA per the SYS-E Phase E comment at permission_sheet.dart:140-145) keeps the sheet open with no pop` — pins the calendar Allow CTA wire-up so a future refactor that wires real calendar permission logic surfaces via the test.
+
+**Batch 2 — permanentlyDenied retry paths (4 tests).** Pins the 4 re-probe outcomes in `_onOpenSettings` at `permission_sheet.dart:226-342`. The sheet opens on `permanentlyDenied` (Allow hidden, error text visible, only "Open settings" button shown). The user taps "Open settings" → deep-link + re-probe. The 4 tests:
+1. `permanentlyDenied → Open settings → re-probe granted pops the sheet and show() returns true` — the happy-path granted retry.
+2. `permanentlyDenied → Open settings → re-probe denied(canOpenSettings: true) transitions to the 2-button layout with Allow re-enabled` — pins the 3-state UI machine transition: permanentlyDenied → denied(canOpenSettings: true) re-renders with BOTH buttons AND hides the error text.
+3. `permanentlyDenied → Open settings → openAppSettings returns false shows snackbar but keeps the sheet open` — pins the snackbar path + sheet-stays-open invariant when the OS rejects the deep-link.
+4. `permanentlyDenied → Open settings → re-probe still permanentlyDenied keeps the sheet open with the error text` — pins the same-error-text-on-retry invariant.
+
+**Out-of-scope.** Modal scrim-tap dismissal tests (Flutter framework behavior, not widget-owned); modal drag-down dismissal tests (slide animation does not interact with the widget's state machine); system-back dismissal tests; an explicit "Cancel" button (NOT in v0.1); a test that verifies a thrown exception from `requestExactAlarm()` surfaces to the test framework (the `permission_handler` package swallows the exception).
+
+**Cross-references:** SYS-162; ADR-093; v1.7-ζ row in `implementation_status.md`; `### v1.7-ζ` subsection in `plan.md`; `## v1.7-ζ` entry in `CHANGELOG.md`; feature.md cycle entry; the v1.7 locked roadmap at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`; ADR-093 drift lesson (e) — the `tester.runAsync(() async { return future; })` footgun documented; ADR-092 (v1.7-ε drift lessons); ADR-091 (v1.7-δ drift lessons); ADR-090 (v1.7-γ drift lessons); ADR-089 (v1.7-β drift lessons); ADR-088 (v1.7-α drift lessons).
+
+- **v1.7 milestone: 6/9 cycles shipped (α + β + γ + δ + ε + ζ); tests 1773 → 1850 (+77 net across 6 cycles; +13 exact for α, +14 exact for β, +12 exact for γ, +20 exact for δ, +10 exact for ε, +8 exact for ζ); `permission_sheet.dart` cancel branch + 3-state UI machine + permanentlyDenied retry paths pinned; 0 Kotlin changes; 0 `<uses-permission>` changes; 0 Drift migrations; 0 release APK rebuilds.**
+
