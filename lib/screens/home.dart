@@ -49,6 +49,7 @@ import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/ui/app_palette.dart';
 import 'package:doit/ui/empty_state.dart';
+import 'package:doit/ui/error_view.dart';
 import 'package:doit/ui/loading_view.dart';
 import 'package:doit/ui/tile_surface.dart';
 import 'package:doit/widgets/category_chip.dart';
@@ -229,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     return const LoadingView();
                   }
                   if (snap.hasError) {
-                    return _ErrorView(
+                    return ErrorView(
                       message: 'Could not load habits',
                       onRetry: _refresh,
                     );
@@ -1336,32 +1337,6 @@ class _TileIcon extends StatelessWidget {
     'sports_soccer': Icons.sports_soccer,
     'hiking': Icons.hiking,
   };
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(Spacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message),
-            const SizedBox(height: Spacing.md),
-            FilledButton(
-              onPressed: onRetry,
-              child: Text(AppLocalizations.of(context).homeRetryButton),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _AddFab extends StatelessWidget {
