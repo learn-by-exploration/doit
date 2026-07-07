@@ -8894,3 +8894,87 @@ The `scrolledUnderElevation: 1` is one line of code that addresses one of the mo
 - The 8-invocation private `_SectionHeader` widget is deleted from settings.dart, removing a class that was sitting between the screen and the public primitive layer.
 - 2 new test files (`test/ui/section_header_test.dart` + `test/theme/app_theme_test.dart`) provide regression guards for the new primitive and the theme tweak.
 - 7 files touched (5 screens + 1 theme + 1 settings.dart); APK discipline anchor maintained (no manifest/pubspec/Drift/Kotlin changes).
+
+# ADR-104 — AppFormField + AppChoiceChip primitives (PR7 of 15 / v1.8-07)
+
+**Status:** Accepted (2026-07-07, PR7).
+**Surface:** C4 form patterns batch 1.
+**Drives:** SYS-173 + WF-101.
+
+## Context
+
+The wireframe audit (`docs/wireframes/UI_ORG_AUDIT.md` — derived from the 38 W01..W38 wireframes) identified 7 C4 form-pattern issues. The two highest-leverage issues were:
+
+1. **Bare `TextField` + inline `InputDecoration` pattern** — the same 4-line `TextField(controller:..., decoration: InputDecoration(labelText: ..., errorText: ...))` shape recurred 7 times across `add_habit.dart`, `add_event.dart`, `add_person.dart`, `person_groups.dart`, `mission_math.dart`, `mission_type.dart`, and the 3 `Save as template` dialogs.
+2. **Bare `ChoiceChip`** without the canonical 48dp tap target — the same `<Wrap><ChoiceChip>...` pattern recurred 3 times across `add_event.dart:450`, `add_habit.dart:566`, `person_groups.dart:417/435/450`. The default `ChoiceChip` padding produces a ~32dp-tall chip on most densities which falls short of the project's `Sizing.tapMin` (48dp) minimum.
+
+Each occurrence had its own label/errorText/keyboardType contract and each was a one-off that future maintainers would have to read in full. There was no canonical `AppFormField` or `AppChoiceChip` in the design system.
+
+## Decision
+
+Create two new primitives in `lib/ui/`:
+
+### D1 — `AppFormField` (text + multi-line TextField wrapper)
+
+- **Class:** `class AppFormField extends StatefulWidget` (NOT `StatelessWidget`).
+- **Why Stateful:** the standard Flutter pattern for "preset value" form fields requires a `TextEditingController` — `TextField` itself does not accept `initialValue` on the constructor. By making AppFormField a StatefulWidget, callers can pass `initialValue: '7'` and the internal state creates + disposes the controller cleanly.
+- **API surface:** `label` (String?), `errorText` (String?), `controller` (TextEditingController?), `initialValue` (String?), `onChanged` (ValueChanged<String>?), `onSubmitted` (ValueChanged<String>?), `keyboardType` (TextInputType?), `autofocus` (bool, default false), `helperText` (String?), `maxLines` (int?, default 1), `textAlign` (TextAlign?).
+- **Wrapper:** `TextField` with canonical `InputDecoration(labelText, errorText, helperText)`. The outline border is the M3 default (no override needed).
+- **Why not TextFormField:** `TextFormField` requires a `Form` ancestor. Half of the use sites are inside `Form`, half are not (e.g., the Save-as-template dialogs, the mission input fields). Using `TextField` everywhere means the same primitive works in both contexts.
+
+### D2 — `AppChoiceChip` (≥48dp tap target wrapper)
+
+- **Class:** `class AppChoiceChip extends StatelessWidget`.
+- **API surface:** `label` (Widget, required), `selected` (bool, required), `onSelected` (ValueChanged<bool>, required).
+- **Wrapper:** `ChoiceChip` with `padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)` (the canonical M3 selectable-chip rhythm).
+- **Why not Wrap the chip in a `Padding` widget externally:** the internal padding of ChoiceChip is part of the chip's own hit-test; wrapping externally would not increase the tap target reliably (it would create visual padding but the Material widget's gesture detection would still be on the inner chip). The `ChoiceChip.padding` parameter is the correct extension point.
+
+## Drift lessons (from the implementation)
+
+(a) **`TextField` does NOT have an `initialValue` constructor parameter** (only `TextFormField` does). The fix is to make `AppFormField` a `StatefulWidget` with an internally-managed `TextEditingController` that is created on first build (if `initialValue` is non-null) and disposed in `dispose()`. This is the canonical Flutter pattern for preset-value form fields.
+
+(b) **`ChoiceChip.padding` is a `WidgetProperty<EdgeInsetsGeometry?>`** (nullable), not a `Widget` parameter. Passing `null` to `padding:` is OK (uses defaults). The test pins `chip.padding == const EdgeInsets.symmetric(horizontal: 12, vertical: 8)` directly on the ChoiceChip widget, NOT by searching the widget tree for a `Padding` widget (ChoiceChip's internal Padding is not reachable from the test via `find.descendant` because Material widgets compose the chip's surface into a `Material > InkWell > Container` chain, not a Padding wrapper).
+
+(c) **`ChoiceChip.selected` (NOT `isSelected`)** — the constructor parameter is `selected:`, not `isSelected:`. The test that reads `tester.widget<ChoiceChip>(...).selected` pins the right field. An earlier test had `chip.isSelected` which is a no-such-getter error.
+
+(d) **`PrimaryButton` has a `label:` parameter, not a `child:` parameter** — unlike the raw `FilledButton` it wraps. The 2 Save-as-template dialog migrations had to convert `child: const Text('Save')` → `label: const Text('Save')`. This is the same pattern as PR1's `PrimaryButton.label: const Text('Save')` for the AddHabit Save CTA.
+
+(e) **`TextField.textAlign` is `TextAlign` (non-nullable), but the caller's `textAlign` parameter is `TextAlign?` (nullable)** — the fix is `widget.textAlign ?? TextAlign.start` in the State.build. The default `TextAlign.start` matches Flutter's own default for `TextField`.
+
+(f) **Save-as-template dialogs each contain BOTH a TextField AND a FilledButton** — the plan undercounted by treating them as a single migration. In practice each dialog is 2 sites (1 TextField + 1 FilledButton), so the 2-dialog migration counts as 4 sites (2 fields + 2 CTAs), not 2.
+
+(g) **`AppFormField` calls `widget.controller` directly in State.build (not via `_effectiveController`)** — but for `onChanged`/`onSubmitted`/`keyboardType`/etc., the State reads from `widget.X` (NOT from a local). The `_effectiveController` getter is only for the controller-specific path (initialValue + dispose).
+
+## Alternatives considered
+
+### A1 — Use `TextFormField` everywhere
+
+- **Pro:** all parameters `TextFormField` supports (incl. `initialValue`, `validator`) come for free.
+- **Con:** requires a `Form` ancestor. Half the use sites are NOT inside a Form. Would force a refactor of the dialog / mission UI to introduce a `Form` ancestor just to use the primitive. Rejected.
+
+### A2 — StatelessWidget + use `controller: TextEditingController(text: initialValue)` in the caller
+
+- **Pro:** keeps AppFormField stateless.
+- **Con:** every caller that wants an initial value has to create a controller in initState and dispose in dispose. Doubles the boilerplate. The pattern at `add_person.dart:212` (one of 6 sites that uses initialValue) would balloon from 7 lines to 20 lines. Rejected.
+
+### B1 — Wrap `ChoiceChip` in an external `Padding` widget
+
+- **Pro:** simple — `Padding(padding: ..., child: ChoiceChip(...))`.
+- **Con:** the external padding is visual only; the chip's own Material/InkWell hit-test is still at the inner ~32dp height. Users would tap the visual padding area and the chip wouldn't respond. Rejected. The correct extension point is `ChoiceChip.padding`.
+
+### B2 — Use `MaterialTapTargetSize.padded` on `ChoiceChip`
+
+- **Pro:** built-in M3 way to extend tap targets.
+- **Con:** increases the visual size of the chip beyond the canonical rhythm; doesn't give the 12+8 padding the M3 spec recommends. The M3 selectable-chip spec uses the `padding` prop, not `MaterialTapTargetSize`. Rejected.
+
+## Verification
+
+- `flutter test` 2000/2000 pass.
+- All 12 migration sites use the new primitives.
+- The 4 `Save as template` dialogs (in add_habit, add_event, add_person) now share a consistent `AppFormField(label: 'Template name', controller: _ctrl, autofocus: true)` shape.
+
+## Defers (out-of-scope, PR7)
+
+- The `FilterChip` pattern (e.g., `add_habit.dart:587` weekday active-days selector) — `FilterChip` is a separate widget with different semantics. The plan reserved this for a future PR. Deferred.
+- The bare `SwitchListTile` and `Slider` patterns in the same screens — separate widgets, separate PRs. Deferred.
+- The `CalendarPicker` and `LocationPicker` modal form fields — these are third-party / widget-tree-deep and would need their own primitive. Deferred.

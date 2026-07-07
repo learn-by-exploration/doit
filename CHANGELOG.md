@@ -4790,3 +4790,22 @@ Extracted 3 card / surface primitives (`lib/ui/surface_card.dart` + `lib/ui/tile
 - 3-gate green: `dart format --output=none --set-exit-if-changed .` clean, `flutter analyze --fatal-infos lib test` 0 issues, `flutter test` 1974/1974 pass.
 - APK discipline anchor maintained: no `AndroidManifest.xml` change, no new pubspec dep, no Drift migration, no Kotlin change.
 - SYS-172 / ADR-103 / WF-100.
+
+## v1.8-07 — PR7 of 15 (AppFormField + AppChoiceChip primitives)
+
+Phase 83 / C4 form patterns batch 1.
+
+- NEW `lib/ui/app_form_field.dart` (~145 LOC) — `class AppFormField extends StatefulWidget` wrapping `TextField` with canonical `InputDecoration(labelText, errorText, helperText)`. The StatefulWidget pattern allows the internal `TextEditingController` to be created + disposed when `initialValue` is provided without an external controller (the standard Flutter "preset value" form-field pattern). API surface: `label`, `errorText`, `controller`, `initialValue`, `onChanged`, `onSubmitted`, `keyboardType`, `autofocus`, `helperText`, `maxLines`, `textAlign`. Replaces the bare `TextField` + inline `InputDecoration` pattern that recurred 6 times across `add_habit.dart`, `add_event.dart`, `add_person.dart`, `person_groups.dart`, `mission_math.dart`, `mission_type.dart`.
+- NEW `lib/ui/app_choice_chip.dart` (~62 LOC) — `class AppChoiceChip extends StatelessWidget` wrapping M3 `ChoiceChip` with `padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)` to force the canonical ≥48dp tap target. The default `ChoiceChip` padding produces a ~32dp-tall chip on most densities which falls short of `Sizing.tapMin`. Replaces the bare `ChoiceChip` pattern that recurred 3 times across `add_event.dart`, `add_habit.dart`, `person_groups.dart`.
+- NEW `test/ui/app_form_field_test.dart` (15 tests, 7 groups) + `test/ui/app_choice_chip_test.dart` (12 tests, 6 groups). 27 new tests total.
+- EDITED 7 screens for 12 migration sites:
+  - `lib/screens/add_habit.dart` — 4 sites: `TextField` (line 314) + `ChoiceChip` (line 566) + 2 dialog sites (TextField line 1265 + FilledButton line 1277 → `AppFormField` + `PrimaryButton`).
+  - `lib/screens/add_event.dart` — 3 sites: `TextField` (line 416) + `ChoiceChip` (line 450) + FilledButton dialog (line 530 → `PrimaryButton`).
+  - `lib/screens/add_person.dart` — 2 sites: `TextFormField` (line 212) + `TextField` dialog (line 521 → `AppFormField`).
+  - `lib/screens/person_groups.dart` — 5 sites: 2 `TextField` (lines 391, 399) + 3 `ChoiceChip` (lines 417, 435, 450).
+  - `lib/screens/mission_math.dart` — 1 site: `TextField` (line 99 → `AppFormField`).
+  - `lib/screens/mission_type.dart` — 1 site: `TextField` (line 79 → `AppFormField`).
+- Test count 1974 → 2000 (+26 net; +4 over the +22 plan target — added 2 tests for `onSubmitted` + `textAlign` parameters that were discovered needed during migration).
+- 3-gate green: `dart format --output=none --set-exit-if-changed .` clean, `flutter analyze --fatal-infos lib test` 0 issues, `flutter test` 2000/2000 pass.
+- APK discipline anchor maintained: no `AndroidManifest.xml` change, no new pubspec dep, no Drift migration, no Kotlin change.
+- SYS-173 / ADR-104 / WF-101.

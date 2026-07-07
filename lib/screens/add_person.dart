@@ -42,6 +42,7 @@ import 'package:doit/templates/template.dart';
 import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/trigger.dart';
+import 'package:doit/ui/app_form_field.dart';
 import 'package:doit/ui/primary_button.dart';
 import 'package:doit/ui/secondary_button.dart';
 import 'package:doit/ui/section_header.dart';
@@ -209,7 +210,7 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
               title: const Text('Every N days'),
               trailing: SizedBox(
                 width: 80,
-                child: TextFormField(
+                child: AppFormField(
                   key: const ValueKey('add_person.every_n'),
                   textAlign: TextAlign.right,
                   initialValue: _everyNDays.toString(),
@@ -518,12 +519,11 @@ class _SaveAsTemplateDialogState extends State<_SaveAsTemplateDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Save as template'),
-      content: TextField(
+      content: AppFormField(
         key: const ValueKey('add_person.save_as_template.name'),
         controller: _ctrl,
+        label: 'Template name',
         autofocus: true,
-        decoration: const InputDecoration(labelText: 'Template name'),
-        textInputAction: TextInputAction.done,
       ),
       actions: [
         SecondaryButton(

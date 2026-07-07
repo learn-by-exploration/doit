@@ -16,6 +16,7 @@ import 'package:doit/missions/mission_attempts.dart';
 import 'package:doit/missions/mission_input.dart';
 import 'package:doit/missions/mission_result.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/app_form_field.dart';
 
 class MissionMathScreen extends StatefulWidget {
   const MissionMathScreen({super.key, required this.mission});
@@ -96,15 +97,13 @@ class _MissionMathScreenState extends State<MissionMathScreen> {
                 ),
               ),
               const SizedBox(height: Spacing.md),
-              TextField(
+              AppFormField(
                 key: const ValueKey('mission_math.input'),
                 controller: _ctrl,
                 autofocus: true,
                 keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Answer',
-                  errorText: _error,
-                ),
+                label: 'Answer',
+                errorText: _error,
                 onSubmitted: (_) => _submit(),
               ),
               const SizedBox(height: Spacing.md),

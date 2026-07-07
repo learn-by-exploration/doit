@@ -15,6 +15,7 @@ import 'package:doit/missions/mission_attempts.dart';
 import 'package:doit/missions/mission_input.dart';
 import 'package:doit/missions/mission_result.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/app_form_field.dart';
 
 class MissionTypeScreen extends StatefulWidget {
   const MissionTypeScreen({super.key, required this.mission});
@@ -76,14 +77,12 @@ class _MissionTypeScreenState extends State<MissionTypeScreen> {
                 ),
               ),
               const SizedBox(height: Spacing.md),
-              TextField(
+              AppFormField(
                 key: const ValueKey('mission_type.input'),
                 controller: _ctrl,
                 autofocus: true,
-                decoration: InputDecoration(
-                  labelText: 'Type the phrase',
-                  errorText: _error,
-                ),
+                label: 'Type the phrase',
+                errorText: _error,
                 onSubmitted: (_) => _submit(),
               ),
               const SizedBox(height: Spacing.md),
