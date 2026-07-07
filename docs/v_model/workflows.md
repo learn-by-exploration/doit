@@ -4303,3 +4303,21 @@ SYS-158; ADR-089; v1.7-β row in `implementation_status.md`; `### v1.7-β` subse
 
 - **v1.7 milestone: 7/9 cycles shipped (α + β + γ + δ + ε + ζ + η); tests 1773 → 1858 (+85 net across 7 cycles; +13 exact for α, +14 exact for β, +12 exact for γ, +20 exact for δ, +10 exact for ε, +8 exact for ζ, +8 exact for η); `_GroupCard` per-row guards + `pickNextMember` rotation algorithm + AddPersonGroupScreen empty-state surfaces pinned; 0 Kotlin changes; 0 `<uses-permission>` changes; 0 Drift migrations; 0 release APK rebuilds.**
 
+
+### v1.7-θ — condition.dart boundaries + permission_lifecycle_observer.dart per-instance cold-start gate + triggerRefreshForTest hook independence
+
+**Eighth cycle of v1.7.** Tests-only. **+8 tests** (6 condition + 2 permission). **EXACT MATCH with v1.7 pre-auth plan target.**
+
+**Files:** `test/triggers/condition_test.dart` (+6 tests) + `test/services/permission_lifecycle_observer_test.dart` (+2 tests). **No production-code change.**
+
+**Batches:**
+- **Condition.dart (6 tests):** `ConditionOr.validate() recurses into BOTH leaves (left invalid → throws)` (pins ConditionOr validate line 79) + `ConditionOr.validate() recurses into BOTH leaves (right invalid → throws)` (pins line 81) + `ConditionTimeWindow.validate() rejects invalid endHour + negative startMinute + invalid endMinute` (pins lines 119-127 end-side + negative branches) + `ConditionAnd operator == + hashCode` (pins lines 63-67) + `ConditionTimeWindow operator == + hashCode` (pins lines 131-142) + `ConditionValidationException toString format` (pins lines 257-258).
+- **Permission_lifecycle_observer.dart (2 tests):** `cold_start gate is per_observer_instance (second observer starts with its own cold_start no_op)` (pins line 65 instance-field semantics) + `triggerRefreshForTest exposes _safeRefresh directly (runs without a lifecycle event and tolerates ReliabilityService not being init)` (pins line 89 test-hook independence from gate consumption).
+
+**Cumulative v1.7:** 1773 → 1866 (+93 across α+β+γ+δ+ε+ζ+η+θ; 8/9 cycles shipped).
+
+**Coverage gain:** `condition.dart` 59.8% → 80.5% (+20.7 pp). `permission_lifecycle_observer.dart` stays at 78.6% (debugPrint catch branches are dead code). `mission_result.dart` stays at 100% (no coverage gap).
+
+**Drift lessons:** see ADR-095 — (a) `ConditionDayOfWeek` non-const ctor + (b) `ConditionOr`/`ConditionAnd` non-const in equality + (c) `ConditionValidationException.toString()` format invariance + (d) `_coldStartSeen` per-instance semantics + (e) `triggerRefreshForTest` does NOT consume the gate.
+
+**3-gate:** `dart format` (clean after auto-format of 2 files) + `flutter analyze --fatal-infos` (0 issues) + `flutter test` (1866/1866 pass).

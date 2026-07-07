@@ -4706,3 +4706,10 @@ Cycle is the **SIXTH** in the v1.7 milestone (6/9 cycles shipped). 3 remaining: 
 
 **Test count: 1850 → 1858 (+8 net — exactly matches plan).** Cumulative v1.7 progress: 1773 → 1858 (+85 net across α + β + γ + δ + ε + ζ + η). **3-gate green.** **Discipline anchor:** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes. APK SHA1 NOT REPORTED (per ADR-093 (e) + the [v1-7-cyc-zeta-cycle-shipped.md](../../../.claude/projects/-home-shyam-common-games-doit/memory/v1-7-cyc-zeta-cycle-shipped.md) finding). SYS-163 / ADR-094 / WF-091.
 
+
+
+## v1.7-θ
+
+**Date:** 2026-07-07. **Tests:** 1858 → 1866 (+8 net). **Cumulative v1.7:** 1773 → 1866 (+93 across α+β+γ+δ+ε+ζ+η+θ; 8/9 cycles shipped).
+
+EXTEND `test/triggers/condition_test.dart` (+6 tests) + `test/services/permission_lifecycle_observer_test.dart` (+2 tests). 3 batches: condition.dart boundaries (ConditionOr recursion + TimeWindow end-side + equality + hashCode + toString) + permission_lifecycle_observer.dart per-instance cold-start gate + triggerRefreshForTest hook independence. Coverage gain: condition.dart 59.8% → 80.5% (+20.7 pp). 5 drift lessons per ADR-095. SYS-164/ADR-095/WF-092. 3-gate green.

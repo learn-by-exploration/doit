@@ -204,4 +204,167 @@ void main() {
       }
     });
   });
+
+  // ---- v1.7-θ additions (SYS-164 / ADR-095 / WF-092) ----
+  group('v1.7-θ boundaries', () {
+    test('ConditionOr.validate() recurses into BOTH leaves '
+        '(left invalid → throws)', () {
+      // ConditionOr.validate() (condition.dart:78-83) walks
+      // both `left.validate()` AND `right.validate()`. The
+      // baseline test only exercises the empty-weekday path
+      // via ConditionAnd; OR recursion is uncovered. Here
+      // the LEFT leaf is the invalid one.
+      expect(
+        () => ConditionOr(
+          ConditionDayOfWeek(const <int>{}), // invalid
+          ConditionDayOfWeek(const {1}),
+        ).validate(),
+        throwsA(isA<ConditionDayOfWeekEmpty>()),
+      );
+    });
+
+    test('ConditionOr.validate() recurses into BOTH leaves '
+        '(right invalid → throws)', () {
+      // Mirror of the above: the RIGHT leaf is the invalid
+      // one. Pins the second branch at condition.dart:81.
+      expect(
+        () => ConditionOr(
+          ConditionDayOfWeek(const {1}),
+          ConditionDayOfWeek(const {0}), // invalid weekday
+        ).validate(),
+        throwsA(isA<ConditionDayOfWeekInvalidWeekday>()),
+      );
+    });
+
+    test('ConditionTimeWindow.validate() rejects invalid endHour '
+        '+ negative startMinute + invalid endMinute '
+        '(pins condition.dart:119-127 end-side branches)', () {
+      // Baseline covers invalid startHour + invalid
+      // startMinute; the end-side branches (endHour,
+      // endMinute) and the negative-minute branch are
+      // uncovered.
+      expect(
+        () => const ConditionTimeWindow(
+          startHour: 8,
+          startMinute: 0,
+          endHour: 24, // out of range
+          endMinute: 0,
+        ).validate(),
+        throwsA(isA<ConditionTimeWindowInvalidHour>()),
+      );
+      expect(
+        () => const ConditionTimeWindow(
+          startHour: 8,
+          startMinute: -1, // out of range
+          endHour: 18,
+          endMinute: 0,
+        ).validate(),
+        throwsA(isA<ConditionTimeWindowInvalidMinute>()),
+      );
+      expect(
+        () => const ConditionTimeWindow(
+          startHour: 8,
+          startMinute: 0,
+          endHour: 18,
+          endMinute: 60, // out of range
+        ).validate(),
+        throwsA(isA<ConditionTimeWindowInvalidMinute>()),
+      );
+    });
+
+    test('ConditionAnd operator == + hashCode cover the '
+        'left+right equality branch (pins condition.dart:63-67)', () {
+      // The baseline test exercises structural equality of
+      // two ConditionAnd instances with the same leaves,
+      // but the `==` operator + `hashCode` (lines 63-67)
+      // are not directly tested. Equality is the inverse
+      // pin: same leaves → equal + same hashCode; flipped
+      // leaves → NOT equal.
+      final a = ConditionAnd(
+        ConditionDayOfWeek(const {1}),
+        ConditionDayOfWeek(const {2}),
+      );
+      final b = ConditionAnd(
+        ConditionDayOfWeek(const {1}),
+        ConditionDayOfWeek(const {2}),
+      );
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+
+      final flipped = ConditionAnd(
+        ConditionDayOfWeek(const {2}),
+        ConditionDayOfWeek(const {1}),
+      );
+      expect(a, isNot(equals(flipped)));
+
+      // Cross-type inequality: an AND vs an OR with the
+      // same leaves is NOT equal.
+      final orSameLeaves = ConditionOr(
+        ConditionDayOfWeek(const {1}),
+        ConditionDayOfWeek(const {2}),
+      );
+      expect(a, isNot(equals(orSameLeaves)));
+    });
+
+    test('ConditionTimeWindow operator == + hashCode '
+        '(pins condition.dart:131-142)', () {
+      // Two windows with identical fields are equal and
+      // have the same hashCode.
+      const w1 = ConditionTimeWindow(
+        startHour: 8,
+        startMinute: 30,
+        endHour: 18,
+        endMinute: 45,
+      );
+      const w2 = ConditionTimeWindow(
+        startHour: 8,
+        startMinute: 30,
+        endHour: 18,
+        endMinute: 45,
+      );
+      expect(w1, equals(w2));
+      expect(w1.hashCode, equals(w2.hashCode));
+
+      // Flipping ONE field → not equal.
+      const w3 = ConditionTimeWindow(
+        startHour: 9, // different
+        startMinute: 30,
+        endHour: 18,
+        endMinute: 45,
+      );
+      expect(w1, isNot(equals(w3)));
+
+      // Cross-type inequality: a window vs a ConditionAnd
+      // is not equal (the identical check at line 133
+      // returns early on the type mismatch).
+      const andNotWindow = ConditionAnd(
+        ConditionCalendarBusy(calendarId: ''),
+        ConditionSilentMode(SilentMode.silent),
+      );
+      expect(w1, isNot(equals(andNotWindow)));
+    });
+
+    test('ConditionValidationException toString format '
+        '(pins condition.dart:257-258)', () {
+      // Each exception subtype toString()s via the base
+      // class's `ConditionValidationException: $message`
+      // format. Pin the prefix + message for one
+      // representative subtype.
+      const e = ConditionTimeWindowInvalidHour('startHour', 24);
+      expect(
+        e.toString(),
+        equals('ConditionValidationException: Hour must be in 0..23.'),
+      );
+      const e2 = ConditionDayOfWeekEmpty();
+      expect(
+        e2.toString(),
+        equals('ConditionValidationException: weekdays must be non-empty.'),
+      );
+      const e3 = ConditionBatteryRangeInverted();
+      expect(
+        e3.toString(),
+        equals('ConditionValidationException: low must be <= high.'),
+      );
+    });
+  });
 }

@@ -1466,3 +1466,26 @@ The **FIFTH cycle of the v1.7 milestone** — pins the raw-column `pausedUntil_m
 
 **Test count: 1850 → 1858 (+8 net — exactly matches plan).** Cumulative v1.7 progress: 1773 → 1858 (+85 net across 7 cycles). **3-gate green.** **Discipline anchor:** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes. APK SHA1 NOT REPORTED (per ADR-093 (e) + the [v1-7-cyc-zeta-cycle-shipped.md](../../../.claude/projects/-home-shyam-common-games-doit/memory/v1-7-cyc-zeta-cycle-shipped.md) finding). SYS-163 / ADR-094 / WF-091.
 
+
+
+### v1.7-θ — condition.dart boundaries + permission_lifecycle_observer.dart per-instance cold-start gate + triggerRefreshForTest hook independence
+
+**Eighth cycle of v1.7.** Tests-only. **+8 tests** (6 condition + 2 permission). **EXACT MATCH with v1.7 pre-auth plan target.**
+
+**Date:** 2026-07-07. **Tests:** 1858 → 1866 (+8 net). **Cumulative v1.7:** 1773 → 1866 (+93 across α+β+γ+δ+ε+ζ+η+θ; 8/9 cycles shipped).
+
+**Files:** `test/triggers/condition_test.dart` (+6 tests) + `test/services/permission_lifecycle_observer_test.dart` (+2 tests). **No production-code change.**
+
+**Batches (6 condition + 2 permission):**
+- ConditionOr recursion (2): left invalid throws + right invalid throws.
+- ConditionTimeWindow end-side (1): invalid endHour + negative startMinute + invalid endMinute.
+- Equality + hashCode (2): ConditionAnd + ConditionTimeWindow.
+- toString format (1): ConditionValidationException (3 subtypes).
+- Per-instance cold-start gate (1): second observer starts with its own cold-start no-op.
+- triggerRefreshForTest independence (1): runs without lifecycle event + does NOT consume gate.
+
+**Coverage gain:** `condition.dart` 59.8% → 80.5% (+20.7 pp). `permission_lifecycle_observer.dart` stays at 78.6%. `mission_result.dart` stays at 100%.
+
+**Drift lessons:** see ADR-095 — 5 lessons covering `ConditionDayOfWeek` non-const + cross-type non-const + `ConditionValidationException.toString()` format + `_coldStartSeen` per-instance + `triggerRefreshForTest` independence.
+
+**3-gate:** `dart format` (clean) + `flutter analyze --fatal-infos` (0 issues) + `flutter test` (1866/1866 pass).

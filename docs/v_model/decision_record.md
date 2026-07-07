@@ -8429,3 +8429,31 @@ The `final future = PermissionSheet.show(...)` is a non-awaited handle to the Fu
 - The 5 drift lessons follow the canonical pattern from ADR-087 §b (tests-only + 2-bug-fix canonical pattern)
 - The APK SHA1 streak (broken at v1.7-ζ per ADR-093 (e) + the [v1-7-cyc-zeta-cycle-shipped.md](../../../../.claude/projects/-home-shyam-common-games-doit/memory/v1-7-cyc-zeta-cycle-shipped.md) finding) is NOT reported as a discipline anchor from v1.7-η onwards; replaced with test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes
 
+
+## ADR-095 — v1.7-θ drift lessons (condition.dart boundaries + permission_lifecycle_observer.dart per-instance cold-start gate + triggerRefreshForTest hook independence)
+
+**Eighth cycle of the v1.7 milestone.** Tests-only. **+8 tests, EXACT MATCH with plan.**
+
+**Date:** 2026-07-07.
+**Tests:** 1858 → 1866 (+8 net).
+
+### Drift lessons
+
+(a) **`ConditionDayOfWeek` constructor is NOT const** — `ConditionDayOfWeek(Set<int>)` does not have a `const` constructor; an EARLIER draft of the `ConditionTimeWindow operator == + hashCode` test used `const ConditionOr(ConditionDayOfWeek(const {1}), ConditionDayOfWeek(const {2}))`. The `ConditionDayOfWeek(...)` calls failed compilation with `Cannot invoke a non-'const' constructor where a const expression is expected`. Fix: drop `const` from the outer `ConditionOr(...)` and use `final` (the inner `const {1}` set literal is fine — sets are const-constructible).
+
+(b) **The `ConditionOr` cross-type-inequality pin in the `ConditionAnd operator == + hashCode` test requires non-`const` instances** — same root cause as (a); both `ConditionOr` and `ConditionAnd` in the equality assertion must be `final` to compile. The fix preserves the equality semantics: `ConditionAnd(a, b) != ConditionOr(a, b)` because the runtime types differ, which is exactly what the test wants to pin.
+
+(c) **`ConditionValidationException` is a sealed base class with one `String message` field + one `toString()` returning `'ConditionValidationException: $message'`** — the 6 subtypes all pass their custom message string to `super(...)`. The `toString()` format is invariant; the test pins 3 representative messages which covers 3 of the 6 subtypes — the remaining 3 all use the same base-class `toString()` so the invariant is pinned by the 3 sampled ones.
+
+(d) **The `_coldStartSeen` field at `permission_lifecycle_observer.dart:65` is an INSTANCE field, NOT a static field** — a fresh `PermissionLifecycleReProbe()` starts with `_coldStartSeen = false` regardless of prior observers' state. The per-instance test pins this by constructing obs2 AFTER obs1 has already consumed its cold-start gate, then verifying obs2's FIRST resumed is still a no-op. If the gate were static, obs2's first resumed would fire a refresh — the test would fail.
+
+(e) **`triggerRefreshForTest()` calls `_safeRefresh()` DIRECTLY** — it does NOT go through `didChangeAppLifecycleState`, so it does NOT consume the `_coldStartSeen` gate. The independence test pins this by calling `triggerRefreshForTest()` on a fresh observer, then driving a `didChangeAppLifecycleState(resumed)` AFTERWARDS and verifying the resumed is still a no-op. This is a useful invariant for tests that want to drive `_safeRefresh` without affecting the cold-start gate's state.
+
+### Defers
+
+- Testing the `kDebugMode` `debugPrint` catch branches at lines 108, 122-123 of `permission_lifecycle_observer.dart` (defensive double-coverage — `PermissionService.refresh()` swallows its own errors internally, so the outer catch is unreachable in normal flow).
+- Direct pin of `ConditionDayOfWeek` / `ConditionCalendarBusy` / `ConditionBatteryRange` / `ConditionSilentMode` `operator == + hashCode` (low value; the existing baseline tests cover equality implicitly).
+
+### Cumulative v1.7
+
+1773 → 1866 (+93 net across α+β+γ+δ+ε+ζ+η+θ; 8/9 cycles shipped).

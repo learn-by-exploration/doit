@@ -683,3 +683,22 @@ Cycle is the **SIXTH** in the v1.7 milestone — v1.7 milestone 6/9 cycles shipp
 
 **Test count: 1850 → 1858 (+8 net — exactly matches plan).** Cumulative v1.7 progress: 1773 → 1858 (+85 net across α + β + γ + δ + ε + ζ + η). **3-gate green:** `dart format --output=none --set-exit-if-changed .` (clean after auto-format of 1 file — `person_groups_test.dart` 80-col line-width normalization) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1858/1858 pass). **Discipline anchor:** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes. **APK SHA1: NOT REPORTED** — debug-build SHA1 is non-deterministic per v1.7-ζ ADR-093 (e) + the [v1-7-cyc-zeta-cycle-shipped.md](../../../.claude/projects/-home-shyam-common-games-doit/memory/v1-7-cyc-zeta-cycle-shipped.md) finding (3 unique SHA1s in 3 clean rebuilds); replaced with the discipline anchor from v1.7-η onwards. **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** SYS-163 / ADR-094 / WF-091.
 
+
+
+## v1.7-θ
+
+**Eighth cycle of the v1.7 milestone.** Tests-only. **+8 tests, EXACT MATCH with plan.**
+
+**Date:** 2026-07-07. **Tests:** 1858 → 1866 (+8 net). **Cumulative v1.7:** 1773 → 1866 (+93 net across α+β+γ+δ+ε+ζ+η+θ; 8/9 cycles shipped).
+
+**Scope:** EXTEND `test/triggers/condition_test.dart` (+6 tests) + `test/services/permission_lifecycle_observer_test.dart` (+2 tests). **No production-code change; no Drift migration; no Kotlin change; no new `<uses-permission>`; no new pubspec dep.**
+
+**Batches:**
+- **Condition.dart (6 tests):** `ConditionOr.validate() recurses into BOTH leaves (left invalid → throws)` (pins ConditionOr validate line 79) + `ConditionOr.validate() recurses into BOTH leaves (right invalid → throws)` (pins line 81) + `ConditionTimeWindow.validate() rejects invalid endHour + negative startMinute + invalid endMinute` (pins lines 119-127 + the negative-minute branch) + `ConditionAnd operator == + hashCode` (pins lines 63-67) + `ConditionTimeWindow operator == + hashCode` (pins lines 131-142) + `ConditionValidationException toString format` (pins lines 257-258).
+- **Permission_lifecycle_observer.dart (2 tests):** `cold_start gate is per_observer_instance` (pins line 65 instance-field semantics) + `triggerRefreshForTest exposes _safeRefresh directly` (pins line 89 test-hook independence from gate consumption).
+
+**Coverage gain:** `condition.dart` 59.8% → 80.5% (+20.7 pp). `permission_lifecycle_observer.dart` stays at 78.6% (debugPrint catch branches at lines 108, 122-123 are dead code given `PermissionService.refresh()` swallows its own errors internally). `mission_result.dart` stays at 100% (already covered by v1.4-stab-K / SYS-138; no coverage gap).
+
+**Drift lessons:** see ADR-095 — (a) `ConditionDayOfWeek` non-const ctor + (b) cross-type-inequality non-const + (c) `ConditionValidationException.toString()` format invariance + (d) `_coldStartSeen` per-instance semantics + (e) `triggerRefreshForTest` does NOT consume the gate.
+
+**3-gate:** `dart format` (clean after auto-format of 2 files) + `flutter analyze --fatal-infos` (0 issues) + `flutter test` (1866/1866 pass).

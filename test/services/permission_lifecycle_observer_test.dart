@@ -469,4 +469,107 @@ void main() {
     // the test hook call above did not throw.
     expect(observer, isNotNull);
   });
+
+  // ---- v1.7-θ additions (SYS-164 / ADR-095 / WF-092) ----
+
+  // The cold-start gate is per-observer-instance, not
+  // shared across observers. Constructing a second
+  // observer resets the gate; its first `resumed` is a
+  // cold-start no-op, while the FIRST observer's second
+  // `resumed` continues to fire refreshes.
+  test('v1.7-θ: cold_start gate is per_observer_instance '
+      '(second observer starts with its own cold_start no_op)', () async {
+    final obs1 = PermissionLifecycleReProbe();
+    await PermissionService.instance.init();
+    // Consume obs1's cold-start resumed.
+    obs1.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await _drain();
+    // obs1 second resumed → fires refreshes.
+    obs1.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await _drain();
+    // Now construct a NEW observer. Its cold-start gate
+    // is independent — the FIRST resumed event for it
+    // MUST be a no-op (cold-start gate still active).
+    final obs2 = PermissionLifecycleReProbe();
+    final before = _fireCountSinceStart;
+    obs2.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    // Drain generously so any erroneously-scheduled
+    // refresh would have time to fire.
+    await _drain();
+    await _drain();
+    expect(
+      _fireCountSinceStart,
+      before,
+      reason:
+          'A new observer\'s first resumed must be a '
+          'cold-start no-op (the gate is per-instance '
+          'at permission_lifecycle_observer.dart:65).',
+    );
+
+    // The next resumed on obs2 is a non-cold-start
+    // resumed and MUST fire the statuses notifier.
+    obs2.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await _drain();
+    expect(
+      _fireCountSinceStart,
+      greaterThan(before),
+      reason:
+          'A subsequent resumed on the second observer '
+          'must trigger a refresh after the cold-start '
+          'gate has been consumed.',
+    );
+  });
+
+  // `triggerRefreshForTest()` exposes `_safeRefresh`
+  // directly via `@visibleForTesting`. The point of the
+  // hook is to let tests await the chain without driving
+  // a lifecycle event. Pin: calling it on a fresh
+  // observer (no `didChangeAppLifecycleState` calls yet)
+  // runs the full `_safeRefresh` body — the statuses
+  // notifier fires (the permission refresh half
+  // completes) — and does NOT throw even when
+  // `ReliabilityService` is uninitialized.
+  test('v1.7-θ: triggerRefreshForTest exposes _safeRefresh directly '
+      '(runs without a lifecycle event and tolerates '
+      'ReliabilityService not being init)', () async {
+    // No `didChangeAppLifecycleState` calls at all —
+    // the hook is the only way to drive the chain.
+    final observer = PermissionLifecycleReProbe();
+    await PermissionService.instance.init();
+    final before = _fireCountSinceStart;
+    // ReliabilityService.resetForTesting() runs in
+    // setUp's tearDown chain — at this point it is
+    // uninitialized, so the StateError catch at line
+    // 113 will fire AND the permission refresh half
+    // must still complete (the statuses notifier fires).
+    await observer.triggerRefreshForTest();
+    await _drain();
+    expect(
+      _fireCountSinceStart,
+      greaterThan(before),
+      reason:
+          'triggerRefreshForTest must run the full '
+          '_safeRefresh body (PermissionService.refresh '
+          '+ ReliabilityService.refresh with StateError '
+          'catch). The permission half completes; the '
+          'reliability half is swallowed.',
+    );
+
+    // After the test hook ran, the cold-start gate is
+    // still intact (the hook does NOT touch it). The
+    // next resumed event is therefore still a cold-start
+    // no-op.
+    final afterHook = _fireCountSinceStart;
+    observer.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await _drain();
+    await _drain();
+    expect(
+      _fireCountSinceStart,
+      afterHook,
+      reason:
+          'The cold-start gate must remain intact after '
+          'triggerRefreshForTest (the hook does NOT '
+          'consume the gate).',
+    );
+  });
 }
