@@ -50,6 +50,7 @@ import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/trigger.dart';
 import 'package:doit/ui/primary_button.dart';
+import 'package:doit/ui/secondary_button.dart';
 import 'package:doit/widgets/calendar_picker.dart';
 import 'package:doit/widgets/location_picker.dart';
 
@@ -211,9 +212,9 @@ class _AddEventScreenState extends State<AddEventScreen> {
             ),
           ),
           actions: [
-            TextButton(
+            SecondaryButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
+              label: const Text('Cancel'),
             ),
             PrimaryButton(
               onPressed: () => Navigator.of(ctx).pop(n),

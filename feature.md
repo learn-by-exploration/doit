@@ -851,6 +851,11 @@ Cycle v1.6-λ (`feat/v1.6-λ-doc-cleanups`) shipped: **0 net tests** (doc-only c
 | v1.7-ι | doc-only | `plan.md`/`decision_record.md` closeout + 0 tests + 8 V-Model artifacts | 8 doc appends; plan/decision/workflow/trace + status/feature/changelog; 13 blocked-items carry + Phase B TODO audit (0 outstanding) | 1866 → 1866 (+0) |
 
 | PR1 of 15 (UI) | new `lib/ui/primary_button.dart` primitive + tests | `lib/ui/primary_button.dart` (NEW, ~70 lines) + `test/ui/primary_button_test.dart` (NEW, 11 tests, 6 groups) + 3 screen migrations (`add_event.dart:217`, `add_person.dart:548`, `rest_day_picker_dialog.dart:110`) — first file in `lib/ui/` design-system layer | 1866 → 1877 (+11) |
+| PR2 of 15 (UI) | new `lib/ui/secondary_button.dart` primitive + tests + 3 dialog Cancel migrations | `lib/ui/secondary_button.dart` (NEW, ~62 lines) + `test/ui/secondary_button_test.dart` (NEW, 11 tests, 6 groups) + 3 dialog Cancel migrations (`add_event.dart:213`, `add_person.dart:544`, `rest_day_picker_dialog.dart:106`) — second file in `lib/ui/` design-system layer | 1877 → 1888 (+11) |
+
+### PR2 of 15 — UI consolidation sprint — SecondaryButton extraction
+
+**Second cycle of the 15-PR UI consolidation sprint.** Extracts `lib/ui/secondary_button.dart` (wraps `TextButton`/`TextButton.icon`; 48dp via inline `TextButton.styleFrom` since `textButtonTheme` is NOT set in `AppTheme._build()`; supports `label`, `icon`, `tooltip`, `key` parameters) + 11 widget tests (6 groups mirroring PR1's structure) + migrates 3 dialog Cancel CTAs as the canonical-pattern call. **NEW drift lesson:** `TextButton` does NOT have a theme-level `minimumSize` default (unlike `FilledButton`'s 48dp inheritance); SecondaryButton MUST specify `TextButton.styleFrom(minimumSize: const Size(0, 48))` inline per instance. PR1's dart-format deviation lesson was applied proactively (formatted upfront) — CI passed on first try. Cumulative v1.7 + UI sprint: 1773 → 1888 (+115 net).
 
 ### PR1 of 15 — UI consolidation sprint — PrimaryButton extraction
 

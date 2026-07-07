@@ -766,3 +766,39 @@ Cycle is the **SIXTH** in the v1.7 milestone — v1.7 milestone 6/9 cycles shipp
 **Drift lessons:** see ADR-095 — (a) `ConditionDayOfWeek` non-const ctor + (b) cross-type-inequality non-const + (c) `ConditionValidationException.toString()` format invariance + (d) `_coldStartSeen` per-instance semantics + (e) `triggerRefreshForTest` does NOT consume the gate.
 
 **3-gate:** `dart format` (clean after auto-format of 2 files) + `flutter analyze --fatal-infos` (0 issues) + `flutter test` (1866/1866 pass).
+## PR2 of 15 — UI consolidation sprint — SecondaryButton extraction + 3 dialog Cancel migrations
+
+**PR2 (Phase 77)** of the 15-PR UI consolidation sprint. **Second file in `lib/ui/`.** **+11 tests (EXACT match with plan: 11 widget tests).**
+
+**Date:** 2026-07-07. **Tests:** 1877 → 1888 (+11 net). **Cumulative v1.7 + UI sprint:** 1773 → 1888 (+115 net across 9 v1.7 cycles + PR1 + PR2 of UI sprint).
+
+**Surface — 4 changes:**
+1. **NEW `lib/ui/secondary_button.dart`** — canonical cancel/dismiss CTA. `StatelessWidget` wrapping `TextButton` / `TextButton.icon`. 48dp minimum via inline `TextButton.styleFrom(minimumSize: const Size(0, 48))` (textButtonTheme is NOT set in `AppTheme._build()` — verified at `lib/theme/app_theme.dart:51-77`).
+2. **NEW `test/ui/secondary_button_test.dart`** — 11 widget tests (6 groups): plain-text variant (3) + icon variant (2) + disabled state (1) + tooltip wrapper (2) + 48dp touch target (1) + Key + Semantics (2). All deterministic.
+3. **MIGRATE 3 dialog Cancel CTAs:** `add_event.dart:213` (Cancel in time picker dialog, sibling to PR1 PrimaryButton at line 217) + `add_person.dart:544` (Cancel in Save-as-Template, sibling to PR1 PrimaryButton at line 548) + `rest_day_picker_dialog.dart:106` (Cancel in rest day picker, sibling to PR1 PrimaryButton at line 110). All preserve onPressed handlers + labels verbatim.
+4. **+ Imports** to each migrated screen.
+
+**Test count + coverage:**
+- `lib/ui/secondary_button.dart`: 100% (4 branches: onPressed null vs enabled × icon null vs non-null; all 4 pinned)
+- `lib/screens/add_event.dart`: no regression (52/52 tests pass)
+- `lib/screens/add_person.dart`: no regression (16/16 tests pass)
+- `lib/screens/rest_day_picker_dialog.dart`: no regression
+- Cumulative: 1877 → 1888 (+11 net)
+
+**V-Model artifacts (8):**
+- `docs/v_model/requirements.md` — SYS-167 row appended
+- `docs/v_model/decision_record.md` — ADR-098 section appended
+- `docs/v_model/traceability_matrix.md` — WF-095 row appended
+- `docs/v_model/workflows.md` — `### PR2 of 15` subsection appended
+- `docs/v_model/implementation_status.md` — `## PR2 of 15` row appended (this row)
+- `docs/v_model/plan.md` — `### PR2 of 15` subsection appended
+- `feature.md` — PR2 of 15 row appended (table row 24)
+- `CHANGELOG.md` — `## PR2 of 15` entry appended
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean — formatted upfront) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1888/1888 pass — zero regressions).
+
+**Drift lessons:** see ADR-098 — (a) `AppTheme.dark` getter-not-Widget (PR1 mirror) + (b) `const MaterialApp(theme: AppTheme.dark, ...)` fails (PR1 mirror) + (c) `TextButton` does NOT inherit 48dp from `filledButtonTheme` (NEW lesson) + (d) `TextButton.onPressed: null` auto-disables (PR1 mirror) + (e) PR1 dart-format deviation lesson applied proactively.
+
+**APK discipline anchor (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)):** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes.
+
+**Next:** PR3 of 15 (IconButton — the canonical icon-only CTA).

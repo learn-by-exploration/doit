@@ -26,6 +26,7 @@
 
 import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/ui/primary_button.dart';
+import 'package:doit/ui/secondary_button.dart';
 import 'package:flutter/material.dart';
 
 /// The integer range of valid rest-day budgets. Exposed as a constant
@@ -104,9 +105,9 @@ class _RestDayPickerDialogState extends State<RestDayPickerDialog> {
         ],
       ),
       actions: [
-        TextButton(
+        SecondaryButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(l.homeTileBudgetEditCancel),
+          label: Text(l.homeTileBudgetEditCancel),
         ),
         PrimaryButton(
           onPressed: () => Navigator.of(context).pop(_value),

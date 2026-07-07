@@ -8570,3 +8570,56 @@ Sizing: 48dp minimum, INHERITED from `filledButtonTheme` in `lib/theme/app_theme
 - Migrating the remaining 36 occurrences of `FilledButton`/`FilledButton.icon`/`TextButton` across 19 screens.
 - Extracting the 10 remaining primitives (SecondaryButton, IconButton, FAB, EmptyStateView, ErrorStateView, LoadingView, FormField, SectionCard, ScreenScaffold, ReliabilityBadge).
 - The cancel-button pattern (`TextButton` + `'Cancel'` / `'Back'` / `'Discard'`) is scoped to PR2.
+
+## ADR-098 — PR2 of 15 UI consolidation — `SecondaryButton` primitive design decisions
+
+**Date:** 2026-07-07. **Status:** APPROVED (PR2 of 15 / Phase 77 / SYS-167 / WF-095).
+
+### Context
+
+Per the UI_ORG_AUDIT.md C1 category (6 button-style issues — pairs with PR1 PrimaryButton migration), the screen layer uses raw `TextButton` for Cancel CTAs in ~5 dialogs across 22 screens. Each occurrence repeats the same minimum-size/icon-or-not/onPressed/key/tooltip wiring. PR1 extracted `PrimaryButton` (Save/OK/Add contact) as the first primitive in `lib/ui/`; PR2 extracts `SecondaryButton` (Cancel/Back/Discard) as the cancel/dismiss counterpart.
+
+### Decision
+
+Extract `lib/ui/secondary_button.dart` as a thin wrapper around `TextButton` / `TextButton.icon`. Migrate the 3 highest-traffic dialog Cancel CTAs (`add_event.dart:213` Cancel in time picker dialog, `add_person.dart:544` Cancel in Save-as-Template dialog, `rest_day_picker_dialog.dart:106` Cancel in rest day picker) to use it. PR3+ will migrate the remaining 2 dialog Cancel CTAs + add the other primitives (IconButton wrapping `IconButton`, FAB wrapping `FloatingActionButton`, EmptyStateView, ErrorStateView, LoadingView, FormField, SectionCard, ScreenScaffold, ReliabilityBadge).
+
+### Design
+
+API mirrors PrimaryButton: `const SecondaryButton({super.key, required onPressed, required label, this.icon, this.tooltip})` where `label` is a `Widget` (typically `Text('Cancel' | 'Back' | 'Discard')`); `icon` is the `Widget?` that decides the `TextButton` vs `TextButton.icon` branch; `tooltip` (optional) wraps the button in a `Tooltip(message: ...)` for TalkBack / long-press affordance.
+
+**Sizing (NEW drift lesson vs PrimaryButton):** 48dp minimum is specified INLINE via `TextButton.styleFrom(minimumSize: const Size(0, 48))` because `AppTheme._build()` does NOT set `textButtonTheme` — only `filledButtonTheme` (PrimaryButton inherits 48dp for free; SecondaryButton must specify it inline). See ADR-098 lesson (c).
+
+### Alternatives considered
+
+**A. Bigger PR migrating all 5 dialog Cancel CTAs.** Rejected: the 5-occurrence blast radius is small; the 3-CTAs-in-one-PR is the canonical-pattern call from PR1 (consistency over coverage).
+
+**B. Specify the 48dp inline via `style: TextButton.styleFrom(...)` rather than `style: const ButtonStyle(...)`.** Rejected: `TextButton.styleFrom(minimumSize: ...)` is the Material 3 idiomatic pattern; using `const ButtonStyle(...)` would force explicit `textStyle`/`foregroundColor`/`backgroundColor`/`overlayColor`/`shadowColor`/`surfaceTintColor`/`elevation`/`padding`/`shape`/`mouseCursor`/`visualDensity`/`tapTargetSize`/`animationDuration`/`splashFactory`/`alignment` params, which defeats the purpose of using a primitive.
+
+**C. Add a `textButtonTheme` to `AppTheme._build()` so SecondaryButton doesn't need inline style.** Rejected: changes the global theme; affects any future screen using raw `TextButton`. The inline-style approach is localized and explicit — no global side effects.
+
+### Drift lessons
+
+**(a) `AppTheme.dark` is a `ThemeData` getter, NOT a `Widget` constructor** (same root cause as PR1 / ADR-097 (a)) — first draft of `secondary_button_test.dart` made the same mistake. Fix: wrap in `MaterialApp(theme: AppTheme.dark, home: ...)` (matches existing tests at `test/l10n/locale_render_test.dart:53`).
+
+**(b) `const MaterialApp(theme: AppTheme.dark, ...)` fails (`Invalid constant value`)** (same root cause as PR1 / ADR-097 (b)) — fix: keep `MaterialApp` non-const, `const` the inner `Scaffold`/`Center`/`SecondaryButton`/`Text` constructors where params are compile-time constants.
+
+**(c) `TextButton` does NOT have a theme-level `minimumSize` default** (NOT like `FilledButton`) — `AppTheme._build()` only sets `filledButtonTheme` (lines 71-75); there is no `textButtonTheme`. PR2 had to specify `TextButton.styleFrom(minimumSize: const Size(0, 48))` explicitly per SecondaryButton instance to satisfy the 48dp touch-target invariant. The 48dp touch-target test pins this.
+
+**(d) `TextButton.onPressed: null` auto-disables + suppresses the callback** (mirrors PR1 / ADR-097 (c)) — Flutter's `ButtonStyleButton` (which `TextButton` extends) auto-disables when `onPressed` is null; the disabled tap test confirms zero invocations.
+
+**(e) The PR1 dart-format deviation lesson (separate `style: apply dart format` commit after the first CI fail) was applied proactively in PR2** — `dart format lib/ui/secondary_button.dart test/ui/secondary_button_test.dart` was run immediately after writing the test files, BEFORE `git add`. CI passed on the first try. The lesson from the v1-8-cyc-01 memory file is now the canonical-pattern call for PR3..PR15.
+
+### Constraints honored
+
+- **No `AndroidManifest.xml` changes** (pure Dart).
+- **No new pubspec deps** — uses existing `package:flutter/material.dart` + `AppTheme.dark` from `lib/theme/app_theme.dart`.
+- **No Drift migration, no Kotlin changes.**
+- **APK discipline anchor (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)):** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes.
+- **48dp touch target retained** (via inline `TextButton.styleFrom`).
+
+### Out-of-scope (deferred to PR3+)
+
+- Migrating the remaining 2 dialog Cancel CTAs (estimated: `add_habit.dart` Save-as-Template + 1 more) across the rest of the dialog surface.
+- Extracting the 9 remaining primitives (IconButton, FAB, EmptyStateView, ErrorStateView, LoadingView, FormField, SectionCard, ScreenScaffold, ReliabilityBadge).
+- The icon-only CTA pattern (`IconButton` + `tooltip`) is scoped to PR3.
+

@@ -4741,3 +4741,14 @@ The v1.7 9-cycle milestone is now **COMPLETE (9/9 cycles shipped)**. Next per th
 **Date:** 2026-07-07. **Tests:** 1858 → 1866 (+8 net). **Cumulative v1.7:** 1773 → 1866 (+93 across α+β+γ+δ+ε+ζ+η+θ; 8/9 cycles shipped).
 
 EXTEND `test/triggers/condition_test.dart` (+6 tests) + `test/services/permission_lifecycle_observer_test.dart` (+2 tests). 3 batches: condition.dart boundaries (ConditionOr recursion + TimeWindow end-side + equality + hashCode + toString) + permission_lifecycle_observer.dart per-instance cold-start gate + triggerRefreshForTest hook independence. Coverage gain: condition.dart 59.8% → 80.5% (+20.7 pp). 5 drift lessons per ADR-095. SYS-164/ADR-095/WF-092. 3-gate green.
+## PR2 of 15 — UI consolidation sprint — SecondaryButton extraction + 3 dialog Cancel migrations
+
+- **NEW `lib/ui/secondary_button.dart`** — canonical cancel/dismiss CTA wrapping `TextButton` / `TextButton.icon`. 48dp minimum via inline `TextButton.styleFrom(minimumSize: const Size(0, 48))` (`textButtonTheme` is NOT set in `AppTheme._build()`, unlike `filledButtonTheme` for PrimaryButton — verified).
+- **NEW `test/ui/secondary_button_test.dart`** — 11 widget tests (6 groups): plain-text variant (3) + icon variant (2) + disabled state (1) + tooltip wrapper (2) + 48dp touch target (1) + Key + Semantics (2). All deterministic.
+- **MIGRATE 3 dialog Cancel CTAs:** `lib/screens/add_event.dart:213` (Cancel in time picker dialog, sibling to PR1 PrimaryButton at line 217) + `lib/screens/add_person.dart:544` (Cancel in Save-as-Template, sibling to PR1 PrimaryButton at line 548) + `lib/screens/rest_day_picker_dialog.dart:106` (Cancel in rest day picker, sibling to PR1 PrimaryButton at line 110). All preserve onPressed handlers + labels verbatim.
+- **Second file in the new `lib/ui/` design-system layer** — pairs with PrimaryButton (PR1) as the cancel/dismiss counterpart.
+- **Tests:** 1877 → 1888 (+11 net; EXACT match with plan)
+- **Drift lessons per ADR-098:** (a) `AppTheme.dark` getter-not-Widget (PR1 mirror) + (b) `const MaterialApp(theme: AppTheme.dark, ...)` fails (PR1 mirror) + (c) **`TextButton` does NOT inherit 48dp from `filledButtonTheme`** (NEW) — explicit inline `TextButton.styleFrom(minimumSize: Size(0, 48))` required + (d) `TextButton.onPressed: null` auto-disables (PR1 mirror) + (e) PR1 dart-format deviation lesson applied proactively
+- **3-gate:** `dart format` clean (formatted upfront) + `flutter analyze --fatal-infos` 0 issues + `flutter test` 1888/1888 pass
+
+The 15-PR UI consolidation sprint has shipped 2/15 cycles. 13 cycles remaining. Next: PR3 (IconButton).
