@@ -30,6 +30,7 @@ import 'package:doit/services/permission_service.dart';
 import 'package:doit/services/settings_service.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/trigger.dart' show SilentMode;
+import 'package:doit/ui/section_header.dart';
 import 'package:doit/widgets/permission_sheet.dart';
 
 class AddRoutineScreen extends StatefulWidget {
@@ -87,13 +88,7 @@ class _AddRoutineScreenState extends State<AddRoutineScreen> {
               onChanged: (v) => setState(() => _enabled = v),
             ),
             const SizedBox(height: Spacing.sm),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-              child: Text(
-                'Contacts',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
+            const SectionHeader('Contacts'),
             Text(
               'Pick the contacts whose calls should ring through. '
               'Calls from anyone else stay on the current silent mode.',
@@ -106,13 +101,7 @@ class _AddRoutineScreenState extends State<AddRoutineScreen> {
               onRemove: (i) => setState(() => _picked.removeAt(i)),
             ),
             const SizedBox(height: Spacing.md),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-              child: Text(
-                'Ringer mode',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
+            const SectionHeader('Ringer mode'),
             Text(
               'When a chosen contact calls, the phone snaps to this mode '
               'for the duration of the call.',

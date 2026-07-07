@@ -4773,3 +4773,20 @@ Extracted `AppPalette` primitive (`lib/ui/app_palette.dart` — new 4th file in 
 
 Extracted 3 card / surface primitives (`lib/ui/surface_card.dart` + `lib/ui/tile_surface.dart` + `lib/ui/banner_surface.dart`) as the FIFTH/SEVENTH files in the new `lib/ui/` design-system layer. `SurfaceCard` wraps canonical `Card + Padding(Spacing.md)` with optional `onTap` + `semanticLabel` + `padding` override (for ListTile-based children); `TileSurface` wraps per-tile accent-color tint with canonical alphas `0.30`/`0.12` (private `_TileAlphas` constants); `BannerSurface` wraps full-width banner with `tone: BannerTone` enum (error/info/primary/neutral → M3 container roles). Migrated 7 sites: 3 SurfaceCard (person_groups._GroupCard, events._EventTile, recently_deleted_screen._RecentlyDeletedRow), 1 TileSurface (home.dart _HabitTileState — the 164-line home habit tile), 3 BannerSurface (reliability_banner, streak_recovery_card, routine_banner). The RoutineBanner migration adds a previously-missing Semantics wrapper — a free a11y win. 38 new tests across 3 new test files (surface_card 12 + tile_surface 13 + banner_surface 13). Test count: 1910 → 1948 (+38 net; +5 over the +33 plan target — the 3-primitive split naturally produces ~38 tests vs canonical ~11/PR). 3-gate green. No manifest / pubspec / Drift / Kotlin changes. V-Model: SYS-171 + ADR-102 + WF-099 + 5 doc rows.
 
+
+## v1.8-06 — PR6 of 15 (SectionHeader primitive + scrolledUnderElevation: 1)
+
+- NEW `lib/ui/section_header.dart` — canonical `SectionHeader(title, {compact: false})` primitive with `compact: true` flag for the inline-list titleMedium variant. Replaces 23 inline `Padding(EdgeInsets.symmetric(vertical: Spacing.sm)) + Text(titleLarge/titleMedium)` patterns across 6 screens.
+- NEW `test/ui/section_header_test.dart` — 12 tests, 5 groups (default variant renders title + titleLarge + vertical Spacing.sm padding; compact variant renders title + titleMedium + no padding; Key + Semantics; theme integration; static accessor).
+- NEW `test/theme/app_theme_test.dart` — 14 tests, 4 groups (AppBar theme with `scrolledUnderElevation: 1` pin; scheme sanity with `Brightness`/`useMaterial3`; spacing + sizing tokens; brand sanity).
+- EDITED `lib/theme/app_theme.dart:66-78` — added `scrolledUnderElevation: 1` to the `appBarTheme` to calm the M3 default 3dp scroll-under shadow to 1dp (matches the project's dark-theme visual language).
+- EDITED `lib/screens/settings.dart` — dropped the private `_SectionHeader` widget (11 lines), replaced 8 invocations with the public `SectionHeader` primitive.
+- EDITED `lib/screens/add_habit.dart` — 3 form-section header sites (Routines / Schedule / Pause) → `SectionHeader`.
+- EDITED `lib/screens/add_person.dart` — 3 form-section header sites (Cadence / Routines / Pause) → `SectionHeader`.
+- EDITED `lib/screens/add_routine.dart` — 2 form-section header sites (Contacts / Ringer mode) → `SectionHeader`.
+- EDITED `lib/screens/events.dart` — 2 inline list-section headers (Upcoming / Past (unarchived)) → `SectionHeader(compact: true)`.
+- EDITED `lib/screens/person_groups.dart` — 4 inline group-edit form-section headers (Channel / Cadence / Semantic / Members) → `SectionHeader(compact: true)`.
+- Test count 1948 → 1974 (+26 net).
+- 3-gate green: `dart format --output=none --set-exit-if-changed .` clean, `flutter analyze --fatal-infos lib test` 0 issues, `flutter test` 1974/1974 pass.
+- APK discipline anchor maintained: no `AndroidManifest.xml` change, no new pubspec dep, no Drift migration, no Kotlin change.
+- SYS-172 / ADR-103 / WF-100.

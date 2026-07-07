@@ -8818,3 +8818,79 @@ The PR5 scope is 3 primitives + 7 migrations (the canonical-pattern call); the r
 - The `Material + InkWell + Padding` 0.18-alpha + 20-radius pattern in `category_chip.dart:106` + `add_habit.dart:1324` (icon-picker thumb) — different alphas (0.18) + radius (20) from TileSurface's canonical (0.30/0.12 + 12-radius); deferred until a `ChipSurface` primitive is added to the `lib/ui/` design-system layer (likely PR7+).
 - The C4 form, C5 empty/loading/error, C6 nav, C7 typography, C8 icon, C9 a11y, C10 FAB categories are the scope of PR6..PR15.
 
+
+## ADR-103 — SectionHeader primitive + scrolledUnderElevation: 1 (v1.8-06 / PR6 of 15)
+
+**Status:** Accepted 2026-07-07.
+
+### Context
+
+The Month 1 UI-consolidation sprint (15-PR series, post-v1.7 closeout) targets 39 wireframe-audit issues across 10 categories. PR6 ships:
+
+1. **C3 cards part 2** — the `SectionHeader` primitive. The audit found 23+ inline `Padding(EdgeInsets.symmetric(vertical: Spacing.sm)) + Text(titleLarge/titleMedium)` patterns across 7 screens (`settings.dart`, `add_habit.dart`, `add_person.dart`, `add_routine.dart`, `events.dart`, `person_groups.dart`, `add_event.dart`). The settings.dart file had a private `_SectionHeader` widget (8 invocations) that lived as a private widget because the canonical pattern was never extracted to the `lib/ui/` design-system layer.
+
+2. **C6 nav theme tweak** — `AppBarTheme.scrolledUnderElevation: 1`. The audit noted the M3 default 3dp scroll-under shadow was visually too heavy for the project's calm dark-theme language (per `docs/v_model/architecture_options.md` § Visual language). The current `appBarTheme` (per `lib/theme/app_theme.dart:66-70`) sets `elevation: 0` but does NOT override the default scrolled-under elevation, so the default 3dp shadow flashes when lists scroll under the AppBar.
+
+### Decision
+
+**A. Extract `SectionHeader` to `lib/ui/section_header.dart`** as a public primitive with the following API:
+
+```dart
+class SectionHeader extends StatelessWidget {
+  const SectionHeader(this.title, {super.key, this.compact = false});
+  final String title;
+  final bool compact;
+}
+```
+
+- **Default variant** (`compact: false`): `Padding(EdgeInsets.symmetric(vertical: Spacing.sm)) + Text(title, style: textTheme.titleLarge)`. The padding is part of the contract — it is the canonical vertical breathing room between the previous section and the new heading. Removing it in the default variant produces a noticeably tighter layout in the rendered settings screen.
+- **Compact variant** (`compact: true`): bare `Text(title, style: textTheme.titleMedium)` with no surrounding padding. Used when the section sits inside an already-padded list (events.dart's Upcoming / Past; person_groups.dart's Channel / Cadence / Semantic / Members) where the surrounding spacing is owned by the list's `SizedBox(height: ...)` rhythm.
+
+**B. Add `scrolledUnderElevation: 1` to the `appBarTheme` block in `lib/theme/app_theme.dart:66-78`.** This is a global theme tweak that overrides the M3 default 3dp shadow with a calmer 1dp shadow when a list scrolls under the AppBar. The flat `elevation: 0` (no shadow when not scrolled under) is preserved — only the scroll-under state gets the 1dp shadow.
+
+**C. Migrate 23 call sites across 6 screens:**
+- settings.dart — drop the private `_SectionHeader` widget, replace 8 invocations with the public `SectionHeader` primitive (default variant).
+- add_habit.dart — 3 sites (Routines / Schedule / Pause — default variant).
+- add_person.dart — 3 sites (Cadence / Routines / Pause — default variant).
+- add_routine.dart — 2 sites (Contacts / Ringer mode — default variant).
+- events.dart — 2 sites (Upcoming / Past (unarchived) — compact variant).
+- person_groups.dart — 4 sites (Channel / Cadence / Semantic / Members — compact variant).
+
+**D. Create `test/ui/section_header_test.dart`** (12 tests, 5 groups) and `test/theme/app_theme_test.dart`** (14 tests, 4 groups).
+
+### Rationale
+
+The 8-site duplication in `settings.dart` alone justified extraction; the 15 additional sites across the 5 other screens made extraction unavoidable. The `compact: true` flag is a deliberate design choice — the events.dart and person_groups.dart inline patterns had NO surrounding Padding (the spacing was owned by `SizedBox(height: Spacing.md)` separators in the list), while the settings.dart + add_* patterns had a `Padding(EdgeInsets.symmetric(vertical: Spacing.sm))` wrapper. The `compact: true` flag preserves the visual rhythm of each context — the default variant keeps the form-section breathing room; the compact variant drops into the list rhythm.
+
+The `scrolledUnderElevation: 1` is one line of code that addresses one of the most-noticed visual issues from the wireframe audit. The M3 default 3dp shadow is a heavy scrim that flashes visibly when the home / events / person-groups lists scroll under the AppBar; 1dp is the calmer alternative that matches the project's dark-theme visual language (per `docs/design/03-design-system.md` § Visual language).
+
+### Alternatives considered
+
+- **A1. Make `padding:` a public constructor parameter** (let callers override the default `EdgeInsets.symmetric(vertical: Spacing.sm)`). Rejected: the padding is the canonical contract; exposing it would let callers drift from the canonical rhythm. The `compact: true` flag is the right escape hatch (compact = no padding + titleMedium).
+- **A2. Use a single `style:` parameter** instead of the `compact: true` flag. Rejected: this would let callers pick any text style and re-introduce the drift the primitive is supposed to eliminate.
+- **B1. Set `scrolledUnderElevation: 0`** (no shadow on scroll-under). Rejected: a 0dp scrolled-under shadow looks identical to the un-scrolled state, which loses the depth cue that "the list is now under the AppBar". 1dp is the calmest value that still preserves the depth cue.
+- **B2. Set `scrolledUnderElevation: 3`** (M3 default). Rejected: the audit explicitly called this out as too heavy for the dark-theme visual language.
+
+### Drift lessons (NEW for PR6)
+
+(a) **`EdgeInsets.symmetric(vertical: Spacing.sm)` is the canonical padding for form-section headers** (NEW for PR6 — confirmed by the 18 default-variant sites across 4 screens (settings.dart + add_habit + add_person + add_routine). A future refactor that drops the padding produces a noticeably tighter layout; pin it via the `firstWhere(p.padding == const EdgeInsets.symmetric(vertical: Spacing.sm))` test pattern).
+
+(b) **`compact: true` strips the Padding AND changes the text style to titleMedium** (NEW for PR6 — the compact variant is BOTH a no-padding variant AND a smaller-text variant. They go together as a single contract; the test pins BOTH `compact: true` produces no Padding AND `compact: true` applies `textTheme.titleMedium`. A future refactor that splits these (e.g., a `compact: true, large: true` combination) breaks the contract).
+
+(c) **The `appBarTheme.scrolledUnderElevation` defaults to 3 in M3 even when `elevation: 0` is set** (NEW for PR6 — the M3 default is independent of the un-scrolled state. The fix is `scrolledUnderElevation: 1`; the test pins `AppTheme.dark.appBarTheme.scrolledUnderElevation == 1`).
+
+(d) **`AppPalette._tileAlpha = 0.20` is the per-tile surface background alpha; do NOT confuse it with `TileSurface._TileAlphas.unselected = 0.12`** (NEW for PR6 — both are per-tile surface alpha values, but PR4's `_tileAlpha = 0.20` is for the `home.dart` _TileIcon glyph background and PR5's `_TileAlphas.unselected = 0.12` is for the canonical TileSurface body. Different primitives, different alphas, different design intent).
+
+(e) **Per-screen `Widget build` calls to `Theme.of(context).textTheme.X` can be replaced by `SectionHeader('...')` calls** (NEW for PR6 — the migration pattern is mechanical: replace `Padding(padding: const EdgeInsets.symmetric(vertical: Spacing.sm), child: Text('Title', style: Theme.of(context).textTheme.titleLarge))` with `const SectionHeader('Title')`. The `const` keyword is allowed because the primitive's constructor is `const` and `Spacing.sm` is a compile-time constant. If `compact: true` is also needed, `const SectionHeader('Title', compact: true)` works the same way).
+
+(f) **PR12 (originally scoped as C6 nav alone) is collapsed into PR6** (NEW for PR6 — the C6 audit had 2 issues: back-button affordance + scrolled-under elevation. The back-button affordance is already canonical (Material default `automaticallyImplyLeading: true`), so PR12 had no independent work. PR6 picked up the `scrolledUnderElevation: 1` theme tweak and the SectionHeader primitive in a single PR. The C6 audit is now fully closed by PR6).
+
+(g) **`AppPalette.iconMuted(context)` (PR4) and `SectionHeader('Title')` (PR6) BOTH require `BuildContext`** (NEW for PR6 — neither is a pure-static utility; both derive their values from the active theme. The PR5 `TileSurface` and `BannerSurface` primitives also require `BuildContext` for the same reason. The `lib/ui/` design-system layer is a layer of *theme-aware* helpers, not pure-static constants).
+
+### Consequences
+
+- 23 inline form-section header patterns consolidated into 1 primitive + 7 caller sites that follow the canonical `SectionHeader('Title')` pattern.
+- 1 global theme tweak (`scrolledUnderElevation: 1`) calms the M3 default scroll-under shadow.
+- The 8-invocation private `_SectionHeader` widget is deleted from settings.dart, removing a class that was sitting between the screen and the public primitive layer.
+- 2 new test files (`test/ui/section_header_test.dart` + `test/theme/app_theme_test.dart`) provide regression guards for the new primitive and the theme tweak.
+- 7 files touched (5 screens + 1 theme + 1 settings.dart); APK discipline anchor maintained (no manifest/pubspec/Drift/Kotlin changes).

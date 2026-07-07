@@ -66,7 +66,16 @@ abstract class AppTheme {
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,
+        // v1.8-06 / SYS-172 / ADR-103: explicit
+        // `scrolledUnderElevation: 1` to calm the M3 default
+        // 3dp scroll-under shadow. The lower elevation matches
+        // the calm dark-theme visual language (see
+        // `docs/v_model/architecture_options.md` § Visual
+        // language) and avoids the heavy scrim that flashes
+        // when the home / events / person-groups lists scroll
+        // under the AppBar.
         elevation: 0,
+        scrolledUnderElevation: 1,
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(

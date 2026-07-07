@@ -875,3 +875,4 @@ Extracted 3 card / surface primitives (`lib/ui/surface_card.dart` + `lib/ui/tile
 **Next:** PR6 of 15 (C3 cards part 2 — `SectionHeader` primitive + C6 nav — `appBarTheme.scrolledUnderElevation: 1`).
 
 **Next:** PR6 of 15 (C3 cards part 2 — `SectionHeader` primitive + C6 nav — `appBarTheme.scrolledUnderElevation: 1`).
+| v1.8-06 / PR6 of 15 (2026-07-07) | SHIPPED | C3 cards part 2 (`SectionHeader` primitive — `compact: true` flag for the inline-list titleMedium variant) + C6 nav (`appBarTheme.scrolledUnderElevation: 1`). 5 default-variant migrations (settings.dart + add_habit + add_person + add_routine = 16 sites) + 6 compact-variant migrations (events.dart + person_groups.dart = 6 sites). Test count 1948 → 1974 (+26 net). 3-gate green. APK discipline anchor maintained. SYS-172 / ADR-103 / WF-100. PR12 (originally scoped as C6 nav alone) collapsed into PR6 — the back-button affordance is already canonical (Material default `automaticallyImplyLeading: true`). |
