@@ -4325,6 +4325,37 @@ SYS-158; ADR-089; v1.7-β row in `implementation_status.md`; `### v1.7-β` subse
 
 ### v1.7-ι — v1.7 milestone CLOSEOUT — doc-only closeout cycle
 
+### PR1 of 15 — UI consolidation — PrimaryButton extraction + 3 high-traffic CTAs migration
+
+**PR1 (Phase 76)** of the UI consolidation sprint. First file in `lib/ui/`. **+11 tests (EXACT match with plan: 11 widget tests).**
+
+**Date:** 2026-07-07. **Tests:** 1866 → 1877 (+11 net). **Cumulative UI sprint:** 1877 (PR1 of 15 shipped, 14/15 remaining).
+
+**Files (4 changed):**
+- NEW `lib/ui/primary_button.dart` (~70 lines; `StatelessWidget` wrapping `FilledButton`/`FilledButton.icon`)
+- NEW `test/ui/primary_button_test.dart` (~225 lines; 11 widget tests, 6 groups)
+- MIGRATE `lib/screens/add_event.dart` (line 217 + add import) — Save-OK time picker dialog
+- MIGRATE `lib/screens/add_person.dart` (line 548 + add import) — Save-as-Template dialog (preserves key `'add_person.save_as_template.save'`)
+- MIGRATE `lib/screens/rest_day_picker_dialog.dart` (line 110 + add import) — OK button (localized label `l.homeTileBudgetEditOk`)
+
+**Batches (3):**
+- **Batch 1 — Primitive extraction:** `PrimaryButton` widget + 48dp inherited sizing from `filledButtonTheme`. API: `const PrimaryButton({super.key, required onPressed, required label, icon, tooltip})` where `icon` decides FilledButton vs FilledButton.icon branch.
+- **Batch 2 — Tests (11 across 6 groups):** plain-text variant (3) + icon variant (2) + disabled state (1) + tooltip wrapper (2) + 48dp touch target (1) + Key + Semantics (2).
+- **Batch 3 — Screen migrations (3 CTAs):** preserved keys + onPressed handlers + labels. Imports added to each screen file.
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1877/1877 pass — zero regressions). Targeted: `flutter test test/ui/primary_button_test.dart` (11/11 pass) + migrated screens (68/68 pass).
+
+**Drift lessons per ADR-097:**
+- (a) `AppTheme.dark` is a `ThemeData` getter, not a Widget constructor → wrap in `MaterialApp(theme: AppTheme.dark, home: ...)`
+- (b) `const MaterialApp(theme: AppTheme.dark, ...)` fails (`Invalid constant value`) because the theme getter is runtime; keep `MaterialApp` non-const, const the inner constructors
+- (c) `FilledButton.onPressed: null` auto-disables + suppresses callback
+- (d) 48dp minimum inherited from `filledButtonTheme` (PrimaryButton does not re-specify)
+- (e) `lib/ui/` is empty today; PrimaryButton is the first primitive of C1 (PR1) + the canonical-pattern call for PR2..PR15
+
+**Cumulative v1.7 + UI sprint:** 1773 → 1877 (+104 net across 9 v1.7 cycles + PR1 of UI sprint; 1/15 UI sprint cycles shipped).
+
+**Next:** PR2 of 15 (SecondaryButton — the cancel/dismiss CTA wrapping `TextButton`).
+
 **Ninth and FINAL cycle of v1.7.** Doc-only. **0 tests.** **EXACT MATCH with v1.7 pre-auth plan target.**
 
 **Date:** 2026-07-07. **Tests:** 1866 → 1866 (0 net). **Cumulative v1.7:** 1773 → 1866 (+93 across α+β+γ+δ+ε+ζ+η+θ+ι; 9/9 cycles shipped).

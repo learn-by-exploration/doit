@@ -1472,6 +1472,32 @@ The **FIFTH cycle of the v1.7 milestone** — pins the raw-column `pausedUntil_m
 
 ### v1.7-ι — v1.7 milestone CLOSEOUT — doc-only closeout cycle
 
+### PR1 of 15 — UI consolidation sprint — PrimaryButton extraction + 3 high-traffic CTAs migration
+
+**PR1 (Phase 76)** of the UI consolidation sprint (Month 1 / 2026-07-20..08-03). **First file in `lib/ui/`.** **+11 tests (EXACT match with plan).**
+
+**Date:** 2026-07-07. **Tests:** 1866 → 1877 (+11 net). **Cumulative UI sprint:** 1877 (PR1 of 15 shipped, 14 remaining).
+
+**What:**
+- `lib/ui/primary_button.dart` — `StatelessWidget` wrapping `FilledButton`/`FilledButton.icon`. 48dp minimum inherited from `lib/theme/app_theme.dart:71-75` `filledButtonTheme`. Constructor: `const PrimaryButton({super.key, required onPressed, required label, icon, tooltip})`.
+- 3 high-traffic CTAs migrated: `add_event.dart:217`, `add_person.dart:548`, `rest_day_picker_dialog.dart:110`.
+- 11 widget tests in `test/ui/primary_button_test.dart` (6 groups).
+
+**Why:** per UI_ORG_AUDIT.md C1 (6 button-style issues), the screen layer uses raw `FilledButton`/`FilledButton.icon`/`TextButton` in 39 places across 22 screens. Each occurrence repeats the same minimum-size/icon-or-not/onPressed/key/tooltip wiring. Deviations make the CTA layer brittle to a11y/theme/size token changes. PR1 establishes the primitive + migrates the 3 highest-traffic CTAs as the canonical-pattern call; PR2..PR15 will migrate the remaining 36 occurrences + add the other primitives (SecondaryButton, IconButton, FAB, EmptyStateView, ErrorStateView, LoadingView, FormField, SectionCard, ScreenScaffold, ReliabilityBadge).
+
+**Constraint adherence:**
+- No `AndroidManifest.xml` changes (pure Dart).
+- No new pubspec deps (uses existing `package:flutter/material.dart` + `AppTheme.dark`).
+- No Drift migration, no Kotlin changes.
+- APK SHA1 discipline anchor: test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)).
+- 48dp touch target retained (inherited from `filledButtonTheme` — PrimaryButton does not re-specify).
+
+**Drift lessons:** see ADR-097 — 5 lessons including the `AppTheme.dark` getter-not-Widget one + the const-MaterialApp-with-getter-theme limitation + the inherited 48dp sizing.
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1877/1877 pass — zero regressions).
+
+**Next:** PR2 of 15 (SecondaryButton — the cancel/dismiss CTA wrapping `TextButton`).
+
 **Ninth and FINAL cycle of v1.7.** Doc-only. **0 tests.** **EXACT MATCH with v1.7 pre-auth plan target.** **The v1.7 milestone is now COMPLETE (9/9 cycles shipped).**
 
 **Date:** 2026-07-07. **Tests:** 1866 → 1866 (0 net). **Cumulative v1.7:** 1773 → 1866 (+93 net across α+β+γ+δ+ε+ζ+η+θ+ι; 9/9 cycles shipped).

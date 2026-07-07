@@ -689,6 +689,44 @@ Cycle is the **SIXTH** in the v1.7 milestone — v1.7 milestone 6/9 cycles shipp
 
 ## v1.7-ι — v1.7 milestone CLOSEOUT — doc-only closeout cycle
 
+## PR1 of 15 — UI consolidation sprint — PrimaryButton extraction + 3 high-traffic CTAs migration
+
+**PR1 (Phase 76)** of the 15-PR UI consolidation sprint. **First file in `lib/ui/`.** **+11 tests (EXACT match with plan: 11 widget tests).**
+
+**Date:** 2026-07-07. **Tests:** 1866 → 1877 (+11 net). **Cumulative UI sprint:** 1877 (PR1 of 15 shipped, 14 remaining).
+
+**Surface — 4 changes:**
+1. **NEW `lib/ui/primary_button.dart`** — canonical "Save" / "OK" / "Add contact" CTA. `StatelessWidget` wrapping `FilledButton` (icon=null) or `FilledButton.icon` (icon=non-null). 48dp minimum inherited from `lib/theme/app_theme.dart:71-75` `filledButtonTheme`.
+2. **NEW `test/ui/primary_button_test.dart`** — 11 widget tests (6 groups): plain-text variant (3 tests), icon variant (2 tests), disabled state (1 test), tooltip wrapper (2 tests), 48dp touch target (1 test), Key + Semantics (2 tests). All deterministic.
+3. **MIGRATE `lib/screens/add_event.dart:217`** — Save-OK time picker dialog `FilledButton` → `PrimaryButton` (label "OK"). + `import 'package:doit/ui/primary_button.dart';`.
+4. **MIGRATE `lib/screens/add_person.dart:548`** — Save-as-Template dialog `FilledButton` → `PrimaryButton` (label "Save"; key `'add_person.save_as_template.save'` preserved). + import.
+5. **MIGRATE `lib/screens/rest_day_picker_dialog.dart:110`** — OK button `FilledButton` (localized `l.homeTileBudgetEditOk`) → `PrimaryButton`. + import.
+
+**Test count + coverage:**
+- `lib/ui/primary_button.dart`: 100% (the widget has 4 branches: onPressed null vs enabled × icon null vs non-null; all 4 pinned)
+- `lib/screens/add_event.dart`: no regression (68/68 add_event+add_person tests still pass)
+- `lib/screens/add_person.dart`: no regression
+- `lib/screens/rest_day_picker_dialog.dart`: no regression
+- Cumulative: 1866 → 1877 (+11 net)
+
+**V-Model artifacts (8):**
+- `docs/v_model/requirements.md` — SYS-166 row appended
+- `docs/v_model/decision_record.md` — ADR-097 section appended
+- `docs/v_model/traceability_matrix.md` — WF-094 row appended
+- `docs/v_model/workflows.md` — `### PR1 of 15` subsection appended
+- `docs/v_model/implementation_status.md` — `## PR1 of 15` row appended (this row)
+- `docs/v_model/plan.md` — `### PR1 of 15` subsection appended
+- `feature.md` — PR1 of 15 row appended (table row 23)
+- `CHANGELOG.md` — `## PR1 of 15` entry appended
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1877/1877 pass — zero regressions).
+
+**Drift lessons:** see ADR-097 — (a) `AppTheme.dark` is a getter not a Widget + (b) const-MaterialApp-with-getter-theme limitation + (c) `FilledButton.onPressed: null` auto-disables + (d) 48dp minimum inherited from `filledButtonTheme` + (e) `lib/ui/` is the new design-system layer.
+
+**APK discipline anchor (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)):** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes.
+
+**Next:** PR2 of 15 (SecondaryButton — the cancel/dismiss CTA wrapping `TextButton`).
+
 **Ninth and FINAL cycle of v1.7.** Doc-only. **0 tests.** **EXACT MATCH with v1.7 pre-auth plan target.** **The v1.7 milestone is now COMPLETE (9/9 cycles shipped).**
 
 **Date:** 2026-07-07. **Tests:** 1866 → 1866 (0 net). **Cumulative v1.7:** 1773 → 1866 (+93 net across α+β+γ+δ+ε+ζ+η+θ+ι; 9/9 cycles shipped).
