@@ -813,3 +813,17 @@ Cycle v1.6-λ (`feat/v1.6-λ-doc-cleanups`) shipped: **0 net tests** (doc-only c
 
 **Test count: 1832 → 1842 (+10 net — exactly matches plan).** Cumulative v1.7 progress: 1773 → 1842 (+69 net across α + β + γ + δ + ε). APK SHA1 stays at H's `25bb7fab`. **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** SYS-161 / ADR-092 / WF-089.
 
+### v1.7-ζ — `permission_sheet.dart` cancel + permanentlyDenied-retry coverage closure (Phase 73 / SYS-162 / ADR-093 / WF-090)
+
+**SIXTH cycle of the v1.7 milestone** — pins the widget's cancel state machine (the user taps "Allow" but the request still returns `denied` or `permanentlyDenied`; the sheet stays open + `show()` returns `false`) + the 4 `permanentlyDenied` deep-link retry paths (re-probe granted / denied(canOpenSettings: true) / still permanentlyDenied / `openAppSettings() == false`). **No production-code change.** Tests-only cycle.
+
+**Scope:** EXTEND `test/widgets/permission_sheet_test.dart` (+8 tests, 11 baseline → 19 total). **No production-code change.**
+
+| # | Cycle | PR | Plan | Actual | Δ | Notes |
+|---|---|---|---|---|---|---|
+| 19 | v1.7-ζ | #84 | +8 | +8 | 0 | Exact match — cancel/no-spurious-pop + 4 permanentlyDenied retry paths pinned |
+
+**Drift lessons per ADR-093:** (a) **The widget has NO explicit "Cancel" button — the framework's scrim tap IS the cancel path.** An EARLIER draft wrote 4 cancellation tests using `tester.tapAt` + `tester.fling` + `tester.binding.handlePopRoute()`. All three hung at the 10-minute timeout because Flutter's modal framework does NOT reliably register scrim taps + drag gestures in widget tests. The fix: pivot to what the WIDGET controls — the user taps "Allow" but the request still returns `denied` or `permanentlyDenied`; the sheet stays open + `show()` returns `false`; (b) **`_onAllow` does NOT have try/catch around the request call.** An EARLIER draft attempted to pin exception resilience by overriding the mock handler to throw `PlatformException`. The test FAILED — `tester.takeException()` returned null because the `permission_handler` package swallows the exception. The fix: REPLACE the exception pin with the calendar no-op pin (which exercises real wiring); (c) **The `permanentlyDenied` UI state hides the "Allow" button and shows the error sub-text at `permission_sheet.dart:383-389` and `:392-407`** — this is the ONLY state where "Allow" is hidden. The companion invariant — `denied(canOpenSettings: true)` shows BOTH buttons AND hides the error sub-text — is pinned by Batch 2 test 2; (d) **`_onOpenSettings` re-probes AFTER `openAppSettings()` resolves, NOT before.** The 4 Batch 2 tests use the `setMockMethodCallHandler` override pattern to script the POST-deep-link re-probe status; (e) **`await tester.runAsync(() async { return future; })` returns the UNRESOLVED `Future<bool>` object, not the resolved value.** An EARLIER draft used this broken pattern and hung at the 10-minute timeout. The fix: use the SYS-067 baseline test 2 pattern — `final future = PermissionSheet.show(...); ...; expect(await future, isTrue);`.
+
+**Test count: 1842 → 1850 (+8 net — exactly matches plan).** Cumulative v1.7 progress: 1773 → 1850 (+77 net across α + β + γ + δ + ε + ζ). APK SHA1 stays at H's `25bb7fab`. **No new `<uses-permission>`, no new pubspec deps, no Drift migration, no Kotlin changes.** SYS-162 / ADR-093 / WF-090.
+

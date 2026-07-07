@@ -8330,3 +8330,62 @@ that the v1.1h + v1.3e scaffolding shipped unverified).
 - v1.7-β (ADR-089) — the cadence + channel raw-column pin set; v1.7-ε is the third column-pair pin set
 - The 5 drift lessons follow the canonical pattern from ADR-087 §b (the 2-bug-fix canonical example: tests-only + 2-bug-fix canonical pattern)
 
+## ADR-093 — v1.7-ζ drift lessons (permission_sheet cancel + permanentlyDenied-retry coverage)
+
+**Date:** 2026-07-07.
+**Status:** Accepted.
+**Cycle:** v1.7-ζ / Phase 70 / SYS-162 / ADR-093 / WF-090.
+
+**Context.** The v1.7-ζ cycle extends `test/widgets/permission_sheet_test.dart` with 8 new tests covering the widget's cancel/no-spurious-pop branches (4 tests) and the `permanentlyDenied` deep-link retry paths (4 tests). The cycle exists because the SYS-066/067/068 baseline (11 tests) covered the happy path (granted short-circuit, denied→Allow→grant, permanentlyDenied initial render, battery-optimization bridge, per-kind renders for location/exactAlarm/usageStats/callScreening/fullScreenIntent, backupFolder short-circuit) but left the **cancel branch** (when the user dismisses or taps Allow but the request still returns denied/permanentlyDenied — the sheet MUST stay open and `show()` MUST return `false`) and the **permanentlyDenied retry paths** (when the sheet opens on `permanentlyDenied` and the user taps "Open settings" — the re-probe may return granted, denied(canOpenSettings: true), still permanentlyDenied, or `openAppSettings()` may return false) UNCOVERED. v1.7-ζ closes this gap with 8 new pins.
+
+The cycle is tests-only (no production-code change, no Drift migration, no Kotlin change, no new `<uses-permission>`, no new pubspec dep). It follows the canonical pattern from ADR-087 §b (tests-only + APK-SHA1-stable).
+
+**Decision.** Extend `test/widgets/permission_sheet_test.dart` with 8 tests in 2 batches, structured by WHAT THE WIDGET CONTROLS (its own cancel + re-probe state machine), NOT by what Flutter's modal framework controls (the dismissal paths). The decision to test the widget's state machine (not the framework's scrim-tap/drag-down/system-back) was forced by a series of debug iterations during the cycle — see drift lesson (a) below.
+
+**The 5 drift lessons.**
+
+(a) **The widget has NO explicit "Cancel" button — the framework's scrim tap IS the cancel path.** An EARLIER draft of v1.7-ζ wrote 4 cancellation tests using `tester.tapAt(Offset(20, 20))` (scrim tap) + `tester.fling(find.text('Notifications'), Offset(0, 600), 4000)` (drag-down) + `tester.binding.handlePopRoute()` (system back). All three hung at the 10-minute timeout. The root cause: Flutter's modal framework does NOT reliably register scrim taps + drag gestures in widget tests; the `barrierDismissible: true` flag controls user-visible behavior but `tester.tapAt` does not trigger the barrier dismiss callback. The fix: pivot the "Cancel" tests to what the WIDGET controls — the user taps "Allow" but the request still returns `denied` or `permanentlyDenied`. The widget's `_onAllow` at `permission_sheet.dart:119-224` does NOT pop on a non-granted result; the sheet stays open + `show()` returns `false`. The 4 Batch 1 tests pin this widget-owned state machine (test 1: `denied` no-pop; test 2: `permanentlyDenied` re-renders with error text + hides Allow; test 3: granted pops with `true`; test 4: calendar no-op pops with `true`).
+
+(b) **`_onAllow` does NOT have try/catch around the request call at `permission_sheet.dart:119-224`.** An EARLIER draft of Batch 1 test 4 attempted to pin exception resilience by overriding the mock handler to throw `PlatformException` and asserting `tester.takeException()` returns the exception. The test FAILED — `tester.takeException()` returned null. The root cause: the `permission_handler` package's `Permission.scheduleExactAlarm.request()` swallows the `PlatformException` internally and returns `PermissionStatus.denied`. The exception never propagates to the test framework. The fix: REPLACE the exception pin with the calendar no-op pin (which exercises real wiring) — do NOT pin behaviors that depend on framework exception propagation when the library swallows them. Future v1.8+ cycles that want exception-resilience coverage should add an `instrumentation_test/` integration test that catches the exception via `FlutterError.onError` in a real device run, not a widget test.
+
+(c) **The `permanentlyDenied` UI state hides the "Allow" button and shows the error sub-text at `:383-389` and `:392-407`.** This is the ONLY state where "Allow" is hidden. A future refactor that shows "Allow" alongside the error sub-text would break the contract — re-asking a permanently-denied permission does NOT show a system dialog, so the "Allow" button is misleading. Batch 1 test 2 + Batch 2 test 4 pin this invariant explicitly: in `permanentlyDenied` initial render AND in the "re-probe still permanentlyDenied" branch, the Allow button is `findsNothing` AND the error sub-text is `findsOneWidget`. The companion invariant — `denied(canOpenSettings: true)` shows BOTH buttons AND hides the error sub-text — is pinned by Batch 2 test 2 (re-probe transitions from `permanentlyDenied` to `denied(canOpenSettings: true)` → Allow re-appears + error text disappears). These 2 invariants together pin the 3-state UI machine (`granted` short-circuit, `denied(canOpenSettings: true)` 2-button layout, `permanentlyDenied` 1-button error layout).
+
+(d) **`_onOpenSettings` re-probes AFTER `openAppSettings()` resolves, NOT before.** The deep-link launches the OS Settings activity; on the user's return, the re-probe decides the final status. A future refactor that re-probes BEFORE the deep-link would never see the user's toggle. The 4 Batch 2 tests use the `setMockMethodCallHandler(permissionsChannel, ...)` override pattern to script the POST-deep-link re-probe status — `probeScriptedStatuses[Permission.contacts.value]` is set BEFORE the sheet opens (for the initial `permanentlyDenied` probe) AND `requestScriptedStatuses[Permission.contacts.value]` is set BEFORE the "Open settings" tap (for the re-probe). The mock handler at `:152-166` reads `probeScriptedStatuses` on `checkPermissionStatus` + reads `requestScriptedStatuses` on `requestPermissions`. The 4 Batch 2 tests cover the 4 reachable re-probe outcomes: granted (pop with `true`), `denied(canOpenSettings: true)` (re-render with 2-button layout), still `permanentlyDenied` (re-render with same error text), `openAppSettingsResult = false` (re-render with snackbar + same error text).
+
+(e) **`await tester.runAsync(() async { return future; })` returns the UNRESOLVED `Future<bool>` object, not the resolved value.** An EARLIER draft of Batch 1 test 3 + Batch 2 test 1 used this broken pattern:
+```dart
+final granted = await tester.runAsync(() async {
+  final future = PermissionSheet.show(...);
+  await Future<void>.delayed(const Duration(milliseconds: 100));
+  return future;
+});
+// ...later...
+expect(granted, isTrue);  // granted is a Future<bool>, NOT a bool!
+```
+Both tests hung at the 10-minute timeout. The root cause: the `tester.runAsync` closure returns `future` (an unresolved `Future<bool>`); `await tester.runAsync(...)` resolves to `future` itself. The test then asserts `granted == true` on a `Future<bool>`, which never resolves. The fix: use the SYS-067 baseline test 2 pattern:
+```dart
+final future = PermissionSheet.show(...);
+await tester.runAsync(() async {
+  await Future<void>.delayed(const Duration(milliseconds: 100));
+});
+// ...later, AFTER the tap + pump...
+expect(await future, isTrue);
+```
+The `final future = PermissionSheet.show(...)` is a non-awaited handle to the Future; `expect(await future, ...)` at the end suspends until the sheet pops. This pattern works for any "tap Allow/Open settings + assert sheet popped" test. Future v1.8+ cycles writing permission_sheet or similar widget tests MUST use this pattern; the broken `runAsync(() async { return future; })` pattern is a footgun.
+
+**Consequences.**
+
+- `test/widgets/permission_sheet_test.dart` gains 8 new tests under the `// v1.7-ζ additions (SYS-162 / ADR-093 / WF-090)` banner.
+- `permission_sheet.dart` line coverage increases modestly: the cancel/no-pop branches at `_onAllow` are now hit by 2 of the 4 Batch 1 tests; the `_onOpenSettings` re-probe branches are now hit by all 4 Batch 2 tests.
+- The widget's cancel semantics (`show() == false` when Allow returns denied) is now a regression-protected contract. A future refactor that pops on every Allow tap would fail loudly at Batch 1 test 1.
+- The widget's 3-state UI machine (`granted` / `denied(canOpenSettings: true)` / `permanentlyDenied`) is now a regression-protected contract via the 2 invariants in drift lesson (c).
+- The `tester.runAsync(() async { return future; })` footgun is documented in drift lesson (e); future cycles writing widget tests MUST avoid it.
+- APK SHA1 stays at H's `25bb7fab8ce3834fbc15b0a624229f09b3e49a4d` (25+ cycle streak).
+- Related ADRs: ADR-066/067/068 (the baseline permission_sheet ADRs); ADR-087 §b (tests-only + APK-SHA1-stable canonical pattern); ADR-086 (a) verify-wiring-exists rule (the framework-dismissal pivot in drift lesson (a) is a softer version of the rule — verify what the WIDGET controls before writing tests).
+
+### Cross-references
+
+- v1.7-ζ PR #84 commit (will be created at end of cycle)
+- SYS-066/067/068 baseline — the 11 existing tests that v1.7-ζ extends
+- The 5 drift lessons follow the canonical pattern from ADR-087 §b (tests-only + 2-bug-fix canonical pattern)
+
