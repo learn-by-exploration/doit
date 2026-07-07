@@ -37,6 +37,7 @@ import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/do_repository.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/ui/empty_state.dart';
+import 'package:doit/ui/error_view.dart';
 import 'package:doit/widgets/category_chip.dart';
 
 /// A pre-baked row. Computed in the screen's `initState` /
@@ -193,7 +194,8 @@ class _StatsScreenState extends State<StatsScreen> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snap.hasError) {
-              return _ErrorView(
+              return ErrorView(
+                message: 'Could not load stats.',
                 onRetry: () {
                   setState(() => _future = _load());
                 },
@@ -477,32 +479,6 @@ class _Last7DaysChart extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.onRetry});
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(Spacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Could not load stats.'),
-            const SizedBox(height: Spacing.md),
-            FilledButton(
-              key: const ValueKey('stats.retry'),
-              onPressed: onRetry,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
       ),
     );
   }

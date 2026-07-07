@@ -9399,3 +9399,194 @@ remove ~150-200 LOC net across the 3 PRs.
   loading is a transient state, not a persistent placeholder). The
   migration is mechanical but the visual treatment (size, stroke
   width) is intentionally smaller in those contexts. Deferred.
+
+## ADR-116 — ErrorView primitive (v1.8-10 / PR10 of 15)
+
+**Status:** Accepted (PR10 of 15 shipped).
+
+### Context
+
+The C5 form-pattern audit (per the 3-month launch roadmap) found
+that the "data load failed" pattern recurs across 3 screens
+(`home.dart`, `stats.dart`, `templates.dart`) as a hand-rolled
+`Center > Padding > Column(Text, FilledButton)` private widget,
+with no consistent retry-button label (the home screen uses
+`l.homeRetryButton`, the stats + templates screens use the
+literal `'Retry'`), no shared `ValueKey` (so widget tests can't
+reliably find the retry button — `home.dart` has NO `ValueKey`,
+`stats.dart` has `ValueKey('stats.retry')`, `templates.dart` has
+NO `ValueKey`), and no central point of design-intent for the
+error visual. Every screen that needs an error state had to
+re-derive the styling + the button label + the key from scratch.
+
+The plan's intent (per the locked pre-auth at
+`~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`) was to
+introduce a canonical primitive that centralizes the error-state
+styling + the retry-button label + the canonical `ValueKey`, then
+migrate a representative 3 sites (the 3 remaining private
+`_ErrorView` widgets) to lock the pattern in.
+
+### Decision
+
+Introduce `lib/ui/error_view.dart` — a `StatelessWidget` with 3
+slots:
+
+```dart
+class ErrorView extends StatelessWidget {
+  const ErrorView({
+    super.key,
+    required this.message,    // M3 bodyLarge, required
+    required this.onRetry,    // VoidCallback, required
+    this.retryLabel,          // defaults to l.homeRetryButton
+  });
+  // Renders Center > Padding(Spacing.lg) >
+  //   Column(min, [Text(message, bodyLarge),
+  //                 SizedBox(height: Spacing.md),
+  //                 FilledButton(key: ValueKey('error.retry'),
+  //                              onPressed: onRetry,
+  //                              child: Text(retryLabel ?? l.homeRetryButton))])
+}
+```
+
+The `message` is required and M3 `bodyLarge`. The `onRetry`
+callback is `VoidCallback` — the caller typically calls
+`setState` to re-fire the FutureBuilder. The `retryLabel` is an
+optional override; the default resolves to
+`AppLocalizations.of(context).homeRetryButton`. The retry button
+carries a `ValueKey('error.retry')` so widget tests can find it
+unambiguously.
+
+### Why these specific decisions
+
+D1. **`ErrorView` is a `StatelessWidget` with 3 slots, not a
+`const` constructor with required slots.** The 3 existing call
+sites fall into 2 distinct shapes: (a) message + retry
+(`home.dart:_ErrorView`, `templates.dart:_ErrorView` — the
+canonical "data load failed" hero), (b) hardcoded message +
+retry (`stats.dart:_ErrorView` — the OLD widget had
+`const Text('Could not load stats.')` and `const Text('Retry')`
+inside; PR10 promotes the hardcoded message to the `message:`
+parameter and uses `l.homeRetryButton` for the button). Making
+all 3 slots `final` (`String`/`VoidCallback`/`String?`) covers
+both shapes in a single primitive. The alternative (2 separate
+widgets: `ErrorViewWithMessage`, `ErrorViewHardcoded`) would
+be over-engineering for 2 call sites.
+
+D2. **`retryLabel` defaults to `l.homeRetryButton`, not to
+`'Retry'`.** The OLD private widgets used 2 different labels
+(`l.homeRetryButton` in `home.dart`, literal `'Retry'` in
+`stats.dart` + `templates.dart`). PR10 unifies on
+`l.homeRetryButton` (the localized ARB string) so the button
+label responds to the user's locale. The `retryLabel:` override
+is the single point of escape for a site-specific label (e.g.,
+"Try again" or "Reload" — not currently used but reserved for
+future flexibility).
+
+D3. **The retry button carries a `ValueKey('error.retry')`,
+not a per-site key.** The OLD `stats.dart:_ErrorView` had
+`ValueKey('stats.retry')`; the OLD `home.dart:_ErrorView` and
+`templates.dart:_ErrorView` had NO `ValueKey`. PR10 unifies on
+`ValueKey('error.retry')` (one identifier, one canonical
+pattern). The test that previously tapped the stats retry
+button via `ValueKey('stats.retry')` will need to update —
+the search is `'stats.retry'` in `test/`. The unified key is
+the canonical identifier for "this widget is the retry
+affordance" across the codebase.
+
+D4. **The retry button is a `FilledButton`, not a `TextButton`
+or an `OutlinedButton`.** The OLD private widgets used
+`FilledButton` for all 3 sites. The retry button is the
+primary CTA on the error surface — the user should be able to
+recover with a confident tap. `FilledButton` is the project's
+primary CTA (per PR1 / SYS-166 / ADR-097). `OutlinedButton`
+would be a secondary CTA (e.g., "Cancel" in a dialog); the
+error surface does NOT have a secondary action. `TextButton`
+would be too quiet (the user is in a failure state, not a
+calm default state).
+
+D5. **The message uses M3 `bodyLarge` (fontSize 16), not
+`titleLarge` (fontSize 22).** The error message is a
+subordinate visual — the retry button is the primary action.
+`bodyLarge` is the M3 "supporting text" size that pairs with
+a primary action. `titleLarge` would compete with the button
+for attention.
+
+### Drift lessons (NEW for PR10)
+
+(a) **`find.descendant(of: ..., matching: ...)` matches
+MULTIPLE Padding widgets in the typical test tree** (the
+Scaffold's `body:` is wrapped in a Padding for safe-area, the
+ErrorView wraps its Column in a Padding for `Spacing.lg`, and
+the FilledButton internally wraps its child in a Padding for
+its minimum-size). The PR10 test file initially tried
+`tester.widget<Padding>(find.descendant(of: find.byType(Center),
+matching: find.byType(Padding)))` and got
+`Bad state: Too many elements`. The fix is to use
+`.first` on the find, or to scope the descendant to the
+primitive (`find.descendant(of: find.byType(ErrorView), ...)`).
+NEW for PR10 — apply this pattern to any future test that pins
+a primitive's internal Padding; the test should scope to the
+primitive, NOT to a generic ancestor (matches the PR5 lesson
+that `SurfaceCard.padding` override required a similar
+specificity — both are "inner-padding vs outer-padding"
+disambiguations).
+
+(b) **`ValueKey('stats.retry')` is REMOVED in PR10.** The OLD
+`stats.dart:_ErrorView` had `ValueKey('stats.retry')` on the
+retry button. PR10 unifies on `ValueKey('error.retry')` and
+removes the per-site key. Any test that previously tapped the
+stats retry button via `ValueKey('stats.retry')` will need to
+update to `ValueKey('error.retry')`. NEW for PR10 — when
+consolidating per-site keys into a canonical key, the
+search-and-replace is the canonical pattern (no test should
+reference the OLD per-site key after the PR merges).
+
+(c) **The `localizedApp` test helper from
+`test/support/localized_app.dart` is REQUIRED for any
+`lib/ui/` primitive that reads `AppLocalizations.of(context)`.**
+The helper wires `AppLocalizations.localizationsDelegates` and
+`supportedLocales` on the test `MaterialApp`. Without it,
+`AppLocalizations.of(context)` returns null and the primitive
+crashes on the `!` assertion in the generated code. The PR10
+test file uses `localizedApp(...)` for all 11 tests; the OLD
+`test/ui/empty_state_test.dart` and `test/ui/loading_view_test.dart`
+did NOT need it (those primitives don't read localizations).
+NEW for PR10 — any future `lib/ui/` primitive that reads
+localizations should use `localizedApp` in tests, NOT the
+plain `MaterialApp(theme: ..., home: ...)` pattern.
+
+(d) **Removing the 3 private `_ErrorView` widgets reduced
+net LOC by 72 lines** (79 deletions + 7 additions across the
+3 screen files). Combined with PR9's -68 LOC for the 3 private
+empty-state widgets, the C5 sweep (PR9 + PR10) is now at
+**-140 LOC net** across 5 screens. The consolidation is
+substantial — the per-screen `ColorScheme` + `TextTheme` +
+`Spacing` references are now resolved once in each primitive.
+PR11 (MissionFailedView) is expected to remove another
+~30-50 LOC; the cumulative C5 sweep will be ~170-190 LOC
+removed by the end of the 3-PR cycle.
+
+### Defers (out-of-scope, PR10)
+
+- The `errorIcon` slot (an optional `IconData?` for a hero
+  icon above the message — similar to the EmptyState's
+  `icon:` slot). The current 3 call sites don't use an icon
+  in the error state, so the slot is reserved for a future
+  design need. Deferred.
+- The `errorCode` slot (a structured `int?` for telemetry —
+  the retry button could include the error code in its
+  callback for logging). Deferred — would change the
+  `onRetry` signature from `VoidCallback` to
+  `void Function(int? code)`.
+- The `errorView` variant for **mission failures** (a
+  separate "you didn't pass the mission" surface). PR11
+  (SYS-186 / ADR-117) introduces `MissionFailedView` for
+  this use case; it is NOT a 4th slot on `ErrorView` because
+  the visual treatment is intentionally different (mission
+  failures are user-actionable, with a "Try again" CTA that
+  re-launches the mission — a different affordance). Deferred.
+- The 3 in-modal-screen error states in `add_event.dart`,
+  `add_habit.dart`, `add_person.dart` that use a
+  `Center > Padding > Column(Text, TextButton)` for inline
+  validation errors (not load failures). The visual treatment
+  is intentionally smaller in those contexts. Deferred.

@@ -29,6 +29,7 @@ import 'package:doit/templates/template.dart';
 import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/ui/empty_state.dart';
+import 'package:doit/ui/error_view.dart';
 
 /// The entity-type filter chip selected at the top of the
 /// catalog. `all` shows every template; the rest filter by
@@ -113,7 +114,7 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (snap.hasError) {
-                    return _ErrorView(
+                    return ErrorView(
                       message: 'Could not load templates',
                       onRetry: () => setState(() {
                         _future = _seedAndLoad();
@@ -336,30 +337,6 @@ class _TrailingAction extends StatelessWidget {
         key: ValueKey('template_card.${template.id}.use'),
         onPressed: onUse,
         child: const Text('Use this'),
-      ),
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(Spacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message),
-            const SizedBox(height: Spacing.md),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
       ),
     );
   }
