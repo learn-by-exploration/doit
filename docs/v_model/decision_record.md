@@ -9191,3 +9191,211 @@ method instead of 2 separate static methods**
   variant. Deferred — the existing call sites all use the fixed
   behavior; adding the floating variant requires per-site design
   review.
+
+## ADR-115 — EmptyState + LoadingView primitives (v1.8-09 / PR9 of 15)
+
+**Status:** Accepted (PR9 of 15 shipped).
+
+### Context
+
+The C5 form-pattern audit (per the 3-month launch roadmap) found that
+the "no data" placeholder pattern recurs across 3 screens (`home.dart`,
+`stats.dart`, `templates.dart`) as a hand-rolled `Center > Padding >
+Column(Icon, Text, Text)` private widget, and that the
+"data still loading" pattern recurs across 3 screens (`home.dart`,
+`events.dart`, `person_groups.dart`) as a hand-rolled
+`Center(child: CircularProgressIndicator())`. Each private empty-state
+widget re-derives the spacing tokens, the icon size + color, the
+title/body text styles, and the centered layout from scratch — every
+new screen that needs an empty state had to re-derive the styling. The
+loading pattern is identical across 3 sites but no two use the same
+size or stroke width, so the loading affordance looks different in
+different screens.
+
+The plan's intent (per the locked pre-auth at
+`~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`) was to introduce
+2 canonical primitives that centralize the empty-state + loading-state
+styling, then migrate a representative 6 sites (3 empty + 3 loading)
+to lock the pattern in. The remaining empty-state sites in
+`person_groups.dart` (which uses a `Scaffold` `body:` empty state
+rather than a `Center` placeholder) and the remaining loading sites
+in `add_event.dart` (which uses an inline `Column > SizedBox(
+height: 24, child: CircularProgressIndicator(strokeWidth: 2))` —
+the in-row variant) follow the same pattern and can be migrated in a
+follow-up PR.
+
+### Decision
+
+Introduce `lib/ui/empty_state.dart` — a `StatelessWidget` with 4 slots:
+
+```dart
+class EmptyState extends StatelessWidget {
+  const EmptyState({
+    super.key,
+    required this.title,    // M3 titleLarge, required
+    this.message,           // M3 bodyMedium, optional
+    this.icon,              // Sizing.huge, colorScheme.outline, optional
+    this.action,            // Widget? slot for a CTA, optional
+  });
+  // ...
+}
+```
+
+The `title` is required. The `message` is the secondary line. The
+`icon` uses `colorScheme.outline` (the calm muted tone) rather than
+`colorScheme.primary` so the empty state does not compete with the
+surrounding content area. The `action` slot is the load-bearing
+affordance for "pull the user forward" — used by PR-B's
+"Show me around" CoachMark CTA on the home empty state. Both text
+widgets have `textAlign: TextAlign.center` so the empty state is
+visually balanced on any width. The widget is `Center > Padding(
+EdgeInsets.all(Spacing.lg)) > Column(MainAxisSize.min, [...])` — the
+canonical M3 empty-state composition.
+
+Introduce `lib/ui/loading_view.dart` — a `StatelessWidget` with 2
+variants:
+
+```dart
+class LoadingView extends StatelessWidget {
+  const LoadingView({super.key, this.size = 36, this.strokeWidth = 4});
+  const LoadingView.inline({super.key, this.size = 20, this.strokeWidth = 2});
+  // Renders Center(SizedBox(CircularProgressIndicator(strokeWidth: ...)))
+}
+```
+
+The `LoadingView()` constructor is the full-area variant (36dp / 4dp
+stroke — M3 "comfortable" spinner). The `LoadingView.inline()` named
+constructor is the in-row variant (20dp / 2dp stroke — M3 "small"
+spinner). Both take optional `size` and `strokeWidth` parameters that
+override the defaults. The `Center + SizedBox + CircularProgressIndicator`
+composition is the canonical M3 loading affordance; the primitive does
+NOT add a `Padding` or `Container` wrapper (the caller controls
+layout — the in-row variant is intended to be dropped into a
+`ListTile` subtitle or a button row).
+
+### Why these specific decisions
+
+D1. **`EmptyState` is a `StatelessWidget` with optional slots, not a
+`const` constructor with required slots.** The 3 existing call sites
+fall into 3 distinct shapes: (a) icon + title + body
+(`home.dart:_EmptyState` — the canonical "no data" hero), (b)
+icon + title + body (`stats.dart:_EmptyView` — same shape with a
+different icon), (c) title only (`templates.dart:_EmptyView` — the
+quiet "no results for this filter" hint). Making all 4 slots
+`final` `Widget?`/`String?` (with `title` required) covers all 3
+shapes in a single primitive. The alternative (3 separate widgets:
+`EmptyStateHero`, `EmptyStateHint`, `EmptyStateQuiet`) would be
+over-engineering for 3 call sites.
+
+D2. **`EmptyState.action` is `Widget?`, not `String?` + a `PrimaryButton`
+internally.** The CTA on the empty state is a `PrimaryButton` today
+(PR-B's "Show me around" CoachMark CTA), but the empty state should
+NOT be coupled to a specific button widget — a future design might
+want a `SecondaryButton` or a `TextButton` for a quieter CTA. The
+`action` slot is the single point of escape.
+
+D3. **`EmptyState.icon` uses `colorScheme.outline`, not
+`colorScheme.primary`.** A brand-colored hero icon would compete with
+the primary brand color of the surrounding content (e.g., the "Add
+habit" FAB on the home screen). The empty state should be calm and
+"set the stage" for the user to take action, not "demand attention."
+The icon is a visual anchor, not a primary call-to-action.
+
+D4. **`LoadingView` exposes BOTH a default constructor AND a
+`LoadingView.inline()` named constructor.** The 3 existing call sites
+all use the full-area pattern, but `add_event.dart` and
+`completion_log_section.dart` use an in-row pattern (a small spinner
+next to a label). The named constructor surfaces the 2 patterns
+explicitly; the alternative (a single constructor with a
+`bool isInline` flag) is more compact but less readable at the call
+site (`LoadingView(isInline: true)` vs `LoadingView.inline()`).
+
+D5. **`LoadingView` does NOT add a `Padding` or `Container` wrapper.**
+The caller controls layout — the in-row variant is intended to be
+dropped into a `ListTile` subtitle or a button row, where the caller
+already provides the spacing. Adding a wrapper would force callers to
+`Padding(padding: EdgeInsets.zero, child: LoadingView.inline())` to
+defeat the default. The primitive is intentionally minimal.
+
+### Drift lessons (NEW for PR9)
+
+(a) **`tester.widget<Text>(find.text(...)).style` returns the
+*resolved* `TextStyle` (after theme merge), NOT the
+`TextStyle?` passed to the constructor.** The framework merges the
+caller-supplied style with the surrounding `DefaultTextStyle`
+ancestor at paint time. The PR9 test file initially tried
+`expect(text.style, AppTheme.dark.textTheme.titleLarge)` (reference
+equality on the TextStyle) and the assert failed with
+`Expected: TextStyle:<TextStyle(debugLabel: (englishLike titleLarge
+2021).merge(((whiteMountainView titleLarge).apply).merge(unknown))...`
+vs `Actual: TextStyle:<TextStyle(debugLabel: (englishLike titleLarge
+2021)...`. The fix is to pin a specific property (the canonical
+`titleLarge` `fontSize` = 22) instead of the full TextStyle. NEW for
+PR9 — apply this pattern to any future test that wants to assert
+"this text uses theme style X" — compare on `fontSize` or `color`,
+not on the merged TextStyle itself (mirrors the PR8 lesson that
+`SnackBar.backgroundColor` is `null` at the `tester.widget` level —
+both are paint-time-vs-constructor-time gotchas).
+
+(b) **`package:doit/theme/app_theme.dart` is NOT needed by
+`LoadingView`.** The primitive renders a `Center + SizedBox +
+CircularProgressIndicator` — no `Spacing` tokens, no `Sizing`
+constants, no `ColorScheme` reads. The `flutter analyze` lint
+`unused_import` catches this. The `EmptyState` primitive DOES need
+the import (it reads `Spacing.lg` for the padding and `Sizing.huge`
+for the icon size) — the 2 primitives have different import
+requirements. The PR9 first pass imported the theme into both files
+to keep them visually consistent; the lint correctly flagged
+`loading_view.dart` and the import was removed. NEW for PR9 — the
+`lib/ui/` layer is not "always import the theme"; the import is
+needed iff the primitive reads theme tokens.
+
+(c) **The home empty-state body ("Tap the + to add a do or a
+person.") was hardcoded English in the old private `_EmptyState`.**
+PR9 keeps the title localized (`l.homeEmptyTitle`) and the body still
+hardcoded. PR-D (SYS-193 / ADR-124) will land the body localization
++ the rest-day wording flip as a single small ARB + render-layer PR.
+Stats and templates are also still English-only in their empty
+states (the strings are passed verbatim to `EmptyState(title: 'No
+stats yet.', message: 'Add a do to start tracking consecutive runs.',
+...)` for now); the same PR-D scope covers the home body, but the
+stats + templates bodies are deferred to a follow-up i18n sweep (not
+PR-D). NEW for PR9 — the EmptyState primitive is i18n-ready (every
+string is a `String` parameter, no hardcoded literals) but the
+migrations do NOT have to land full localization in the same PR.
+
+(d) **Removing the 3 private empty-state widgets (`_EmptyState` +
+2x `_EmptyView`) reduced net LOC by 68 lines** (89 deletions + 21
+additions across the 5 screen files). The consolidation is real —
+the surface shrinks because the per-screen `ColorScheme` + `TextTheme`
++ `Spacing` references are now resolved once in the primitive. The
+`home.dart:_EmptyState` was 30 lines alone. NEW for PR9 — the
+`lib/ui/` extraction reduces code surface even when the screen-local
+widget is small. The C5 sweep (PR9 + PR10 + PR11) is expected to
+remove ~150-200 LOC net across the 3 PRs.
+
+### Defers (out-of-scope, PR9)
+
+- The in-row loading pattern in `add_event.dart` (an inline
+  `Column > SizedBox(height: 24, child: CircularProgressIndicator(
+  strokeWidth: 2))` for the in-button busy state) and the
+  in-`ListTile` loading pattern in `completion_log_section.dart` (a
+  `ListTile` with a `trailing: SizedBox(width: 16, height: 16,
+  child: CircularProgressIndicator(strokeWidth: 2))`). These are
+  the inline variant's use cases; the migration is a separate
+  follow-up PR. Deferred.
+- The empty-state body localization (home/stats/templates) — see
+  PR-D. Deferred.
+- The empty-state CTA button on the home empty state (PR-B's
+  "Show me around" CoachMark trigger). Deferred to PR-B.
+- The "skeleton placeholder" pattern (a `Shimmer`-style box that
+  imitates the data layout while loading) — the canonical M3
+  pattern is `CircularProgressIndicator`, not a skeleton. Skeleton
+  is a design-departure; if it lands, it lands as a separate ADR.
+  Deferred.
+- The 3 `FutureBuilder` `Center(child: CircularProgressIndicator())`
+  sites in `add_event.dart`, `add_habit.dart`, `add_person.dart`
+  that use the loading indicator INSIDE a modal screen (i.e., the
+  loading is a transient state, not a persistent placeholder). The
+  migration is mechanical but the visual treatment (size, stroke
+  width) is intentionally smaller in those contexts. Deferred.

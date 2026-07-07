@@ -20,6 +20,7 @@ import 'package:doit/ui/surface_card.dart';
 import 'package:doit/ui/app_choice_chip.dart';
 import 'package:doit/ui/app_form_field.dart';
 import 'package:doit/ui/icon_button.dart';
+import 'package:doit/ui/loading_view.dart';
 
 class PersonGroupsScreen extends StatefulWidget {
   const PersonGroupsScreen({super.key});
@@ -77,7 +78,7 @@ class _PersonGroupsScreenState extends State<PersonGroupsScreen> {
           future: _future,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
+              return const LoadingView();
             }
             if (snapshot.hasError) {
               return Center(
