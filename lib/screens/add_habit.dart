@@ -37,6 +37,9 @@ import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/action.dart';
 import 'package:doit/triggers/trigger.dart';
+import 'package:doit/ui/app_choice_chip.dart';
+import 'package:doit/ui/app_form_field.dart';
+import 'package:doit/ui/primary_button.dart';
 import 'package:doit/ui/section_header.dart';
 import 'package:doit/widgets/category_chip.dart';
 import 'package:doit/l10n/gen/app_localizations.dart';
@@ -311,14 +314,11 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
         child: ListView(
           padding: const EdgeInsets.all(Spacing.md),
           children: [
-            TextField(
+            AppFormField(
               key: _nameKey,
               controller: _nameCtrl,
-              decoration: InputDecoration(
-                labelText: 'Name',
-                errorText: _nameError,
-              ),
-              textInputAction: TextInputAction.next,
+              label: 'Name',
+              errorText: _nameError,
             ),
             const SizedBox(height: Spacing.md),
             // --- v0.2 visual identity row.
@@ -563,7 +563,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
               spacing: Spacing.sm,
               children: [
                 for (final h in const [12, 14, 16, 18, 20])
-                  ChoiceChip(
+                  AppChoiceChip(
                     label: Text('$h h'),
                     selected: _twTargetHours == h,
                     onSelected: (v) => setState(() {
@@ -1262,22 +1262,21 @@ class _SaveAsTemplateDialogState extends State<_SaveAsTemplateDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Save as template'),
-      content: TextField(
+      content: AppFormField(
         key: const ValueKey('add_habit.save_as_template.name'),
         controller: _ctrl,
+        label: 'Template name',
         autofocus: true,
-        decoration: const InputDecoration(labelText: 'Template name'),
-        textInputAction: TextInputAction.done,
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(
+        PrimaryButton(
           key: const ValueKey('add_habit.save_as_template.save'),
           onPressed: () => Navigator.of(context).pop(_ctrl.text.trim()),
-          child: const Text('Save'),
+          label: const Text('Save'),
         ),
       ],
     );

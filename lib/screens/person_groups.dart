@@ -17,6 +17,8 @@ import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/ui/section_header.dart';
 import 'package:doit/ui/surface_card.dart';
+import 'package:doit/ui/app_choice_chip.dart';
+import 'package:doit/ui/app_form_field.dart';
 import 'package:doit/ui/icon_button.dart';
 
 class PersonGroupsScreen extends StatefulWidget {
@@ -388,19 +390,15 @@ class _AddPersonGroupScreenState extends State<AddPersonGroupScreen> {
         child: ListView(
           padding: const EdgeInsets.all(Spacing.md),
           children: [
-            TextField(
+            AppFormField(
               controller: _nameCtrl,
-              decoration: InputDecoration(
-                labelText: 'Group name',
-                errorText: _nameError,
-              ),
+              label: 'Group name',
+              errorText: _nameError,
             ),
             const SizedBox(height: Spacing.md),
-            TextField(
+            AppFormField(
               controller: _handleCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Channel handle (URI / phone / @handle)',
-              ),
+              label: 'Channel handle (URI / phone / @handle)',
             ),
             const SizedBox(height: Spacing.md),
             const SectionHeader('Channel', compact: true),
@@ -414,7 +412,7 @@ class _AddPersonGroupScreenState extends State<AddPersonGroupScreen> {
                   'signal',
                   'sms',
                 ])
-                  ChoiceChip(
+                  AppChoiceChip(
                     label: Text(c),
                     selected: _channel == c,
                     onSelected: (_) => setState(() => _channel = c),
@@ -432,7 +430,7 @@ class _AddPersonGroupScreenState extends State<AddPersonGroupScreen> {
                   'monthly_on',
                   'yearly_on',
                 ])
-                  ChoiceChip(
+                  AppChoiceChip(
                     label: Text(_cadenceChipLabel(t)),
                     selected: _cadenceType == t,
                     onSelected: (_) => setState(() => _cadenceType = t),
@@ -447,7 +445,7 @@ class _AddPersonGroupScreenState extends State<AddPersonGroupScreen> {
               spacing: Spacing.sm,
               children: [
                 for (final s in GroupSemantic.values)
-                  ChoiceChip(
+                  AppChoiceChip(
                     label: Text(s.name),
                     selected: _semantic == s,
                     onSelected: (_) => setState(() => _semantic = s),

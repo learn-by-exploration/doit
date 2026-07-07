@@ -49,6 +49,8 @@ import 'package:doit/widgets/automation_reliability_dialog.dart';
 import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/trigger.dart';
+import 'package:doit/ui/app_choice_chip.dart';
+import 'package:doit/ui/app_form_field.dart';
 import 'package:doit/ui/primary_button.dart';
 import 'package:doit/ui/secondary_button.dart';
 import 'package:doit/widgets/calendar_picker.dart';
@@ -413,12 +415,10 @@ class _AddEventScreenState extends State<AddEventScreen> {
         child: ListView(
           padding: const EdgeInsets.all(Spacing.md),
           children: [
-            TextField(
+            AppFormField(
               controller: _nameCtrl,
-              decoration: InputDecoration(
-                labelText: 'Name',
-                errorText: _nameError,
-              ),
+              label: 'Name',
+              errorText: _nameError,
             ),
             const SizedBox(height: Spacing.md),
             ListTile(
@@ -447,7 +447,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
               spacing: Spacing.sm,
               children: [
                 for (final r in EventRecurrence.values)
-                  ChoiceChip(
+                  AppChoiceChip(
                     label: Text(_recurrenceLabel(r)),
                     selected: _recurrence == r,
                     onSelected: (_) => setState(() => _recurrence = r),
@@ -515,22 +515,21 @@ class _SaveAsTemplateDialogState extends State<_SaveAsTemplateDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Save as template'),
-      content: TextField(
+      content: AppFormField(
         key: const ValueKey('add_event.save_as_template.name'),
         controller: _ctrl,
+        label: 'Template name',
         autofocus: true,
-        decoration: const InputDecoration(labelText: 'Template name'),
-        textInputAction: TextInputAction.done,
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(
+        PrimaryButton(
           key: const ValueKey('add_event.save_as_template.save'),
           onPressed: () => Navigator.of(context).pop(_ctrl.text.trim()),
-          child: const Text('Save'),
+          label: const Text('Save'),
         ),
       ],
     );
