@@ -8675,5 +8675,79 @@ API: `const AppIconButton({super.key, required icon, required onPressed, this.to
 - Migrating the remaining 23 occurrences of `IconButton` across 6 screens (events.dart, add_event.dart, add_habit.dart, add_person.dart, home.dart, person_groups.dart:215 delete).
 - Extracting the 8 remaining primitives (FAB, EmptyStateView, ErrorStateView, LoadingView, FormField, SectionCard, ScreenScaffold, ReliabilityBadge).
 - The per-instance widget configuration (Kotlin side, DoitWidgetConfigureActivity.kt) is unchanged.
+## ADR-101 — PR4 of 15 UI consolidation — `AppPalette` primitive design decisions
+
+**Date:** 2026-07-07. **Status:** APPROVED (PR4 of 15 / Phase 79 / SYS-170 / WF-098).
+
+### Context
+
+Per UI_ORG_AUDIT.md C2 (color palette misuse, 3 issues → 1 PR), the codebase audit revealed:
+- **1 hardcoded `Colors.X` literal**: `Colors.grey` in `lib/widget/widget_config_screen.dart:156`.
+- **0 `Color(0xFF...)` literals outside `lib/theme/app_theme.dart`**.
+- **0 `withOpacity(...)` calls** (deprecated; superseded by `withValues(alpha:)`).
+- **12 `withValues(alpha: ...)` calls** in `lib/screens/` + `lib/widgets/`. Of these, 2 are repeated patterns:
+  1. `color.withValues(alpha: 0.20)` — the muted-tile-circle background, used by `_TileIcon` in `lib/screens/home.dart:1270` (every habit tile on home renders this 48×48 circle).
+  2. `color.withValues(alpha: 0.15)` (fill) + `color.withValues(alpha: 0.5)` (border) + `width: 0.5` + `BorderRadius.circular(8)` — the muted-pill badge `BoxDecoration`, used by `DoAnchorTargetPausedBadge` in `lib/widgets/do_anchor_paused_badge.dart:68-75`.
+
+C2 audit found 3 issues. The 1 hardcoded literal (issue 1) + 2 repeated patterns (issues 2 + 3) → 3 issues → 1 PR via the canonical helper-extraction pattern from PR1 (PrimaryButton) + PR2 (SecondaryButton) + PR3 (AppIconButton).
+
+### Decision
+
+Extract `lib/ui/app_palette.dart` as a thin namespace-class exposing 3 canonical semantic color helpers (`iconMuted`, `mutedTileBackground`, `mutedPillDecoration`). Migrate the 3 sites identified in the audit to use them.
+
+### Design
+
+**API:** `class AppPalette { AppPalette._(); static Color iconMuted(BuildContext); static Color mutedTileBackground(BuildContext, Color accent); static BoxDecoration mutedPillDecoration(BuildContext, Color accent); }` — all helpers are `static`; the class is not instantiable (private constructor `AppPalette._()`).
+
+**Theme derivation:** every helper takes `BuildContext` and reads `Theme.of(context).colorScheme` (or accepts a caller-supplied accent color for derived helpers). This is the canonical pattern for theme-derived semantic colors: pass the context, derive from the active `ColorScheme`. The alternatives (`final Color kIconMuted = Color(0xFF...)` as a global constant) lose theme reactivity; `const Color kIconMuted = ...` requires hardcoding RGB.
+
+**Canonical constants:** the 5 numeric constants exposed by the helpers live as `static const double` on `AppPalette`:
+- `_tileAlpha = 0.20` (muted-tile circle fill alpha)
+- `_pillFillAlpha = 0.15` (muted-pill fill alpha)
+- `_pillBorderAlpha = 0.5` (muted-pill border alpha)
+- `_pillBorderWidth = 0.5` (muted-pill border width in dp — preserves the original `do_anchor_paused_badge.dart:74` visual)
+- `_pillRadius = 8` (muted-pill border-radius in dp — preserves the original `BorderRadius.circular(8)` in `do_anchor_paused_badge.dart:71`)
+
+These are private (`_` prefix) so the migration looks like a vanilla call site; future alpha/dimension tweaks land in one place.
+
+**Visual preservation (byte-for-byte):** the 3 migrations do NOT change pixels. The 0.20 fill alpha is the same; the 0.15/0.5 pair is the same; the 0.5 border-width is the same; the 8px radius is the same. The PR introduces NO behavioral change to the rendered surface.
+
+### Alternatives considered
+
+**A. Bigger PR migrating all 12 `withValues(alpha: ...)` calls.** Rejected: 6 of the 12 sites are visual-only (map grids, category-chip teardrops) with local meaning that doesn't benefit from the canonical helper. The 3-CTAs-in-one-PR is the canonical-pattern call from PR1 + PR2 + PR3.
+
+**B. Expose `kIconMutedColor = const Color(0xFF...)` as a global constant.** Rejected: loses theme reactivity (dark vs light gets the same hex). Taking `BuildContext` and reading `colorScheme.X` is the canonical pattern for the theme-driven app.
+
+**C. Use `ColorScheme.fromSeed`'s M3 tonal-palette API to derive tones for the muted helpers.** Rejected: M3 already provides `onSurfaceVariant`, `surfaceContainerHighest`, `outlineVariant` as the canonical muted roles. The canonical helpers just rename them so the call sites read like design tokens (e.g., `AppPalette.iconMuted(context)` rather than `Theme.of(context).colorScheme.onSurfaceVariant`).
+
+**D. Add `_pillBorderWidth = 0.5` to `AppPalette` instead of inlining `width: 0.5` in `Border.all`.** Accepted (chosen) — the constant lives on `AppPalette` so a future tweak (e.g., bumping to 0.75 for the light theme) lands in one place.
+
+### Drift lessons
+
+**(a) `AppPalette` helpers require `BuildContext`** (NEW for PR4 — unlike static `Color` constants, every helper takes `BuildContext` so it can read the active `ColorScheme`. This is the canonical pattern for semantic-color helpers in a theme-driven app: pass the context, derive from `Theme.of(context).colorScheme`).
+
+**(b) `Color.red/green/blue` accessors are deprecated in Flutter 3.31+** (NEW for PR4 — `analyzer --fatal-infos` flags them with `deprecated_member_use`. Use `.r/.g/.b` (double 0..1) on modern Flutter. 12 lint hits in the RGB-preservation test were caught + fixed via `.r/.g/.b`).
+
+**(c) `Color.opacity` is deprecated in Flutter 3.31+** (NEW for PR4 — same root cause as (b). Use `.a` (double 0..1). 3 lint hits in the alpha-math tests (0.15 fill, 0.5 border, 0.20 tile) were caught + fixed).
+
+**(d) `withValues(alpha: 0.5)` rounds to 128/255 ≈ 0.5020** (NEW for PR4 — the alpha byte carries only 256 discrete values, so `0.5 * 255` rounds to `128` and `.a` reads `0.5020`, NOT `0.5`. The 0.5-border-alpha test had to use tolerance `closeTo(0.5, 0.01)` rather than `0.001` to absorb the +0.0020 quantization).
+
+**(e) Two sequential `pumpWidget` calls in the SAME `testWidgets` need distinct `ValueKey`s on the `MaterialApp`** (NEW for PR4 — when a test declares two `late Color` variables + two `pumpWidget` calls + two `Builder`s (one per variable), both `Builder`s fire but the framework may optimize the two `MaterialApp`s into the same Element if they have no `Key`. Symptom: the second `late` reads the first `MaterialApp`'s theme even though the second `pumpWidget` was supposed to swap it. Fix: distinct `ValueKey('dark')` + `ValueKey('light')` on the `MaterialApp`s. This is the canonical pattern for multi-theme widget tests).
+
+### Constraints honored
+
+- **No `AndroidManifest.xml` changes** (pure Dart).
+- **No new pubspec deps** — uses existing `package:flutter/material.dart` + `BuildContext` from any widget.
+- **No Drift migration, no Kotlin changes.**
+- **APK discipline anchor (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)):** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes.
+- **Visual preservation:** byte-for-byte pixel parity with the pre-migration surface (the 5 canonical constants preserve the original 0.20 / 0.15 / 0.5 / 0.5 / 8 values exactly).
+
+### Out-of-scope (deferred to PR5+)
+
+- Migrating the remaining 9 `withValues(alpha: ...)` sites (`location_map_preview.dart:104/244/265`, `category_chip.dart:107`, `home.dart:771-772`, `add_habit.dart:1325`). These are visual-only (map grids, category chips) and don't need the canonical pattern; deferred to a future PR if `AppPalette` grows `mutedMapBackground` + `mutedCategoryChip` helpers.
+- Extracting the 7 remaining UI primitives (SectionCard, FormField, FAB, EmptyStateView, ErrorStateView, LoadingView, ReliabilityBadge).
+- The per-instance widget configuration (Kotlin side, DoitWidgetConfigureActivity.kt) is unchanged.
+- The C3 card / surface, C4 form, C5 empty/loading/error, C6 nav, C7 typography, C8 icon, C9 a11y, C10 FAB categories are the scope of PR5..PR15.
+
 - The C2 color palette, C3 card / surface, C4 form, C5 empty/loading/error, C6 nav, C7 typography, C10 FAB categories are the scope of PR4..PR15.
 
