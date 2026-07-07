@@ -1,5 +1,11 @@
 // Widget tests for PersonGroupsScreen (WF-018).
 
+// v1.7-η additions (SYS-163 / ADR-094 / WF-091): +8 tests
+// covering the paused-chip + null-rotation + empty-state surfaces.
+//
+// Test count: 13 → 21 (+8 net — exactly matches plan).
+// APK SHA1: N/A (tests-only cycle; see ADR-094 (e)).
+
 import 'package:doit/people/cadence.dart';
 import 'package:doit/people/person.dart';
 import 'package:doit/people/person_group.dart';
@@ -310,6 +316,220 @@ void main() {
       final members = await PersonGroupRepository.instance.listMembers(squadId);
       expect(members.length, 1);
       expect(members.first.personId, 'p1');
+    },
+  );
+
+  // ---------------- v1.7-η additions (SYS-163 / ADR-094 / WF-091) ----------------
+  //
+  // 8 tests across 3 batches:
+  //   Batch 1 — Paused-chip (2 tests): pinned the per-row guards at
+  //             `_GroupCard` (person_groups.dart:201, :215-223).
+  //   Batch 2 — Null-rotation (3 tests): pinned the rotation selector
+  //             invariant at `pickNextMember` (person_group.dart:166-185)
+  //             exercised via the widget's `_load` (person_groups.dart:35-47).
+  //   Batch 3 — Empty-state (3 tests): pinned the AddPersonGroupScreen
+  //             title + empty-people copy + 5-channel ChoiceChips.
+
+  // ----- Batch 1 — Paused-chip (2 tests) -----
+
+  testWidgets(
+    'Paused group does NOT render the Mark contacted CTA (still renders Delete) (v1.7-η / SYS-163)',
+    (tester) async {
+      await _resetDb(tester);
+      await _seed();
+      // Pause the group for 30 days.
+      final group = (await PersonGroupRepository.instance.getById('g1'))!;
+      await PersonGroupRepository.instance.save(
+        group.copyWith(pausedUntil: DateTime(2027, 6)),
+      );
+      await tester.pumpWidget(const MaterialApp(home: PersonGroupsScreen()));
+      await tester.pumpAndSettle();
+      // Sanity: the Paused chip IS rendered.
+      expect(find.text('Friends'), findsOneWidget);
+      expect(find.text('Paused'), findsOneWidget);
+      // The Mark-contacted CTA must NOT render while paused
+      // (person_groups.dart:201 — `if (row.nextPerson != null && !paused)`).
+      expect(find.byKey(const ValueKey('group.g1.mark')), findsNothing);
+      // The Delete IconButton must STILL render (no `!paused` guard at
+      // person_groups.dart:215-223). The user can unpause by deleting + re-adding.
+      expect(find.byKey(const ValueKey('group.g1.delete')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Paused group still renders the cadence label + Members count (only Mark is suppressed) (v1.7-η / SYS-163)',
+    (tester) async {
+      await _resetDb(tester);
+      await _seed();
+      final group = (await PersonGroupRepository.instance.getById('g1'))!;
+      await PersonGroupRepository.instance.save(
+        group.copyWith(pausedUntil: DateTime(2027, 6)),
+      );
+      await tester.pumpWidget(const MaterialApp(home: PersonGroupsScreen()));
+      await tester.pumpAndSettle();
+      // The cadence label + Members count are unconditional (rendered
+      // regardless of `paused`). Pins person_groups.dart:180-188.
+      expect(find.textContaining('Every 7 days'), findsOneWidget);
+      expect(find.textContaining('Members: 1'), findsOneWidget);
+    },
+  );
+
+  // ----- Batch 2 — Null-rotation (3 tests) -----
+
+  testWidgets(
+    'Empty members list renders the group row but hides the "Next:" line + suppresses Mark (v1.7-η / SYS-163)',
+    (tester) async {
+      await _resetDb(tester);
+      // Seed a group with NO members.
+      await PersonGroupRepository.instance.save(
+        ContactGroup(
+          id: 'g_empty',
+          name: 'EmptyGroup',
+          cadence: const EveryNDays(7),
+          semantic: GroupSemantic.rotation,
+          channel: 'whatsapp',
+          handle: '@empty',
+          createdAt: DateTime(2026, 6),
+        ),
+      );
+      await tester.pumpWidget(const MaterialApp(home: PersonGroupsScreen()));
+      await tester.pumpAndSettle();
+      // The group name still renders.
+      expect(find.text('EmptyGroup'), findsOneWidget);
+      // No "Next:" line (person_groups.dart:189-196 — guarded on
+      // `row.nextPerson != null && g.semantic == GroupSemantic.rotation`).
+      expect(find.textContaining('Next:'), findsNothing);
+      // Mark CTA also hidden (person_groups.dart:201 — `row.nextPerson != null`).
+      expect(find.byKey(const ValueKey('group.g_empty.mark')), findsNothing);
+      // Delete still available.
+      expect(
+        find.byKey(const ValueKey('group.g_empty.delete')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'Pre-existing lastContacted on the older member → next pick is the null-lastContacted newer member (null beats contacted) (v1.7-η / SYS-163)',
+    (tester) async {
+      await _resetDb(tester);
+      // Seed 2 people + 1 group + both members.
+      await _seed();
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p2',
+          lookupKey: 'lk_p2',
+          channel: const ChannelWhatsApp('+10000000002'),
+          cadence: const EveryNDays(7),
+          createdAt: DateTime(2026, 6),
+        ),
+      );
+      await PersonGroupRepository.instance.addMember('g1', 'p2');
+      // Mark p1 (the older member) as already contacted BEFORE pumping
+      // the screen. Now p1.lastContactedMillis is set; p2 is null.
+      // pickNextMember must pick p2 (null beats contacted, per
+      // person_group.dart:176-177).
+      await PersonGroupRepository.instance.markContacted(
+        'g1',
+        'p1',
+        DateTime(2026, 6),
+      );
+      await tester.pumpWidget(const MaterialApp(home: PersonGroupsScreen()));
+      await tester.pumpAndSettle();
+      expect(find.text('Next: p2'), findsOneWidget);
+      expect(find.text('Next: p1'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Mark contacted on the current next → page refresh shows the OTHER member as next (rotation advances) (v1.7-η / SYS-163)',
+    (tester) async {
+      await _resetDb(tester);
+      // Seed 2 people + 1 group + both members. Both start with
+      // lastContactedMillis = null. Initial tie-break by addedAtMillis
+      // (older wins, per person_group.dart:181) → p1 is the initial next.
+      await _seed();
+      await PersonRepository.instance.save(
+        ContactPerson(
+          id: 'p2',
+          lookupKey: 'lk_p2',
+          channel: const ChannelWhatsApp('+10000000002'),
+          cadence: const EveryNDays(7),
+          createdAt: DateTime(2026, 6),
+        ),
+      );
+      await PersonGroupRepository.instance.addMember('g1', 'p2');
+      await tester.pumpWidget(const MaterialApp(home: PersonGroupsScreen()));
+      await tester.pumpAndSettle();
+      // Sanity: p1 is the initial next (addedAtMillis tie-break).
+      expect(find.text('Next: p1'), findsOneWidget);
+      // Tap Mark for p1.
+      await tester.tap(find.byKey(const ValueKey('group.g1.mark')));
+      await tester.pumpAndSettle();
+      // After markContacted(p1) → p1.lastContacted is now; p2 is null.
+      // pickNextMember → null beats contacted → p2 wins.
+      expect(find.text('Next: p2'), findsOneWidget);
+      expect(find.text('Next: p1'), findsNothing);
+    },
+  );
+
+  // ----- Batch 3 — Empty-state (3 tests) -----
+
+  testWidgets(
+    'Add screen with existing != null shows "Edit group" title in AppBar (v1.7-η / SYS-163)',
+    (tester) async {
+      await _resetDb(tester);
+      final existing = ContactGroup(
+        id: 'g_edit',
+        name: 'Edit Me',
+        cadence: const EveryNDays(7),
+        semantic: GroupSemantic.rotation,
+        channel: 'whatsapp',
+        handle: '@edit',
+        createdAt: DateTime(2026, 6),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: AddPersonGroupScreen(existing: existing)),
+      );
+      await tester.pumpAndSettle();
+      // Pins person_groups.dart:378 — title is "Edit group" when existing != null.
+      expect(find.text('Edit group'), findsOneWidget);
+      expect(find.text('New group'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Add screen with empty people list shows "No people added yet" copy (v1.7-η / SYS-163)',
+    (tester) async {
+      await _resetDb(tester);
+      // No people seeded → _people list is empty after _loadPeople.
+      await tester.pumpWidget(const MaterialApp(home: AddPersonGroupScreen()));
+      await tester.pumpAndSettle();
+      // Pins person_groups.dart:464-470 — empty-people branch.
+      expect(find.textContaining('No people added yet'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Add screen renders 5 channel ChoiceChips (dialer, whatsapp, telegram, signal, sms) (v1.7-η / SYS-163)',
+    (tester) async {
+      await _resetDb(tester);
+      await tester.pumpWidget(const MaterialApp(home: AddPersonGroupScreen()));
+      await tester.pumpAndSettle();
+      // Pins person_groups.dart:410-416 — 5 channel ChoiceChips render.
+      for (final ch in const [
+        'dialer',
+        'whatsapp',
+        'telegram',
+        'signal',
+        'sms',
+      ]) {
+        expect(
+          find.widgetWithText(ChoiceChip, ch),
+          findsOneWidget,
+          reason: 'Channel ChoiceChip for "$ch" must render',
+        );
+      }
     },
   );
 }

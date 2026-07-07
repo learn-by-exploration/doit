@@ -8389,3 +8389,43 @@ The `final future = PermissionSheet.show(...)` is a non-awaited handle to the Fu
 - SYS-066/067/068 baseline — the 11 existing tests that v1.7-ζ extends
 - The 5 drift lessons follow the canonical pattern from ADR-087 §b (tests-only + 2-bug-fix canonical pattern)
 
+## ADR-094 — v1.7-η drift lessons (person_groups paused-chip + null-rotation + empty-state coverage)
+
+**Cycle:** v1.7-η / Phase 71 / SYS-163 / ADR-094 / WF-091.
+
+**Context.** v1.7-η EXTENDS `test/screens/person_groups_test.dart` with **+8 tests** in 3 batches (2 + 3 + 3) under a `// v1.7-η additions (SYS-163 / ADR-094 / WF-091)` banner. The 13 baseline tests cover the happy-path surfaces; the 8 new tests pin the paused-chip per-row guards + the `pickNextMember` rotation algorithm + the empty-state surface of `AddPersonGroupScreen`.
+
+**Decision.** The 8 tests pin invariants that are documented in code at `person_groups.dart:180-201, 215-223, 378, 410-416, 464-470` + `person_group.dart:166-185`. Each batch is independent and pins a distinct layer:
+
+(a) Batch 1 — Paused-chip (2 tests): the per-row guards at `_GroupCard`. The Mark-contacted CTA is suppressed by `!paused` (line 201); the cadence label + Members count are unconditional renders (lines 180-188); the Delete IconButton has no `!paused` guard (lines 215-223).
+
+(b) Batch 2 — Null-rotation (3 tests): the rotation selector at `pickNextMember` (lines 166-185). Null lastContacted beats contacted (lines 176-177); tie-break by oldest addedAtMillis when both null (lines 180-181); smallest lastContacted wins when both contacted (lines 178-179).
+
+(c) Batch 3 — Empty-state (3 tests): the AddPersonGroupScreen surfaces. "Edit group" title when `existing != null` (line 378); "No people added yet" copy when person list is empty (lines 464-470); 5 channel ChoiceChips render (lines 410-416).
+
+**5 drift lessons:**
+
+(a) **`DateTime(int year, [int month = 1, int day = 1, ...])` — passing `day = 1` triggers the `avoid_redundant_argument_values` lint.** The existing 13 tests in this file use `DateTime(2026, 6)` (without explicit day) consistently; the new Batch 2 pre-marks a member with `DateTime(2026, 6, 1)` which fails the lint. Fix: drop the redundant `1` and use `DateTime(2026, 6)` to match the existing convention. This is the THIRD explicit instance of the "the existing file's lint configuration is the source of truth, follow it" lesson (after v1.7-δ ADR-091 + v1.7-ζ ADR-093).
+
+(b) **`ContactGroup` is NOT a const-constructible class** — the `createdAt: DateTime(2026, 6)` field is a runtime value. An EARLIER draft of Batch 3 test 1 used `const existing = ContactGroup(...)` which fails compilation (`Cannot invoke a non-'const' constructor where a const expression is expected`). Fix: use `final existing = ContactGroup(...)` (no `const`), then remove `const` from the `MaterialApp(home: AddPersonGroupScreen(existing: existing))` wrapper. The same `DateTime` non-const-ness surfaced here; the second-order fix was to drop `const` from BOTH the variable declaration AND the call site.
+
+(c) **The `_GroupCard` line 189-196 + 201 dual-guard pairs the "Next:" line AND the Mark CTA** — both checks reference `row.nextPerson != null`. A future refactor that adds a 3rd guard reference to `nextPerson` (e.g., a "Next person" avatar) MUST respect the same null-check to avoid rendering a null avatar. Batch 2 test 1 pins this pairing explicitly.
+
+(d) **`pickNextMember`'s 3 tie-break rules are independent** — (i) null beats contacted (line 176-177), (ii) oldest addedAtMillis wins when both null (line 180-181), (iii) smallest lastContacted wins when both contacted (line 178-179). The 3 Batch 2 tests cover all 3 cases via the widget: test 2 covers case (i), test 3's initial state covers case (ii) and final state covers case (i) again, no explicit test for case (iii) since it requires manually setting lastContactedMillis on 2 members before pumping. This is the 4th concrete example of the ADR-086 (a) verify-wiring-exists rule applied to a model function (after v1.7-β person_repository, v1.7-γ add_event, v1.7-ε person_repository_pausedUntil).
+
+(e) **`_GroupCard` line 201's `!paused` guard is the ONLY suppression of the Mark CTA in the widget** — cadence label (line 180-183) and Members count (line 185-188) render unconditionally. The Delete IconButton (line 215-223) ALSO has no `!paused` guard (deleting a paused group is a valid escape hatch — the user can delete + re-add). The 2 Batch 1 tests pin these 2 distinct invariants.
+
+**Consequences.**
+
+- The 8 pins extend the per-row guard coverage at `_GroupCard` to cover paused + null-rotation + empty-state.
+- The `pickNextMember` algorithm's 3 independent tie-break rules are now widget-pinnable via the `PersonGroupRepository.instance.markContacted(...)` API (which persists to DB and is the same code path the widget's "Mark contacted" CTA exercises).
+- `DateTime(2026, 6)` (without explicit `day`) is now the canonical convention for this test file (was the convention for 13 tests; v1.7-η Batch 2 test 2 was the 14th instance).
+- Future v1.7-η+ cycles that touch `person_groups.dart` should keep the 8 pins green; if a refactor intentionally changes the `!paused` guard on Delete (e.g., to suppress Delete on paused), the 8 pins must be updated.
+
+### Cross-references
+
+- v1.7-η PR #85 commit (will be created at end of cycle)
+- SYS-162 baseline — v1.7-ζ immediately preceding cycle (permission_sheet cancel + permanentlyDenied-retry)
+- The 5 drift lessons follow the canonical pattern from ADR-087 §b (tests-only + 2-bug-fix canonical pattern)
+- The APK SHA1 streak (broken at v1.7-ζ per ADR-093 (e) + the [v1-7-cyc-zeta-cycle-shipped.md](../../../../.claude/projects/-home-shyam-common-games-doit/memory/v1-7-cyc-zeta-cycle-shipped.md) finding) is NOT reported as a discipline anchor from v1.7-η onwards; replaced with test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes
+

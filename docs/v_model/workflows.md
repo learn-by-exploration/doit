@@ -4276,3 +4276,30 @@ SYS-158; ADR-089; v1.7-β row in `implementation_status.md`; `### v1.7-β` subse
 
 - **v1.7 milestone: 6/9 cycles shipped (α + β + γ + δ + ε + ζ); tests 1773 → 1850 (+77 net across 6 cycles; +13 exact for α, +14 exact for β, +12 exact for γ, +20 exact for δ, +10 exact for ε, +8 exact for ζ); `permission_sheet.dart` cancel branch + 3-state UI machine + permanentlyDenied retry paths pinned; 0 Kotlin changes; 0 `<uses-permission>` changes; 0 Drift migrations; 0 release APK rebuilds.**
 
+### v1.7-η — person_groups paused-chip + null-rotation + empty-state coverage closure (Phase 71 / SYS-163 / ADR-094 / WF-091)
+
+**Tests-only cycle.** EXTEND `test/screens/person_groups_test.dart` (+8 tests, 13 baseline → 21 total). No production-code change; no Drift migration; no Kotlin change; no new `<uses-permission>`; no new pubspec dep.
+
+**Batch 1 — Paused-chip (2 tests).** Pins the per-row guards at `_GroupCard` in `person_groups.dart:180-201, 215-223`. The Mark-contacted CTA is the ONLY row action suppressed by `!paused` (line 201); the cadence label + Members count are unconditional renders (lines 180-188); the Delete IconButton has no `!paused` guard (lines 215-223). The 2 tests:
+
+1. `Paused group does NOT render the Mark contacted CTA (still renders Delete)` — pauses the seeded group + asserts the Mark button is hidden AND the Delete button is still present. Pins the line 201 guard.
+2. `Paused group still renders the cadence label + Members count (only Mark is suppressed)` — pauses the seeded group + asserts the cadence label (`'Every 7 days'`) AND the Members count (`'Members: 1'`) both render. Pins the lines 180-188 unconditional renders.
+
+**Batch 2 — Null-rotation (3 tests).** Pins the `pickNextMember` rotation selector at `person_group.dart:166-185`. The selector has 3 independent tie-break rules: null beats contacted (lines 176-177), oldest addedAtMillis wins when both null (lines 180-181), smallest lastContacted wins when both contacted (lines 178-179). The 3 tests:
+
+3. `Empty members list renders the group row but hides the "Next:" line + suppresses Mark` — seeds a group with NO members + asserts the group name renders, the "Next:" line is hidden, AND the Mark CTA is hidden (Delete still renders). Pins the dual-guard at lines 189-196 + 201.
+4. `Pre-existing lastContacted on the older member → next pick is the null-lastContacted newer member (null beats contacted)` — seeds 2 members + pre-marks p1 as contacted via `PersonGroupRepository.instance.markContacted('g1', 'p1', DateTime(2026, 6))` BEFORE pumping the screen + asserts "Next: p2" renders (not "Next: p1"). Pins line 176-177 null-beats-contacted rule.
+5. `Mark contacted on the current next → page refresh shows the OTHER member as next (rotation advances)` — seeds 2 members + both null-LC + initial tie-break by addedAtMillis picks p1 + taps Mark + asserts "Next: p2" renders after refresh. Pins the rotation algorithm end-to-end (lines 176-181).
+
+**Batch 3 — Empty-state (3 tests).** Pins the AddPersonGroupScreen state surfaces at `person_groups.dart:378, 410-416, 464-470`. The 3 tests:
+
+6. `Add screen with existing != null shows "Edit group" title in AppBar` — pumps `AddPersonGroupScreen(existing: someGroup)` + asserts the title is `'Edit group'` (not `'New group'`). Pins line 378 ternary.
+7. `Add screen with empty people list shows "No people added yet" copy` — no people seeded + pumps `AddPersonGroupScreen()` + asserts the empty-state copy renders. Pins lines 464-470.
+8. `Add screen renders 5 channel ChoiceChips (dialer, whatsapp, telegram, signal, sms)` — pumps `AddPersonGroupScreen()` + asserts all 5 channel ChoiceChips render via `find.widgetWithText(ChoiceChip, ch)` for each. Pins lines 410-416.
+
+**Out-of-scope.** Case (iii) `pickNextMember` tie-break pin via widget (would require manual SQL UPDATE — fragile); `pickNextMember` tests where the member's `addedAtMillis` is set to a specific DateTime via direct DB write (the schema uses `_millisecondsSinceEpoch` integers; round-trip is brittle); the Add screen 4-cadence ChoiceChips pin (`person_groups.dart:429-433`) — already covered by the existing baseline test "Add screen: tapping Weekly cadence switches the params widget to a weekday DropdownButton"; the per-person `_PersonPausedChip` render pin (`person_groups.dart:480-481`) — requires seeding a paused person + pumping the Add screen, brittle and not in scope.
+
+**Cross-references:** SYS-163; ADR-094; v1.7-η row in `implementation_status.md`; `### v1.7-η` subsection in `plan.md`; `## v1.7-η` entry in `CHANGELOG.md`; feature.md cycle entry; the v1.7 locked roadmap at `~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`; ADR-094 drift lesson (a) — the `DateTime(year, [month=1, day=1, ...])` `avoid_redundant_argument_values` lint pattern; ADR-094 drift lesson (b) — `ContactGroup` is not const-constructible because of `DateTime` fields; ADR-093 (v1.7-ζ drift lessons, especially the APK SHA1 finding at lesson (e) — v1.7-η does NOT report APK SHA1 stability, replaced with test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes per ADR-093 (e) + the [v1-7-cyc-zeta-cycle-shipped.md](../../../../.claude/projects/-home-shyam-common-games-doit/memory/v1-7-cyc-zeta-cycle-shipped.md) finding); ADR-092 (v1.7-ε drift lessons); ADR-091 (v1.7-δ drift lessons); ADR-090 (v1.7-γ drift lessons); ADR-089 (v1.7-β drift lessons); ADR-088 (v1.7-α drift lessons).
+
+- **v1.7 milestone: 7/9 cycles shipped (α + β + γ + δ + ε + ζ + η); tests 1773 → 1858 (+85 net across 7 cycles; +13 exact for α, +14 exact for β, +12 exact for γ, +20 exact for δ, +10 exact for ε, +8 exact for ζ, +8 exact for η); `_GroupCard` per-row guards + `pickNextMember` rotation algorithm + AddPersonGroupScreen empty-state surfaces pinned; 0 Kotlin changes; 0 `<uses-permission>` changes; 0 Drift migrations; 0 release APK rebuilds.**
+

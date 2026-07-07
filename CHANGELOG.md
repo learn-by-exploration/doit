@@ -4696,3 +4696,13 @@ Cycle is the **FIFTH** in the v1.7 milestone (5/9 cycles shipped). **Refs:** SYS
 
 Cycle is the **SIXTH** in the v1.7 milestone (6/9 cycles shipped). 3 remaining: v1.7-η (person_groups paused-chip + null-rotation + empty-state), v1.7-θ (triggers/condition.dart boundaries + permission_lifecycle_observer.dart resume debounce + mission_result.dart toString), v1.7-ι (doc cleanup closeout). **Refs:** SYS-162, ADR-093, WF-090.
 
+## v1.7-η — `person_groups.dart` paused-chip + null-rotation + empty-state coverage closure (Phase 73 / SYS-163 / ADR-094 / WF-091)
+
+**SEVENTH cycle of the v1.7 milestone.** Pins the `_GroupCard` per-row guards at `person_groups.dart:180-201, 215-223` (paused-chip + null-rotation) + the `pickNextMember` rotation selector at `person_group.dart:166-185` (3 tie-break rules) + the AddPersonGroupScreen empty-state surfaces at `person_groups.dart:378, 410-416, 464-470`. **No production-code change.** Tests-only cycle.
+
+**Scope:** EXTEND `test/screens/person_groups_test.dart` (+8 tests, 13 baseline → 21 total).
+
+**Drift lessons per ADR-094:** (a) `DateTime(year, [month=1, day=1, ...])` — passing `day = 1` triggers the `avoid_redundant_argument_values` lint. Fix: drop the redundant `1` to match the existing 13-test convention; (b) `ContactGroup` is NOT const-constructible because of `DateTime` fields. Fix: drop `const` from both the variable declaration AND the `MaterialApp(home: ...)` wrapper; (c) The `_GroupCard` line 189-196 + 201 dual-guard pairs the "Next:" line AND the Mark CTA — both reference `row.nextPerson != null`. Batch 2 test 1 pins this pairing; (d) `pickNextMember`'s 3 tie-break rules are independent. The 3 Batch 2 tests cover cases (i) + (ii) via the widget; case (iii) deferred (would require manual SQL UPDATE); (e) `_GroupCard` line 201's `!paused` guard is the ONLY suppression of the Mark CTA — cadence label + Members count render unconditionally; Delete IconButton ALSO has no `!paused` guard (deleting a paused group is a valid escape hatch).
+
+**Test count: 1850 → 1858 (+8 net — exactly matches plan).** Cumulative v1.7 progress: 1773 → 1858 (+85 net across α + β + γ + δ + ε + ζ + η). **3-gate green.** **Discipline anchor:** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes. APK SHA1 NOT REPORTED (per ADR-093 (e) + the [v1-7-cyc-zeta-cycle-shipped.md](../../../.claude/projects/-home-shyam-common-games-doit/memory/v1-7-cyc-zeta-cycle-shipped.md) finding). SYS-163 / ADR-094 / WF-091.
+
