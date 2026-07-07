@@ -31,6 +31,7 @@ import 'package:doit/do/do.dart' as domain;
 import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/services/do_repository.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/icon_button.dart';
 
 class RecentlyDeletedScreen extends StatefulWidget {
   const RecentlyDeletedScreen({super.key});
@@ -229,13 +230,13 @@ class _Row extends StatelessWidget {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            IconButton(
+            AppIconButton(
               key: ValueKey('recently_deleted.restore.${item.id}'),
               tooltip: l.recentlyDeletedRestoreAction,
               icon: const Icon(Icons.restore),
               onPressed: onRestore,
             ),
-            IconButton(
+            AppIconButton(
               key: ValueKey('recently_deleted.delete_forever.${item.id}'),
               tooltip: l.recentlyDeletedDeleteForeverAction,
               icon: const Icon(Icons.delete_forever),

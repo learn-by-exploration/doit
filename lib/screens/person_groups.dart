@@ -15,6 +15,7 @@ import 'package:doit/services/person_group_repository.dart';
 import 'package:doit/services/person_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/icon_button.dart';
 
 class PersonGroupsScreen extends StatefulWidget {
   const PersonGroupsScreen({super.key});
@@ -59,7 +60,7 @@ class _PersonGroupsScreenState extends State<PersonGroupsScreen> {
       appBar: AppBar(
         title: const Text('Contact groups'),
         actions: [
-          IconButton(
+          AppIconButton(
             key: const ValueKey('person_groups.refresh'),
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh),
