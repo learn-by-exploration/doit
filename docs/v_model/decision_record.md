@@ -8978,3 +8978,216 @@ Create two new primitives in `lib/ui/`:
 - The `FilterChip` pattern (e.g., `add_habit.dart:587` weekday active-days selector) — `FilterChip` is a separate widget with different semantics. The plan reserved this for a future PR. Deferred.
 - The bare `SwitchListTile` and `Slider` patterns in the same screens — separate widgets, separate PRs. Deferred.
 - The `CalendarPicker` and `LocationPicker` modal form fields — these are third-party / widget-tree-deep and would need their own primitive. Deferred.
+
+
+## ADR-105 — AppSnack snackbar wrapper primitive (v1.8-08 / PR8 of 15)
+
+**Status:** Accepted (PR8 of 15 shipped).
+
+### Context
+
+The C4 form-pattern audit (per the 3-month launch roadmap) found that the
+`ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(...)))`
+pattern recurs across 8+ screens with no semantic distinction between
+"error" and "info" tones, no consistent foreground color, no canonical
+duration, and no central point of design-intent. Every migration that
+adds a new snackbar copy had to re-derive the styling from scratch.
+
+The 8 call sites catalogued in PR8's pre-audit are:
+- `add_habit.dart:700` (pre-modal info), `:1060-1062` (helper method),
+  `:1108` (captured-messenger post-async error)
+- `add_event.dart:336` (pre-modal error), `:373-375` (info success),
+  `:378-380` (error)
+- `add_person.dart:452-454` (info success), `:457-459` (error)
+- (additional 11 sites in `home.dart`, `settings.dart`,
+  `recently_deleted_screen.dart`, `completion_log_section.dart`,
+  `permission_sheet.dart` deferred to a future sweep PR)
+
+The plan's intent (per the locked pre-auth at
+`~/.claude/plans/here-now-i-hvae-enumerated-reddy.md`) was to introduce
+a canonical primitive that centralizes the styling + the error/info
+semantic distinction, then migrate a representative 6 sites to lock the
+pattern in. The remaining 11 sites follow the same pattern and can be
+migrated in a follow-up PR.
+
+### Decision
+
+Introduce `lib/ui/app_snack.dart` — a thin static-method class with 2
+helpers:
+
+```dart
+class AppSnack {
+  AppSnack._();
+
+  /// M3 error-tone: errorContainer background + onErrorContainer text.
+  /// Use for user-actionable errors (validation failures, missing
+  /// input, operation failures).
+  static void showError(BuildContext context, String message) { ... }
+
+  /// M3 default-tone: inverseSurface background + onInverseSurface text.
+  /// Use for informational acknowledgments (template saved, marked as
+  /// up, no other dos).
+  static void showInfo(BuildContext context, String message) { ... }
+}
+```
+
+The visual distinction is the design-intent signal: a red-tinted snack
+(`errorContainer`) reads as "something went wrong" while a default-styled
+snack (`inverseSurface`) reads as "the system did a thing, just letting
+you know". Both helpers preserve the caller's responsibility for the
+standard `if (!mounted) return;` gate before invocation.
+
+### Drift lessons (from the implementation)
+
+(a) **`SnackBar.backgroundColor` is `null` at the `tester.widget` level
+when the developer doesn't pass an explicit backgroundColor** — Flutter
+resolves `null` to the active `snackBarTheme.backgroundColor` (or the
+`inverseSurface` fallback) only at paint time, not at widget-snapshot
+time. The canonical pin for "M3 default styling" is
+`expect(bar.backgroundColor, isNull)` (the developer-supplied value
+snapshot), NOT `expect(bar.backgroundColor, isNot(equals(inverseSurface)))`
+which would be a paint-time resolved value. The PR8 test file initially
+tried the resolved-value approach and failed; the fix is to pin the
+`null` developer-supplied value (NEW for PR8 — applies to any future
+test that wants to assert "M3 default styling" on a Material widget
+whose default is resolved at paint time; mirror this pattern in any
+future snackbar / dialog / chip test).
+
+(b) **`find.byType(SnackBar)` is ambiguous when two snacks are queued
+in the same ScaffoldMessenger** — when the same test calls
+`AppSnack.showError(...)` then `AppSnack.showInfo(...)` with the same
+message, the queue dedup keeps the first one visible and
+`find.byType(SnackBar)` returns the error snack even after the
+showInfo tap. The canonical fix is to use **two separate `pumpWidget`
+calls in the same test** (wipe the tree with `pumpWidget(SizedBox.shrink())`
+between them), each with its own `MaterialApp` + `Scaffold`. This is
+the same pattern as PR4's two-`pumpWidget`-needs-`ValueKey` gotcha, but
+for snackbars the value-key is unnecessary because the two trees are
+constructed fresh (NEW for PR8 — apply this pattern to any future test
+that compares two different widget-tree snapshots from the same helper
+that uses an internal queue, e.g., a custom toast or banner system).
+
+(c) **The captured-messenger pattern (`final messenger = ScaffoldMessenger.of(context);` at the top of a long async method, then `messenger.showSnackBar(...)` after an `await`) is RIPE for the
+`use_build_context_synchronously` lint when the captured messenger is
+dropped in favor of the AppSnack helper** — the lint fires on the
+`context` argument to `AppSnack.showError(context, ...)` because the
+lint sees the `context` is used across an `await delete(original.id)`
+gap. The fix is to add an `if (!mounted) return;` guard immediately
+before the AppSnack call. This is the **same pattern as the pre-helper
+state** (the original code at `add_habit.dart:1108` had the captured
+messenger, so the lint never fired because the context was implicit in
+the captured messenger; switching to AppSnack makes the context explicit
+and triggers the lint). The fix at `add_habit.dart:1106` adds the
+`if (!mounted) return;` guard in the `on Object catch (_)` block
+immediately before the AppSnack call (NEW for PR8 — apply this pattern
+to any future migration that drops a captured messenger in favor of a
+context-accepting helper; the lint will fire and the fix is the same).
+
+(d) **`AppPalette.iconMuted(context)` (PR4) + `SectionHeader('Title')`
+(PR6) + `AppSnack.showError(context, msg)` (PR8) ALL require a valid
+BuildContext** — the `lib/ui/` design-system layer consistently uses
+the `BuildContext` to derive theme-aware styling. This is the
+established pattern across all 11 primitives added in v1.8 (PR1-PR8);
+future primitives should follow the same pattern (extend it to
+`BuildContext` parameter, not to a `Color` / `TextStyle` parameter —
+the latter would freeze the style at construction time, defeating the
+dark/light theme switch). The `lib/ui/` layer is intentionally NOT
+pure-static constants; it is a layer of **theme-aware helpers**.
+
+(e) **`app_snack.dart` does NOT need a `const` constructor** — both
+static methods are top-level functions in disguise (the class is just
+a namespace). The `private constructor AppSnack._()` prevents the
+class from being instantiated but does NOT make the static methods
+const-callable. This is the same pattern as `AppPalette._()` (PR4) +
+`AppChoiceChip(label:, selected:, onSelected:)` (PR7) — the design
+system is intentionally not "compile-time frozen"; a future change
+to the M3 error tone (e.g., from `errorContainer` to a darker
+`error` for stronger visual feedback) can land in one place without
+breaking any call site (NEW for PR8 — same lesson as PR4 / PR7; the
+primitive layer is a single point of change, not a static contract).
+
+(f) **The `AppSnack` class' private constructor `AppSnack._()` is NOT
+reachable from the test file (it's private to the library)** — the
+test's "static accessor" group cannot pin the private constructor
+itself (test is in a different library); it can only pin the
+public-static-method surface (`AppSnack.showError`, `AppSnack.showInfo`).
+The PR8 test file initially tried `AppSnack._; // ignore: ...` and
+got a compilation error `Member not found: '_'`; the fix is to drop
+the private-constructor pin and only pin the 2 public static methods
+(NEW for PR8 — applies to any future `lib/ui/` primitive with a
+private constructor; the static-accessor test should only pin the
+public surface, not the private constructor).
+
+### Design decisions
+
+**D1 — Use the M3 `errorContainer` (not `error`)** — `errorContainer` is
+the soft, M3-canonical error background (a desaturated red tone) that
+blends with the dark theme's calm visual language. The full
+`colorScheme.error` is too saturated for a transient snackbar; the
+Material 3 design guide recommends `errorContainer` for low-emphasis
+error surfaces. This is the same choice as the M3 spec for the
+`errorContainer` semantic role.
+
+**D2 — No `duration` override** — the M3 default snackbar duration is
+4 seconds; the existing 8+ call sites use this default. The AppSnack
+helpers do not pass a `duration` parameter, preserving the default
+duration verbatim. A future PR can add a `duration:` parameter to one
+or both helpers if the design needs longer error durations (e.g.,
+for multi-line error messages).
+
+### Alternatives considered
+
+**A1 — Inline the styling at each call site (status quo)**
+- **Pro:** zero refactor effort.
+- **Con:** the styling decision is duplicated 8+ times; future design
+  tweaks (e.g., a darker error tone) require N edits. Rejected.
+
+**A2 — Wrap `ScaffoldMessenger` in a `Scaffold` global key + use a
+custom `showDoitSnack` extension method**
+- **Pro:** the call site becomes `context.showDoitSnack('msg')` (one
+  argument, no static method).
+- **Con:** requires a global scaffold key, which couples the
+  `ScaffoldMessenger` state to a specific scaffold instance. The
+  current pattern (capture `ScaffoldMessenger.of(context)` per call)
+  is more flexible for nested scaffolds. Rejected.
+
+**B1 — Make `AppSnack` a class with a `const` constructor + 2 final
+fields (context + message) + a `show()` method**
+- **Pro:** could be unit-tested as a plain Dart object.
+- **Con:** the `context` parameter would freeze the call site's
+  context at construction time; the snack would fire on a stale
+  context if the call site held the instance across an `await`. The
+  static-method pattern keeps the context lookup lazy (inside the
+  static method, not at construction). Rejected.
+
+**B2 — Use a single `show(BuildContext, String, {bool isError = false})`
+method instead of 2 separate static methods**
+- **Pro:** one entry point, one canonical call shape.
+- **Con:** the call site must remember to pass `isError: true` for
+  errors; the named-parameter default is error-prone. Two separate
+  static methods make the intent explicit at the call site. Rejected.
+
+### Verification
+
+- `flutter test` 2010/2010 pass.
+- All 6 migration sites use the new primitive.
+- The 3 inlined `ScaffoldMessenger.of(context).showSnackBar(...)` calls
+  are gone from `add_habit.dart` + `add_event.dart`; the 2 files now
+  import `package:doit/ui/app_snack.dart` and route through
+  `AppSnack.showError` / `AppSnack.showInfo`.
+
+### Defers (out-of-scope, PR8)
+
+- The 11 remaining snackbar call sites in `home.dart` (5),
+  `settings.dart` (3), `recently_deleted_screen.dart` (3),
+  `completion_log_section.dart` (2), `permission_sheet.dart` (1) —
+  same pattern, separate follow-up PR. Deferred.
+- The `duration:` parameter for `showError` (longer duration for
+  user-actionable errors). Deferred.
+- The `action:` parameter for `showInfo` (e.g., a "Undo" button on
+  the "Marked as up" snack). Deferred — this would change the visual
+  surface area and requires a separate design decision.
+- The `behavior: SnackBarBehavior.floating` option for the floating
+  variant. Deferred — the existing call sites all use the fixed
+  behavior; adding the floating variant requires per-site design
+  review.

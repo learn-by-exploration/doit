@@ -51,6 +51,7 @@ import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/trigger.dart';
 import 'package:doit/ui/app_choice_chip.dart';
 import 'package:doit/ui/app_form_field.dart';
+import 'package:doit/ui/app_snack.dart';
 import 'package:doit/ui/primary_button.dart';
 import 'package:doit/ui/secondary_button.dart';
 import 'package:doit/widgets/calendar_picker.dart';
@@ -333,9 +334,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
   Future<void> _saveAsTemplate() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Give the event a name first.')),
-      );
+      AppSnack.showError(context, 'Give the event a name first.');
       return;
     }
     final templateName = await showDialog<String>(
@@ -370,14 +369,10 @@ class _AddEventScreenState extends State<AddEventScreen> {
         ),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Template saved')));
+      AppSnack.showInfo(context, 'Template saved');
     } on TemplateValidationException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Template validation failed: ${e.message}')),
-      );
+      AppSnack.showError(context, 'Template validation failed: ${e.message}');
     }
   }
 
