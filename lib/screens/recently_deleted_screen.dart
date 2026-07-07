@@ -32,6 +32,7 @@ import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/services/do_repository.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/ui/icon_button.dart';
+import 'package:doit/ui/surface_card.dart';
 
 class RecentlyDeletedScreen extends StatefulWidget {
   const RecentlyDeletedScreen({super.key});
@@ -218,7 +219,8 @@ class _Row extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final deletedAt = item.deletedAt;
     final when = deletedAt == null ? '' : _formatWhen(deletedAt);
-    return Card(
+    return SurfaceCard(
+      padding: EdgeInsets.zero,
       child: ListTile(
         key: ValueKey('recently_deleted.row.${item.id}'),
         leading: const Icon(Icons.delete_outline),

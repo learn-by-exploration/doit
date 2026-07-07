@@ -27,7 +27,7 @@ import 'package:flutter/material.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/services/reliability_service.dart';
 import 'package:doit/services/reminder_service.dart';
-import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/banner_surface.dart';
 
 /// The visual surface for the reliability banner. Tap
 /// behavior is configurable via [onTap]; if null, the
@@ -82,37 +82,22 @@ class ReliabilityBanner extends StatelessWidget {
       return const SizedBox.shrink();
     }
     final scheme = Theme.of(context).colorScheme;
-    return Semantics(
-      label: 'Reminder reliability degraded',
-      button: onTap != null,
-      child: Material(
-        color: scheme.errorContainer,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Spacing.md,
-              vertical: Spacing.sm,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  color: scheme.onErrorContainer,
-                ),
-                const SizedBox(width: Spacing.sm),
-                Expanded(
-                  child: Text(
-                    'Reminders may be late. Tap to fix.',
-                    style: TextStyle(color: scheme.onErrorContainer),
-                  ),
-                ),
-                if (onTap != null)
-                  Icon(Icons.chevron_right, color: scheme.onErrorContainer),
-              ],
+    return BannerSurface(
+      tone: BannerTone.error,
+      onTap: onTap,
+      semanticLabel: 'Reminder reliability degraded',
+      icon: const Icon(Icons.warning_amber_rounded),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Reminders may be late. Tap to fix.',
+              style: TextStyle(color: scheme.onErrorContainer),
             ),
           ),
-        ),
+          if (onTap != null)
+            Icon(Icons.chevron_right, color: scheme.onErrorContainer),
+        ],
       ),
     );
   }

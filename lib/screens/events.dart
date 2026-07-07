@@ -17,6 +17,7 @@ import 'package:doit/screens/add_event.dart';
 import 'package:doit/services/event_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/surface_card.dart';
 
 export 'package:doit/screens/add_event.dart' show AddEventScreen;
 
@@ -169,7 +170,8 @@ class _EventTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final at = DateTime.fromMillisecondsSinceEpoch(event.atMillis);
-    return Card(
+    return SurfaceCard(
+      padding: EdgeInsets.zero,
       child: ListTile(
         key: ValueKey('event.${event.id}'),
         title: Text(event.name),

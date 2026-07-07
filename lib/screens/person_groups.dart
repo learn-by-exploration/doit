@@ -15,6 +15,7 @@ import 'package:doit/services/person_group_repository.dart';
 import 'package:doit/services/person_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/surface_card.dart';
 import 'package:doit/ui/icon_button.dart';
 
 class PersonGroupsScreen extends StatefulWidget {
@@ -157,75 +158,72 @@ class _GroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final g = row.group;
     final paused = g.isPausedAt(DateTime.now());
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(Spacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    g.name,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  g.name,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                if (paused)
-                  const Chip(label: Text('Paused'))
-                else
-                  Chip(label: Text(_semanticLabel(g.semantic))),
-              ],
-            ),
-            const SizedBox(height: Spacing.sm),
-            Text(
-              _cadenceLabel(g.cadence),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: Spacing.sm),
-            Text(
-              'Members: ${row.members.length}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            if (row.nextPerson != null &&
-                g.semantic == GroupSemantic.rotation) ...[
-              const SizedBox(height: Spacing.sm),
-              Text(
-                'Next: ${_personLabel(row.nextPerson!)}',
-                style: Theme.of(context).textTheme.bodyLarge,
               ),
+              if (paused)
+                const Chip(label: Text('Paused'))
+              else
+                Chip(label: Text(_semanticLabel(g.semantic))),
             ],
+          ),
+          const SizedBox(height: Spacing.sm),
+          Text(
+            _cadenceLabel(g.cadence),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: Spacing.sm),
+          Text(
+            'Members: ${row.members.length}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          if (row.nextPerson != null &&
+              g.semantic == GroupSemantic.rotation) ...[
             const SizedBox(height: Spacing.sm),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (row.nextPerson != null && !paused)
-                  FilledButton.icon(
-                    key: ValueKey('group.${g.id}.mark'),
-                    icon: const Icon(Icons.check),
-                    label: const Text('Mark contacted'),
-                    onPressed: () async {
-                      await PersonGroupRepository.instance.markContacted(
-                        g.id,
-                        row.nextPerson!.id,
-                        DateTime.now(),
-                      );
-                      await onChanged();
-                    },
-                  ),
-                IconButton(
-                  key: ValueKey('group.${g.id}.delete'),
-                  tooltip: 'Delete group',
-                  icon: const Icon(Icons.delete_outline),
+            Text(
+              'Next: ${_personLabel(row.nextPerson!)}',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ],
+          const SizedBox(height: Spacing.sm),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (row.nextPerson != null && !paused)
+                FilledButton.icon(
+                  key: ValueKey('group.${g.id}.mark'),
+                  icon: const Icon(Icons.check),
+                  label: const Text('Mark contacted'),
                   onPressed: () async {
-                    await PersonGroupRepository.instance.deleteById(g.id);
+                    await PersonGroupRepository.instance.markContacted(
+                      g.id,
+                      row.nextPerson!.id,
+                      DateTime.now(),
+                    );
                     await onChanged();
                   },
                 ),
-              ],
-            ),
-          ],
-        ),
+              IconButton(
+                key: ValueKey('group.${g.id}.delete'),
+                tooltip: 'Delete group',
+                icon: const Icon(Icons.delete_outline),
+                onPressed: () async {
+                  await PersonGroupRepository.instance.deleteById(g.id);
+                  await onChanged();
+                },
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

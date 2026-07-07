@@ -22,6 +22,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/banner_surface.dart';
 
 /// What the user needs to know to act on the recovery
 /// card. Computed by the home-screen binding — the
@@ -73,73 +74,60 @@ class StreakRecoveryCard extends StatelessWidget {
     if (s == null) return const SizedBox.shrink();
     final scheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context).textTheme;
-    return Semantics(
-      label:
+    return BannerSurface(
+      tone: BannerTone.info,
+      semanticLabel:
           'Streak broken: ${s.habitLabel} missed ${s.missedDays} days in a row.',
-      container: true,
-      child: Material(
-        color: scheme.tertiaryContainer,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Spacing.md,
-            vertical: Spacing.sm,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.calendar_today_outlined,
+              Icon(
+                Icons.calendar_today_outlined,
+                color: scheme.onTertiaryContainer,
+                semanticLabel: 'Streak broken',
+              ),
+              const SizedBox(width: Spacing.sm),
+              Expanded(
+                child: Text(
+                  'Streak broken on ${s.habitLabel}',
+                  style: theme.titleSmall?.copyWith(
                     color: scheme.onTertiaryContainer,
-                    semanticLabel: 'Streak broken',
-                  ),
-                  const SizedBox(width: Spacing.sm),
-                  Expanded(
-                    child: Text(
-                      'Streak broken on ${s.habitLabel}',
-                      style: theme.titleSmall?.copyWith(
-                        color: scheme.onTertiaryContainer,
-                      ),
-                    ),
-                  ),
-                  if (onDismiss != null)
-                    IconButton(
-                      key: ValueKey(
-                        'streak_recovery_card.dismiss.${s.habitId}',
-                      ),
-                      icon: Icon(
-                        Icons.close,
-                        color: scheme.onTertiaryContainer,
-                        semanticLabel: 'Dismiss recovery card',
-                      ),
-                      onPressed: onDismiss,
-                    ),
-                ],
-              ),
-              const SizedBox(height: Spacing.xs),
-              Text(
-                '${s.missedDays} days missed. Jump back in at '
-                '${s.nextSlotLabel}.',
-                style: theme.bodySmall?.copyWith(
-                  color: scheme.onTertiaryContainer,
-                ),
-              ),
-              if (onResume != null) ...[
-                const SizedBox(height: Spacing.xs),
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: FilledButton(
-                    key: ValueKey('streak_recovery_card.resume.${s.habitId}'),
-                    onPressed: onResume,
-                    child: const Text("I'm back"),
                   ),
                 ),
-              ],
+              ),
+              if (onDismiss != null)
+                IconButton(
+                  key: ValueKey('streak_recovery_card.dismiss.${s.habitId}'),
+                  icon: Icon(
+                    Icons.close,
+                    color: scheme.onTertiaryContainer,
+                    semanticLabel: 'Dismiss recovery card',
+                  ),
+                  onPressed: onDismiss,
+                ),
             ],
           ),
-        ),
+          const SizedBox(height: Spacing.xs),
+          Text(
+            '${s.missedDays} days missed. Jump back in at '
+            '${s.nextSlotLabel}.',
+            style: theme.bodySmall?.copyWith(color: scheme.onTertiaryContainer),
+          ),
+          if (onResume != null) ...[
+            const SizedBox(height: Spacing.xs),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FilledButton(
+                key: ValueKey('streak_recovery_card.resume.${s.habitId}'),
+                onPressed: onResume,
+                child: const Text("I'm back"),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
