@@ -28,6 +28,7 @@ import 'package:doit/services/template_repository.dart';
 import 'package:doit/templates/template.dart';
 import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/empty_state.dart';
 
 /// The entity-type filter chip selected at the top of the
 /// catalog. `all` shows every template; the rest filter by
@@ -126,7 +127,9 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
                             .where((t) => t.entityType == _filter.entityType)
                             .toList(growable: false);
                   if (filtered.isEmpty) {
-                    return const _EmptyView();
+                    return const EmptyState(
+                      title: 'No templates for this filter.',
+                    );
                   }
                   return GridView.builder(
                     padding: const EdgeInsets.all(Spacing.md),
@@ -333,23 +336,6 @@ class _TrailingAction extends StatelessWidget {
         key: ValueKey('template_card.${template.id}.use'),
         onPressed: onUse,
         child: const Text('Use this'),
-      ),
-    );
-  }
-}
-
-class _EmptyView extends StatelessWidget {
-  const _EmptyView();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(Spacing.lg),
-        child: Text(
-          'No templates for this filter.',
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
       ),
     );
   }

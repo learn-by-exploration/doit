@@ -36,6 +36,7 @@ import 'package:doit/do/consecutive_counter.dart';
 import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/do_repository.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/empty_state.dart';
 import 'package:doit/widgets/category_chip.dart';
 
 /// A pre-baked row. Computed in the screen's `initState` /
@@ -200,7 +201,11 @@ class _StatsScreenState extends State<StatsScreen> {
             }
             final buckets = snap.data ?? <_CategoryBucket>[];
             if (buckets.isEmpty) {
-              return const _EmptyView();
+              return const EmptyState(
+                title: 'No stats yet.',
+                message: 'Add a do to start tracking consecutive runs.',
+                icon: Icons.bar_chart_outlined,
+              );
             }
             return ListView.builder(
               padding: const EdgeInsets.all(Spacing.md),
@@ -472,39 +477,6 @@ class _Last7DaysChart extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyView extends StatelessWidget {
-  const _EmptyView();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(Spacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.bar_chart_outlined,
-              size: Sizing.huge,
-              color: Theme.of(context).colorScheme.outline,
-            ),
-            const SizedBox(height: Spacing.md),
-            Text(
-              'No stats yet.',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: Spacing.sm),
-            Text(
-              'Add a do to start tracking consecutive runs.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
-        ),
       ),
     );
   }

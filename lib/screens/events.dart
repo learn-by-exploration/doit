@@ -17,6 +17,7 @@ import 'package:doit/screens/add_event.dart';
 import 'package:doit/services/event_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/loading_view.dart';
 import 'package:doit/ui/section_header.dart';
 import 'package:doit/ui/surface_card.dart';
 
@@ -65,7 +66,7 @@ class _EventsScreenState extends State<EventsScreen> {
           future: _eventsFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
+              return const LoadingView();
             }
             if (snapshot.hasError) {
               return Center(

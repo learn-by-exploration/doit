@@ -48,6 +48,8 @@ import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/ui/app_palette.dart';
+import 'package:doit/ui/empty_state.dart';
+import 'package:doit/ui/loading_view.dart';
 import 'package:doit/ui/tile_surface.dart';
 import 'package:doit/widgets/category_chip.dart';
 import 'package:doit/widgets/reliability_banner.dart';
@@ -224,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 future: _habitsFuture,
                 builder: (context, snap) {
                   if (snap.connectionState != ConnectionState.done) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const LoadingView();
                   }
                   if (snap.hasError) {
                     return _ErrorView(
@@ -234,7 +236,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   }
                   final habits = snap.data ?? <Do>[];
                   if (habits.isEmpty) {
-                    return const _EmptyState();
+                    return EmptyState(
+                      title: AppLocalizations.of(context).homeEmptyTitle,
+                      icon: Icons.bolt_outlined,
+                    );
                   }
                   return ListView.separated(
                     padding: const EdgeInsets.all(Spacing.md),
@@ -1331,39 +1336,6 @@ class _TileIcon extends StatelessWidget {
     'sports_soccer': Icons.sports_soccer,
     'hiking': Icons.hiking,
   };
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(Spacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.bolt_outlined,
-              size: Sizing.huge,
-              color: Theme.of(context).colorScheme.outline,
-            ),
-            const SizedBox(height: Spacing.md),
-            Text(
-              AppLocalizations.of(context).homeEmptyTitle,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: Spacing.sm),
-            Text(
-              'Tap the + to add a do or a person.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _ErrorView extends StatelessWidget {
