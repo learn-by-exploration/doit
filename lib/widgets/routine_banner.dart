@@ -37,7 +37,7 @@ import 'package:flutter/material.dart';
 
 import 'package:doit/routines/routine.dart';
 import 'package:doit/routines/routine_executor.dart';
-import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/banner_surface.dart';
 
 /// Drains [RoutineExecutor.pendingOpenApp] and pushes the
 /// requested route via the nearest [Navigator]. Renders
@@ -91,31 +91,18 @@ class RoutineBanner extends StatelessWidget {
         // route is about to push; this gives the user
         // a moment of feedback that something is
         // happening.
-        return Material(
-          color: Theme.of(context).colorScheme.primaryContainer,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Spacing.md,
-              vertical: Spacing.sm,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.open_in_new,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-                const SizedBox(width: Spacing.sm),
-                Expanded(
-                  child: Text(
-                    queue.length == 1
-                        ? 'Opening routine destination…'
-                        : 'Opening ${queue.length} routine destinations…',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                ),
-              ],
+        return BannerSurface(
+          tone: BannerTone.primary,
+          semanticLabel: queue.length == 1
+              ? 'Opening routine destination'
+              : 'Opening ${queue.length} routine destinations',
+          icon: const Icon(Icons.open_in_new),
+          child: Text(
+            queue.length == 1
+                ? 'Opening routine destination…'
+                : 'Opening ${queue.length} routine destinations…',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
             ),
           ),
         );

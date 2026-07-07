@@ -865,3 +865,13 @@ Cycle is the **SIXTH** in the v1.7 milestone — v1.7 milestone 6/9 cycles shipp
 **Next:** PR5 of 15 (C3 cards — card / surface pattern consolidation: 5 issues → 2 PRs).
 
 **Next:** PR5 of 15 (C3 cards — card / surface pattern consolidation: 5 issues → 2 PRs).
+
+## PR5 of 15 (2026-07-07)
+
+Extracted 3 card / surface primitives (`lib/ui/surface_card.dart` + `lib/ui/tile_surface.dart` + `lib/ui/banner_surface.dart` — the FIFTH, SIXTH, and SEVENTH files in the `lib/ui/` design-system layer). `SurfaceCard` wraps canonical `Card + Padding(Spacing.md)` + optional onTap/semanticLabel/padding-override-for-ListTile. `TileSurface` wraps per-tile accent-color tint with canonical `_TileAlphas.selected = 0.30` + `_TileAlphas.unselected = 0.12` (matches the home tile's pre-PR5 inline literals byte-for-byte). `BannerSurface` wraps full-width banner with `tone: BannerTone` enum (error/info/primary/neutral → M3 container roles). Migrated 7 sites preserving visuals byte-for-byte: 3 SurfaceCard (person_groups._GroupCard + events._EventTile + recently_deleted_screen._RecentlyDeletedRow), 1 TileSurface (home.dart _HabitTileState, the 164-line habit tile), 3 BannerSurface (reliability_banner.ReliabilityBanner + streak_recovery_card.StreakRecoveryCard + routine_banner.RoutineBanner). The RoutineBanner migration adds a Semantics wrapper that was previously missing — a free a11y win from the primitive extraction. 2 unused `app_theme.dart` imports removed (reliability_banner + routine_banner). 38 new tests across 3 new test files (`test/ui/surface_card_test.dart` 12 + `test/ui/tile_surface_test.dart` 13 + `test/ui/banner_surface_test.dart` 13). Test count: 1910 → 1948 (+38 net; +5 over the +33 plan target — explained by the 3-primitive split in PR5 per ADR-102 drift lesson (f)). 3-gate green (`dart format` clean — 8 files reformatted; + `flutter analyze --fatal-infos lib test` 0 issues; + `flutter test` 1948/1948 pass). No manifest / pubspec / Drift / Kotlin changes. V-Model artifacts: SYS-171 + ADR-102 + WF-099 + 5 doc rows.
+
+**Cumulative v1.7 + UI sprint:** 1773 → 1948 (+175 net across 9 v1.7 cycles + 5/15 UI sprint cycles).
+
+**Next:** PR6 of 15 (C3 cards part 2 — `SectionHeader` primitive + C6 nav — `appBarTheme.scrolledUnderElevation: 1`).
+
+**Next:** PR6 of 15 (C3 cards part 2 — `SectionHeader` primitive + C6 nav — `appBarTheme.scrolledUnderElevation: 1`).

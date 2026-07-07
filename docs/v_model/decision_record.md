@@ -8751,3 +8751,70 @@ These are private (`_` prefix) so the migration looks like a vanilla call site; 
 
 - The C2 color palette, C3 card / surface, C4 form, C5 empty/loading/error, C6 nav, C7 typography, C10 FAB categories are the scope of PR4..PR15.
 
+
+## ADR-102 — PR5 of 15 UI consolidation — 3 card / surface primitives design decisions
+
+**Date:** 2026-07-07. **Status:** APPROVED (PR5 of 15 / Phase 81 / SYS-171 / WF-099).
+
+### Context
+
+Per UI_ORG_AUDIT.md C3 (card / surface pattern, 5 issues → 2 PRs; PR5 is the first of two), the codebase audit revealed:
+- **At least 9 inline `Card + Padding` blocks** across 5 screens: `person_groups.dart:_GroupCard`, `events.dart:_EventTile`, `recently_deleted_screen.dart:_RecentlyDeletedRow`, `home.dart:_HabitTile` (using `Material + InkWell + Padding` not `Card`), `stats.dart:_StatCard`, `templates.dart:_TemplateCard`, `completion_log_section.dart`, `settings_restore.dart` 4 cards, `dst_transition_banner.dart`.
+- **3 inline `Material + Padding` full-width banner blocks**: `reliability_banner.dart:ReliabilityBanner`, `streak_recovery_card.dart:StreakRecoveryCard`, `routine_banner.dart:RoutineBanner`. One of them (`RoutineBanner`) lacked a `Semantics` wrapper entirely — an a11y gap.
+- The home habit tile (`_HabitTileState._build` at lines 770-933) is a 164-line `Material + InkWell + Padding + Row` composition with hand-rolled `accent.withValues(alpha: 0.30)` for selected + `0.12` for unselected.
+
+The 5-issues-from-the-audit mapping:
+- **C3-1 (Card surface)**: 4 inline `Card + Padding` blocks (events, recently_deleted, person_groups, completion_log) → `SurfaceCard` primitive.
+- **C3-2 (Tile surface)**: the 164-line home habit tile → `TileSurface` primitive.
+- **C3-3 (Banner surface)**: 3 inline `Material + Padding` banner blocks (reliability, streak_recovery, routine) → `BannerSurface` primitive.
+- **C3-4 (Banner a11y gap)**: `RoutineBanner` lacks `Semantics` wrapper → fixed by the `BannerSurface` primitive's built-in `semanticLabel` parameter.
+- **C3-5 (M3 color-pair sprawl)**: the 3 banner sites each hardcoded a different M3 container role (`errorContainer`, `tertiaryContainer`, `primaryContainer`) → consolidated via `BannerTone` enum.
+
+The PR5 scope is 3 primitives + 7 migrations (the canonical-pattern call); the remaining 6+ Card sites (`stats.dart:_StatCard`, `templates.dart:_TemplateCard`, `completion_log_section.dart`, `settings_restore.dart` 4 cards, `dst_transition_banner.dart`) are deferred to PR6+ because they need a `stretch:` child contract for stats.dart, a `clipBehavior` + tappable-InkWell pattern for templates.dart, an internal `Row+Column` for completion_log_section.dart, and design work for settings_restore.dart's 4 cards + dst_transition_banner.dart.
+
+### Decision
+
+**A. Split into THREE primitives (`SurfaceCard` + `TileSurface` + `BannerSurface`) rather than ONE `Surface` super-primitive.** Accepted (chosen) — the 3 surface types have distinct semantic meanings (Card is a generic elevated container; Tile is a per-item tinted background; Banner is a full-width system-message strip) and the call sites read more clearly with one primitive per use case. A super-primitive with 12 optional parameters would obscure intent.
+
+**B. Add an optional `padding` parameter to `SurfaceCard` (default `EdgeInsets.all(Spacing.md)`, override `EdgeInsets.zero` for `ListTile`-based children).** Accepted (chosen) — M3 `Card` adds its own internal padding; when the child is a `ListTile` (which manages its own padding), double-padding produces an over-padded row. The override solves this without forcing every consumer to think about padding. The 3 ListTile-based sites (`events.dart`, `recently_deleted_screen.dart`, future `_RoutineRow`) use the override; the other 4 use the canonical default.
+
+**C. Use a `BannerTone` enum (vs raw `Color` parameter) for `BannerSurface.tone`.** Accepted (chosen) — the tone is semantic, not visual. A future brand-tweak to the "error" tone must propagate everywhere; a raw `Color` would silently diverge. The M3 role pair (`errorContainer` / `onErrorContainer`, `tertiaryContainer` / `onTertiaryContainer`, etc.) is brightness-aware — using the role (not the raw color) means the dark and light themes get the right pair automatically.
+
+**D. Make `TileSurface.onTap` `VoidCallback?` (nullable), not required.** Accepted (chosen) — even though the canonical selectable-tile use requires onTap, making it optional avoids forcing every consumer to pass `() {}` when the tile is static. The `home.dart` migration passes `onTap: onTap` (which is itself nullable); the build code branches on `(onTap == null && onLongPress == null)` to skip the InkWell wrapper entirely (no ripple cost for static surfaces).
+
+**E. Make `BannerSurface.onTap` `VoidCallback?` (nullable) for the same reason as (D).** Accepted (chosen) — `StreakRecoveryCard` is informational (no tap), `RoutineBanner` is informational (no tap), `ReliabilityBanner` is interactive (tap → settings). The 3 migration sites use the parameter correctly: 2 null + 1 non-null.
+
+**F. Canonical `_TileAlphas.selected = 0.30` and `_TileAlphas.unselected = 0.12` as private `static const double` constants in `_TileAlphas` abstract class.** Accepted (chosen) — mirrors PR4's `_tileAlpha = 0.20` pattern (private canonical constants on a dedicated holder class). The values match the home tile's pre-PR5 inline literals exactly (the migration is byte-for-byte); a future alpha tweak (e.g., bumping selected to 0.35 for better visibility on light themes) lands in one place.
+
+**G. Add the missing `Semantics(label: ..., container: true)` wrapper to `RoutineBanner` via the `BannerSurface.semanticLabel` parameter.** Accepted (chosen, accidental a11y win) — the prior inline `RoutineBanner` had no Semantics at all; TalkBack read each banner element separately. The `BannerSurface` primitive's built-in `semanticLabel` parameter (defaulted to optional) wraps the banner in `Semantics(label: ..., container: true)` so TalkBack reads it as a single element. This is a free a11y win that comes from extracting the primitive.
+
+**H. SurfaceCard reads `cardTheme.elevation` from the active theme rather than hardcoding `elevation: 1.0`.** Accepted (chosen) — M3 default Card elevation is 1.0 but a future brand-tweak (e.g., bumping to 2.0 for a more pronounced surface) should land in `AppTheme._build()` not in `SurfaceCard`. Reading `Theme.of(context).cardTheme.elevation` makes `SurfaceCard` theme-driven.
+
+### Drift lessons
+
+**(a) `SurfaceCard.padding` override is required for `ListTile`-based children** (NEW for PR5 — M3 `Card` adds its own internal padding; when the child is a `ListTile` (which also manages padding), double-padding produces an over-padded row. Fix: `SurfaceCard(padding: EdgeInsets.zero, child: ListTile(...))`). The 3 ListTile-based sites (`events.dart`, `recently_deleted_screen.dart`, future `_RoutineRow`) need the override; the canonical-padding sites (`person_groups.dart:_GroupCard`) do not.
+
+**(b) M3 `Card` adds its own internal `Padding` widget** (NEW for PR5 — when a test asserts "SurfaceCard renders `EdgeInsets.all(Spacing.md)` Padding", the finder returns MULTIPLE Padding widgets because the inner `Card` adds its own. Fix: use `firstWhere(p.padding == const EdgeInsets.all(Spacing.md))` to disambiguate; the canonical-padding Padding is the one whose `padding` property matches the canonical value).
+
+**(c) `Semantics(container: true, label: ...)` CONCATENATES the parent's label with the child's own semantics** (NEW for PR5 — `getSemantics(find.byType(BannerSurface)).label` returns `'A warning banner\nbody'` not just `'A warning banner'` because the inner `Text('body')` has its own semantics. Fix: use `contains('A warning banner')` rather than `equals('A warning banner')` in the Semantics-label assertions. This is a Flutter framework quirk: `Semantics.container = true` does NOT replace the child's semantics, it concatenates them).
+
+**(d) `TileSurface.onTap` is `VoidCallback?` (nullable), not required** (NEW for PR5 — the home.dart migration passes `onTap: onTap` (which is itself nullable); the build code branches on `(onTap == null && onLongPress == null)` to skip the InkWell wrapper. This avoids forcing every consumer to pass `() {}` when the tile is static).
+
+**(e) `TileSurface.onLongPress: null` does NOT throw on `tester.longPress(...)`** (NEW for PR5 — confirmed that `tester.longPress(...)` on a tile without an `onLongPress` is a no-op (no exception); the test `onLongPress omitted — long-press is a no-op` pins this. Flutter's `InkWell.onLongPress: null` is the canonical "no-op long-press" pattern).
+
+**(f) The 3-primitive test count is naturally +38 net (12 + 13 + 13) — exceeding the canonical +11/PR** (NEW for PR5 — PR5 ships 3 primitives in a single PR (vs the canonical 1-primitive-per-PR pattern established by PR1-4); the 3 test files naturally produce ~38 tests instead of ~33 because each primitive has a richer test surface (BannerSurface's 4-tone-mapping group adds 5 tests; TileSurface's selection-alpha group adds 4 tests). Documented as a one-off PR5 deviation; PR6 returns to the canonical 1-primitive 1-test-file shape with `SectionHeader` (+12 tests planned)).
+
+### Constraints honored
+
+- **No `AndroidManifest.xml` changes** (pure Dart).
+- **No new pubspec deps** — uses existing `package:flutter/material.dart`.
+- **No Drift migration, no Kotlin changes.**
+- **APK discipline anchor (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)):** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes.
+- **Visual preservation:** byte-for-byte pixel parity with the pre-migration surface for SurfaceCard and TileSurface (canonical alphas + 12dp radius + Spacing.md padding match the inline literals exactly). BannerSurface replaces 3 distinct banner implementations with the canonical pattern; the resulting visuals are semantically equivalent (same M3 color roles, same padding scheme) but the RoutineBanner gains a `Semantics` wrapper it previously lacked.
+
+### Out-of-scope (deferred to PR6+)
+
+- Migrating the remaining 6+ inline Card sites (`stats.dart:_StatCard`, `templates.dart:_TemplateCard`, `completion_log_section.dart`, `settings_restore.dart` 4 cards, `dst_transition_banner.dart`) — these need a `stretch:` child contract for stats.dart, a `clipBehavior` + tappable-InkWell pattern for templates.dart, an internal `Row+Column` for completion_log_section.dart, and design work for settings_restore.dart's 4 cards + dst_transition_banner.dart.
+- The `Material + InkWell + Padding` 0.18-alpha + 20-radius pattern in `category_chip.dart:106` + `add_habit.dart:1324` (icon-picker thumb) — different alphas (0.18) + radius (20) from TileSurface's canonical (0.30/0.12 + 12-radius); deferred until a `ChipSurface` primitive is added to the `lib/ui/` design-system layer (likely PR7+).
+- The C4 form, C5 empty/loading/error, C6 nav, C7 typography, C8 icon, C9 a11y, C10 FAB categories are the scope of PR6..PR15.
+

@@ -48,6 +48,7 @@ import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/ui/app_palette.dart';
+import 'package:doit/ui/tile_surface.dart';
 import 'package:doit/widgets/category_chip.dart';
 import 'package:doit/widgets/reliability_banner.dart';
 import 'package:doit/widgets/routine_banner.dart';
@@ -767,167 +768,154 @@ class _HabitTileState extends State<_HabitTile> {
           '${selected ? ', selected' : ''}',
       button: true,
       selected: selected,
-      child: Material(
-        color: selected
-            ? color.withValues(alpha: 0.30)
-            : color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          key: ValueKey('habit_tile.${habit.id}'),
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          onLongPress: onLongPress,
-          child: Padding(
-            padding: const EdgeInsets.all(Spacing.md),
-            child: Row(
-              children: [
-                if (selectMode)
-                  Padding(
-                    padding: const EdgeInsets.only(right: Spacing.sm),
-                    child: Icon(
-                      selected
-                          ? Icons.check_circle
-                          : Icons.radio_button_unchecked,
-                      color: color,
-                    ),
-                  ),
-                _TileIcon(
-                  category: habit.category,
-                  iconName: habit.iconName,
+      child: TileSurface(
+        key: ValueKey('habit_tile.${habit.id}'),
+        accent: color,
+        selected: selected,
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: Row(
+          children: [
+            if (selectMode)
+              Padding(
+                padding: const EdgeInsets.only(right: Spacing.sm),
+                child: Icon(
+                  selected ? Icons.check_circle : Icons.radio_button_unchecked,
                   color: color,
                 ),
-                const SizedBox(width: Spacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              habit.name,
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                          ),
-                          // v1.4b / SYS-116: streak badge.
-                          // Renders the run length next to
-                          // the name. Mirrors the widget's
-                          // middle row. v1.4c / SYS-117
-                          // also takes a budget future to
-                          // render the rest-day caption
-                          // underneath.
-                          //
-                          // v1.4m (SYS-127): wrap in
-                          // `KeyedSubtree` with a
-                          // `streakBadge-<habitId>` key so
-                          // widget tests can find the
-                          // rendered streak number without
-                          // inspecting the private
-                          // `_DoStreakBadge` widget tree.
-                          // The key MUST stay stable for a
-                          // given `habit.id` — the tile
-                          // rebuild path uses the same id
-                          // (the `Do` instance is keyed by
-                          // id in `_HomeScreenState._buildTiles`).
-                          KeyedSubtree(
-                            key: Key('streakBadge-${habit.id}'),
-                            child: _DoStreakBadge(
-                              completions: completions,
-                              activeDo: habit,
-                              asOf: asOf,
-                              onBudgetCaptionTapped: _onBudgetCaptionTapped,
-                              budget: budgetRemainingForDo(
-                                activeDo: habit,
-                                asOf: asOf,
-                                completionLog: CompletionLogService.instance,
-                              ),
-                            ),
-                          ),
-                          if (isPaused)
-                            Tooltip(
-                              message: 'Paused',
-                              child: Icon(
-                                Icons.pause_circle,
-                                size: 18,
-                                color: Theme.of(context).colorScheme.outline,
-                              ),
-                            ),
-                          // v1.4-stab-G / Phase 47 / SYS-134 /
-                          // ADR-065 / WF-062: surfaces the v1.4l
-                          // tombstone semantics at the UI layer
-                          // — renders a "Target paused" badge
-                          // when this is a `DoAnchor` whose
-                          // target habit has been soft-deleted.
-                          // The badge widget is self-gating
-                          // (visibility = `target.isDeleted`)
-                          // and resilient to `null`. The lookup
-                          // is owned by `_resolveTargetHabit()`
-                          // in `initState` — see ADR-065 §"Why
-                          // a NEW widget file (vs. inline in
-                          // home.dart)".
-                          DoAnchorTargetPausedBadge(
-                            habitId: habit.id,
-                            target: _targetHabit,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: Spacing.xs),
-                      Text(
-                        describeDo(habit),
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      if (habit is DoTimeWindow) _FastingTimer(habit: habit),
-                    ],
-                  ),
-                ),
-                if (!selectMode)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // v1.4h / SYS-122: per-tile edit
-                      // button. Renders first (leftmost) in
-                      // the action row, separated from the
-                      // completion buttons (Skip / Undo /
-                      // Done) so the destructive-action
-                      // cluster (Edit / Delete) is visually
-                      // distinct from the completion
-                      // cluster.
-                      _EditButton(onPressed: _onEditPressed),
-                      _DeleteButton(busy: _busy, onPressed: _onDeletePressed),
-                      // v1.4c / SYS-117: skip-today button.
-                      // Hidden when the do has no rest-day
-                      // budget configured (the user opted
-                      // out of rest days for this do).
-                      // Disabled-look is achieved by not
-                      // rendering at all — there's nothing
-                      // to skip.
-                      if (habit.restDaysPerMonth > 0)
-                        _SkipButton(
-                          busy: _busy,
-                          isSkippedToday: _isSkippedToday,
-                          onPressed: _onSkipTodayPressed,
-                        ),
-                      // v1.4d / SYS-118: undo button.
-                      // Visible only when the day is
-                      // resolved (Done or Skip recorded).
-                      // Tap opens an `AlertDialog` that
-                      // calls `undoToday` on confirm.
-                      if (_isResolvedToday)
-                        _UndoButton(
-                          busy: _busy,
-                          onPressed: _onUndoTodayPressed,
-                        ),
-                      _DoneButton(
-                        busy: _busy,
-                        isCompletedToday: _isCompletedToday,
-                        isStrong: habit.proofMode is StrongProof,
-                        onPressed: _onMarkDonePressed,
-                      ),
-                    ],
-                  ),
-              ],
+              ),
+            _TileIcon(
+              category: habit.category,
+              iconName: habit.iconName,
+              color: color,
             ),
-          ),
+            const SizedBox(width: Spacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          habit.name,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      // v1.4b / SYS-116: streak badge.
+                      // Renders the run length next to
+                      // the name. Mirrors the widget's
+                      // middle row. v1.4c / SYS-117
+                      // also takes a budget future to
+                      // render the rest-day caption
+                      // underneath.
+                      //
+                      // v1.4m (SYS-127): wrap in
+                      // `KeyedSubtree` with a
+                      // `streakBadge-<habitId>` key so
+                      // widget tests can find the
+                      // rendered streak number without
+                      // inspecting the private
+                      // `_DoStreakBadge` widget tree.
+                      // The key MUST stay stable for a
+                      // given `habit.id` — the tile
+                      // rebuild path uses the same id
+                      // (the `Do` instance is keyed by
+                      // id in `_HomeScreenState._buildTiles`).
+                      KeyedSubtree(
+                        key: Key('streakBadge-${habit.id}'),
+                        child: _DoStreakBadge(
+                          completions: completions,
+                          activeDo: habit,
+                          asOf: asOf,
+                          onBudgetCaptionTapped: _onBudgetCaptionTapped,
+                          budget: budgetRemainingForDo(
+                            activeDo: habit,
+                            asOf: asOf,
+                            completionLog: CompletionLogService.instance,
+                          ),
+                        ),
+                      ),
+                      if (isPaused)
+                        Tooltip(
+                          message: 'Paused',
+                          child: Icon(
+                            Icons.pause_circle,
+                            size: 18,
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                        ),
+                      // v1.4-stab-G / Phase 47 / SYS-134 /
+                      // ADR-065 / WF-062: surfaces the v1.4l
+                      // tombstone semantics at the UI layer
+                      // — renders a "Target paused" badge
+                      // when this is a `DoAnchor` whose
+                      // target habit has been soft-deleted.
+                      // The badge widget is self-gating
+                      // (visibility = `target.isDeleted`)
+                      // and resilient to `null`. The lookup
+                      // is owned by `_resolveTargetHabit()`
+                      // in `initState` — see ADR-065 §"Why
+                      // a NEW widget file (vs. inline in
+                      // home.dart)".
+                      DoAnchorTargetPausedBadge(
+                        habitId: habit.id,
+                        target: _targetHabit,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: Spacing.xs),
+                  Text(
+                    describeDo(habit),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  if (habit is DoTimeWindow) _FastingTimer(habit: habit),
+                ],
+              ),
+            ),
+            if (!selectMode)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // v1.4h / SYS-122: per-tile edit
+                  // button. Renders first (leftmost) in
+                  // the action row, separated from the
+                  // completion buttons (Skip / Undo /
+                  // Done) so the destructive-action
+                  // cluster (Edit / Delete) is visually
+                  // distinct from the completion
+                  // cluster.
+                  _EditButton(onPressed: _onEditPressed),
+                  _DeleteButton(busy: _busy, onPressed: _onDeletePressed),
+                  // v1.4c / SYS-117: skip-today button.
+                  // Hidden when the do has no rest-day
+                  // budget configured (the user opted
+                  // out of rest days for this do).
+                  // Disabled-look is achieved by not
+                  // rendering at all — there's nothing
+                  // to skip.
+                  if (habit.restDaysPerMonth > 0)
+                    _SkipButton(
+                      busy: _busy,
+                      isSkippedToday: _isSkippedToday,
+                      onPressed: _onSkipTodayPressed,
+                    ),
+                  // v1.4d / SYS-118: undo button.
+                  // Visible only when the day is
+                  // resolved (Done or Skip recorded).
+                  // Tap opens an `AlertDialog` that
+                  // calls `undoToday` on confirm.
+                  if (_isResolvedToday)
+                    _UndoButton(busy: _busy, onPressed: _onUndoTodayPressed),
+                  _DoneButton(
+                    busy: _busy,
+                    isCompletedToday: _isCompletedToday,
+                    isStrong: habit.proofMode is StrongProof,
+                    onPressed: _onMarkDonePressed,
+                  ),
+                ],
+              ),
+          ],
         ),
       ),
     );
