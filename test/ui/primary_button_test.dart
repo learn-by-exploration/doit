@@ -33,10 +33,7 @@ void main() {
           theme: AppTheme.dark,
           home: Scaffold(
             body: Center(
-              child: PrimaryButton(
-                onPressed: () {},
-                label: const Text('Save'),
-              ),
+              child: PrimaryButton(onPressed: () {}, label: const Text('Save')),
             ),
           ),
         ),
@@ -51,10 +48,7 @@ void main() {
           theme: AppTheme.dark,
           home: Scaffold(
             body: Center(
-              child: PrimaryButton(
-                onPressed: () {},
-                label: const Text('Save'),
-              ),
+              child: PrimaryButton(onPressed: () {}, label: const Text('Save')),
             ),
           ),
         ),
@@ -86,7 +80,9 @@ void main() {
   });
 
   group('PrimaryButton — icon variant', () {
-    testWidgets('renders a FilledButton with the icon AND label', (tester) async {
+    testWidgets('renders a FilledButton with the icon AND label', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.dark,
@@ -105,7 +101,9 @@ void main() {
       expect(find.text('Add contact'), findsOneWidget);
     });
 
-    testWidgets('renders FilledButton.icon when icon is non-null', (tester) async {
+    testWidgets('renders FilledButton.icon when icon is non-null', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.dark,
@@ -126,17 +124,16 @@ void main() {
   });
 
   group('PrimaryButton — disabled', () {
-    testWidgets('onPressed: null disables the button (tap is a no-op)', (tester) async {
+    testWidgets('onPressed: null disables the button (tap is a no-op)', (
+      tester,
+    ) async {
       final tapCount = [0];
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.dark,
           home: const Scaffold(
             body: Center(
-              child: PrimaryButton(
-                onPressed: null,
-                label: Text('Save'),
-              ),
+              child: PrimaryButton(onPressed: null, label: Text('Save')),
             ),
           ),
         ),
@@ -150,8 +147,9 @@ void main() {
   });
 
   group('PrimaryButton — tooltip', () {
-    testWidgets('non-null tooltip wraps a Tooltip widget with the message',
-        (tester) async {
+    testWidgets('non-null tooltip wraps a Tooltip widget with the message', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.dark,
@@ -175,17 +173,13 @@ void main() {
       expect(tooltip.message, 'Save habit');
     });
 
-    testWidgets('null tooltip does NOT wrap a Tooltip widget',
-        (tester) async {
+    testWidgets('null tooltip does NOT wrap a Tooltip widget', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.dark,
           home: Scaffold(
             body: Center(
-              child: PrimaryButton(
-                onPressed: () {},
-                label: const Text('Save'),
-              ),
+              child: PrimaryButton(onPressed: () {}, label: const Text('Save')),
             ),
           ),
         ),
@@ -199,17 +193,15 @@ void main() {
   });
 
   group('PrimaryButton — 48dp minimum touch target', () {
-    testWidgets('fits the 48dp minimumSize from filledButtonTheme',
-        (tester) async {
+    testWidgets('fits the 48dp minimumSize from filledButtonTheme', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.dark,
           home: Scaffold(
             body: Center(
-              child: PrimaryButton(
-                onPressed: () {},
-                label: const Text('Save'),
-              ),
+              child: PrimaryButton(onPressed: () {}, label: const Text('Save')),
             ),
           ),
         ),
@@ -220,8 +212,7 @@ void main() {
   });
 
   group('PrimaryButton — Key + Semantics', () {
-    testWidgets('forwards key to the underlying FilledButton',
-        (tester) async {
+    testWidgets('forwards key to the underlying FilledButton', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.dark,
@@ -239,17 +230,15 @@ void main() {
       expect(find.byKey(const ValueKey('primary.btn')), findsOneWidget);
     });
 
-    testWidgets('label is reachable from Semantics (TalkBack tree)',
-        (tester) async {
+    testWidgets('label is reachable from Semantics (TalkBack tree)', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.dark,
           home: Scaffold(
             body: Center(
-              child: PrimaryButton(
-                onPressed: () {},
-                label: const Text('Save'),
-              ),
+              child: PrimaryButton(onPressed: () {}, label: const Text('Save')),
             ),
           ),
         ),

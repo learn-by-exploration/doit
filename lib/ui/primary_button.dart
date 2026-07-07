@@ -64,15 +64,8 @@ class PrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final button = icon == null
-        ? FilledButton(
-            onPressed: onPressed,
-            child: label,
-          )
-        : FilledButton.icon(
-            onPressed: onPressed,
-            icon: icon!,
-            label: label,
-          );
+        ? FilledButton(onPressed: onPressed, child: label)
+        : FilledButton.icon(onPressed: onPressed, icon: icon!, label: label);
     if (tooltip == null) return button;
     return Tooltip(message: tooltip!, child: button);
   }
