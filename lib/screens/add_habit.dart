@@ -39,6 +39,7 @@ import 'package:doit/triggers/action.dart';
 import 'package:doit/triggers/trigger.dart';
 import 'package:doit/ui/app_choice_chip.dart';
 import 'package:doit/ui/app_form_field.dart';
+import 'package:doit/ui/app_snack.dart';
 import 'package:doit/ui/primary_button.dart';
 import 'package:doit/ui/section_header.dart';
 import 'package:doit/widgets/category_chip.dart';
@@ -696,9 +697,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     }
     if (!mounted) return;
     if (_otherHabits.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No other dos to anchor on.')),
-      );
+      AppSnack.showInfo(context, 'No other dos to anchor on.');
       return;
     }
     final picked = await showModalBottomSheet<String>(
@@ -1058,7 +1057,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   }
 
   void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    AppSnack.showError(context, msg);
   }
 
   // --- delete (WF-022) -------------------------------------------
@@ -1069,7 +1068,6 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   Future<void> _confirmAndDelete() async {
     final original = _original;
     if (original == null) return;
-    final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     final name = original.name;
     final confirmed = await showDialog<bool>(
@@ -1105,9 +1103,8 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     } on Object catch (_) {
       // Defensive: the platform path can fail. Show a snack
       // and stay on the screen so the user can retry.
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Delete failed. Please try again.')),
-      );
+      if (!mounted) return;
+      AppSnack.showError(context, 'Delete failed. Please try again.');
       return;
     }
     navigator.pop(true);
