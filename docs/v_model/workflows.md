@@ -4403,3 +4403,34 @@ SYS-158; ADR-089; v1.7-β row in `implementation_status.md`; `### v1.7-β` subse
 **Cumulative v1.7 + UI sprint:** 1773 → 1888 (+115 net across 9 v1.7 cycles + PR1 + PR2 of UI sprint; 2/15 UI sprint cycles shipped).
 
 **Next:** PR3 of 15 (IconButton — the canonical icon-only CTA wrapping `Material.IconButton`).
+
+### PR3 of 15 — UI consolidation — AppIconButton extraction + 3 icon-only CTA migrations
+
+**PR3 (Phase 78)** of the UI consolidation sprint. Third file in `lib/ui/`. **+11 tests (EXACT match with plan: 11 widget tests).**
+
+**Date:** 2026-07-07. **Tests:** 1888 → 1899 (+11 net). **Cumulative v1.7 + UI sprint:** 1773 → 1899 (+126 net across 9 v1.7 cycles + 3/15 UI sprint cycles).
+
+**Files (4 changed):**
+- NEW `lib/ui/icon_button.dart` (~52 lines; `StatelessWidget` wrapping `Material.IconButton`)
+- NEW `test/ui/icon_button_test.dart` (~245 lines; 11 widget tests, 5 groups)
+- MIGRATE `lib/screens/person_groups.dart:62` — Refresh icon-only CTA in AppBar
+- MIGRATE `lib/screens/recently_deleted_screen.dart:232` — Restore per-row action (sibling to :238)
+- MIGRATE `lib/screens/recently_deleted_screen.dart:238` — Delete Forever per-row action (sibling to :232)
+
+**Batches (3):**
+- **Batch 1 — Primitive extraction:** `AppIconButton` widget. 48dp minimum INHERITED from `IconButton` defaults (unlike `TextButton` which needed explicit inline `ButtonStyle` in PR2 per ADR-098 (c)). API: `const AppIconButton({super.key, required icon, required onPressed, tooltip})`.
+- **Batch 2 — Tests (11 across 5 groups):** icon rendering (4: renders icon + renders IconButton + tap invokes + multiple taps invoke) + disabled (1) + tooltip (2: non-null set + null allowed) + 48dp touch target (1) + Key/Semantics (3: forwards key + icon widget identity + tooltip wraps Tooltip widget). Same structure as PR1+PR2 but for IconButton family.
+- **Batch 3 — Icon-only CTA migrations (3 sites):** preserved keys + tooltips + onPressed handlers + icons verbatim. Imports added to each screen file.
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean — formatted upfront per PR1 deviation lesson) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1899/1899 pass — zero regressions).
+
+**Drift lessons per ADR-099:**
+- (a) `AppTheme.dark` getter-not-Widget (PR1 + PR2 mirror — same root cause as ADR-097 (a) + ADR-098 (a))
+- (b) `const MaterialApp(theme: AppTheme.dark, ...)` fails (PR1 + PR2 mirror)
+- (c) **`IconButton` INHERITS the 48dp minimum from defaults** (NEW — UNLIKE `TextButton` which needs inline `ButtonStyle` per ADR-098 (c); `IconButton` is 48×48 by default via `IconButtonThemeData`)
+- (d) `IconButton.tooltip` is rendered as a `Tooltip` widget (not a `Semantics` label) — the `find.bySemanticsLabel('Refresh')` finder returns 0 widgets. The test was rewritten to `find.byType(Tooltip)` + verify `message` (passes). This is a NEW pattern vs PrimaryButton/SecondaryButton which use `Text` labels that DO become Semantics labels.
+- (e) **`IconButton.filled` is a separate constructor that returns a private `_FilledIconButton` class** — the test's `expect(button.filled, isFalse)` was wrong (no `filled` getter on the base `IconButton` class). The test was simplified to `find.byType(IconButton)` (passes). This is the canonical IconButton-construction pattern from the M3 docs.
+
+**Cumulative v1.7 + UI sprint:** 1773 → 1899 (+126 net across 9 v1.7 cycles + 3/15 UI sprint cycles; 3/15 UI sprint cycles shipped).
+
+**Next:** PR4 of 15 (C2 colors — color palette misuse consolidation: 3 issues → 1 PR).

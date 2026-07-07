@@ -1567,3 +1567,29 @@ The **FIFTH cycle of the v1.7 milestone** — pins the raw-column `pausedUntil_m
 **3-gate:** `dart format --output=none --set-exit-if-changed .` (clean — formatted upfront) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1888/1888 pass — zero regressions).
 
 **Next:** PR3 of 15 (IconButton — the canonical icon-only CTA wrapping `Material.IconButton`).
+
+### PR3 of 15 — UI consolidation sprint — AppIconButton extraction + 3 icon-only CTA migrations
+
+**PR3 (Phase 78)** of the UI consolidation sprint (Month 1 / 2026-07-20..08-03). **Third file in `lib/ui/`.** **+11 tests (EXACT match with plan).**
+
+**Date:** 2026-07-07. **Tests:** 1888 → 1899 (+11 net).
+
+**What:**
+- `lib/ui/icon_button.dart` — `StatelessWidget` wrapping `Material.IconButton`. 48dp minimum INHERITED from defaults (no inline style needed — unlike `TextButton` which needs explicit `ButtonStyle` per ADR-098 (c)). API: `const AppIconButton({super.key, required icon, required onPressed, tooltip})`.
+- 3 icon-only CTA migrations: `person_groups.dart:62` (Refresh in AppBar) + `recently_deleted_screen.dart:232` (Restore per-row action) + `recently_deleted_screen.dart:238` (Delete Forever per-row action).
+- 11 widget tests in `test/ui/icon_button_test.dart` (5 groups).
+
+**Why:** per UI_ORG_AUDIT.md C8 (icon set) + C9 (touch targets / a11y), the screen layer uses raw `IconButton` in 26 places across 8 screens. Each occurrence repeats the same key/tooltip/icon/onPressed wiring. PR3 establishes the icon-only CTA primitive that pairs with `PrimaryButton` (PR1) + `SecondaryButton` (PR2) and migrates the 3 highest-traffic icon-only CTAs as the canonical-pattern call.
+
+**Constraint adherence:**
+- No `AndroidManifest.xml` changes (pure Dart).
+- No new pubspec deps (uses existing `package:flutter/material.dart` + `AppTheme.dark`).
+- No Drift migration, no Kotlin changes.
+- APK SHA1 discipline anchor: test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)).
+- 48dp touch target retained (inherited from `IconButton` defaults).
+
+**Drift lessons:** see ADR-099 — 5 lessons including the `AppTheme.dark` getter-not-Widget (PR1 + PR2 mirror) + the const-MaterialApp-with-getter-theme limitation (PR1 + PR2 mirror) + **`IconButton` INHERITS 48dp from defaults** (NEW — UNLIKE `TextButton`) + `IconButton.tooltip` is a `Tooltip` widget not a `Semantics` label (NEW pattern) + `IconButton.filled` is a separate constructor (NEW test pattern).
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean — formatted upfront) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1899/1899 pass — zero regressions).
+
+**Next:** PR4 of 15 (C2 colors — color palette misuse consolidation: 3 issues → 1 PR).

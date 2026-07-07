@@ -852,6 +852,11 @@ Cycle v1.6-λ (`feat/v1.6-λ-doc-cleanups`) shipped: **0 net tests** (doc-only c
 
 | PR1 of 15 (UI) | new `lib/ui/primary_button.dart` primitive + tests | `lib/ui/primary_button.dart` (NEW, ~70 lines) + `test/ui/primary_button_test.dart` (NEW, 11 tests, 6 groups) + 3 screen migrations (`add_event.dart:217`, `add_person.dart:548`, `rest_day_picker_dialog.dart:110`) — first file in `lib/ui/` design-system layer | 1866 → 1877 (+11) |
 | PR2 of 15 (UI) | new `lib/ui/secondary_button.dart` primitive + tests + 3 dialog Cancel migrations | `lib/ui/secondary_button.dart` (NEW, ~62 lines) + `test/ui/secondary_button_test.dart` (NEW, 11 tests, 6 groups) + 3 dialog Cancel migrations (`add_event.dart:213`, `add_person.dart:544`, `rest_day_picker_dialog.dart:106`) — second file in `lib/ui/` design-system layer | 1877 → 1888 (+11) |
+| PR3 of 15 (UI) | new `lib/ui/icon_button.dart` primitive + tests + 3 icon-only CTA migrations | `lib/ui/icon_button.dart` (NEW, ~52 lines) + `test/ui/icon_button_test.dart` (NEW, 11 tests, 5 groups) + 3 icon-only CTA migrations (`person_groups.dart:62` Refresh, `recently_deleted_screen.dart:232` Restore, `recently_deleted_screen.dart:238` Delete Forever) — third file in `lib/ui/` design-system layer | 1888 → 1899 (+11) |
+
+### PR3 of 15 — UI consolidation sprint — AppIconButton extraction
+
+**Third cycle of the 15-PR UI consolidation sprint.** Extracts `lib/ui/icon_button.dart` (wraps `Material.IconButton`; 48dp INHERITED from defaults — unlike `TextButton` which needs inline `ButtonStyle` per ADR-098 (c); supports `icon`, `onPressed`, `tooltip`, `key` parameters) + 11 widget tests (5 groups) + migrates 3 icon-only CTAs as the canonical-pattern call. **NEW drift lessons:** (c) `IconButton` INHERITS 48dp from defaults (UNLIKE `TextButton`) + (d) `IconButton.tooltip` is a `Tooltip` widget not a `Semantics` label (NEW pattern vs PrimaryButton/SecondaryButton which use `Text` labels) + (e) `IconButton.filled` is a separate constructor (no `filled` getter on base class). Cumulative v1.7 + UI sprint: 1773 → 1899 (+126 net).
 
 ### PR2 of 15 — UI consolidation sprint — SecondaryButton extraction
 

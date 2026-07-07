@@ -8623,3 +8623,57 @@ API mirrors PrimaryButton: `const SecondaryButton({super.key, required onPressed
 - Extracting the 9 remaining primitives (IconButton, FAB, EmptyStateView, ErrorStateView, LoadingView, FormField, SectionCard, ScreenScaffold, ReliabilityBadge).
 - The icon-only CTA pattern (`IconButton` + `tooltip`) is scoped to PR3.
 
+
+## ADR-099 — PR3 of 15 UI consolidation — `AppIconButton` primitive design decisions
+
+**Date:** 2026-07-07. **Status:** APPROVED (PR3 of 15 / Phase 78 / SYS-168 / WF-096).
+
+### Context
+
+Per the UI_ORG_AUDIT.md C8 (icon set) + C9 (touch targets / a11y) categories, the screen layer uses raw `IconButton` in 26 places across 8 screens. Each occurrence repeats the same key/tooltip/icon/onPressed wiring. PR1 extracted `PrimaryButton` (Save/OK) and PR2 extracted `SecondaryButton` (Cancel/Back) as the first two primitives in `lib/ui/`; PR3 extracts `AppIconButton` as the icon-only CTA counterpart.
+
+### Decision
+
+Extract `lib/ui/icon_button.dart` as a thin wrapper around `Material.IconButton`. Migrate the 3 highest-traffic icon-only CTAs (`person_groups.dart:62` Refresh in AppBar, `recently_deleted_screen.dart:232` Restore per-row action, `recently_deleted_screen.dart:238` Delete Forever per-row action) to use it. PR4+ will migrate the remaining 23 occurrences across 6 screens (likely a sub-batch within PR14 which is C8+C9 combined).
+
+### Design
+
+API: `const AppIconButton({super.key, required icon, required onPressed, this.tooltip})` where `icon` is a `Widget` (typically `Icon(Icons.xxx)`); `onPressed` is the tap handler (null disables); `tooltip` (optional) is passed through to the underlying `IconButton.tooltip` for long-press / TalkBack affordance.
+
+**Sizing (NEW drift lesson vs PrimaryButton + SecondaryButton):** 48dp minimum is INHERITED from `IconButton` defaults (no inline style needed) — UNLIKE `TextButton` which needed explicit inline `ButtonStyle(minimumSize: const Size(0, 48))` per ADR-098 (c). `IconButton` is 48×48 by default via `IconButtonThemeData`. See ADR-099 lesson (c).
+
+### Alternatives considered
+
+**A. Bigger PR migrating all 26 icon-only CTAs.** Rejected: the 8-screen blast radius makes review harder; the 3-CTAs-in-one-PR is the canonical-pattern call from PR1 + PR2 (consistency over coverage).
+
+**B. Use `IconButton.filledTonal` or `IconButton.outlined` for a richer visual.** Rejected: the project ships dark theme + standard M3 IconButton; the audit doc C8 (icon set) calls for consistency with the standard variant, not a richer one. The standard `IconButton` is the canonical primitive.
+
+**C. Add an `iconButtonTheme` to `AppTheme._build()` so the sizing is centralized.** Rejected: `IconButton` already has 48dp by default; adding a theme is unnecessary and would add a layer of indirection.
+
+### Drift lessons
+
+**(a) `AppTheme.dark` is a `ThemeData` getter, NOT a `Widget` constructor** (PR1 + PR2 mirror — same root cause as ADR-097 (a) + ADR-098 (a)) — first draft of `icon_button_test.dart` made the same mistake. Fix: wrap in `MaterialApp(theme: AppTheme.dark, home: ...)` (matches existing tests at `test/l10n/locale_render_test.dart:53`).
+
+**(b) `const MaterialApp(theme: AppTheme.dark, ...)` fails (`Invalid constant value`)** (PR1 + PR2 mirror — same root cause as ADR-097 (b) + ADR-098 (b)) — fix: keep `MaterialApp` non-const, `const` the inner `Scaffold`/`Center`/`AppIconButton`/`Icon` constructors where params are compile-time constants.
+
+**(c) `IconButton` INHERITS the 48dp minimum from defaults** (NEW for PR3 — UNLIKE `TextButton` which needed explicit inline `ButtonStyle` per ADR-098 (c); `IconButton` is 48×48 by default via `IconButtonThemeData`). No inline `style` parameter needed for `AppIconButton`.
+
+**(d) `IconButton.tooltip` is rendered as a `Tooltip` widget, NOT a `Semantics` label** (NEW for PR3 — `find.bySemanticsLabel('Refresh')` returns 0 widgets; the canonical test pattern is `find.byType(Tooltip)` + verify `message`). This is DIFFERENT from PrimaryButton/SecondaryButton which use `Text` labels that DO become Semantics labels automatically.
+
+**(e) `IconButton.filled` is a separate constructor that returns a private `_FilledIconButton` class** (NEW for PR3 — there is NO `filled` getter on the base `IconButton` class; the canonical test pattern is just `find.byType(IconButton)` to verify the standard unfilled variant; the original test's `expect(button.filled, isFalse)` was wrong syntax and had to be simplified).
+
+### Constraints honored
+
+- **No `AndroidManifest.xml` changes** (pure Dart).
+- **No new pubspec deps** — uses existing `package:flutter/material.dart` + `AppTheme.dark` from `lib/theme/app_theme.dart`.
+- **No Drift migration, no Kotlin changes.**
+- **APK discipline anchor (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)):** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes.
+- **48dp touch target retained** (inherited from `IconButton` defaults).
+
+### Out-of-scope (deferred to PR4+)
+
+- Migrating the remaining 23 occurrences of `IconButton` across 6 screens (events.dart, add_event.dart, add_habit.dart, add_person.dart, home.dart, person_groups.dart:215 delete).
+- Extracting the 8 remaining primitives (FAB, EmptyStateView, ErrorStateView, LoadingView, FormField, SectionCard, ScreenScaffold, ReliabilityBadge).
+- The per-instance widget configuration (Kotlin side, DoitWidgetConfigureActivity.kt) is unchanged.
+- The C2 color palette, C3 card / surface, C4 form, C5 empty/loading/error, C6 nav, C7 typography, C10 FAB categories are the scope of PR4..PR15.
+

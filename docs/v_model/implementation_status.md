@@ -802,3 +802,39 @@ Cycle is the **SIXTH** in the v1.7 milestone — v1.7 milestone 6/9 cycles shipp
 **APK discipline anchor (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)):** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes.
 
 **Next:** PR3 of 15 (IconButton — the canonical icon-only CTA).
+
+## PR3 of 15 — UI consolidation sprint — AppIconButton extraction + 3 icon-only CTA migrations
+
+**PR3 (Phase 78)** of the 15-PR UI consolidation sprint. **Third file in `lib/ui/`.** **+11 tests (EXACT match with plan: 11 widget tests).**
+
+**Date:** 2026-07-07. **Tests:** 1888 → 1899 (+11 net). **Cumulative v1.7 + UI sprint:** 1773 → 1899 (+126 net across 9 v1.7 cycles + 3/15 UI sprint cycles).
+
+**Surface — 4 changes:**
+1. **NEW `lib/ui/icon_button.dart`** — canonical icon-only CTA. `StatelessWidget` wrapping `Material.IconButton`. 48dp minimum INHERITED from `IconButton` defaults (unlike `TextButton` which needs inline `ButtonStyle` per ADR-098 (c) — verified at `lib/ui/secondary_button.dart:50`).
+2. **NEW `test/ui/icon_button_test.dart`** — 11 widget tests (5 groups): icon rendering (4: renders icon + renders IconButton + tap invokes + multiple taps invoke) + disabled (1) + tooltip (2: non-null set + null allowed) + 48dp touch target (1) + Key/Semantics (3: forwards key + icon widget identity + tooltip wraps Tooltip widget). All deterministic.
+3. **MIGRATE 3 icon-only CTAs:** `person_groups.dart:62` (Refresh in AppBar) + `recently_deleted_screen.dart:232` (Restore per-row action, sibling to :238) + `recently_deleted_screen.dart:238` (Delete Forever per-row action, sibling to :232). All preserve keys + tooltips + onPressed handlers + icons verbatim.
+4. **+ Imports** to each migrated screen.
+
+**Test count + coverage:**
+- `lib/ui/icon_button.dart`: 100% (4 branches: onPressed null vs enabled × tooltip null vs non-null; all 4 pinned)
+- `lib/screens/person_groups.dart`: no regression
+- `lib/screens/recently_deleted_screen.dart`: no regression
+- Cumulative: 1888 → 1899 (+11 net)
+
+**V-Model artifacts (8):**
+- `docs/v_model/requirements.md` — SYS-168 row appended
+- `docs/v_model/decision_record.md` — ADR-099 section appended
+- `docs/v_model/traceability_matrix.md` — WF-096 row appended
+- `docs/v_model/workflows.md` — `### PR3 of 15` subsection appended
+- `docs/v_model/implementation_status.md` — `## PR3 of 15` row appended (this row)
+- `docs/v_model/plan.md` — `### PR3 of 15` subsection appended
+- `feature.md` — PR3 of 15 row appended (table row 25)
+- `CHANGELOG.md` — `## PR3 of 15` entry appended
+
+**3-gate:** `dart format --output=none --set-exit-if-changed .` (clean — formatted upfront) + `flutter analyze --fatal-infos lib test` (0 issues) + `flutter test` (1899/1899 pass — zero regressions).
+
+**Drift lessons:** see ADR-099 — (a) `AppTheme.dark` getter-not-Widget (PR1 + PR2 mirror) + (b) `const MaterialApp(theme: AppTheme.dark, ...)` fails (PR1 + PR2 mirror) + (c) **`IconButton` INHERITS 48dp from defaults** (NEW — UNLIKE `TextButton` which needs inline style) + (d) `IconButton.tooltip` is a `Tooltip` widget, NOT a `Semantics` label (NEW pattern vs PrimaryButton/SecondaryButton which use `Text` labels) + (e) `IconButton.filled` is a separate constructor (no `filled` getter on base class) (NEW test pattern).
+
+**APK discipline anchor (per v1.7-ζ / ADR-093 (e) + v1.7-ι / ADR-096 lesson (b)):** test count + 3-gate green + no manifest/pubspec/Drift/Kotlin changes.
+
+**Next:** PR4 of 15 (C2 colors — color palette misuse consolidation: 3 issues → 1 PR).

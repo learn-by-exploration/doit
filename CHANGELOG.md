@@ -4752,3 +4752,15 @@ EXTEND `test/triggers/condition_test.dart` (+6 tests) + `test/services/permissio
 - **3-gate:** `dart format` clean (formatted upfront) + `flutter analyze --fatal-infos` 0 issues + `flutter test` 1888/1888 pass
 
 The 15-PR UI consolidation sprint has shipped 2/15 cycles. 13 cycles remaining. Next: PR3 (IconButton).
+
+## PR3 of 15 — UI consolidation sprint — AppIconButton extraction + 3 icon-only CTA migrations
+
+- **NEW `lib/ui/icon_button.dart`** — canonical icon-only CTA wrapping `Material.IconButton`. 48dp minimum INHERITED from `IconButton` defaults (`IconButtonThemeData` provides 48×48 by default — unlike `TextButton` which needs explicit inline `ButtonStyle` per ADR-098 (c) — verified).
+- **NEW `test/ui/icon_button_test.dart`** — 11 widget tests (5 groups): icon rendering (4: renders icon + renders IconButton + tap invokes + multiple taps invoke) + disabled (1) + tooltip (2: non-null set + null allowed) + 48dp touch target (1) + Key/Semantics (3: forwards key + icon widget identity + tooltip wraps Tooltip widget). All deterministic.
+- **MIGRATE 3 icon-only CTAs:** `lib/screens/person_groups.dart:62` (Refresh in AppBar) + `lib/screens/recently_deleted_screen.dart:232` (Restore per-row action, sibling to :238) + `lib/screens/recently_deleted_screen.dart:238` (Delete Forever per-row action, sibling to :232). All preserve keys + tooltips + onPressed handlers + icons verbatim.
+- **Third file in the new `lib/ui/` design-system layer** — pairs with PrimaryButton (PR1) + SecondaryButton (PR2) + AppIconButton (PR3) as the icon-only CTA counterpart.
+- **Tests:** 1888 → 1899 (+11 net; EXACT match with plan)
+- **Drift lessons per ADR-099:** (a) `AppTheme.dark` getter-not-Widget (PR1 + PR2 mirror) + (b) `const MaterialApp(theme: AppTheme.dark, ...)` fails (PR1 + PR2 mirror) + (c) **`IconButton` INHERITS 48dp from defaults** (NEW — UNLIKE `TextButton` which needs inline style) + (d) `IconButton.tooltip` is a `Tooltip` widget NOT a `Semantics` label (NEW pattern vs PrimaryButton/SecondaryButton which use `Text` labels) + (e) `IconButton.filled` is a separate constructor (NEW test pattern — no `filled` getter on base class)
+- **3-gate:** `dart format` clean (formatted upfront) + `flutter analyze --fatal-infos` 0 issues + `flutter test` 1899/1899 pass
+
+The 15-PR UI consolidation sprint has shipped 3/15 cycles. 12 cycles remaining. Next: PR4 (C2 colors — color palette misuse consolidation).
