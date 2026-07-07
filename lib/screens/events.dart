@@ -17,6 +17,7 @@ import 'package:doit/screens/add_event.dart';
 import 'package:doit/services/event_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/section_header.dart';
 import 'package:doit/ui/surface_card.dart';
 
 export 'package:doit/screens/add_event.dart' show AddEventScreen;
@@ -137,23 +138,11 @@ class _EventsList extends StatelessWidget {
       padding: const EdgeInsets.all(Spacing.md),
       children: [
         if (upcoming.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-            child: Text(
-              'Upcoming',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ),
+          const SectionHeader('Upcoming', compact: true),
           for (final e in upcoming) _EventTile(event: e, onChanged: onChanged),
         ],
         if (past.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-            child: Text(
-              'Past (unarchived)',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ),
+          const SectionHeader('Past (unarchived)', compact: true),
           for (final e in past) _EventTile(event: e, onChanged: onChanged),
         ],
       ],

@@ -37,6 +37,7 @@ import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/action.dart';
 import 'package:doit/triggers/trigger.dart';
+import 'package:doit/ui/section_header.dart';
 import 'package:doit/widgets/category_chip.dart';
 import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/screens/rest_day_picker_dialog.dart';
@@ -340,13 +341,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             ),
             const SizedBox(height: Spacing.lg),
             const Divider(),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-              child: Text(
-                'Routines',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
+            const SectionHeader('Routines'),
             _RoutinesSection(
               automations: _automations,
               onAddLocation: _addLocationRoutine,
@@ -377,13 +372,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             ),
             const SizedBox(height: Spacing.lg),
             const Divider(),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-              child: Text(
-                'Schedule',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
+            const SectionHeader('Schedule'),
             // --- Schedule-type picker.
             SegmentedButton<String>(
               segments: const [
@@ -402,13 +391,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             if (_isEdit) ...[
               const SizedBox(height: Spacing.lg),
               const Divider(),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-                child: Text(
-                  'Pause',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
+              const SectionHeader('Pause'),
               _PauseRow(
                 pausedUntil: _pausedUntil,
                 onPick: _pickPauseUntil,

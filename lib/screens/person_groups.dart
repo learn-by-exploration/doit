@@ -15,6 +15,7 @@ import 'package:doit/services/person_group_repository.dart';
 import 'package:doit/services/person_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/section_header.dart';
 import 'package:doit/ui/surface_card.dart';
 import 'package:doit/ui/icon_button.dart';
 
@@ -402,7 +403,7 @@ class _AddPersonGroupScreenState extends State<AddPersonGroupScreen> {
               ),
             ),
             const SizedBox(height: Spacing.md),
-            Text('Channel', style: Theme.of(context).textTheme.titleMedium),
+            const SectionHeader('Channel', compact: true),
             Wrap(
               spacing: Spacing.sm,
               children: [
@@ -421,7 +422,7 @@ class _AddPersonGroupScreenState extends State<AddPersonGroupScreen> {
               ],
             ),
             const SizedBox(height: Spacing.md),
-            Text('Cadence', style: Theme.of(context).textTheme.titleMedium),
+            const SectionHeader('Cadence', compact: true),
             Wrap(
               spacing: Spacing.sm,
               children: [
@@ -441,7 +442,7 @@ class _AddPersonGroupScreenState extends State<AddPersonGroupScreen> {
             const SizedBox(height: Spacing.sm),
             _cadenceParams(),
             const SizedBox(height: Spacing.md),
-            Text('Semantic', style: Theme.of(context).textTheme.titleMedium),
+            const SectionHeader('Semantic', compact: true),
             Wrap(
               spacing: Spacing.sm,
               children: [
@@ -454,7 +455,7 @@ class _AddPersonGroupScreenState extends State<AddPersonGroupScreen> {
               ],
             ),
             const SizedBox(height: Spacing.md),
-            Text('Members', style: Theme.of(context).textTheme.titleMedium),
+            const SectionHeader('Members', compact: true),
             if (!_loaded)
               const Padding(
                 padding: EdgeInsets.all(Spacing.md),

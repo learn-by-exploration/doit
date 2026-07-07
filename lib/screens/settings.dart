@@ -39,6 +39,7 @@ import 'package:doit/services/reliability_service.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/services/settings_service.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/section_header.dart';
 import 'package:doit/widgets/device_state_row.dart';
 import 'package:doit/widgets/reliability_banner.dart';
 
@@ -73,7 +74,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               key: const ValueKey<String>('settings.reliability_banner'),
             ),
             const SizedBox(height: Spacing.md),
-            _SectionHeader(l.settingsSectionAppearance),
+            SectionHeader(l.settingsSectionAppearance),
             ValueListenableBuilder<ThemeMode>(
               valueListenable: SettingsService.instance.themeMode,
               builder: (_, mode, _) => _ThemeModeTile(
@@ -82,7 +83,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: Spacing.md),
-            _SectionHeader(l.settingsSectionAnchor),
+            SectionHeader(l.settingsSectionAnchor),
             _AnchorModeTile(
               mode: _anchorMode,
               onChanged: (m) {
@@ -93,10 +94,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             const SizedBox(height: Spacing.md),
-            _SectionHeader(l.settingsSectionPermissions),
+            SectionHeader(l.settingsSectionPermissions),
             const _PermissionsRow(),
             const SizedBox(height: Spacing.md),
-            _SectionHeader(l.settingsSectionReliability),
+            SectionHeader(l.settingsSectionReliability),
             const _ReliabilityRow(),
             ListTile(
               key: const ValueKey('settings.test_reminder'),
@@ -113,13 +114,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             const SizedBox(height: Spacing.md),
-            _SectionHeader(l.settingsSectionDeviceState),
+            SectionHeader(l.settingsSectionDeviceState),
             const DeviceStateRow(),
             const SizedBox(height: Spacing.md),
-            _SectionHeader(l.settingsSectionStats),
+            SectionHeader(l.settingsSectionStats),
             const _StatsTile(),
             const SizedBox(height: Spacing.md),
-            _SectionHeader(l.settingsSectionBackup),
+            SectionHeader(l.settingsSectionBackup),
             ListTile(
               key: const ValueKey('settings.restore'),
               leading: const Icon(Icons.restore_outlined),
@@ -154,7 +155,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             const SizedBox(height: Spacing.lg),
-            _SectionHeader(l.settingsSectionAbout),
+            SectionHeader(l.settingsSectionAbout),
             ListTile(
               title: Text(l.appTitle),
               subtitle: Text(l.settingsAboutAppVersion(kAppVersion)),
@@ -175,19 +176,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.title);
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-      child: Text(title, style: Theme.of(context).textTheme.titleLarge),
     );
   }
 }

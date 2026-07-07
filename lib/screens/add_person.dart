@@ -44,6 +44,7 @@ import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/trigger.dart';
 import 'package:doit/ui/primary_button.dart';
 import 'package:doit/ui/secondary_button.dart';
+import 'package:doit/ui/section_header.dart';
 import 'package:doit/widgets/calendar_picker.dart';
 import 'package:doit/widgets/location_picker.dart';
 import 'package:doit/widgets/permission_sheet.dart';
@@ -203,13 +204,7 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
               ),
             ],
             const Divider(height: Spacing.lg),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-              child: Text(
-                'Cadence',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
+            const SectionHeader('Cadence'),
             ListTile(
               title: const Text('Every N days'),
               trailing: SizedBox(
@@ -230,13 +225,7 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
             ),
             const SizedBox(height: Spacing.lg),
             const Divider(),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-              child: Text(
-                'Routines',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
+            const SectionHeader('Routines'),
             _RoutinesSection(
               automations: _automations,
               onAddLocation: _addLocationRoutine,
@@ -255,13 +244,7 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
             if (_pickedName != null) ...[
               const SizedBox(height: Spacing.lg),
               const Divider(),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-                child: Text(
-                  'Pause',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
+              const SectionHeader('Pause'),
               _PersonPauseRow(
                 pausedUntil: _pausedUntil,
                 onPick: _pickPauseUntil,
