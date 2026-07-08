@@ -10073,3 +10073,37 @@ The English ARB value is `"Tap the + to add a do or a person."`. The Spanish ARB
 
 **(a) `flutter gen-l10n` is not automatic on test runs.** First `flutter analyze` pass on this PR would have caught a stale-generate error if the source ARB had new keys but the generated `app_localizations*.dart` were stale. The fix is a one-line `flutter gen-l10n` re-run; this is now part of the canonical pre-3-gate flow for any PR that touches an ARB file (mirrors PR14 / ADR-119 lesson (b)). The bigger lesson: ARB round-trip tests (the Spanish mirror test in `home_tile_budget_caption_test.dart`) **fail loudly with `Actual: <null>` if `flutter gen-l10n` is not run** — they are a load-bearing safety net for the localization pipeline. Without the Spanish mirror test, a forgotten `gen-l10n` would silently type-check (the source ARB still has the key) but fail at runtime when the Spanish delegate loads.
 
+
+## ADR-123 — Passphrase input on the Restore-from-Backup screen (v1.8-pr-c / PR-C)
+
+### Context
+
+`SettingsRestoreScreen` previously called `BackupService.instance.importFrom(File(path))` with `passphrase: null` (`lib/screens/settings_restore.dart:127`). This is a v2.0 launch blocker: v2/v3 backups produced via the `doit.tour` post-onboarding pass are encrypted (Argon2id, `kBackupFormatVersion = 3`, ADR-045 / SYS-115) and cannot be restored from the UI today. The service throws `Backup is encrypted (v$version); a passphrase is required.` and the user sees a raw error Card. The fix is purely screen-layer: the service's `importFrom` signature at `lib/services/backup_service.dart:190` already accepts the `{String? passphrase}` named parameter. The migration is to add a `TextField` between the picked-file Card and the Replace button, forward the typed text to `importFrom`, and map the service's "Decryption failed" message to a localized "Wrong passphrase" string.
+
+### Decision
+
+**Add a passphrase `TextField` to `SettingsRestoreScreen` with the following contract:**
+
+1. **Controller lifecycle.** `TextEditingController _passphraseController` held in `_SettingsRestoreScreenState`; disposed in `dispose()`. Cleared on every successful `_pick()` — a new backup may not share the passphrase with the old one. Cleared again when the obscure toggle re-flips to `true` (visual-only; the text persists).
+2. **Obscure toggle.** `bool _obscurePassphrase = true` (default). A 48dp `IconButton` suffix with `Icons.visibility_outlined` / `Icons.visibility_off_outlined` flips the flag. The `tooltip` reads `settingsRestorePassphraseShowCta` / `settingsRestorePassphraseHideCta` (both en + es localized).
+3. **Forwarding.** In `_restore()`: `final typed = _passphraseController.text; final passphrase = typed.isEmpty ? null : typed;` then `importFrom(File(path), passphrase: passphrase)`. Empty input maps to `null` (preserves the v1 plain-JSON contract — no passphrase).
+4. **Error mapping.** `e.message.contains('Decryption failed')` → `l.settingsRestoreWrongPassphraseError`; all other `BackupFormatException` messages pass through verbatim (the service's "Could not read file" / "Unknown backup version" errors are user-actionable without localization).
+5. **Layout.** The body Column is wrapped in `SingleChildScrollView(physics: const ClampingScrollPhysics())` to handle the new Card on small viewports.
+6. **ARB keys.** 6 new keys in `app_en.arb` (line 296+): `settingsRestorePassphraseLabel` / `settingsRestorePassphraseHint` / `settingsRestorePassphraseShowCta` / `settingsRestorePassphraseHideCta` / `settingsRestoreWrongPassphraseError` / `settingsRestoreEncryptedBackupHint`. Spanish mirror in `app_es.arb` (line 91+).
+
+### Alternatives considered
+
+- **Move the passphrase into a separate route (`SettingsRestoreWithPassphraseScreen`)**. Rejected: the passphrase is contextual to the file pick (a re-pick resets it). Splitting into a separate route would force a back-stack shuffle on every pick and lose the "currently picking this file, with this passphrase" mental model.
+- **Persist the passphrase in `SharedPreferences`** (e.g., `doit.backup.last_passphrase`). Rejected: violates the security model — the passphrase is the encryption key for the backup; persisting it defeats the threat model (someone with the device unlock can read it via `SharedPreferences`). `dispose()` clears it; a re-pick clears it; the next restore must be re-typed.
+- **Use `AppFormField.password` (PR7 primitive)**. Rejected for PR-C: the primitive did not land until PR7 (post-UI-sprint). For PR-C, a raw `TextField` with `obscureText: true` + `suffixIcon: IconButton` is the lighter-touch path. A follow-up PR may migrate to `AppFormField.password` once the primitive is stable; flagged in the PR-C followups.
+- **Use a `DropDownButton<String>` for the passphrase source** (e.g., "Use last typed" / "Type new" / "Stored in keychain"). Rejected: scope creep. The v0.1 contract is "type the passphrase, restore the file" — no keychain integration, no last-typed caching.
+
+### Drift lessons (2 NEW)
+
+**(a) The service throws a single `BackupFormatException` per failure mode.** Today the message string is the only signal (`"Decryption failed"`, `"Could not read file"`, `"Unknown backup version"`, etc.). A future hardening is an exception-code taxonomy (a sealed `BackupFailure` with `WrongPassphrase` / `FileNotReadable` / `UnsupportedVersion` / `IntegrityCheckFailed` variants) that lets the UI route each failure to a distinct localized message. Flagged as a v2.1 candidate — not in scope for PR-C.
+
+**(b) The existing test wrap (`MaterialApp(...)` direct) is not future-proof.** Adding a localized string to any post-pick render path now requires the `localizedApp(...)` helper from `test/support/localized_app.dart` (PR11 lesson). 4 existing tests in `settings_restore_test.dart` failed first-run; fix was a one-line `_wrap()` change. The lesson is recorded in [[v1-8-pr-c-restore-passphrase-cycle-shipped]] so future PRs that add localized strings to existing screens remember to audit the test wrap.
+
+### Cross-references
+
+`BackupService.importFrom` at `lib/services/backup_service.dart:190` (the service-layer call site that already accepts `passphrase:`); the `Decryption failed` message is thrown at `lib/services/backup_service.dart:719` in the v3 dispatcher's `AES-GCM.decrypt(ciphertext, ...)` error path. The Argon2id / v3 envelope shape is recorded in ADR-045. The `homeEmptyBody` / `homeTileBudgetUsed` ARB-rename pattern (PR-D / SYS-193) is the model for "always ship the Spanish mirror in the same commit" used here.

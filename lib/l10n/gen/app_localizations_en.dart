@@ -304,6 +304,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsRestoreSubtitle => 'Pick a do it .json backup file.';
 
   @override
+  String get settingsRestorePassphraseLabel => 'Backup passphrase (optional)';
+
+  @override
+  String get settingsRestorePassphraseHint =>
+      'Required for encrypted (.json v2 or v3) backups';
+
+  @override
+  String get settingsRestorePassphraseShowCta => 'Show';
+
+  @override
+  String get settingsRestorePassphraseHideCta => 'Hide';
+
+  @override
+  String get settingsRestoreWrongPassphraseError =>
+      'Wrong passphrase — could not decrypt this backup.';
+
+  @override
+  String get settingsRestoreEncryptedBackupHint =>
+      'This backup is encrypted. Enter the passphrase used when it was exported.';
+
+  @override
   String settingsAboutAppVersion(String version) {
     return '$version — local-only. See PRIVACY.md for the data we store and the data we do not.';
   }
