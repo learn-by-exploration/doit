@@ -200,11 +200,17 @@ abstract class AppLocalizations {
   /// **'No rest days left this month.'**
   String get homeTileSkipBudgetExhausted;
 
-  /// Caption under the streak badge on the home tile (v1.4c / SYS-117). Renders only when restDaysPerMonth > 0 and at least one rest day has been used. placeholders: remaining (int) and limit (int).
+  /// Legacy v1.4c / SYS-117 wording ("X/Y rest days left"). Kept for ARB back-compat (test pins may reference it), but not used by the home tile renderer as of v1.8-pr-d / SYS-193 / ADR-124 / WF-120.
   ///
   /// In en, this message translates to:
   /// **'{remaining}/{limit} rest days left'**
   String homeTileBudgetRemaining(int remaining, int limit);
+
+  /// Caption under the streak badge on the home tile when restDaysPerMonth > 0 and at least one rest day has been used (v1.8-pr-d / SYS-193 / ADR-124 / WF-120). Replaces the legacy 'remaining/limit' framing — users think of rest days as a budget they consume. placeholders: used (int) and limit (int).
+  ///
+  /// In en, this message translates to:
+  /// **'Used {used} of {limit} this month'**
+  String homeTileBudgetUsed(int used, int limit);
 
   /// Caption under the streak badge on the home tile when restDaysPerMonth > 0 but the user has used all budget units for the month (v1.4c / SYS-117). Distinct from 'No budget configured' — the do opted into rest days but has used them all.
   ///
@@ -301,6 +307,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No dos yet.'**
   String get homeEmptyTitle;
+
+  /// Body subline under the home empty-state title (v1.8-pr-d / SYS-193 / ADR-124 / WF-120). Localized — was hardcoded English in home.dart before this PR.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the + to add a do or a person.'**
+  String get homeEmptyBody;
 
   /// No description provided for @homeRetryButton.
   ///

@@ -256,6 +256,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   if (habits.isEmpty) {
                     return EmptyState(
                       title: AppLocalizations.of(context).homeEmptyTitle,
+                      // v1.8-pr-d / SYS-193 / ADR-124 / WF-120:
+                      // localized body — was hardcoded English.
+                      message: AppLocalizations.of(context).homeEmptyBody,
                       icon: Icons.bolt_outlined,
                     );
                   }
@@ -1570,7 +1573,13 @@ class _BudgetCaption extends StatelessWidget {
         color: Theme.of(context).colorScheme.error,
       );
     } else {
-      text = l.homeTileBudgetRemaining(budget.remaining, budget.limit);
+      // v1.8-pr-d / SYS-193 / ADR-124 / WF-120: caption
+      // flipped from "X/Y rest days left" to "Used X of Y this
+      // month". The progression framing matches the
+      // StreakService wording ("Done 12 of 30 this month") and
+      // encourages users to think of rest days as a budget
+      // they consume, not a stash they deplete.
+      text = l.homeTileBudgetUsed(budget.used, budget.limit);
       style = AppTextStyles.caption(context);
     }
     // v1.4j: wrap the caption in a tap target + Semantics

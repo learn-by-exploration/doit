@@ -67,6 +67,9 @@ void main() {
       // piece — a wrong locale falls back to en and the
       // Spanish title would never render.
       expect(find.text(l.homeEmptyTitle), findsOneWidget);
+      // v1.8-pr-d / SYS-193 / ADR-124 / WF-120: the body
+      // is now localized too (was hardcoded English).
+      expect(find.text(l.homeEmptyBody), findsOneWidget);
       expect(find.byType(AppBar), findsOneWidget);
     },
   );
@@ -81,6 +84,9 @@ void main() {
       await tester.pumpAndSettle();
       final l = await AppLocalizations.delegate.load(const Locale('es'));
       expect(find.text(l.homeEmptyTitle), findsOneWidget);
+      // v1.8-pr-d / SYS-193 / ADR-124 / WF-120: body
+      // resolves to the Spanish string.
+      expect(find.text(l.homeEmptyBody), findsOneWidget);
     },
   );
 
