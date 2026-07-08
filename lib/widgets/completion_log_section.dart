@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/db/schema.dart' show CompletionRow;
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/icon_button.dart';
 
 /// Cap on the number of completions rendered in the
 /// section. Anything older than this is hidden — the user
@@ -140,7 +141,8 @@ class _CompletionLogSectionState extends State<CompletionLogSection> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const Spacer(),
-                IconButton(
+                // v1.8-14 / SYS-188 / ADR-119: migrated to AppIconButton.
+                AppIconButton(
                   key: const ValueKey('completion_log.refresh'),
                   tooltip: 'Refresh',
                   icon: const Icon(Icons.refresh),
@@ -234,7 +236,7 @@ class _CompletionLogRow extends StatelessWidget {
       leading: const Icon(Icons.check_circle_outline),
       title: Text('$dayLabel · $timeLabel'),
       subtitle: Text(row.source),
-      trailing: IconButton(
+      trailing: AppIconButton(
         key: ValueKey('completion_log.delete.${row.id}'),
         tooltip: 'Delete this completion',
         icon: const Icon(Icons.delete_outline),

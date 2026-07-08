@@ -257,4 +257,146 @@ void main() {
       expect(tooltip.message, 'Refresh');
     });
   });
+
+  group('AppIconButton — iconSize parameter (v1.8-14 / SYS-188)', () {
+    testWidgets('default iconSize is null (theme resolves to 24dp at paint)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(
+            body: Center(
+              child: AppIconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      final IconButton button = tester.widget(find.byType(IconButton));
+      // AppIconButton forwards `iconSize: null` when the
+      // caller does not supply one; the project
+      // `IconButtonTheme` then resolves it to 24dp at paint
+      // time. Pinning the contract as "null when not set"
+      // matches the canonical M3 pattern (don't bake the
+      // 24dp default into the primitive; let the theme
+      // own it).
+      expect(button.iconSize, isNull);
+    });
+
+    testWidgets('iconSize override flows through to IconButton', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(
+            body: Center(
+              child: AppIconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () {},
+                iconSize: 28,
+              ),
+            ),
+          ),
+        ),
+      );
+      final IconButton button = tester.widget(find.byType(IconButton));
+      expect(button.iconSize, 28);
+    });
+
+    testWidgets('home tile uses Sizing.tapHome / 2 (28dp) icon size', (
+      tester,
+    ) async {
+      // Mirrors the home.dart tile's per-row buttons (Done /
+      // Edit / Delete / Skip / Undo) which use 28dp icons in
+      // 56dp touch targets.
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(
+            body: Center(
+              child: AppIconButton(
+                icon: const Icon(Icons.check_circle_outline),
+                onPressed: () {},
+                iconSize: 28, // Sizing.tapHome / 2
+              ),
+            ),
+          ),
+        ),
+      );
+      final IconButton button = tester.widget(find.byType(IconButton));
+      expect(button.iconSize, 28);
+    });
+  });
+
+  group('AppIconButton — busy parameter (v1.8-14 / SYS-188)', () {
+    testWidgets('busy: true swaps icon for a CircularProgressIndicator', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(
+            body: Center(
+              child: AppIconButton(
+                icon: const Icon(Icons.check_circle_outline),
+                onPressed: () {},
+                busy: true,
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(find.byIcon(Icons.check_circle_outline), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+
+    testWidgets('busy: true disables the IconButton (onPressed is null)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(
+            body: Center(
+              child: AppIconButton(
+                icon: const Icon(Icons.check_circle_outline),
+                onPressed: () {},
+                busy: true,
+              ),
+            ),
+          ),
+        ),
+      );
+      final IconButton button = tester.widget(find.byType(IconButton));
+      expect(button.onPressed, isNull);
+    });
+
+    testWidgets(
+      'busy: false (default) renders the icon and enables the button',
+      (tester) async {
+        var tapCount = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.dark,
+            home: Scaffold(
+              body: Center(
+                child: AppIconButton(
+                  icon: const Icon(Icons.check_circle_outline),
+                  onPressed: () => tapCount++,
+                ),
+              ),
+            ),
+          ),
+        );
+        expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
+        await tester.tap(find.byType(IconButton));
+        await tester.pump();
+        expect(tapCount, 1);
+      },
+    );
+  });
 }

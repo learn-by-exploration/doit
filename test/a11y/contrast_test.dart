@@ -117,6 +117,30 @@ void main() {
       );
     });
 
+    test('icon-only CTA foreground/background contrast meets WCAG AA Large '
+        '(≥ 3:1, AppIconButton busy-state spinner)', () {
+      // v1.8-14 / SYS-188: the `busy: true` swap renders a
+      // `CircularProgressIndicator` over the icon. The
+      // indicator inherits the theme's `colorScheme.primary`
+      // for its active stroke, painted on top of the surface.
+      // We pin the primary-on-surface contrast at the AA
+      // Large bar (≥ 3:1) so the spinner is legible to users
+      // with low vision when the button is mid-flight.
+      final theme = ThemeData.dark(useMaterial3: true);
+      final fg = theme.colorScheme.primary;
+      final bg = theme.colorScheme.surface;
+      final measured = contrastRatio(fg, bg);
+      expect(
+        measured,
+        greaterThanOrEqualTo(3.0),
+        reason:
+            'primary(${fg.toARGB32().toRadixString(16)}) on '
+            'surface(${bg.toARGB32().toRadixString(16)}) contrast for the '
+            'AppIconButton busy-state spinner dropped below AA Large '
+            '— measured ${measured.toStringAsFixed(2)}:1',
+      );
+    });
+
     test('error / destructive CTA contrast meets a tight-but-readable bar '
         '(≥ 2.7:1, M3-light pin)', () {
       // The v1.4-stab-H delete-forever dialog uses

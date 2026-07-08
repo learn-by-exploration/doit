@@ -43,6 +43,7 @@ import 'package:doit/templates/template_library.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/trigger.dart';
 import 'package:doit/ui/app_form_field.dart';
+import 'package:doit/ui/icon_button.dart';
 import 'package:doit/ui/primary_button.dart';
 import 'package:doit/ui/secondary_button.dart';
 import 'package:doit/ui/section_header.dart';
@@ -636,7 +637,7 @@ class _PersonRoutineRow extends StatelessWidget {
               automation: automation,
             ),
           ),
-          IconButton(
+          AppIconButton(
             key: const ValueKey('add_person.remove_routine'),
             tooltip: 'Remove',
             icon: const Icon(Icons.close),

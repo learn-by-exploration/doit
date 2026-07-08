@@ -110,6 +110,30 @@ abstract class AppLocalizations {
   /// **'do it'**
   String get homeAppBarTitle;
 
+  /// Home AppBar action button tooltip for opening the stats screen. v1.8-14 a11y fix (was hardcoded English).
+  ///
+  /// In en, this message translates to:
+  /// **'Stats'**
+  String get homeAppBarStatsTooltip;
+
+  /// Home AppBar action button tooltip for opening the settings screen. v1.8-14 a11y fix (was hardcoded English).
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get homeAppBarSettingsTooltip;
+
+  /// Home AppBar leading button tooltip when in selection mode (exits selection). v1.8-14 a11y fix (was hardcoded English).
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get homeAppBarCancelTooltip;
+
+  /// Home AppBar action button tooltip when in selection mode (marks selected tiles done). v1.8-14 a11y fix (was hardcoded English).
+  ///
+  /// In en, this message translates to:
+  /// **'Mark selected done'**
+  String get homeAppBarCompleteSelectedTooltip;
+
   /// Home screen AppBar title when the user has entered selection mode.
   ///
   /// In en, this message translates to:

@@ -26,6 +26,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/icon_button.dart';
 
 /// One dropped habit time. The label is what the user sees
 /// on the home tile (e.g., "02:30 AM"); `rescheduledTo` is
@@ -111,8 +112,16 @@ class DstTransitionBanner extends StatelessWidget {
                     ),
                   ),
                   if (onDismiss != null)
-                    IconButton(
+                    // v1.8-14 / SYS-188 / ADR-119: added
+                    // `tooltip:` to the dismiss IconButton —
+                    // the old call only had `semanticLabel:`
+                    // (TalkBack's read-text) but no long-press
+                    // tooltip affordance. The a11y fix bundles
+                    // both — the tooltip shows on long-press +
+                    // is the canonical IconButton contract.
+                    AppIconButton(
                       key: const ValueKey('dst_transition_banner.dismiss'),
+                      tooltip: 'Dismiss',
                       icon: Icon(
                         Icons.close,
                         color: scheme.onSecondaryContainer,

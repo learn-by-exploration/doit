@@ -40,6 +40,7 @@ import 'package:doit/triggers/trigger.dart';
 import 'package:doit/ui/app_choice_chip.dart';
 import 'package:doit/ui/app_form_field.dart';
 import 'package:doit/ui/app_snack.dart';
+import 'package:doit/ui/icon_button.dart';
 import 'package:doit/ui/primary_button.dart';
 import 'package:doit/ui/section_header.dart';
 import 'package:doit/widgets/category_chip.dart';
@@ -1533,7 +1534,7 @@ class _RoutineRow extends StatelessWidget {
               automation: automation,
             ),
           ),
-          IconButton(
+          AppIconButton(
             key: const ValueKey('add_habit.remove_routine'),
             tooltip: 'Remove',
             icon: const Icon(Icons.close),

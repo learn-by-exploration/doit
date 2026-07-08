@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/ui/banner_surface.dart';
+import 'package:doit/ui/icon_button.dart';
 
 /// What the user needs to know to act on the recovery
 /// card. Computed by the home-screen binding — the
@@ -99,8 +100,13 @@ class StreakRecoveryCard extends StatelessWidget {
                 ),
               ),
               if (onDismiss != null)
-                IconButton(
+                // v1.8-14 / SYS-188 / ADR-119: added
+                // `tooltip:` to the dismiss IconButton — a11y
+                // fix (was only `semanticLabel:`, missing the
+                // long-press tooltip affordance).
+                AppIconButton(
                   key: ValueKey('streak_recovery_card.dismiss.${s.habitId}'),
+                  tooltip: 'Dismiss',
                   icon: Icon(
                     Icons.close,
                     color: scheme.onTertiaryContainer,

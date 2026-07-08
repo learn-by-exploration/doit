@@ -52,6 +52,7 @@ import 'package:doit/triggers/trigger.dart';
 import 'package:doit/ui/app_choice_chip.dart';
 import 'package:doit/ui/app_form_field.dart';
 import 'package:doit/ui/app_snack.dart';
+import 'package:doit/ui/icon_button.dart';
 import 'package:doit/ui/primary_button.dart';
 import 'package:doit/ui/secondary_button.dart';
 import 'package:doit/widgets/calendar_picker.dart';
@@ -626,7 +627,7 @@ class _EventRoutineRow extends StatelessWidget {
               automation: automation,
             ),
           ),
-          IconButton(
+          AppIconButton(
             key: const ValueKey('add_event.remove_routine'),
             tooltip: 'Remove',
             icon: const Icon(Icons.close),

@@ -216,7 +216,7 @@ class _GroupCard extends StatelessWidget {
                     await onChanged();
                   },
                 ),
-              IconButton(
+              AppIconButton(
                 key: ValueKey('group.${g.id}.delete'),
                 tooltip: 'Delete group',
                 icon: const Icon(Icons.delete_outline),

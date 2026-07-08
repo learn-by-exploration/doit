@@ -15,6 +15,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get homeAppBarTitle => 'do it';
 
   @override
+  String get homeAppBarStatsTooltip => 'Estadísticas';
+
+  @override
+  String get homeAppBarSettingsTooltip => 'Ajustes';
+
+  @override
+  String get homeAppBarCancelTooltip => 'Cancelar';
+
+  @override
+  String get homeAppBarCompleteSelectedTooltip =>
+      'Marcar seleccionados como hechos';
+
+  @override
   String homeSelectionAppBarTitle(int count) {
     final intl.NumberFormat countNumberFormat = intl.NumberFormat.compact(
       locale: localeName,
