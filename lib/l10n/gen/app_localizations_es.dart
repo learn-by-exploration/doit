@@ -311,6 +311,28 @@ class AppLocalizationsEs extends AppLocalizations {
       'Elige un archivo .json de copia de seguridad de do it.';
 
   @override
+  String get settingsRestorePassphraseLabel =>
+      'Frase de contraseña de la copia (opcional)';
+
+  @override
+  String get settingsRestorePassphraseHint =>
+      'Necesaria para copias cifradas (v2 o v3)';
+
+  @override
+  String get settingsRestorePassphraseShowCta => 'Mostrar';
+
+  @override
+  String get settingsRestorePassphraseHideCta => 'Ocultar';
+
+  @override
+  String get settingsRestoreWrongPassphraseError =>
+      'Frase de contraseña incorrecta — no se pudo descifrar la copia.';
+
+  @override
+  String get settingsRestoreEncryptedBackupHint =>
+      'Esta copia está cifrada. Introduce la frase de contraseña usada al exportarla.';
+
+  @override
   String settingsAboutAppVersion(String version) {
     return '$version — solo local. Consulta PRIVACY.md para los datos que guardamos y los que no.';
   }

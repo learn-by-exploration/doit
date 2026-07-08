@@ -54,6 +54,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/localized_app.dart' as support;
+
 class _ScriptedFilePicker extends FilePicker {
   _ScriptedFilePicker();
 
@@ -100,8 +102,21 @@ class _ScriptedFilePicker extends FilePicker {
   }) async => null;
 }
 
-Widget _wrap() =>
-    MaterialApp(theme: AppTheme.dark, home: const SettingsRestoreScreen());
+// v1.8-pr-c / SYS-192 / ADR-123 / WF-119: switched the wrap
+// from a bare `MaterialApp` to `localizedApp(...)`. The
+// passphrase Card (only visible after a pick) reads
+// `AppLocalizations.of(context)` for its label / hint /
+// show / hide / error / encrypted-backup hint. The bare
+// `MaterialApp` does NOT wire the localizations delegates
+// (production wires them at the `DoItApp` root), so the
+// generated `!` assertion would crash and leave the
+// post-pick tree unrendered. This is the PR11 lesson
+// (mirrored verbatim in the new
+// `settings_restore_passphrase_test.dart`).
+Widget _wrap() => support.localizedApp(
+  theme: AppTheme.dark,
+  home: const SettingsRestoreScreen(),
+);
 
 Future<void> _resetDb() async {
   await AppDatabaseService.instance.closeForTesting();

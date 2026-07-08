@@ -72,7 +72,7 @@ The app must work in ordinary day-to-day environments:
 | Contact (named) | A person from the phone's contact list that the user has added to a call/message cadence |
 | Phone platform | Provides AlarmManager, WorkManager, full-screen intents, contacts, sensors, file picker, storage, settings |
 | OEM (Xiaomi / Oppo / Vivo / Honor / Samsung) | Aggressively terminates background work; requires user cooperation (whitelist, auto-start toggle) |
-| Backup storage | A user-chosen folder (SAF URI) on the same device; the file is plain JSON in v0.1 |
+| Backup storage | A user-chosen folder (SAF URI) on the same device; the file is plain JSON for v1 envelopes and Argon2id-encrypted (v2/v3 envelopes, per ADR-045 / SYS-115) for v2.0+. Restore reads a chosen file and asks for the passphrase when the envelope is encrypted. |
 
 ## Operating Modes
 

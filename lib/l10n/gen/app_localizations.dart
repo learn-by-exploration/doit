@@ -602,6 +602,42 @@ abstract class AppLocalizations {
   /// **'Pick a do it .json backup file.'**
   String get settingsRestoreSubtitle;
 
+  /// Label above the passphrase TextField on the restore screen. Most backups are unencrypted v1 — only v2/v3 need this. Shown after a backup file is picked.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup passphrase (optional)'**
+  String get settingsRestorePassphraseLabel;
+
+  /// Helper text under the passphrase TextField. Tells the user the passphrase is only needed for encrypted backups. Plain-JSON v1 backups ignore this field.
+  ///
+  /// In en, this message translates to:
+  /// **'Required for encrypted (.json v2 or v3) backups'**
+  String get settingsRestorePassphraseHint;
+
+  /// Toggle label on the passphrase TextField that flips obscureText to false so the user can verify what they typed.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get settingsRestorePassphraseShowCta;
+
+  /// Toggle label on the passphrase TextField that flips obscureText back to true to obscure the passphrase from over-the-shoulder viewing.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get settingsRestorePassphraseHideCta;
+
+  /// Shown in the error Card when importFrom throws BackupFormatException with the 'Decryption failed' message.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong passphrase — could not decrypt this backup.'**
+  String get settingsRestoreWrongPassphraseError;
+
+  /// Shown after the file is picked if the envelope header reports v2 or v3 (Argon2id / PBKDF2 envelopes). Not shown for plain-JSON v1 backups.
+  ///
+  /// In en, this message translates to:
+  /// **'This backup is encrypted. Enter the passphrase used when it was exported.'**
+  String get settingsRestoreEncryptedBackupHint;
+
   /// About-section subtitle. Carries the version string verbatim.
   ///
   /// In en, this message translates to:

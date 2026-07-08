@@ -292,6 +292,30 @@
   "settingsTestReminderSnackbar": "Test reminder scheduled for 5s from now.",
   "settingsRestoreTitle": "Restore from backup",
   "settingsRestoreSubtitle": "Pick a do it .json backup file.",
+  "settingsRestorePassphraseLabel": "Backup passphrase (optional)",
+  "@settingsRestorePassphraseLabel": {
+    "description": "Label above the passphrase TextField on the restore screen. Most backups are unencrypted v1 — only v2/v3 need this. Shown after a backup file is picked."
+  },
+  "settingsRestorePassphraseHint": "Required for encrypted (.json v2 or v3) backups",
+  "@settingsRestorePassphraseHint": {
+    "description": "Helper text under the passphrase TextField. Tells the user the passphrase is only needed for encrypted backups. Plain-JSON v1 backups ignore this field."
+  },
+  "settingsRestorePassphraseShowCta": "Show",
+  "@settingsRestorePassphraseShowCta": {
+    "description": "Toggle label on the passphrase TextField that flips obscureText to false so the user can verify what they typed."
+  },
+  "settingsRestorePassphraseHideCta": "Hide",
+  "@settingsRestorePassphraseHideCta": {
+    "description": "Toggle label on the passphrase TextField that flips obscureText back to true to obscure the passphrase from over-the-shoulder viewing."
+  },
+  "settingsRestoreWrongPassphraseError": "Wrong passphrase — could not decrypt this backup.",
+  "@settingsRestoreWrongPassphraseError": {
+    "description": "Shown in the error Card when importFrom throws BackupFormatException with the 'Decryption failed' message."
+  },
+  "settingsRestoreEncryptedBackupHint": "This backup is encrypted. Enter the passphrase used when it was exported.",
+  "@settingsRestoreEncryptedBackupHint": {
+    "description": "Shown after the file is picked if the envelope header reports v2 or v3 (Argon2id / PBKDF2 envelopes). Not shown for plain-JSON v1 backups."
+  },
   "settingsAboutAppVersion": "{version} — local-only. See PRIVACY.md for the data we store and the data we do not.",
   "@settingsAboutAppVersion": {
     "description": "About-section subtitle. Carries the version string verbatim.",
