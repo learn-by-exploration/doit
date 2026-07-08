@@ -55,13 +55,15 @@ void main() {
   // home tile" assertion lives in home_test.dart
   // ("Used 1 of 2 this month" / "Used 0 of 3 this month")
   // where the snapshot/future plumbing is already exercised.
-  testWidgets('caption ARB key resolves to "Used X of Y this month" in English',
-      (tester) async {
-    final l = await AppLocalizations.delegate.load(const Locale('en'));
-    expect(l.homeTileBudgetUsed(1, 2), 'Used 1 of 2 this month');
-    expect(l.homeTileBudgetUsed(0, 3), 'Used 0 of 3 this month');
-    expect(l.homeTileBudgetUsed(2, 2), 'Used 2 of 2 this month');
-  });
+  testWidgets(
+    'caption ARB key resolves to "Used X of Y this month" in English',
+    (tester) async {
+      final l = await AppLocalizations.delegate.load(const Locale('en'));
+      expect(l.homeTileBudgetUsed(1, 2), 'Used 1 of 2 this month');
+      expect(l.homeTileBudgetUsed(0, 3), 'Used 0 of 3 this month');
+      expect(l.homeTileBudgetUsed(2, 2), 'Used 2 of 2 this month');
+    },
+  );
 
   testWidgets(
     'caption ARB key round-trips in Spanish (Usados X de Y este mes)',
