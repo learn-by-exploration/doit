@@ -36,6 +36,7 @@ import 'package:doit/do/consecutive_counter.dart';
 import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/do_repository.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/app_text_styles.dart';
 import 'package:doit/ui/empty_state.dart';
 import 'package:doit/ui/error_view.dart';
 import 'package:doit/widgets/category_chip.dart';
@@ -396,9 +397,12 @@ class _StatsCard extends StatelessWidget {
                 trailing: Text(
                   '${stats.snapshot.currentStreak}',
                   key: const ValueKey('stats.current_streak'),
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.primary,
-                  ),
+                  // v1.8-13 / SYS-187 / ADR-118: shared with
+                  // the home tile's streak number — same numeric
+                  // tabular-figures treatment.
+                  style: AppTextStyles.streakNumber(
+                    context,
+                  ).copyWith(color: theme.colorScheme.primary),
                 ),
               ),
               const SizedBox(height: Spacing.xs),

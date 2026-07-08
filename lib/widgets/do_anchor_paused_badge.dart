@@ -1,6 +1,7 @@
 import 'package:doit/do/do.dart';
 import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/ui/app_palette.dart';
+import 'package:doit/ui/app_text_styles.dart';
 import 'package:flutter/material.dart';
 
 /// Compact, accessible badge that surfaces the v1.4l tombstone
@@ -74,7 +75,10 @@ class DoAnchorTargetPausedBadge extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   l.doAnchorTargetPaused,
-                  style: theme.textTheme.labelSmall?.copyWith(color: color),
+                  // v1.8-13 / SYS-187 / ADR-118: badge label uses
+                  // the canonical AppTextStyles.badgeLabel with
+                  // the tertiary color override (the badge tone).
+                  style: AppTextStyles.badgeLabel(context, color: color),
                 ),
               ],
             ),

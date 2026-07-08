@@ -26,6 +26,7 @@
 //     tree (TalkBack reads the title).
 
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/app_text_styles.dart';
 import 'package:doit/ui/section_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -56,7 +57,11 @@ void main() {
           home: Scaffold(
             body: Builder(
               builder: (context) {
-                expected = Theme.of(context).textTheme.titleLarge!;
+                // v1.8-13 / SYS-187 / ADR-118: SectionHeader
+                // routes through AppTextStyles.sectionHeaderTitle
+                // which adds the DoItTypography letterSpacing +
+                // height tweaks on top of titleLarge.
+                expected = AppTextStyles.sectionHeaderTitle(context);
                 return const SectionHeader('Appearance');
               },
             ),
@@ -107,7 +112,12 @@ void main() {
           home: Scaffold(
             body: Builder(
               builder: (context) {
-                expected = Theme.of(context).textTheme.titleMedium!;
+                // v1.8-13 / SYS-187 / ADR-118: SectionHeader
+                // (compact) routes through
+                // AppTextStyles.sectionHeaderTitleCompact which adds
+                // the DoItTypography letterSpacing + height tweaks on
+                // top of titleMedium.
+                expected = AppTextStyles.sectionHeaderTitleCompact(context);
                 return const SectionHeader('Channel', compact: true);
               },
             ),
@@ -174,7 +184,11 @@ void main() {
           home: Scaffold(
             body: Builder(
               builder: (context) {
-                lightTitleLarge = Theme.of(context).textTheme.titleLarge!;
+                // v1.8-13 / SYS-187 / ADR-118: the light theme
+                // registers the same DoItTypography extension, so
+                // SectionHeader resolves the same letterSpacing +
+                // height tokens as on dark.
+                lightTitleLarge = AppTextStyles.sectionHeaderTitle(context);
                 return const SectionHeader('Appearance');
               },
             ),
@@ -195,7 +209,9 @@ void main() {
           home: Scaffold(
             body: Builder(
               builder: (context) {
-                lightTitleMedium = Theme.of(context).textTheme.titleMedium!;
+                lightTitleMedium = AppTextStyles.sectionHeaderTitleCompact(
+                  context,
+                );
                 return const SectionHeader('Channel', compact: true);
               },
             ),
