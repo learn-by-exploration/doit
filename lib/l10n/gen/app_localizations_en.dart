@@ -143,6 +143,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeEmptyBody => 'Tap the + to add a do or a person.';
 
   @override
+  String get homeEmptyTourCta => 'Show me around';
+
+  @override
+  String get tourStep1Title => 'Add your first do';
+
+  @override
+  String get tourStep1Body =>
+      'Tap the + button to create a do, a person, or a template.';
+
+  @override
+  String get tourStep2Title => 'Pick a schedule';
+
+  @override
+  String get tourStep2Body =>
+      'Choose when the reminder should fire — fixed time, every N days, after another do, or on a specific day of the month.';
+
+  @override
+  String get tourNext => 'Next';
+
+  @override
+  String get tourSkip => 'Skip tour';
+
+  @override
+  String get tourDone => 'Done';
+
+  @override
+  String tourBubbleAriaLabel(String title, String body) {
+    return '$title. $body';
+  }
+
+  @override
   String get homeRetryButton => 'Retry';
 
   @override

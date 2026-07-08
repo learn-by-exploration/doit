@@ -91,6 +91,15 @@ class SettingsService extends ChangeNotifier {
   final ValueNotifier<Map<String, RoutineConfig>> routines =
       ValueNotifier<Map<String, RoutineConfig>>(<String, RoutineConfig>{});
 
+  /// v1.8-pr-b / SYS-191 / ADR-122 / WF-118. `true` once
+  /// the user has completed the post-onboarding coach-mark
+  /// tour at least once on this install. Defaults to
+  /// `false`. The home screen reads this notifier to decide
+  /// whether to show the "Show me around" CTA on the
+  /// empty state. Backed by [SharedPreferences] under
+  /// [_kTourSeenKey].
+  final ValueNotifier<bool> tourSeen = ValueNotifier<bool>(false);
+
   /// Init gate (`Completer<void> _ready`). Public reads wait on
   /// this before touching the underlying [SharedPreferences]
   /// instance. Pattern: see .claude/rules/lib-services.md §2.
@@ -119,6 +128,14 @@ class SettingsService extends ChangeNotifier {
   /// [RoutineConfig] (see `RoutineConfig.toJson`).
   static const String _kRoutinesPrefix = 'doit.routine.';
 
+  /// v1.8-pr-b / SYS-191 / ADR-122 / WF-118. Persisted
+  /// boolean flag for the post-onboarding coach-mark
+  /// tour. `true` once the user has completed the tour
+  /// at least once; `false` (default) otherwise. The
+  /// home screen reads `tourSeen` to decide whether to
+  /// show the "Show me around" CTA on the empty state.
+  static const String _kTourSeenKey = 'doit.tour.seen';
+
   /// Idempotent init. Loads the persisted values; safe to call
   /// multiple times (the gate is completed on the first call and
   /// subsequent calls are no-ops).
@@ -129,6 +146,8 @@ class SettingsService extends ChangeNotifier {
         _prefs.getBool(_kFirstLaunchCompletedKey) ?? false;
     japanRoutine.value = _loadJapanRoutine();
     routines.value = _loadRoutines();
+    // v1.8-pr-b / SYS-191 / ADR-122 / WF-118.
+    tourSeen.value = _prefs.getBool(_kTourSeenKey) ?? false;
     if (!_ready.isCompleted) _ready.complete();
   }
 
@@ -246,6 +265,19 @@ class SettingsService extends ChangeNotifier {
     );
   }
 
+  /// v1.8-pr-b / SYS-191 / ADR-122 / WF-118. Mark the
+  /// post-onboarding coach-mark tour as seen. Persists
+  /// the value so the next [DoItApp] mount suppresses
+  /// the "Show me around" CTA on the empty state.
+  /// Awaiting this is safe in widget tests; in widget
+  /// bodies, the [tourSeen] [ValueNotifier] updates
+  /// synchronously so a `setState` is not required.
+  Future<void> markTourSeen() async {
+    await _ready.future;
+    tourSeen.value = true;
+    await _prefs.setBool(_kTourSeenKey, true);
+  }
+
   /// v1.1 (SYS-083). Remove a template-driven routine
   /// configuration. Idempotent: deleting a template id that
   /// was never saved is a no-op. The in-memory [routines]
@@ -275,6 +307,8 @@ class SettingsService extends ChangeNotifier {
     backupFolderUri.value = null;
     japanRoutine.value = JapanRoutineConfig.defaults;
     routines.value = const <String, RoutineConfig>{};
+    // v1.8-pr-b / SYS-191 / ADR-122 / WF-118.
+    tourSeen.value = false;
     // Allow a subsequent init() to re-load from the backing
     // store. Re-creating the completer is the standard pattern
     // when the gate has not yet been awaited in tests.

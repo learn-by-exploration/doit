@@ -10107,3 +10107,100 @@ The English ARB value is `"Tap the + to add a do or a person."`. The Spanish ARB
 ### Cross-references
 
 `BackupService.importFrom` at `lib/services/backup_service.dart:190` (the service-layer call site that already accepts `passphrase:`); the `Decryption failed` message is thrown at `lib/services/backup_service.dart:719` in the v3 dispatcher's `AES-GCM.decrypt(ciphertext, ...)` error path. The Argon2id / v3 envelope shape is recorded in ADR-045. The `homeEmptyBody` / `homeTileBudgetUsed` ARB-rename pattern (PR-D / SYS-193) is the model for "always ship the Spanish mirror in the same commit" used here.
+
+## ADR-122 — CoachMark tour primitive + home empty-state CTA (v1.8-pr-b / PR-B)
+
+**Status:** Accepted. **Date:** 2026-07-08.
+
+### Context
+
+The v1.8 UI-consolidation sprint shipped 15 primitives (PR1–PR15) and stabilized the design system across the app, but two product gaps remained for first-time users:
+
+1. **No guided tour of the FAB.** A new install sees "No dos yet." with no hint that the floating + button is the entry point. Users who do not tap it on day 1 may uninstall before discovering the core loop.
+2. **No "Show me around" affordance on the home empty state.** The empty state is otherwise a wall of "No dos yet." + a body line, with no primary CTA — users who land here have nothing to do.
+
+PR-D (SYS-193) localized the empty-state body, and PR15 (SYS-189) shipped the `AddFab` primitive that the tour needs as a target. PR-B closes the product gap by shipping a 2-step `CoachMarkOverlay` tour that walks the user through the FAB → push `AddHabitScreen` → point at the schedule picker. The CTA on the empty state re-triggers the tour.
+
+### Decision
+
+**1. New `lib/ui/coach_mark.dart` primitive (the 17th `lib/ui/` file).** API:
+
+```dart
+class TourStep {
+  const TourStep({
+    required GlobalKey targetKey,
+    required String title,
+    required String body,
+    Future<void> Function()? onAdvance,  // optional inter-step navigation
+  });
+}
+
+abstract final class CoachMarkController {
+  static Future<void> start(BuildContext, List<TourStep>);
+}
+
+class CoachMarkOverlay extends StatefulWidget {
+  // full-screen scrim + Positioned.fromRect ring around the target's
+  // RenderBox + Card callout with title + body + Skip + Next/Skip
+  // (ValueKey('tour.skip') / ValueKey('tour.next')) + Semantics(
+  // liveRegion: true, label: tourBubbleAriaLabel(step.title, step.body))
+  // for TalkBack.
+}
+```
+
+**2. New SharedPreferences key `doit.tour.seen`.** Stored on `SettingsService` as `ValueNotifier<bool> tourSeen` (mirror of `firstLaunchCompleted`). The home empty state wraps the `EmptyState` in `ValueListenableBuilder<bool>(valueListenable: SettingsService.instance.tourSeen, ...)`; the CTA renders only when `tourSeen == false`. `markTourSeen()` is called after the tour completes (or is skipped) — the flag persists across app restarts.
+
+**3. Inter-step navigation via `TourStep.onAdvance` hook.** Step 1's `onAdvance` calls `Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddHabitScreen()))` BEFORE the overlay route pops. Step 2's target (`GlobalObjectKey('tour.schedule_picker')`) is then mounted on `AddHabitScreen` so its `RenderBox` rect lookup succeeds. The hook is `await`-ed inside `onNext` (the Next button handler); the route is only popped after the future resolves, guarded with `if (!context.mounted) return;` for the `use_build_context_synchronously` lint.
+
+**4. `GlobalObjectKey` for cross-screen shared target keys.** A regular `GlobalKey()` has identity-based equality — two instances are NOT equal even if they look similar. The home tour step 2 references the schedule picker on a DIFFERENT screen. The fix: use `const GlobalObjectKey('tour.schedule_picker')` at BOTH the home tour declaration AND the picker's `key:` parameter on `add_habit.dart`. `GlobalObjectKey` is equality-by-id (String), so the two `const` instances resolve to the same key in the widget tree.
+
+**5. ARB `placeholders` metadata controls the generated function signature.** The `tourBubbleAriaLabel` ARB key takes 2 args (`title`, `body`). Without `placeholders` metadata, `flutter gen-l10n` defaults to `(Object title, Object body)` and arg order is not guaranteed. With:
+
+```json
+"@tourBubbleAriaLabel": {
+  "description": "...",
+  "placeholders": {
+    "title": { "type": "String" },
+    "body": { "type": "String" }
+  }
+}
+```
+
+the generated signature is `String tourBubbleAriaLabel(String title, String body)` — typed AND ordered.
+
+**6. Fallback positioning when target is not in the tree.** The overlay's `addPostFrameCallback` looks up `widget.step.targetKey.currentContext`; if null (target not mounted), `_targetRect` stays null and the build method positions the callout at the top of the screen with `media.padding.top + margin`. Tests that mount the overlay without mounting the target do NOT have to mount a placeholder widget.
+
+**7. v1 scrim is plain `Colors.black54` (no `BlendMode.clear` cutout).** A future PR may add a `CustomPaint` cutout overlay that punches a hole in the scrim at the target's rect; for v1, the scrim covers everything at 54% opacity and the callout's body text names the target so the user can find it. Tradeoff: v1 ships faster; future PR upgrades the affordance.
+
+**8. The `ValueKey('home.fab')` is preserved on `_AddFab.build`'s `AddFab` key when no `fabKey` is passed.** This keeps the existing home_test.dart `find.byKey(const ValueKey('home.fab'))` assertions working. When `_fabKey` IS passed (the tour wiring), it overrides the ValueKey and provides identity-based rect lookup.
+
+### Alternatives considered
+
+**A. Single-step tour (FAB only), no schedule picker step.** The plan originally listed 3 steps (FAB + schedule picker + proof-mode picker). 1 step was too thin — the user learns the FAB but the schedule picker remains undiscovered until they tap the FAB, navigate, and explore. 2 steps strikes a balance: enough content to justify the CTA, short enough to not feel like a tutorial.
+
+**B. Skip the `onAdvance` hook and let the caller push routes manually between steps.** Caller code would look like:
+
+```dart
+await CoachMarkController.start(context, [step1]);
+if (!context.mounted) return;
+await Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddHabitScreen()));
+await CoachMarkController.start(context, [step2]);
+```
+
+Rejected because it forces every caller to remember to navigate between the two `start()` calls, AND because the user could tap Skip on step 1 and we'd still navigate to add_habit (a waste). The `onAdvance` hook keeps navigation co-located with the step declaration — the caller declares "step 1 navigates to add_habit" right next to the target.
+
+**C. Use `BlendMode.clear` to cut a hole in the scrim around the target.** Aesthetically nicer. Rejected for v1 because: (a) it requires a `CustomPaint` with a saved layer + clear blend, adding ~30 LOC; (b) the v1 callout body text names the target ("Add your first do" / "Tap the + button...") so the user can find it without a visual cutout; (c) the test surface grows because we'd have to verify the rect and the cutout in lockstep. Deferred to v1.8-pr-b+1 / a future PR.
+
+**D. Put the tour auto-start on `OnboardingScreen._finish` instead of behind a CTA.** Auto-start would mean every new install sees the tour immediately. Rejected because: (a) the tour requires the FAB target to be visible — onboarding finishes on home where the FAB IS visible, so technically possible; (b) but forcing the tour on every user is hostile UX; users who already know the app from the Play Store description would be annoyed. The CTA + `tourSeen` flag respects user agency.
+
+### Drift lessons (3 NEW)
+
+**(a) `PrimaryButton.label` is `Widget`, not `String`.** The M3 `FilledButton.icon` contract wraps a `Widget`, not a `String`. First `flutter analyze` pass caught `argument type 'String' can't be assigned to the parameter type 'Widget'` at `lib/screens/home.dart:346`. Fix: wrap the localized label in `Text(l.homeEmptyTourCta)`. The lesson generalizes: any `*Button.icon` flavor in the v1.8 design system takes a `Widget label` — wrap ARB strings in `Text(...)` at the call site. (Compare: `lib/ui/secondary_button.dart`, `lib/ui/icon_button.dart`, `lib/ui/add_fab.dart` — all take `Widget` labels via the M3 icon-button contract.)
+
+**(b) `use_build_context_synchronously` lint tracks `context.mounted`, not State's `mounted`.** The Next button's `onNext` callback awaits `widget.step.onAdvance?.call()` and then calls `Navigator.of(context).pop(true)`. The lint flags the `Navigator.of(context)` use after the async gap as suspicious. Fix: guard with `if (!context.mounted) return;` (introduced in Flutter 3.7+). The State's `mounted` getter guards `setState`, but BuildContext use across async gaps must use `context.mounted` specifically. The PR8 / AppSnack lesson (a captured-messenger pattern, fix: `if (!mounted) return;` guard) used `mounted` for the State — that works for `setState` but NOT for `Navigator.of(context)` after an await. The lint specifically tracks BuildContext.
+
+**(c) `GlobalObjectKey` is the canonical cross-widget-target shared key.** The home tour step 2 references the schedule picker on a DIFFERENT screen (`AddHabitScreen`). The picker widget's `key:` parameter and the tour's `TourStep.targetKey` MUST be the same `GlobalObjectKey('tour.schedule_picker')` instance (identity-equality on the String id). Two `GlobalKey()` (without args) instances are NOT equal — they are identity-based. `GlobalObjectKey` accepts a String id and uses that for equality; both call sites pass `const GlobalObjectKey('tour.schedule_picker')` and they resolve to the same key in the widget tree. This is a reusable pattern for any future "post-onboarding tour with cross-screen steps" extension.
+
+### Cross-references
+
+`lib/ui/coach_mark.dart` (NEW); `lib/services/settings_service.dart` (`tourSeen` + `_kTourSeenKey` + `markTourSeen()`); `lib/screens/home.dart` (`_fabKey` + `_AddFab(fabKey:)` + `_startTour()` + empty-state `ValueListenableBuilder<bool>(valueListenable: SettingsService.instance.tourSeen, ...)`); `lib/screens/add_habit.dart` (the `SegmentedButton<String>` `key: const GlobalObjectKey('tour.schedule_picker')`); `lib/l10n/app_en.arb` + `lib/l10n/app_es.arb` (the 9 new keys + `placeholders` metadata for `tourBubbleAriaLabel`); `test/ui/coach_mark_test.dart` + `test/services/settings_service_tour_flag_test.dart` + `test/screens/home_empty_state_tour_cta_test.dart` (17 NEW tests). The `EmptyState` primitive's `action:` slot ([[v1-8-cyc-09-c5-empty-loading-cycle-shipped]] / SYS-184) is the first non-null action consumer after PR9. The `AddFab` primitive ([[v1-8-cyc-15-c10-fab-cycle-shipped]] / SYS-189) accepts the `key:` parameter that the tour rect lookup consumes. The `tourBubbleAriaLabel` ARB `placeholders` pattern is the second consumer of the "pin arg order via `placeholders`" convention (first was PR14's `setCount` arg swap).

@@ -46,14 +46,17 @@ import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/db/schema.dart';
 import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/reminder_service.dart';
+import 'package:doit/services/settings_service.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/ui/app_palette.dart';
 import 'package:doit/ui/app_text_styles.dart';
+import 'package:doit/ui/coach_mark.dart';
 import 'package:doit/ui/empty_state.dart';
 import 'package:doit/ui/error_view.dart';
 import 'package:doit/ui/add_fab.dart';
 import 'package:doit/ui/icon_button.dart';
 import 'package:doit/ui/loading_view.dart';
+import 'package:doit/ui/primary_button.dart';
 import 'package:doit/ui/tile_surface.dart';
 import 'package:doit/widgets/category_chip.dart';
 import 'package:doit/widgets/reliability_banner.dart';
@@ -75,6 +78,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<List<Do>>? _habitsFuture;
   final Set<String> _selected = <String>{};
   bool _selectMode = false;
+
+  /// v1.8-pr-b / SYS-191 / ADR-122 / WF-118: GlobalKey on
+  /// the home FAB so the post-onboarding coach-mark
+  /// controller can find the target rect. Stored on
+  /// the State (not the widget) because the GlobalKey
+  /// is bound to the widget instance.
+  final GlobalKey _fabKey = GlobalKey(debugLabel: 'home.fab');
 
   @override
   void initState() {
@@ -98,6 +108,53 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     setState(() {
       _habitsFuture = DoRepository.instance.listAll();
     });
+  }
+
+  /// v1.8-pr-b / SYS-191 / ADR-122 / WF-118: launch the
+  /// post-onboarding coach-mark tour from the empty-state
+  /// CTA. The tour walks the home FAB (step 1) and the
+  /// schedule picker on the add-habit screen (step 2).
+  /// Step 1's `onAdvance` pushes the `AddHabitScreen`
+  /// route so step 2's target (`tour.schedule_picker`)
+  /// is mounted before its overlay renders.
+  /// Once the tour completes (the user taps Next on the
+  /// last step, or any Skip), `SettingsService.markTourSeen`
+  /// is called so the CTA hides on the next build.
+  Future<void> _startTour(BuildContext context) async {
+    final l = AppLocalizations.of(context);
+    final steps = <TourStep>[
+      TourStep(
+        targetKey: _fabKey,
+        title: l.tourStep1Title,
+        body: l.tourStep1Body,
+        // Push the add-habit screen BEFORE step 2's
+        // overlay renders, so the schedule picker's
+        // `GlobalObjectKey` is mounted and the
+        // overlay's rect lookup succeeds.
+        onAdvance: () async {
+          if (!context.mounted) return;
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const AddHabitScreen()),
+          );
+        },
+      ),
+      TourStep(
+        // v1.8-pr-b / SYS-191 / ADR-122 / WF-118:
+        // `GlobalObjectKey` is identity-equality on
+        // the String id. The same id is attached to
+        // the schedule picker's `SegmentedButton` in
+        // `add_habit.dart`, so the overlay's rect
+        // lookup resolves to that widget's
+        // `RenderBox` once step 1's `onAdvance` has
+        // mounted the add-habit screen.
+        targetKey: const GlobalObjectKey('tour.schedule_picker'),
+        title: l.tourStep2Title,
+        body: l.tourStep2Body,
+      ),
+    ];
+    await CoachMarkController.start(context, steps);
+    if (!context.mounted) return;
+    await SettingsService.instance.markTourSeen();
   }
 
   void _toggleSelect(String id) {
@@ -254,12 +311,52 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   }
                   final habits = snap.data ?? <Do>[];
                   if (habits.isEmpty) {
-                    return EmptyState(
-                      title: AppLocalizations.of(context).homeEmptyTitle,
-                      // v1.8-pr-d / SYS-193 / ADR-124 / WF-120:
-                      // localized body — was hardcoded English.
-                      message: AppLocalizations.of(context).homeEmptyBody,
-                      icon: Icons.bolt_outlined,
+                    // v1.8-pr-b / SYS-191 / ADR-122 / WF-118:
+                    // `tourSeen` controls whether the empty
+                    // state surfaces a "Show me around" CTA.
+                    // The flag persists across installs; users
+                    // who have completed the tour once see the
+                    // plain empty state. The flag is read via
+                    // `ValueListenableBuilder` so it flips
+                    // reactively when the user finishes the
+                    // tour without requiring a hot-reload.
+                    return ValueListenableBuilder<bool>(
+                      valueListenable: SettingsService.instance.tourSeen,
+                      builder: (context, tourSeen, _) {
+                        final l = AppLocalizations.of(context);
+                        return EmptyState(
+                          title: l.homeEmptyTitle,
+                          // v1.8-pr-d / SYS-193 / ADR-124 /
+                          // WF-120: localized body — was
+                          // hardcoded English.
+                          message: l.homeEmptyBody,
+                          icon: Icons.bolt_outlined,
+                          // v1.8-pr-b / SYS-191 / ADR-122 /
+                          // WF-118: action slot is hidden once
+                          // the user has seen the tour at
+                          // least once. The action launches a
+                          // 2-step coach-mark tour that
+                          // walks the user through the home
+                          // FAB + the schedule picker on the
+                          // add-habit screen.
+                          action: tourSeen
+                              ? null
+                              : PrimaryButton(
+                                  key: const ValueKey('home.empty.tour_cta'),
+                                  // v1.8-pr-b / SYS-191 /
+                                  // ADR-122 / WF-118:
+                                  // `PrimaryButton.label` is
+                                  // a `Widget` (per the M3
+                                  // `FilledButton.icon`
+                                  // contract). The localized
+                                  // string is wrapped in a
+                                  // `Text` so the CTA gets
+                                  // the right M3 typography.
+                                  label: Text(l.homeEmptyTourCta),
+                                  onPressed: () => _startTour(context),
+                                ),
+                        );
+                      },
                     );
                   }
                   return ListView.separated(
@@ -288,7 +385,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ],
         ),
       ),
-      floatingActionButton: _AddFab(onAdded: _refresh),
+      floatingActionButton: _AddFab(onAdded: _refresh, fabKey: _fabKey),
     );
   }
 }
@@ -1360,13 +1457,22 @@ class _TileIcon extends StatelessWidget {
 }
 
 class _AddFab extends StatelessWidget {
-  const _AddFab({required this.onAdded});
+  const _AddFab({required this.onAdded, this.fabKey});
   final VoidCallback onAdded;
+  // v1.8-pr-b / SYS-191 / ADR-122 / WF-118: optional
+  // GlobalKey so the post-onboarding coach-mark
+  // controller can resolve the FAB's on-screen rect.
+  // The key is passed through to the `AddFab` widget
+  // (which is the `Material.FloatingActionButton`
+  // wrapper — the key binds to the `AddFab` widget
+  // instance, which is the rendered element the
+  // tour's `RenderBox` lookup hits).
+  final GlobalKey? fabKey;
 
   @override
   Widget build(BuildContext context) {
     return AddFab(
-      key: const ValueKey('home.fab'),
+      key: fabKey ?? const ValueKey('home.fab'),
       onPressed: () async {
         final choice = await showModalBottomSheet<_AddChoice>(
           context: context,

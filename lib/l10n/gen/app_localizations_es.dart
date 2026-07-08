@@ -146,6 +146,37 @@ class AppLocalizationsEs extends AppLocalizations {
   String get homeEmptyBody => 'Toca + para añadir una tarea o una persona.';
 
   @override
+  String get homeEmptyTourCta => 'Muéstrame cómo funciona';
+
+  @override
+  String get tourStep1Title => 'Añade tu primera tarea';
+
+  @override
+  String get tourStep1Body =>
+      'Toca el botón + para crear una tarea, una persona o una plantilla.';
+
+  @override
+  String get tourStep2Title => 'Elige un horario';
+
+  @override
+  String get tourStep2Body =>
+      'Elige cuándo debe dispararse el recordatorio: hora fija, cada N días, después de otra tarea o un día concreto del mes.';
+
+  @override
+  String get tourNext => 'Siguiente';
+
+  @override
+  String get tourSkip => 'Saltar recorrido';
+
+  @override
+  String get tourDone => 'Listo';
+
+  @override
+  String tourBubbleAriaLabel(String title, String body) {
+    return '$title. $body';
+  }
+
+  @override
   String get homeRetryButton => 'Reintentar';
 
   @override

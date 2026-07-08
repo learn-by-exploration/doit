@@ -314,6 +314,60 @@ abstract class AppLocalizations {
   /// **'Tap the + to add a do or a person.'**
   String get homeEmptyBody;
 
+  /// Primary CTA on the home empty state (v1.8-pr-b / SYS-191 / ADR-122 / WF-118) — starts the post-onboarding coach-mark tour. Shown only when SettingsService.tourSeen is false.
+  ///
+  /// In en, this message translates to:
+  /// **'Show me around'**
+  String get homeEmptyTourCta;
+
+  /// No description provided for @tourStep1Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your first do'**
+  String get tourStep1Title;
+
+  /// No description provided for @tourStep1Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the + button to create a do, a person, or a template.'**
+  String get tourStep1Body;
+
+  /// No description provided for @tourStep2Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a schedule'**
+  String get tourStep2Title;
+
+  /// No description provided for @tourStep2Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose when the reminder should fire — fixed time, every N days, after another do, or on a specific day of the month.'**
+  String get tourStep2Body;
+
+  /// No description provided for @tourNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get tourNext;
+
+  /// No description provided for @tourSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip tour'**
+  String get tourSkip;
+
+  /// No description provided for @tourDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get tourDone;
+
+  /// TalkBack label for the coach-mark callout (v1.8-pr-b / SYS-191 / ADR-122 / WF-118). Concatenates title and body so screen-reader users get the same content as sighted users. Placeholders: title: String, body: String.
+  ///
+  /// In en, this message translates to:
+  /// **'{title}. {body}'**
+  String tourBubbleAriaLabel(String title, String body);
+
   /// No description provided for @homeRetryButton.
   ///
   /// In en, this message translates to:
