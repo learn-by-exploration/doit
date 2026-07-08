@@ -30,6 +30,7 @@ import 'package:doit/services/permission_service.dart';
 import 'package:doit/services/settings_service.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/triggers/trigger.dart' show SilentMode;
+import 'package:doit/ui/icon_button.dart';
 import 'package:doit/ui/section_header.dart';
 import 'package:doit/widgets/permission_sheet.dart';
 
@@ -230,7 +231,7 @@ class _ContactsList extends StatelessWidget {
             leading: const Icon(Icons.person_outline),
             title: Text(picked[i].name),
             subtitle: Text(picked[i].phone),
-            trailing: IconButton(
+            trailing: AppIconButton(
               key: ValueKey('add_routine.contact.$i.remove'),
               icon: const Icon(Icons.close),
               tooltip: 'Remove contact',

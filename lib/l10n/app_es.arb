@@ -4,6 +4,10 @@
   "appTitle": "do it",
 
   "homeAppBarTitle": "do it",
+  "homeAppBarStatsTooltip": "Estadísticas",
+  "homeAppBarSettingsTooltip": "Ajustes",
+  "homeAppBarCancelTooltip": "Cancelar",
+  "homeAppBarCompleteSelectedTooltip": "Marcar seleccionados como hechos",
   "homeSelectionAppBarTitle": "{count, plural, =0{Sin selección} =1{1 seleccionado} other{{count} seleccionados}}",
   "homeSnackbarMarkedDone": "Marcado como hecho.",
   "homeSnackbarMarkedCount": "Marcados {count} como hechos.",

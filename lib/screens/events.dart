@@ -17,6 +17,7 @@ import 'package:doit/screens/add_event.dart';
 import 'package:doit/services/event_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/icon_button.dart';
 import 'package:doit/ui/loading_view.dart';
 import 'package:doit/ui/section_header.dart';
 import 'package:doit/ui/surface_card.dart';
@@ -53,7 +54,8 @@ class _EventsScreenState extends State<EventsScreen> {
       appBar: AppBar(
         title: const Text('Events'),
         actions: [
-          IconButton(
+          // v1.8-14 / SYS-188 / ADR-119: migrated to AppIconButton.
+          AppIconButton(
             key: const ValueKey('events.refresh'),
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh),
@@ -171,7 +173,9 @@ class _EventTile extends StatelessWidget {
           children: [
             if (event.recurrence == EventRecurrence.annually)
               const Chip(label: Text('Yearly')),
-            IconButton(
+            // v1.8-14 / SYS-188 / ADR-119: migrated to AppIconButton.
+            AppIconButton(
+              key: const ValueKey('events.archive'),
               icon: const Icon(Icons.archive_outlined),
               tooltip: 'Archive',
               onPressed: () async {
@@ -183,7 +187,9 @@ class _EventTile extends StatelessWidget {
                 await onChanged();
               },
             ),
-            IconButton(
+            // v1.8-14 / SYS-188 / ADR-119: migrated to AppIconButton.
+            AppIconButton(
+              key: const ValueKey('events.delete'),
               icon: const Icon(Icons.delete_outline),
               tooltip: 'Delete',
               onPressed: () async {

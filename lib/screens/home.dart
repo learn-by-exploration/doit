@@ -51,6 +51,7 @@ import 'package:doit/ui/app_palette.dart';
 import 'package:doit/ui/app_text_styles.dart';
 import 'package:doit/ui/empty_state.dart';
 import 'package:doit/ui/error_view.dart';
+import 'package:doit/ui/icon_button.dart';
 import 'package:doit/ui/loading_view.dart';
 import 'package:doit/ui/tile_surface.dart';
 import 'package:doit/widgets/category_chip.dart';
@@ -169,31 +170,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               : l.homeAppBarTitle,
         ),
         leading: _selectMode
-            ? IconButton(
+            // v1.8-14 / SYS-188 / ADR-119: migrated to
+            // AppIconButton + localized tooltip (was hardcoded
+            // English 'Cancel' — a11y fix for es users).
+            ? AppIconButton(
                 key: const ValueKey('home.cancel_select'),
-                tooltip: 'Cancel',
+                tooltip: l.homeAppBarCancelTooltip,
                 icon: const Icon(Icons.close),
                 onPressed: _exitSelectMode,
               )
             : null,
         actions: [
           if (_selectMode)
-            IconButton(
+            // v1.8-14 / SYS-188 / ADR-119: migrated to
+            // AppIconButton + localized tooltip (was hardcoded
+            // English 'Mark selected done' — a11y fix).
+            AppIconButton(
               key: const ValueKey('home.complete_selected'),
-              tooltip: 'Mark selected done',
+              tooltip: l.homeAppBarCompleteSelectedTooltip,
               icon: const Icon(Icons.check_circle),
               onPressed: _selected.isEmpty ? null : _completeSelected,
             )
           else ...[
-            IconButton(
-              tooltip: 'Stats',
+            // v1.8-14 / SYS-188 / ADR-119: migrated to
+            // AppIconButton + localized tooltip (was hardcoded
+            // English 'Stats' — a11y fix).
+            AppIconButton(
+              key: const ValueKey('home.stats'),
+              tooltip: l.homeAppBarStatsTooltip,
               icon: const Icon(Icons.bar_chart),
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(builder: (_) => const StatsScreen()),
               ),
             ),
-            IconButton(
-              tooltip: 'Settings',
+            // v1.8-14 / SYS-188 / ADR-119: migrated to
+            // AppIconButton + localized tooltip (was hardcoded
+            // English 'Settings' — a11y fix).
+            AppIconButton(
+              key: const ValueKey('home.settings'),
+              tooltip: l.homeAppBarSettingsTooltip,
               icon: const Icon(Icons.settings),
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
@@ -1086,17 +1101,16 @@ class _DoneButton extends StatelessWidget {
     final icon = isCompletedToday
         ? Icons.check_circle
         : Icons.check_circle_outline;
-    return IconButton(
+    // v1.8-14 / SYS-188 / ADR-119: migrated to AppIconButton
+    // with the new `iconSize` + `busy` parameters. The
+    // Sizing.tapHome / 2 (28dp) icon size + 56dp target gives
+    // a 14dp breathing room on each side.
+    return AppIconButton(
       tooltip: tooltip,
-      icon: busy
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Icon(icon),
+      icon: Icon(icon),
       iconSize: Sizing.tapHome / 2,
-      onPressed: busy ? null : onPressed,
+      busy: busy,
+      onPressed: onPressed,
     );
   }
 }
@@ -1120,7 +1134,8 @@ class _EditButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return IconButton(
+    // v1.8-14 / SYS-188 / ADR-119: migrated to AppIconButton.
+    return AppIconButton(
       tooltip: l.homeTileEdit,
       icon: const Icon(Icons.edit_outlined),
       iconSize: Sizing.tapHome / 2,
@@ -1146,17 +1161,15 @@ class _DeleteButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return IconButton(
+    // v1.8-14 / SYS-188 / ADR-119: migrated to AppIconButton
+    // with the new `busy` parameter. The delete's DB write is
+    // in-flight; the spinner is the canonical UX.
+    return AppIconButton(
       tooltip: l.homeTileDelete,
-      icon: busy
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.delete_outline),
+      icon: const Icon(Icons.delete_outline),
       iconSize: Sizing.tapHome / 2,
-      onPressed: busy ? null : onPressed,
+      busy: busy,
+      onPressed: onPressed,
     );
   }
 }
@@ -1446,17 +1459,13 @@ class _SkipButton extends StatelessWidget {
         ? l.homeTileSkipAlready
         : l.homeTileSkipToday;
     final icon = isSkippedToday ? Icons.bedtime : Icons.bedtime_outlined;
-    return IconButton(
+    // v1.8-14 / SYS-188 / ADR-119: migrated to AppIconButton.
+    return AppIconButton(
       tooltip: tooltip,
-      icon: busy
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Icon(icon),
+      icon: Icon(icon),
       iconSize: Sizing.tapHome / 2,
-      onPressed: busy ? null : onPressed,
+      busy: busy,
+      onPressed: onPressed,
     );
   }
 }
@@ -1489,17 +1498,13 @@ class _UndoButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return IconButton(
+    // v1.8-14 / SYS-188 / ADR-119: migrated to AppIconButton.
+    return AppIconButton(
       tooltip: l.homeTileUndoToday,
-      icon: busy
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.undo),
+      icon: const Icon(Icons.undo),
       iconSize: Sizing.tapHome / 2,
-      onPressed: busy ? null : onPressed,
+      busy: busy,
+      onPressed: onPressed,
     );
   }
 }

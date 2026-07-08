@@ -9944,3 +9944,41 @@ Two changes, layered:
   (e.g. the dark/light toggle), but the current
   transitions are too fast for the interpolation to
   be observable. Keeping the impl for correctness.
+
+## ADR-119 — AppIconButton `iconSize` + `busy` extension + 4 a11y fixes (v1.8-14 / PR14 of 15)
+
+**Status:** Accepted. **Date:** 2026-07-08.
+
+### Context
+
+PR3 (v1.8-03) extracted `AppIconButton` as the canonical icon-only CTA — a thin wrapper over `Material.IconButton` that inherits the project's 48dp `IconButtonTheme` for free. The primitive carried 3 parameters: `icon`, `onPressed`, `tooltip`. After 11 PRs in the UI sprint, the production call sites surfaced 2 missing affordances:
+
+1. **Home tile per-row buttons** (Done / Edit / Delete / Skip / Undo in `_HabitTileState.build` at `home.dart:1064-1505`) used `Sizing.tapHome / 2` = 28dp icons in 56dp touch targets. The M3 default 24dp icon is too small for a primary action in a 56dp container — the visual weight ratio (icon:target) drops to 43% vs the recommended 50%. The per-row code passed an inline `Icon(..., size: 28)` instead of `AppIconButton(iconSize: 28)` — defeating the primitive's "wrap once, inherit forever" contract.
+2. **Async in-flight pattern** was open-coded in 0 places (good!) but the home tile's `busy` flag (a `_HabitTileState` field that disables Done during a save) had no canonical visual: the button stayed clickable until the save completed, with the spinner as a separate "saving..." label elsewhere on the tile. The pattern "tap → swap icon for spinner → disable" is the M3-canonical in-flight affordance for icon buttons (see [Material 3 progress indicators](https://m3.material.io/components/progress-indicators/overview)).
+
+Separately, 4 home `AppBar.actions` IconButtons (Cancel / Mark selected done / Stats / Settings) had no `tooltip:` parameter — they were icon-only CTAs invisible to TalkBack, a clear violation of `.claude/rules/lib-screens.md:34-39`. A grep across the codebase surfaced 2 more raw `IconButton(Icons.close)` dismiss buttons in `dst_transition_banner.dart` and `streak_recovery_card.dart` with the same gap.
+
+### Decision
+
+Extend `AppIconButton` with two new optional parameters — `iconSize` (forwards to `IconButton.iconSize`; default `null` = M3 24dp) and `busy` (boolean, default `false`; when true, swaps the icon for a 20×20 `CircularProgressIndicator(strokeWidth: 2)` and disables the button). Use the extension to migrate 28 raw `IconButton(` sites across 11 files in one PR. Land the 4 home AppBar a11y fixes + 2 banner a11y fixes in the same sweep.
+
+### Rejected alternatives
+
+- **A new `AppBusyIconButton` primitive.** Rejected: the in-flight swap is a parameter, not a primitive. Callers should not have to know the busy-vs-not distinction at the call site; they pass a flag. Mirrors the canonical Flutter `CircularProgressIndicator.adaptive` pattern.
+- **A `Future<void>?` parameter on `AppIconButton` that auto-sets `busy` while the future is pending.** Rejected: the caller owns the `bool` state (most tiles already have a `_busy` field). The primitive should not own async lifecycle — it just renders the affordance.
+- **Default `busy: true` on the home tile's Done/Edit/Delete/Skip/Undo buttons.** Rejected: tile buttons are usually enabled. The default of `false` is the "no-op" case; callers opt in by passing `busy: tileState.busy`.
+
+### Consequences
+
+- 6 new tests on `AppIconButton` (3 for `iconSize` + 3 for `busy`) lock the contract. The `iconSize: null` test is the load-bearing regression pin — it fails loudly if a future PR bakes the 24dp default into the primitive.
+- 28 sites migrated in one PR. The migration is mechanical and the diff is reviewable: each touched line gains `iconSize: Sizing.tapHome / 2` + `busy: busy` (for the home tile) or `tooltip: l.homeAppBarXxx` (for the AppBar a11y fixes). No visual change for the non-busy path.
+- The `busy: true` swap renders a `CircularProgressIndicator` (foreground = `theme.colorScheme.primary`); a new `test/a11y/contrast_test.dart` test pins the contrast at AA Large (≥ 3:1) so the spinner is legible to users with low vision.
+- The 4 home AppBar tooltips are localized via new ARB keys (`homeAppBarStatsTooltip` / `homeAppBarSettingsTooltip` / `homeAppBarCancelTooltip` / `homeAppBarCompleteSelectedTooltip`); Spanish mirror is in place. A canonical `ValueKey` per AppBar action (`home.stats` / `home.settings`) makes widget tests + e2e discoverability stable.
+
+### Drift lessons (3 NEW for PR14)
+
+**(a) `IconButton.iconSize` returns `null` when not explicitly set — not the resolved M3 default of 24dp.** The first new test asserted `button.iconSize == 24` and failed with `Actual: <null>`. The default 24dp is applied at paint time by the `IconButtonTheme`, not stored on the widget. Tests that pin the contract must assert `isNull` (not the resolved 24dp); the canonical M3 pattern is "null when not set, theme owns the default." This mirrors the PR13 `AppTextStyles` nullable-tolerant pattern from ADR-118 lesson (a) and validates the broader principle: don't bake M3 defaults into a primitive; let the theme own them.
+
+**(b) `flutter gen-l10n` is not automatic on test runs.** The first `flutter analyze` pass on PR14 caught 4 `undefined_getter` errors because the source ARB files had new keys but the generated `app_localizations.dart` + `app_localizations_*.dart` were stale. The fix is a one-line `flutter gen-l10n` re-run. This is now part of the canonical pre-3-gate flow for any PR that touches an ARB file. The fix is cheap (sub-second on warm cache) and the cost of forgetting is high (4 `undefined_getter` errors + a tight `flutter analyze` failure cycle). A pre-commit hook that re-runs `flutter gen-l10n` on ARB file changes is a v2.0+ candidate.
+
+**(c) Raw `IconButton(Icons.close)` is the canonical a11y gap to migrate.** 2 of the 28 PR14 migrations were `dst_transition_banner.dart` and `streak_recovery_card.dart` dismiss buttons, which had no tooltip. They were technically "icon-only CTAs without a label" per `.claude/rules/lib-screens.md:38` and would have failed any a11y audit. PR14 closes the gap as a free win from the broader migration sweep. Future PRs that touch a dismiss IconButton in a banner or recovery card should follow the same pattern: migrate to `AppIconButton(tooltip: 'Dismiss')` in the same step.
