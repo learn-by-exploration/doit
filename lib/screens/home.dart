@@ -48,6 +48,7 @@ import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/ui/app_palette.dart';
+import 'package:doit/ui/app_text_styles.dart';
 import 'package:doit/ui/empty_state.dart';
 import 'package:doit/ui/error_view.dart';
 import 'package:doit/ui/loading_view.dart';
@@ -991,10 +992,12 @@ class _DoStreakBadge extends StatelessWidget {
               children: [
                 Text(
                   '$streak',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                  // v1.8-13 / SYS-187 / ADR-118: AppTextStyles
+                  // centralizes the tabular-figures style for
+                  // numeric tiles (streak counters, sparklines).
+                  style: AppTextStyles.streakNumber(
+                    context,
+                  ).copyWith(color: Theme.of(context).colorScheme.primary),
                 ),
                 Text(
                   l.homeTileStreakLabel,
@@ -1546,21 +1549,24 @@ class _BudgetCaption extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final String text;
-    final TextStyle? style;
+    final TextStyle style;
     if (budget.limit <= 0) {
       // Surface the affordance to users who haven't
       // configured a budget yet — the previous
       // SizedBox.shrink() hid the feature entirely.
       text = zeroCaption;
-      style = Theme.of(context).textTheme.bodySmall;
+      // v1.8-13 / SYS-187 / ADR-118: caption uses the
+      // canonical body-rhythm style.
+      style = AppTextStyles.caption(context);
     } else if (isExhausted) {
       text = l.homeTileBudgetNoRemaining;
-      style = Theme.of(context).textTheme.bodySmall?.copyWith(
+      style = AppTextStyles.caption(
+        context,
         color: Theme.of(context).colorScheme.error,
       );
     } else {
       text = l.homeTileBudgetRemaining(budget.remaining, budget.limit);
-      style = Theme.of(context).textTheme.bodySmall;
+      style = AppTextStyles.caption(context);
     }
     // v1.4j: wrap the caption in a tap target + Semantics
     // button so TalkBack announces "No rest days configured,

@@ -34,6 +34,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/app_text_styles.dart';
 
 class SectionHeader extends StatelessWidget {
   const SectionHeader(this.title, {super.key, this.compact = false});
@@ -51,13 +52,18 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     if (compact) {
       // Compact variant: titleMedium, no padding. Used when the
       // section sits inside an already-padded list (events.dart,
       // person_groups.dart) and the surrounding spacing is owned
       // by the list's SizedBox(height: ...) rhythm.
-      return Text(title, style: theme.textTheme.titleMedium);
+      // v1.8-13 / SYS-187 / ADR-118: letterSpacing + height
+      // come from the AppTextStyles helper (and ultimately from
+      // the DoItTypography theme extension).
+      return Text(
+        title,
+        style: AppTextStyles.sectionHeaderTitleCompact(context),
+      );
     }
     // Default variant: titleLarge with the canonical vertical
     // breathing room. The padding is symmetric so the heading
@@ -65,7 +71,7 @@ class SectionHeader extends StatelessWidget {
     // token (canonical 4dp grid).
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-      child: Text(title, style: theme.textTheme.titleLarge),
+      child: Text(title, style: AppTextStyles.sectionHeaderTitle(context)),
     );
   }
 }

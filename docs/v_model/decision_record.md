@@ -9717,3 +9717,230 @@ violating `.claude/rules/lib-screens.md:34-39`.
   `ScaffoldMessenger.showSnackBar`. PR11 keeps the dead
   copy as-is (the dialog now provides the visible
   reassurance); flagging for removal in a future cleanup.
+
+## ADR-118 — `AppTextStyles` + `DoItTypography` ThemeExtension (v1.8-13 / PR13 of 15)
+
+### Context
+
+The codebase had 6 sites that each inlined the same
+`Theme.of(context).textTheme.X?.copyWith(letterSpacing: ...,
+height: ...)` pattern — section header titles, badge labels,
+streak counter numbers, rest-day captions, etc. The values
+were scattered (inline literals + one copy in the `textTheme`
+override in `app_theme.dart`) and a tweak to the type
+rhythm (e.g. bump the body line-height to 1.4) required
+finding and updating all 6 sites + verifying each one by
+hand.
+
+We also had 3 issues with the inline pattern:
+- The `letterSpacing` + `height` values were not in a
+  named bucket — they were 6 unrelated literal pairs. A
+  reviewer couldn't tell whether `letterSpacing: 0.15` on
+  a `Text` widget was a deliberate "title rhythm" choice
+  or a typo of `0.5`.
+- The override `textTheme: const TextTheme(...)` in
+  `app_theme.dart` reset the M3 default type scale to a
+  3-entry stub (titleLarge, bodyLarge, bodyMedium), which
+  forced every other style to either fall through to the
+  M3 default or be inlined at the call site. The
+  inlining was the root cause of the 6-site duplication.
+- A future "larger text" accessibility mode (planned
+  v2.0+) would need to swap the type rhythm. With the
+  inline pattern, that's 6 file edits.
+
+### Decision
+
+Two changes, layered:
+
+1. **`AppTextStyles`** — a static helper class
+   (`abstract class AppTextStyles` with 5 `static`
+   methods) that takes a `BuildContext` and returns the
+   resolved `TextStyle` for a named category:
+   `streakNumber` / `badgeLabel` / `sectionHeaderTitle` /
+   `sectionHeaderTitleCompact` / `caption`. Each helper
+   reads `Theme.of(context).textTheme.X` and overlays the
+   letterSpacing + height from the new extension
+   (see #2). Migration of the 6 inlined sites is
+   mechanical: replace the inline `TextStyle(...)` or
+   `Theme.of(context).textTheme.X!.copyWith(...)` with
+   `AppTextStyles.X(context)` (optionally
+   `.copyWith(color: ...)` for color overrides).
+
+2. **`DoItTypography extends ThemeExtension<DoItTypography>`**
+   — a `ThemeExtension` that holds 5
+   `DoItTypographyBucket` immutable values
+   (display / headline / title / body / label), each with
+   `letterSpacing` + `height`. Defaults:
+   - display: letterSpacing 0, height 1.1
+   - headline: letterSpacing 0.15, height 1.2
+   - title: letterSpacing 0.15, height 1.25
+   - body: letterSpacing 0.25, height 1.4
+   - label: letterSpacing 0.5, height 1.2
+
+   The values are "M3 with a small readability bump" —
+   no dramatic tracking or leading shifts. The extension
+   is registered in `AppTheme._build()` via
+   `extensions: const <ThemeExtension<dynamic>>[DoItTypography()]`
+   so both `AppTheme.dark` and `AppTheme.light` carry it.
+
+### Rationale
+
+- **Single source of truth for the type rhythm.** A
+  future tweak (e.g. body height 1.4 → 1.45) is one
+  constant change in `DoItTypography.body`. The 6 call
+  sites pick it up automatically.
+- **`ThemeExtension` is the M3-canonical pattern for
+  app-specific theme tokens.** A `ThemeData` extension
+  is the documented Flutter way to carry app-specific
+  data on the theme; the lookup is type-safe and the
+  extension can be swapped (e.g. for accessibility
+  modes) in one place. The alternative — a `const
+  Typography` parameter on `AppTextStyles` — would
+  not survive a theme swap.
+- **Static helpers (not constants) because of the
+  context dependency.** The letterSpacing/height come
+  from the active `ThemeData`, which requires a
+  `BuildContext`. Static `const TextStyle` can't carry
+  a context. Each helper is a 5-line function that
+  resolves the theme + extension in one call.
+- **Nullable-tolerant extension lookup.** The helpers
+  use `theme.extension<DoItTypography>()` (nullable
+  return) and fall back to the base M3 style with no
+  letterSpacing/height overlay if the extension is
+  absent. This is load-bearing for tests: a test that
+  mounts a plain `MaterialApp()` (no `theme: AppTheme.dark`)
+  would otherwise throw on the extension access. The
+  97-test regression after the SectionHeader migration
+  was fixed by making all 5 helpers nullable-tolerant
+  — see "Drift lessons" below.
+- **5 named categories map to the M3 type rhythm.**
+  display/headline/title/body/label are the M3 buckets;
+  mapping 1:1 means the call site can pick the rhythm
+  by semantic intent (this is a "title" — pick
+  `sectionHeaderTitle`) without having to remember
+  which M3 `TextTheme` field carries the closest
+  fontSize.
+
+### Implementation
+
+- `lib/ui/app_text_styles.dart` (NEW, ~125 LOC) — the
+  16th `lib/ui/` file. `abstract class AppTextStyles`
+  with 5 `static` methods. Each method reads the
+  `textTheme` and the `DoItTypography` extension and
+  returns the resolved `TextStyle`. The `color:`
+  override is supported on `badgeLabel` and `caption`
+  (the two categories that are commonly recolored —
+  the badge color comes from the chip state, the
+  caption color from the error/secondary state).
+- `lib/theme/app_theme.dart` (EXTENDED) — added
+  `DoItTypographyBucket` (immutable, == / hashCode /
+  toString), `DoItTypography` (ThemeExtension with
+  copyWith + lerp + 5 default buckets), and the
+  `extensions: ...` registration in `_build()`. The
+  lerp uses a private `_lerpDouble` helper that mirrors
+  `dart:ui.lerpDouble` semantics (return the non-null
+  operand when either side is null).
+- 5 migration sites (preserves visuals as close as
+  possible — the new letterSpacing/height overlay is
+  the only visual delta; the M3 base fontSize +
+  fontWeight are preserved):
+  - `lib/ui/section_header.dart` default + compact
+    variants
+  - `lib/widgets/do_anchor_paused_badge.dart`
+  - `lib/screens/home.dart` streak number + rest-day
+    caption
+  - `lib/screens/stats.dart` streak number
+
+### Drift lessons (3 NEW)
+
+- (a) `Theme.of(context).extension<T>()` returns
+  nullable — the helper MUST tolerate absence.
+  Lesson origin: the initial SectionHeader migration
+  used `theme.extension<DoItTypography>()!` (force
+  unwrap) on a test that mounted a plain `MaterialApp()`
+  without `theme: AppTheme.dark/light`. The 97 tests
+  that mount a plain `MaterialApp()` all failed on the
+  extension lookup. Fix: make all 5 helpers nullable-
+  tolerant (`theme.extension<DoItTypography>()` with
+  `?.letterSpacing` / `?.height`). The fallback is the
+  base M3 `TextTheme` style with no letterSpacing/
+  height overlay — visually identical to the pre-PR13
+  behavior.
+- (b) `localizedApp(...)` test helper takes `home:` as
+  a NAMED parameter, not positional. Lesson origin:
+  the first run of `app_text_styles_test.dart` failed
+  with "Too many positional arguments". The helper
+  signature is
+  `localizedApp({Widget? home, ThemeData? theme, ...})`
+  and the first positional arg is reserved for the
+  `Widget` body in some overloads. The fix is
+  consistent `localizedApp(home: ..., theme: AppTheme.dark,
+  child: ...)` usage.
+- (c) The pre-existing `section_header_test.dart` tests
+  pinned the rendered `TextStyle` to the raw M3 merged
+  style via `equals()`. The migration changes the
+  contract — the rendered style is now
+  `AppTextStyles.sectionHeaderTitle(context)` which
+  adds the `DoItTypography` letterSpacing + height. The
+  4 affected tests had to be updated to capture the
+  post-migration style as `expected` (locking the new
+  contract). Lesson: when a primitive is migrated to
+  route through a vocabulary helper, ALL tests that pin
+  the rendered style must update — not just the
+  migration sites. The new contract is the helper's
+  output, not the raw M3 base.
+
+### Alternatives considered
+
+- **Static `const TextStyle` constants (e.g.
+  `AppTextStyles.streakNumber = TextStyle(fontSize: 22,
+  fontWeight: w600, fontFeatures: ...)`).** Rejected:
+  the letterSpacing/height must come from the active
+  theme (future "larger text" mode swaps them), and a
+  const can't carry a `BuildContext`. The static-helper
+  pattern is the only way to keep the values theme-
+  aware.
+- **Custom `InheritedWidget` instead of
+  `ThemeExtension`.** Rejected: `ThemeExtension` is the
+  M3-canonical pattern; the lookup is built into
+  `Theme.of(context)` and doesn't require a new
+  `InheritedWidget` ancestor on every screen. The
+  custom widget would add boilerplate at every
+  `MaterialApp` boundary.
+- **A new typography file (e.g.
+  `lib/ui/typography.dart`) with static methods that
+  take a `TextTheme` instead of a `BuildContext`.**
+  Rejected: the caller would have to pass both
+  `Theme.of(context).textTheme` and `Theme.of(context).
+  extension<DoItTypography>()` at every call site,
+  which is exactly the boilerplate we're trying to
+  eliminate. The `BuildContext`-accepting helper
+  resolves both in one call.
+- **Per-rhythm classes (e.g. `class TitleTypography
+  extends ...`).** Rejected: 5 classes for 5 styles
+  is over-engineered. A single class with 5 static
+  methods is the canonical Flutter pattern (see
+  `Theme.of(context).textTheme` itself, which is
+  also a class with 13 fields, not 13 classes).
+
+### Deferred
+
+- The `textTheme` override in `app_theme.dart` is
+  still the 3-entry stub (titleLarge + bodyLarge +
+  bodyMedium). It works for the current migrations
+  because each `AppTextStyles.X` helper picks the
+  closest M3 default. A future "complete M3 type
+  scale" pass would remove the override and let
+  `ColorScheme.fromSeed` carry the full M3 default
+  type scale. Tracked as v2.0+ if needed.
+- The `streakNumber` helper applies
+  `FontFeature.tabularFigures()` so digit changes
+  don't jitter. The same trick should be applied to
+  the `sparkline` value text and the stats-screen
+  total counters. Tracked as v2.0+ if the jitter is
+  reported in production.
+- The `DoItTypography.lerp` is implemented but
+  unused — Flutter calls it during theme transitions
+  (e.g. the dark/light toggle), but the current
+  transitions are too fast for the interpolation to
+  be observable. Keeping the impl for correctness.
