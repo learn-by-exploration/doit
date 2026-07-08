@@ -109,6 +109,17 @@ modes.
    order (notifications first, contacts second, exact-alarm third,
    battery optimization last, with rationale for each).
 3. User creates the first do (or accepts a default preset).
+   - **First-time-user coach-mark tour (v1.8-pr-b / PR-B / WF-118):**
+     on the first home render after onboarding, when `tourSeen == false`,
+     a 2-step CoachMark tour walks the user through (a) the home FAB
+     target and (b) the `AddHabitScreen` schedule picker. The tour is
+     skip-able (TalkBack action + Skip button), the bubble is announced
+     via `Semantics(liveRegion: true)`, and the flag
+     `doit.tour.seen` (SharedPreferences) suppresses re-renders on
+     subsequent launches. The empty state also exposes a
+     "Show me around" CTA (`PrimaryButton` with
+     `ValueKey('home.empty.tour_cta')`) for users who dismissed the
+     tour or skipped onboarding-done early.
 4. User adds a person (Mom), picks cadence ("every 3 days"), and picks
    mission ("shake 10").
 5. User sets a wake-up anchor preference (manual only, first-unlock

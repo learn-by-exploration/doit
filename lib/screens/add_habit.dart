@@ -376,7 +376,15 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
             const Divider(),
             const SectionHeader('Schedule'),
             // --- Schedule-type picker.
+            // v1.8-pr-b / SYS-191 / ADR-122 / WF-118:
+            // `GlobalObjectKey` (identity-equality on
+            // the String id) is shared with the home
+            // tour step 2 so the post-onboarding
+            // coach-mark can resolve this widget's
+            // `RenderBox` and position the callout
+            // directly under the picker.
             SegmentedButton<String>(
+              key: const GlobalObjectKey('tour.schedule_picker'),
               segments: const [
                 ButtonSegment(value: 'fixed', label: Text('Fixed')),
                 ButtonSegment(value: 'interval', label: Text('Every N')),

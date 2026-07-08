@@ -168,6 +168,29 @@
   "@homeEmptyBody": {
     "description": "Body subline under the home empty-state title (v1.8-pr-d / SYS-193 / ADR-124 / WF-120). Localized — was hardcoded English in home.dart before this PR."
   },
+  "homeEmptyTourCta": "Show me around",
+  "@homeEmptyTourCta": {
+    "description": "Primary CTA on the home empty state (v1.8-pr-b / SYS-191 / ADR-122 / WF-118) — starts the post-onboarding coach-mark tour. Shown only when SettingsService.tourSeen is false."
+  },
+  "tourStep1Title": "Add your first do",
+  "tourStep1Body": "Tap the + button to create a do, a person, or a template.",
+  "tourStep2Title": "Pick a schedule",
+  "tourStep2Body": "Choose when the reminder should fire — fixed time, every N days, after another do, or on a specific day of the month.",
+  "tourNext": "Next",
+  "tourSkip": "Skip tour",
+  "tourDone": "Done",
+  "tourBubbleAriaLabel": "{title}. {body}",
+  "@tourBubbleAriaLabel": {
+    "description": "TalkBack label for the coach-mark callout (v1.8-pr-b / SYS-191 / ADR-122 / WF-118). Concatenates title and body so screen-reader users get the same content as sighted users. Placeholders: title: String, body: String.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "body": {
+        "type": "String"
+      }
+    }
+  },
   "homeRetryButton": "Retry",
   "missionFailedTitle": "Mission failed",
   "@missionFailedTitle": {
