@@ -137,6 +137,18 @@
   },
   "homeEmptyTitle": "No dos yet.",
   "homeRetryButton": "Retry",
+  "missionFailedTitle": "Mission failed",
+  "@missionFailedTitle": {
+    "description": "Title of the post-mortem dialog shown when a mission does not complete (3rd wrong attempt for math/type, or a chain-abort). The dialog lives in lib/ui/mission_failed_view.dart (v1.8-11 / SYS-186)."
+  },
+  "missionFailedBody": "The mission did not complete. Your streak stays unchanged.",
+  "@missionFailedBody": {
+    "description": "Body copy for the post-mortem dialog. Confirms the streak is intact (the user is NOT penalized for a mission fail — they can try again at the next reminder)."
+  },
+  "missionFailedDismiss": "OK",
+  "@missionFailedDismiss": {
+    "description": "Dismiss CTA on the post-mortem dialog. Closes the dialog; the mission screen then pops back to the launcher with null (chain aborted, streak intact)."
+  },
   "homeTileEdit": "Edit",
   "@homeTileEdit": {
     "description": "Tooltip for the in-app home tile's per-tile edit IconButton (v1.4h / SYS-122). Tapping opens the AddHabitScreen in edit mode for this do — same destination as the body-tap but explicit so the affordance is discoverable without long-press."

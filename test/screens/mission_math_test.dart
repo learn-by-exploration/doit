@@ -1,5 +1,6 @@
 // Tests for the Math mission screen.
 
+import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/missions/mission.dart';
 import 'package:doit/screens/mission_math.dart';
 import 'package:doit/theme/app_theme.dart';
@@ -15,6 +16,11 @@ const _mission = MathMission(
 
 Widget _wrap() => MaterialApp(
   theme: AppTheme.dark,
+  // v1.8-11 / SYS-186: the 3rd-wrong flow shows a
+  // MissionFailedView dialog that reads AppLocalizations.
+  // Wire the delegate so the dialog renders in tests too.
+  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  supportedLocales: AppLocalizations.supportedLocales,
   home: const MissionMathScreen(mission: _mission),
 );
 
@@ -61,7 +67,11 @@ void main() {
     await tester.pump();
     await tester.enterText(input, '0');
     await tester.tap(submit);
-    // The third tap triggers auto-fail (no fourth).
+    // The third tap triggers auto-fail. v1.8-11 / SYS-186
+    // now shows a MissionFailedView dialog before popping;
+    // dismiss it before the pop completes.
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mission_failed.dismiss')));
     await tester.pumpAndSettle();
     expect(find.byType(MissionMathScreen), findsNothing);
   });

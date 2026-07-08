@@ -1,5 +1,6 @@
 // Tests for the Type-phrase mission screen.
 
+import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/missions/mission.dart';
 import 'package:doit/screens/mission_type.dart';
 import 'package:doit/theme/app_theme.dart';
@@ -15,6 +16,11 @@ const _mission = TypeMission(
 
 Widget _wrap() => MaterialApp(
   theme: AppTheme.dark,
+  // v1.8-11 / SYS-186: the 3rd-wrong flow shows a
+  // MissionFailedView dialog that reads AppLocalizations.
+  // Wire the delegate so the dialog renders in tests too.
+  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  supportedLocales: AppLocalizations.supportedLocales,
   home: const MissionTypeScreen(mission: _mission),
 );
 
@@ -63,7 +69,12 @@ void main() {
     await submitWrong('nope 2');
     // The 3rd wrong auto-fails — matching the Math
     // mission's behavior (WF-030 uniform, SYS-011).
+    // v1.8-11 / SYS-186 now shows a MissionFailedView
+    // dialog before popping; dismiss it before the
+    // pop completes.
     await submitWrong('nope 3');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mission_failed.dismiss')));
     await tester.pumpAndSettle();
     expect(find.byType(MissionTypeScreen), findsNothing);
   });

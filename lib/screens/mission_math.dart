@@ -17,6 +17,7 @@ import 'package:doit/missions/mission_input.dart';
 import 'package:doit/missions/mission_result.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/ui/app_form_field.dart';
+import 'package:doit/ui/mission_failed_view.dart';
 
 class MissionMathScreen extends StatefulWidget {
   const MissionMathScreen({super.key, required this.mission});
@@ -51,7 +52,7 @@ class _MissionMathScreenState extends State<MissionMathScreen> {
     MathOp.multiply => '×',
   };
 
-  void _submit() {
+  void _submit() async {
     final raw = _ctrl.text.trim();
     final answer = int.tryParse(raw);
     if (answer == null) {
@@ -67,6 +68,16 @@ class _MissionMathScreenState extends State<MissionMathScreen> {
     }
     final shouldAutoFail = _attempts.recordWrong();
     if (shouldAutoFail) {
+      // Show the post-mortem dialog before popping so the
+      // user gets a visible "your streak is intact" message
+      // and TalkBack announces the failure (C9-1 a11y fix).
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => MissionFailedView(
+          onDismiss: () => Navigator.of(dialogContext).pop(),
+        ),
+      );
+      if (!mounted) return;
       Navigator.of(context).pop();
       return;
     }
@@ -93,6 +104,8 @@ class _MissionMathScreenState extends State<MissionMathScreen> {
                     key: const ValueKey('mission_math.problem'),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.displaySmall,
+                    semanticsLabel:
+                        'Math problem, ${_problem.a} ${_opSymbol(_problem.op)} ${_problem.b}. Type the answer.',
                   ),
                 ),
               ),

@@ -284,6 +284,24 @@ abstract class AppLocalizations {
   /// **'Retry'**
   String get homeRetryButton;
 
+  /// Title of the post-mortem dialog shown when a mission does not complete (3rd wrong attempt for math/type, or a chain-abort). The dialog lives in lib/ui/mission_failed_view.dart (v1.8-11 / SYS-186).
+  ///
+  /// In en, this message translates to:
+  /// **'Mission failed'**
+  String get missionFailedTitle;
+
+  /// Body copy for the post-mortem dialog. Confirms the streak is intact (the user is NOT penalized for a mission fail — they can try again at the next reminder).
+  ///
+  /// In en, this message translates to:
+  /// **'The mission did not complete. Your streak stays unchanged.'**
+  String get missionFailedBody;
+
+  /// Dismiss CTA on the post-mortem dialog. Closes the dialog; the mission screen then pops back to the launcher with null (chain aborted, streak intact).
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get missionFailedDismiss;
+
   /// Tooltip for the in-app home tile's per-tile edit IconButton (v1.4h / SYS-122). Tapping opens the AddHabitScreen in edit mode for this do — same destination as the body-tap but explicit so the affordance is discoverable without long-press.
   ///
   /// In en, this message translates to:

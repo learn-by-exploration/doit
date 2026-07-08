@@ -27,6 +27,7 @@
 
 import 'package:doit/do/do.dart';
 import 'package:doit/do/proof_mode.dart';
+import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/missions/chain.dart';
 import 'package:doit/missions/mission_input.dart';
 import 'package:doit/screens/mission_launcher.dart';
@@ -133,6 +134,11 @@ Future<void> _mountLauncher({
 }) async {
   await tester.pumpWidget(
     MaterialApp(
+      // v1.8-11 / SYS-186: chain-failed + mission-aborted
+      // both show MissionFailedView dialog that reads
+      // AppLocalizations. Wire the delegate.
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: MissionLauncherScreen(
         habitId: habitId,
         habitLoader: habitLoader,
@@ -234,6 +240,13 @@ void main() {
           const TextInput('goodbye'),
         ],
       );
+
+      // v1.8-11 / SYS-186 shows a MissionFailedView
+      // dialog before popping; dismiss it before the
+      // pop completes so the launcher is fully gone.
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mission_failed.dismiss')));
+      await tester.pumpAndSettle();
 
       expect(
         appended,
@@ -380,6 +393,13 @@ void main() {
     // abort the rest of the chain — the second
     // mission is NEVER pushed.
     await _driveMissions(tester: tester, pops: [null]);
+
+    // v1.8-11 / SYS-186 shows a MissionFailedView
+    // dialog before popping; dismiss it before the
+    // pop completes.
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mission_failed.dismiss')));
+    await tester.pumpAndSettle();
 
     // No further mission screen on the stack; the
     // launcher has popped itself.
