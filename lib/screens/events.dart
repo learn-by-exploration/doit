@@ -17,6 +17,7 @@ import 'package:doit/screens/add_event.dart';
 import 'package:doit/services/event_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/add_fab.dart';
 import 'package:doit/ui/icon_button.dart';
 import 'package:doit/ui/loading_view.dart';
 import 'package:doit/ui/section_header.dart';
@@ -104,7 +105,7 @@ class _EventsScreenState extends State<EventsScreen> {
           },
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: AddFab(
         key: const ValueKey('events.add'),
         onPressed: () async {
           final created = await Navigator.of(context).push<bool>(
@@ -112,7 +113,6 @@ class _EventsScreenState extends State<EventsScreen> {
           );
           if (created == true) await _refresh();
         },
-        child: const Icon(Icons.add),
       ),
     );
   }

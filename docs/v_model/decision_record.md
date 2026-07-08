@@ -9982,3 +9982,36 @@ Extend `AppIconButton` with two new optional parameters — `iconSize` (forwards
 **(b) `flutter gen-l10n` is not automatic on test runs.** The first `flutter analyze` pass on PR14 caught 4 `undefined_getter` errors because the source ARB files had new keys but the generated `app_localizations.dart` + `app_localizations_*.dart` were stale. The fix is a one-line `flutter gen-l10n` re-run. This is now part of the canonical pre-3-gate flow for any PR that touches an ARB file. The fix is cheap (sub-second on warm cache) and the cost of forgetting is high (4 `undefined_getter` errors + a tight `flutter analyze` failure cycle). A pre-commit hook that re-runs `flutter gen-l10n` on ARB file changes is a v2.0+ candidate.
 
 **(c) Raw `IconButton(Icons.close)` is the canonical a11y gap to migrate.** 2 of the 28 PR14 migrations were `dst_transition_banner.dart` and `streak_recovery_card.dart` dismiss buttons, which had no tooltip. They were technically "icon-only CTAs without a label" per `.claude/rules/lib-screens.md:38` and would have failed any a11y audit. PR14 closes the gap as a free win from the broader migration sweep. Future PRs that touch a dismiss IconButton in a banner or recovery card should follow the same pattern: migrate to `AppIconButton(tooltip: 'Dismiss')` in the same step.
+
+## ADR-120 — AddFab primitive (v1.8-15 / PR15 of 15)
+
+**Status:** Accepted. **Date:** 2026-07-08.
+
+### Context
+
+Three screens (home `_AddFab` private widget, events, person_groups) all rendered a raw `FloatingActionButton(child: Icon(Icons.add), ...)` with a per-screen `onPressed` and a per-screen `ValueKey`. None had a `tooltip:` — the FAB was an icon-only CTA invisible to TalkBack. The home `_AddFab` additionally opens a choice sheet (`_AddSheet` enum `_AddChoice.habit | person | template`) that dispatches to AddHabit / AddPerson / Templates; the events + person_groups FABs navigate to AddEvent / AddPersonGroup with a refresh-on-result pattern.
+
+The home FAB is also the target of the upcoming PR-B (CoachMark tour) — the tour's first callout positions on `ValueKey('home.fab')` to teach new users "tap here to add a do, person, or template". A canonical primitive makes the tour's `find.byKey` resolution stable.
+
+### Decision
+
+Extract `AddFab` as the 18th `lib/ui/` primitive. The primitive wraps `Material.FloatingActionButton` with a default `Icons.add` child + a default `tooltip: 'Add'` string. Migrate the 3 call sites to use the primitive. The `ValueKey` is preserved at the call site (the primitive does not bake a key).
+
+### Rejected alternatives
+
+- **A new `AppHomeFab` primitive that takes the `_AddChoice` enum + builds the choice sheet.** Rejected: the choice sheet is a home-screen-specific UX (events + person_groups don't show a sheet — they navigate directly). The primitive should be screen-agnostic; the choice sheet is the caller's responsibility. The "2 refresh actions" pattern is similarly caller-specific — it's not a primitive concern.
+- **A `disabled` parameter that hides the FAB via `if (condition) AddFab(...)`.** Rejected: the M3-canonical pattern is "remove the FAB from the tree when not applicable" (e.g. on a loading screen). A `disabled: true` flag that renders a grayed-out FAB would deviate from the canonical pattern. The plan file documents this — the AddFab primitive has only `onPressed` (required) + `tooltip` (optional).
+- **Bake the `home.fab` key into the primitive.** Rejected: the key is call-site-specific. PR-B will use the `home.fab` key to anchor the tour; events uses `events.add`; person_groups uses `person_groups.add`. The primitive should not own a key — the caller forwards the key to the underlying `FloatingActionButton` via the standard Flutter `Widget.key` mechanism.
+
+### Consequences
+
+- 3 call sites migrated. The migration is mechanical: swap `FloatingActionButton(...)` for `AddFab(...)`; preserve the `key:`, `onPressed:`, and the `onPressed: () async { ... }` async pattern. The `child: const Icon(Icons.add)` line is dropped (the primitive supplies it).
+- The 3 FABs gain the `tooltip: 'Add'` default — a free a11y win (TalkBack now reads "Add" when focus lands on the FAB).
+- 11 new tests on `AddFab` lock the contract. The 56dp diameter test pins the M3 default; the `tooltip wraps a Tooltip widget` test pins the a11y contract; the `async onPressed + refresh pattern` test pins the canonical "events.add" + "person_groups.add" pattern.
+- The primitive is the 18th `lib/ui/` file. The next-free V-Model IDs are SYS-190+ / ADR-121+ / WF-117+.
+
+### Drift lessons (2 NEW for PR15)
+
+**(a) `FloatingActionButton.tooltip` wraps the FAB in a `Tooltip` widget internally.** The canonical pattern is to pass the tooltip string as a constructor param; do not wrap the FAB in an outer `Tooltip` widget manually. The new test pins this by asserting `find.byType(Tooltip)` resolves to the wrapping widget with the supplied message. This mirrors the PR3 / ADR-099 lesson that `IconButton.tooltip` is a `Tooltip` widget, not a `Semantics` label — the same is true for `FloatingActionButton`.
+
+**(b) The `M3 FloatingActionButton` is 56dp diameter by default.** This matches `Sizing.tapHome` for visual consistency with the home tile's per-row 56dp touch targets. A future PR that wants a smaller FAB (e.g. a 48dp mini-FAB) should use `FloatingActionButton.small` directly, not pass a size override to the primitive. Pinned via the `FAB is the M3-default 56dp diameter` test.
