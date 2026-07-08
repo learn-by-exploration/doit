@@ -89,6 +89,11 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String homeTileBudgetUsed(int used, int limit) {
+    return 'Usados $used de $limit este mes';
+  }
+
+  @override
   String get homeTileBudgetNoRemaining => 'No quedan días de descanso';
 
   @override
@@ -136,6 +141,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get homeEmptyTitle => 'Sin tareas aún.';
+
+  @override
+  String get homeEmptyBody => 'Toca + para añadir una tarea o una persona.';
 
   @override
   String get homeRetryButton => 'Reintentar';

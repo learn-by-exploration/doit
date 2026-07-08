@@ -10015,3 +10015,61 @@ Extract `AddFab` as the 18th `lib/ui/` primitive. The primitive wraps `Material.
 **(a) `FloatingActionButton.tooltip` wraps the FAB in a `Tooltip` widget internally.** The canonical pattern is to pass the tooltip string as a constructor param; do not wrap the FAB in an outer `Tooltip` widget manually. The new test pins this by asserting `find.byType(Tooltip)` resolves to the wrapping widget with the supplied message. This mirrors the PR3 / ADR-099 lesson that `IconButton.tooltip` is a `Tooltip` widget, not a `Semantics` label — the same is true for `FloatingActionButton`.
 
 **(b) The `M3 FloatingActionButton` is 56dp diameter by default.** This matches `Sizing.tapHome` for visual consistency with the home tile's per-row 56dp touch targets. A future PR that wants a smaller FAB (e.g. a 48dp mini-FAB) should use `FloatingActionButton.small` directly, not pass a size override to the primitive. Pinned via the `FAB is the M3-default 56dp diameter` test.
+
+# ADR-124 — Rest-day caption wording flip + localized empty-state body (v1.8-pr-d / PR-D)
+
+**Status:** Accepted (PR-D shipped 2026-07-08).
+**Supersedes:** the v1.4c / SYS-117 caption wording ("X/Y rest days left").
+**Superseded by:** —
+**Related:** [[SYS-193]], [[WF-120]], [[v1-8-cyc-09-c5-empty-loading-cycle-shipped]] (EmptyState primitive — the `message:` slot PR-D fills).
+
+## Context
+
+Two small inconsistencies surfaced during the v1.7 retention review:
+
+1. **The rest-day budget caption** ([home.dart:1573](lib/screens/home.dart#L1573)) read `"X/Y rest days left"`. The framing frames rest days as a remaining stash, which subtly frames them as "punishment budget" the user is reluctant to spend. The StreakService uses the inverse framing ("Done 12 of 30 this month"), which frames completions as positive progress. Aligning the two framings should make rest-day usage feel less like an admission of failure.
+2. **The home empty-state body** ([home.dart:257-260](lib/screens/home.dart#L257-L260)) was a hardcoded English string `'Tap the + to add a do or a person.'`. Every other piece of the empty state (the title `l.homeEmptyTitle`, the icon `Icons.bolt_outlined`) is localized; the body was an oversight from the original v1.0 implementation. PR9 (the EmptyState primitive extraction) did not migrate the body because the body was hardcoded.
+
+Both are too small to warrant their own PR (each is roughly 2 lines of code + 1 ARB key per locale + 1 test). They bundle into one PR ("PR-D") under the v1.8 retention sprint.
+
+## Decision
+
+### Decision 1 — Flip the caption wording
+
+**Replace** the call `l.homeTileBudgetRemaining(budget.remaining, budget.limit)` with `l.homeTileBudgetUsed(budget.used, budget.limit)`, and **rename** the ARB key from `homeTileBudgetRemaining` (v1.4c wording) to `homeTileBudgetUsed` (v1.8-pr-d wording).
+
+The English ARB value is `"Used {used} of {limit} this month"`. The Spanish ARB value is `"Usados {used} de {limit} este mes"`.
+
+The legacy `homeTileBudgetRemaining` ARB key is **kept** in the catalog (with a back-compat `@description` note) but is no longer called from any screen. This avoids breaking any future test or widget that may have been hardcoded against it during the v1.4 era.
+
+### Decision 2 — Localize the empty-state body
+
+**Replace** the hardcoded literal `'Tap the + to add a do or a person.'` with `l.homeEmptyBody`. The new ARB key fills the previously-vacant `EmptyState.message:` slot that PR9 introduced in [[v1-8-cyc-09-c5-empty-loading-cycle-shipped]] (SYS-184).
+
+The English ARB value is `"Tap the + to add a do or a person."`. The Spanish ARB value is `"Toca + para añadir una tarea o una persona."`.
+
+### Consequences
+
+- The 2 `home_test.dart` caption tests that hardcoded the old wording (`"1/2 rest days left"`, `"3/3 rest days left"`) are updated to the new wording (`"Used 1 of 2 this month"`, `"Used 0 of 3 this month"`). Test titles are updated to reference v1.8-pr-d / SYS-193 as the source-of-truth for the new wording.
+- The 2 `locale_render_test.dart` empty-state tests are extended to assert `l.homeEmptyBody` renders (was not previously asserted). This pins the Spanish round-trip too.
+- A new `home_tile_budget_caption_test.dart` file (5 tests) locks the ARB round-trip contract independently of the home-screen plumbing: English ARB key resolves, Spanish mirror resolves, empty-state body renders in en + es, and the `EmptyState` primitive renders title → message with the canonical 8dp gap.
+- Total: 2084 → 2089 (+5 net). 3-gate green. APK discipline anchor maintained (no `AndroidManifest.xml`, no pubspec, no Drift, no Kotlin changes).
+
+## Alternatives considered
+
+### Decision 1 alternatives
+
+- **Keep the legacy "X/Y rest days left" wording.** Rejected: the framing mismatch with StreakService "Done 12 of 30 this month" was a small but real cognitive dissonance. The cost of the flip is 1 ARB key rename + 2 test updates — far below the threshold of "keep the legacy wording to avoid the churn".
+- **Use a single key with a flag (`homeTileBudgetRemaining(remaining, limit, used: bool)`).** Rejected: a parameterized key is harder to translate and harder to grep. A separate `homeTileBudgetUsed` key is more declarative and matches the existing per-direction key pattern (see `homeTileBudgetNoRemaining` / `homeTileBudgetZeroCaption` — one key per caption variant).
+- **Keep the legacy key, add a NEW `homeTileBudgetUsed` key, deprecate the old key in a follow-up.** Rejected: the legacy key has no callers — keeping it would be dead weight. The `@description` back-compat note in the ARB is sufficient for any future migration that may need to grep for the legacy string.
+
+### Decision 2 alternatives
+
+- **Suppress the body entirely** (omit the `message:` parameter). Rejected: the empty state is the user's first impression. A 2-line title+body empty state is more discoverable than a 1-line title — the body tells the user what the next step is.
+- **Localize inline** (insert `l.homeEmptyBody` via a runtime conditional `l is _EsLocalizations ? '...' : '...'`). Rejected: Dart's `gen_l10n` pattern requires ARB keys at compile time. The conditional approach would force a runtime string match and break the type-safety guarantee.
+- **Drop the English copy in the source ARB and rely on a translation editor.** Rejected: the v0.x→v1.x i18n sweep established that English copy must ship in the source ARB. A future PR can add a translation helper script to push changes to a real locale service, but the source ARB is always English.
+
+## Drift lessons (1 NEW)
+
+**(a) `flutter gen-l10n` is not automatic on test runs.** First `flutter analyze` pass on this PR would have caught a stale-generate error if the source ARB had new keys but the generated `app_localizations*.dart` were stale. The fix is a one-line `flutter gen-l10n` re-run; this is now part of the canonical pre-3-gate flow for any PR that touches an ARB file (mirrors PR14 / ADR-119 lesson (b)). The bigger lesson: ARB round-trip tests (the Spanish mirror test in `home_tile_budget_caption_test.dart`) **fail loudly with `Actual: <null>` if `flutter gen-l10n` is not run** — they are a load-bearing safety net for the localization pipeline. Without the Spanish mirror test, a forgotten `gen-l10n` would silently type-check (the source ARB still has the key) but fail at runtime when the Spanish delegate loads.
+

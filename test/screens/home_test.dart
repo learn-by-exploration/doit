@@ -580,8 +580,8 @@ void main() {
     expect(find.text('Rest day taken — streak holds.'), findsOneWidget);
   });
 
-  testWidgets('tile shows "X / Y rest days left" caption after a skip '
-      '(v1.4c / SYS-117)', (tester) async {
+  testWidgets('tile shows "Used X of Y this month" caption after a skip '
+      '(v1.8-pr-d / SYS-193 — was v1.4c / SYS-117)', (tester) async {
     await _resetDb(tester);
     await DoRepository.instance.save(
       DoFixed(
@@ -602,7 +602,10 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 200));
     });
     await tester.pumpAndSettle();
-    expect(find.text('1/2 rest days left'), findsOneWidget);
+    // v1.8-pr-d / SYS-193 / ADR-124 / WF-120: caption
+    // flipped from "X/Y rest days left" to "Used X of Y this
+    // month". 1 of 2 rest days used after the skip above.
+    expect(find.text('Used 1 of 2 this month'), findsOneWidget);
   });
 
   testWidgets(
@@ -1729,8 +1732,9 @@ void main() {
   });
 
   testWidgets(
-    'tile budget caption shows "X / Y rest days left" even when used == 0 '
-    '(the v1.4c hidden state is now surfaced) (v1.4j / SYS-124)',
+    'tile budget caption shows "Used X of Y this month" even when used == 0 '
+    '(the v1.4c hidden state is now surfaced) '
+    '(v1.4j / SYS-124 caption wording refreshed by v1.8-pr-d / SYS-193)',
     (tester) async {
       await _resetDb(tester);
       await DoRepository.instance.save(
@@ -1752,7 +1756,11 @@ void main() {
       await tester.pumpAndSettle();
       // The caption is rendered with used == 0 — the v1.4c
       // early-return was removed in v1.4j.
-      expect(find.text('3/3 rest days left'), findsOneWidget);
+      // v1.8-pr-d / SYS-193 / ADR-124 / WF-120: caption
+      // flipped from "X/Y rest days left" to "Used X of Y this
+      // month". With used == 0 the caption now reads
+      // "Used 0 of 3 this month".
+      expect(find.text('Used 0 of 3 this month'), findsOneWidget);
     },
   );
 

@@ -86,6 +86,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String homeTileBudgetUsed(int used, int limit) {
+    return 'Used $used of $limit this month';
+  }
+
+  @override
   String get homeTileBudgetNoRemaining => 'No rest days left';
 
   @override
@@ -133,6 +138,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeEmptyTitle => 'No dos yet.';
+
+  @override
+  String get homeEmptyBody => 'Tap the + to add a do or a person.';
 
   @override
   String get homeRetryButton => 'Retry';
