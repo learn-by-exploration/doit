@@ -57,6 +57,7 @@ import 'package:doit/screens/mission_shake.dart';
 import 'package:doit/screens/mission_type.dart';
 import 'package:doit/services/completion_log_service.dart';
 import 'package:doit/services/do_repository.dart';
+import 'package:doit/ui/mission_failed_view.dart';
 
 /// Default habit loader — reads from the local DB via the
 /// Drift-backed `DoRepository` singleton. Exposed as a
@@ -176,7 +177,10 @@ class _MissionLauncherScreenState extends State<MissionLauncherScreen> {
         // Cancel / timeout / dismiss for this mission
         // aborts the whole chain. The streak stays
         // broken (v1.1f grace-window semantics).
-        _dismissWith(reason: 'mission-aborted', result: null);
+        // Show the post-mortem dialog so the user gets a
+        // visible "your streak is intact" message and
+        // TalkBack announces the abort (PR11 / SYS-186).
+        await _showMissionFailedAndDismiss();
         return;
       }
       inputs.add(input);
@@ -246,8 +250,31 @@ class _MissionLauncherScreenState extends State<MissionLauncherScreen> {
         // ChainTimedOut — both branches dismiss
         // with `null` (streak stays broken per
         // the v1.1f grace-window contract).
-        _dismissWith(reason: 'chain-failed', result: null);
+        // Show the post-mortem dialog before popping
+        // so the user sees the canonical "your streak
+        // is intact" message (PR11 / SYS-186).
+        await _showMissionFailedAndDismiss();
     }
+  }
+
+  /// Show the post-mortem dialog and dismiss the launcher.
+  /// Used by both mission-aborted (per-mission cancel) and
+  /// chain-failed (executor rejection) paths. The dialog's
+  /// OK CTA pops the dialog; once it returns, the launcher
+  /// itself pops with `null` so the caller resumes its
+  /// normal "mission didn't complete" flow.
+  Future<void> _showMissionFailedAndDismiss() async {
+    const reason = 'mission-failed';
+    if (!mounted) {
+      _dismissWith(reason: reason, result: null);
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) =>
+          MissionFailedView(onDismiss: () => Navigator.of(dialogContext).pop()),
+    );
+    _dismissWith(reason: reason, result: null);
   }
 
   void _dismissWith({required String reason, required bool? result}) {

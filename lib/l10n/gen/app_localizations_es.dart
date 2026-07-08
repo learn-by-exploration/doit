@@ -128,6 +128,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get homeRetryButton => 'Reintentar';
 
   @override
+  String get missionFailedTitle => 'Misión fallida';
+
+  @override
+  String get missionFailedBody =>
+      'La misión no se completó. Tu racha se mantiene sin cambios.';
+
+  @override
+  String get missionFailedDismiss => 'Aceptar';
+
+  @override
   String get homeTileEdit => 'Editar';
 
   @override

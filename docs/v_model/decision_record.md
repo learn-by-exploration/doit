@@ -9590,3 +9590,130 @@ removed by the end of the 3-PR cycle.
   `Center > Padding > Column(Text, TextButton)` for inline
   validation errors (not load failures). The visual treatment
   is intentionally smaller in those contexts. Deferred.
+
+## ADR-117 — MissionFailedView primitive + C9-1 a11y fix (v1.8-11 / PR11 of 15)
+
+PR11 of 15 in the Month 1 UI-consolidation sprint. The
+problem: every mission screen used to silently pop with
+`null` on failure (3rd wrong for math/type, timeout for
+shake/hold/memory, or chain-executor rejection from the
+launcher). The user got no visible feedback; their streak
+stays intact, but they have no way to know that — the
+screen just disappears. Compounded by the C9-1 audit:
+math + type problem cards rendered with no TalkBack label,
+violating `.claude/rules/lib-screens.md:34-39`.
+
+### Decisions
+
+- **D1.** `MissionFailedView` is an `AlertDialog` (NOT a
+  full-screen widget, NOT a `MaterialBanner`). The
+  rationale: a failed mission is a single-shot event that
+  should not interrupt the user's flow with a full-screen
+  takeover (the launcher's `FullScreenActivity` is reserved
+  for `ChainPassed`). A `MaterialBanner` would render in
+  the parent `Scaffold` but the mission screens have no
+  parent `Scaffold` to host it. `AlertDialog` is the M3
+  canonical "your action did not succeed" surface and
+  works on every screen size without layout coupling.
+- **D2.** The dialog has exactly 1 CTA ("OK" via
+  `FilledButton`). The rationale: the user can't retry from
+  this dialog (the mission screen is already being popped);
+  the only action is "acknowledge and dismiss". A
+  `FilledButton` (not `TextButton`) matches the dialog's
+  elevated-modal context.
+- **D3.** The dialog body is wrapped in
+  `Semantics(liveRegion: true, label: '$title. $body')`.
+  The `liveRegion` flag is what triggers TalkBack to speak
+  the text when the dialog opens — without it, the user
+  on a screen reader would only hear the dialog chrome,
+  not the critical "your streak is intact" reassurance.
+  The label concatenates title + body so the announcement
+  is a single coherent sentence.
+- **D4.** The C9-1 a11y fix for math + type uses
+  `Text.semanticsLabel: '...'` directly on the problem
+  `Text` widget (NOT a `Semantics` wrapper around the whole
+  `Card`). The rationale: the canonical label per
+  `lib-screens.md:38` ("Math problem, 5 + 3. Type the
+  answer.") is a description of the problem, not a
+  container announcement. `Text.semanticsLabel` is the
+  lighter touch and matches Flutter's idiom for adding
+  TalkBack description to a single text element.
+- **D5.** `MissionFailedView.onDismiss` is a required
+  `VoidCallback` (not a `bool Function` returning the
+  dialog's pop value). The rationale: the caller controls
+  the dialog lifecycle; the primitive does not pop
+  itself. This makes the primitive testable in isolation
+  (the test wires `onDismiss: () => called++`) and
+  composable (the launcher + math + type each call
+  `Navigator.of(dialogContext).pop()` from the callback).
+
+### Drift lessons
+
+- (a) The 3 callers (`mission_math.dart`, `mission_type.dart`,
+  `mission_launcher.dart`) had to add `if (!mounted) return;`
+  before their post-dialog `Navigator.pop()` because
+  `showDialog` is async and the screen may have been
+  unmounted while the dialog was on screen. Without the
+  mounted check, the launcher pops twice (once when the
+  dialog closes, once on the original `await` resume)
+  and the screen stack ends up wrong.
+- (b) The math + type `_submit()` methods had to be
+  marked `async` to accommodate the new
+  `await showDialog(...)`. Both were previously
+  synchronous `void _submit()` methods. The lint catches
+  `await_in_wrong_context`; the fix is `void _submit()
+  async` (the callers already `await` indirectly via the
+  `FilledButton.onPressed: _submit` chain — Flutter's
+  `onPressed` accepts a `Future<void> Function()`).
+- (c) The 3 mission screens' existing widget tests had to
+  wire `AppLocalizations.localizationsDelegates` into the
+  `MaterialApp` test wrapper. The dialog uses
+  `AppLocalizations.of(context)`; without the delegate,
+  the generated localization getter throws on first
+  access. The `localizedApp` test helper exists for
+  primitive tests; per-screen tests use the explicit
+  `MaterialApp(... localizationsDelegates: ...)` form.
+- (d) The 3rd-wrong / chain-failed / cancel tests had to
+  dismiss the dialog via
+  `tester.tap(find.byKey(const ValueKey('mission_failed.dismiss')))`
+  BEFORE the final `expect(find.byType(MissionXxxScreen),
+  findsNothing)` assertion. Without the dismiss tap, the
+  dialog stays on the screen stack and the underlying
+  mission screen is still mounted.
+
+### Alternatives considered
+
+- **Inline SnackBar instead of AlertDialog.** Rejected:
+  SnackBars are transient (1-4s) and easy to miss; for a
+  failure the user needs to consciously dismiss, an
+  AlertDialog's modal presence is the right visual weight.
+- **`Semantics(liveRegion: true)` wrapper around the
+  whole `Card` (math/type problem).** Rejected: the
+  Card already has a `Material` ancestor with default
+  Semantics; wrapping it would double-announce. The
+  `Text.semanticsLabel` is the surgical fix.
+- **Auto-dismiss the dialog after 3s.** Rejected: a
+  user on a screen reader needs the dialog to stay open
+  until they explicitly dismiss; auto-dismiss races
+  TalkBack's announcement.
+
+### Deferred
+
+- The 4 other mission screens (shake / hold / memory /
+  launcher pop-without-chain) don't have a per-mission
+  "failed" affordance today; they silently pop. PR11
+  wires the launcher's chain-abort path (which covers
+  any per-mission pop-with-null) but doesn't add a
+  per-screen retry UI. Tracked as v2.0+ if requested.
+- The `_attempts.errorLabel()` strings ("Wrong. 2 attempt(s)
+  left." and "Take a break. The mission will end.") are
+  still hardcoded English in `lib/missions/mission_attempts.dart`
+  (per the `lib-screens.md` rule "no hardcoded English in
+  screens"). PR11 does NOT migrate these to ARB; that's
+  a separate i18n sweep (deferred to a future PR).
+- The `missionTakeBreakNudge` constant is described as
+  "surfaced as a `SnackBar`" in the math/type docstring
+  but no caller actually calls
+  `ScaffoldMessenger.showSnackBar`. PR11 keeps the dead
+  copy as-is (the dialog now provides the visible
+  reassurance); flagging for removal in a future cleanup.

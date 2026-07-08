@@ -126,6 +126,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeRetryButton => 'Retry';
 
   @override
+  String get missionFailedTitle => 'Mission failed';
+
+  @override
+  String get missionFailedBody =>
+      'The mission did not complete. Your streak stays unchanged.';
+
+  @override
+  String get missionFailedDismiss => 'OK';
+
+  @override
   String get homeTileEdit => 'Edit';
 
   @override

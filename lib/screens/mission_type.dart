@@ -16,6 +16,7 @@ import 'package:doit/missions/mission_input.dart';
 import 'package:doit/missions/mission_result.dart';
 import 'package:doit/theme/app_theme.dart';
 import 'package:doit/ui/app_form_field.dart';
+import 'package:doit/ui/mission_failed_view.dart';
 
 class MissionTypeScreen extends StatefulWidget {
   const MissionTypeScreen({super.key, required this.mission});
@@ -37,7 +38,7 @@ class _MissionTypeScreenState extends State<MissionTypeScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  void _submit() async {
     final result = widget.mission.verify(TextInput(_ctrl.text));
     if (result is MissionPassed) {
       Navigator.of(context).pop(TextInput(_ctrl.text));
@@ -45,6 +46,16 @@ class _MissionTypeScreenState extends State<MissionTypeScreen> {
     }
     final shouldAutoFail = _attempts.recordWrong();
     if (shouldAutoFail) {
+      // Show the post-mortem dialog before popping so the
+      // user gets a visible "your streak is intact" message
+      // and TalkBack announces the failure (C9-1 a11y fix).
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => MissionFailedView(
+          onDismiss: () => Navigator.of(dialogContext).pop(),
+        ),
+      );
+      if (!mounted) return;
       Navigator.of(context).pop();
       return;
     }
@@ -73,6 +84,8 @@ class _MissionTypeScreenState extends State<MissionTypeScreen> {
                     widget.mission.expectedPhrase,
                     key: const ValueKey('mission_type.expected'),
                     style: Theme.of(context).textTheme.headlineSmall,
+                    semanticsLabel:
+                        'Type the phrase, ${widget.mission.expectedPhrase}, to confirm.',
                   ),
                 ),
               ),
