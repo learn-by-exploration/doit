@@ -15,6 +15,7 @@ import 'package:doit/services/person_group_repository.dart';
 import 'package:doit/services/person_repository.dart';
 import 'package:doit/services/reminder_service.dart';
 import 'package:doit/theme/app_theme.dart';
+import 'package:doit/ui/add_fab.dart';
 import 'package:doit/ui/section_header.dart';
 import 'package:doit/ui/surface_card.dart';
 import 'package:doit/ui/app_choice_chip.dart';
@@ -122,7 +123,7 @@ class _PersonGroupsScreenState extends State<PersonGroupsScreen> {
           },
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: AddFab(
         key: const ValueKey('person_groups.add'),
         onPressed: () async {
           final created = await Navigator.of(context).push<bool>(
@@ -130,7 +131,6 @@ class _PersonGroupsScreenState extends State<PersonGroupsScreen> {
           );
           if (created == true) await _refresh();
         },
-        child: const Icon(Icons.add),
       ),
     );
   }

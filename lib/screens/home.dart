@@ -51,6 +51,7 @@ import 'package:doit/ui/app_palette.dart';
 import 'package:doit/ui/app_text_styles.dart';
 import 'package:doit/ui/empty_state.dart';
 import 'package:doit/ui/error_view.dart';
+import 'package:doit/ui/add_fab.dart';
 import 'package:doit/ui/icon_button.dart';
 import 'package:doit/ui/loading_view.dart';
 import 'package:doit/ui/tile_surface.dart';
@@ -1361,7 +1362,7 @@ class _AddFab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FloatingActionButton(
+    return AddFab(
       key: const ValueKey('home.fab'),
       onPressed: () async {
         final choice = await showModalBottomSheet<_AddChoice>(
@@ -1387,7 +1388,6 @@ class _AddFab extends StatelessWidget {
             );
         }
       },
-      child: const Icon(Icons.add),
     );
   }
 }
