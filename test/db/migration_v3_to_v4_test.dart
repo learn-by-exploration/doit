@@ -25,9 +25,15 @@ void main() {
       await AppDatabaseService.instance.closeForTesting();
     });
 
-    test('schemaVersion is 5 (Phase C PR 1 / v1.4l pin)', () {
-      expect(db.schemaVersion, 5);
-      expect(kCurrentSchemaVersion, 5);
+    test('schemaVersion is the current pinned version '
+        '(Phase C PR 1 / v1.4l / v2.0 retention pin)', () {
+      // The pin tracks the current schema version, not the
+      // version this migration introduced. v2.0 retention /
+      // PR-E1 / SYS-194 bumped the version to 6 (added the
+      // scheduled_messages table). This test now asserts
+      // the schema has been migrated past that bump.
+      expect(db.schemaVersion, kCurrentSchemaVersion);
+      expect(kCurrentSchemaVersion, 6);
     });
 
     test('habits / people / events have automations_json column', () async {

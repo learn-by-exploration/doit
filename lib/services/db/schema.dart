@@ -49,6 +49,20 @@
 //       can rebuild the streak from the log on restore. See
 //       ADR-056 for the design rationale (the v1.4h trade-
 //       off that motivated v1.4l).
+//   6 — v2.0 retention (PR-E1 / SYS-194):
+//       + scheduled_messages table (one-shot scheduled
+//         contact reminders — person + channel + exact
+//         fire time + optional pre-filled message body +
+//         status lifecycle + audit-fired-at timestamp).
+//         Distinct from `People` (recurring cadences) and
+//         `Events` (general one-shot reminders with
+//         optional mission chain support). See the
+//         `ScheduledMessages` class in `tables.dart` for
+//         the full column reference. The migration is in
+//         `migrations/v5_to_v6.dart`. The
+//         scheduler / notification wire for this table
+//         lands in PR-E2; this migration only creates
+//         the table — no service layer, no UI.
 
 import 'package:drift/drift.dart';
 
@@ -56,6 +70,7 @@ import 'package:doit/services/db/migrations/v1_to_v2.dart';
 import 'package:doit/services/db/migrations/v2_to_v3.dart';
 import 'package:doit/services/db/migrations/v3_to_v4.dart';
 import 'package:doit/services/db/migrations/v4_to_v5.dart';
+import 'package:doit/services/db/migrations/v5_to_v6.dart';
 import 'package:doit/services/db/tables.dart';
 
 part 'schema.g.dart';
@@ -64,7 +79,7 @@ part 'schema.g.dart';
 /// change. The matching migration file MUST land in
 /// `lib/services/db/migrations/vN_to_vM.dart` and be referenced from
 /// [migrations] below.
-const int kCurrentSchemaVersion = 5;
+const int kCurrentSchemaVersion = 6;
 
 @DriftDatabase(
   tables: [
@@ -80,6 +95,8 @@ const int kCurrentSchemaVersion = 5;
     PersonGroupMembers,
     // v1.0 reframe (Phase B PR 1)
     Templates,
+    // v2.0 retention (PR-E1 / SYS-194)
+    ScheduledMessages,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -109,6 +126,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 5) {
         await migrateV4ToV5(m, this);
+      }
+      if (from < 6) {
+        await migrateV5ToV6(m, this);
       }
     },
     beforeOpen: (details) async {

@@ -302,3 +302,76 @@ class Templates extends Table {
   @override
   Set<Column> get primaryKey => {id};
 }
+
+/// A one-shot scheduled contact message (v2.0 retention / PR-E1 /
+/// SYS-194). Distinct from [People] (recurring cadences via
+/// `PersonCadence`) and [Events] (general one-shot reminders with
+/// optional mission chain support). This table is specifically
+/// "remind me to contact this person on this channel at this
+/// exact time, then launch the channel app when I tap the
+/// notification".
+///
+/// The user picks a `channelTag` (one of the 5 `PersonChannel`
+/// variant tags: 'dialer' | 'whatsapp' | 'telegram' | 'signal' |
+/// 'sms'), a `channelHandle` (phone number or @handle; the
+/// launcher in PR-E2 normalizes this to a `Uri` for `url_launcher`),
+/// and an absolute `fireAtMillis` for the reminder. Optional
+/// `personId` and `messageBody` round out the row. `personId` is
+/// nullable so the user can schedule a one-off contact to an
+/// unsaved number; `channelHandle` is denormalized from the
+/// person's handle at schedule time so the launch still works
+/// after the person is deleted. `messageBody` is null = "the
+/// user types the message in the chat app"; non-null = "pre-fill
+/// the chat composer" (used by sms / whatsapp / telegram / signal
+/// where the URI scheme supports a `?text=` param).
+///
+/// `status` is the row's lifecycle: 'pending' (default; waiting
+/// for fire time), 'fired' (notification went out; `firedAtMillis`
+/// is set), 'dismissed' (user dismissed the notification without
+/// opening the channel), 'cancelled' (user deleted the schedule
+/// before fire). The scheduler / notification wire for this
+/// table lands in PR-E2 (the url_launcher integration + the
+/// Schedule-a-message screen). The migration only creates the
+/// table — no service layer, no UI.
+///
+/// v2.0 retention (PR-E1). Created in migration v5 → v6.
+@DataClassName('ScheduledMessageRow')
+class ScheduledMessages extends Table {
+  TextColumn get id => text()();
+  // Nullable: a scheduled message MAY exist without a saved
+  // person record (e.g., the user pasted a phone number and
+  // picked a fire time, without saving a Person first).
+  TextColumn get personId => text().nullable()();
+  // 'dialer' | 'whatsapp' | 'telegram' | 'signal' | 'sms'
+  // (matches the [PersonChannel] variant tags; the launch path
+  // in PR-E2 normalizes one to the other).
+  TextColumn get channelTag => text()();
+  // The handle to launch against. Phone number (E.164 with a
+  // leading `+`; e.g., "+15551234567") for dialer / whatsapp /
+  // signal / sms, or `@username` (no leading @, just the user
+  // name; e.g., "durov") for telegram. Denormalized from
+  // `People.handle` at schedule time so the launch path does
+  // not need to re-resolve the person at fire time.
+  TextColumn get channelHandle => text()();
+  // Optional pre-filled message body. Null = no pre-fill; the
+  // user types the message in the chat app. Non-null = pre-fill
+  // the chat composer via the URI scheme's `?text=` param
+  // (sms:, https://wa.me/, https://t.me/, signal:, etc.).
+  TextColumn get messageBody => text().nullable()();
+  // The absolute epoch millisecond when the reminder should
+  // fire. The scheduler (PR-E2) reads this on app start and
+  // registers an exact alarm at the right offset.
+  IntColumn get fireAtMillis => integer()();
+  // 'pending' | 'fired' | 'dismissed' | 'cancelled'. Default
+  // 'pending'. The scheduler transitions to 'fired' when the
+  // notification actually goes out (and writes `firedAtMillis`).
+  TextColumn get status => text().withDefault(const Constant('pending'))();
+  IntColumn get createdAtMillis => integer()();
+  // Set when the notification actually went out. Distinct from
+  // `status='fired'` (which is the state-transition audit) for
+  // analytics + dedupe purposes.
+  IntColumn get firedAtMillis => integer().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}

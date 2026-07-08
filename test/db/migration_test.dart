@@ -171,12 +171,16 @@ void main() {
       expect(after, isEmpty);
     });
 
-    test('schemaVersion is 5 for v1.4l soft-delete column (Phase 39)', () {
-      // The version pin is a contract — Phase 3+ bump it.
-      // Drift exposes it via the database instance.
+    test('schemaVersion is 6 for v2.0 retention / PR-E1 scheduled_messages '
+        'table (SYS-194)', () {
+      // The version pin is a contract — every migration that
+      // adds a column or a table must bump it. The most
+      // recent bump is v5→v6 (the `scheduled_messages` table
+      // shipped in v2.0 retention / PR-E1 / SYS-194).
+      // Drift exposes the version via the database instance.
       final db = AppDatabaseService.instance.db;
       expect(db.schemaVersion, kCurrentSchemaVersion);
-      expect(kCurrentSchemaVersion, 5);
+      expect(kCurrentSchemaVersion, 6);
     });
 
     test('fresh install creates the v3 templates table', () async {
