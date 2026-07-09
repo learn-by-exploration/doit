@@ -27,6 +27,15 @@ import 'package:meta/meta.dart';
 /// `ActionNotify`). The field defaults to `null` and the
 /// existing habit-reminder path (Phase A) keeps the
 /// Kotlin-side body derivation.
+///
+/// v1.8-pr-e2 / SYS-195 / ADR-126 adds an optional [tapUri]
+/// for scheduled-message notifications. When non-null, the
+/// body-tap `PendingIntent` opens this URI (resolved through
+/// `Intent.ACTION_VIEW` / `ACTION_DIAL` / `ACTION_SENDTO` on
+/// the Kotlin side) instead of the default MainActivity /
+/// FullScreenActivity surface. The value is the
+/// `Uri.toString()` of a `PersonChannel.launch({body: ...})`
+/// call.
 @immutable
 class ReminderEvent {
   const ReminderEvent({
@@ -36,6 +45,7 @@ class ReminderEvent {
     required this.alarmId,
     this.strongMode = false,
     this.body,
+    this.tapUri,
   });
   final String habitId;
   final String habitName;
@@ -48,6 +58,14 @@ class ReminderEvent {
   /// non-null (routine fires), the value is used as the
   /// notification body verbatim.
   final String? body;
+
+  /// Optional deep-link URI for the body-tap
+  /// `PendingIntent`. When `null` (the default), the tap
+  /// targets the existing surface (MainActivity for
+  /// soft-mode, FullScreenActivity for strong-mode). When
+  /// non-null, the Kotlin side switches on the URI scheme
+  /// and launches the right `Intent.ACTION_*`.
+  final String? tapUri;
 }
 
 /// Public surface for the notification service.

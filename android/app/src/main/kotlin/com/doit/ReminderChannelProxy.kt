@@ -55,10 +55,21 @@ object ReminderChannelProxy {
                     val habitName = call.argument<String>("habitName")
                     val body = call.argument<String>("body")
                     val strongMode = call.argument<Boolean>("strongMode") ?: false
+                    // v1.8-pr-e2 / SYS-195 / ADR-126:
+                    // optional deep-link URI for the body-tap
+                    // PendingIntent. When non-null, the
+                    // Kotlin side wraps the URI in the right
+                    // `Intent.ACTION_*` (ACTION_DIAL for
+                    // `tel:`, ACTION_SENDTO for `sms:`,
+                    // ACTION_VIEW for the `https://wa.me`
+                    // family). When null, the existing
+                    // MainActivity / FullScreenActivity
+                    // surface is used.
+                    val tapUri = call.argument<String>("tapUri")
                     if (alarmId == null || habitName == null) {
                         result.error("BAD_ARGS", "alarmId and habitName are required", null)
                     } else {
-                        showNotification(alarmId, habitName, body, strongMode)
+                        showNotification(alarmId, habitName, body, strongMode, tapUri)
                         result.success(null)
                     }
                 }
@@ -131,19 +142,29 @@ object ReminderChannelProxy {
      * The full NotificationCompat.Builder wiring (channel,
      * actions, icon) lives in MainActivity's notification
      * setup at app start — we only need the manager here.
+     *
+     * [tapUri] (v1.8-pr-e2 / SYS-195 / ADR-126) is the
+     * optional deep-link URI for the body-tap PendingIntent
+     * (e.g. `https://wa.me/<digits>?text=...`,
+     * `tel:+15555550100`, `sms:+15555550100?body=...`).
+     * The Kotlin side switches on scheme and picks the
+     * matching `Intent.ACTION_*`; the manifest
+     * `<queries>` block (added in the same PR) is what
+     * lets Android 11+ resolve the target package.
      */
     private fun showNotification(
         alarmId: Int,
         habitName: String,
         body: String?,
         strongMode: Boolean,
+        tapUri: String?,
     ) {
         val ctx = appContext ?: return
         val mgr = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         // Defer to MainActivity.buildReminderNotification so the
         // channel id, action set, and icon stay in one place.
         val notification = MainActivity.buildReminderNotification(
-            ctx, alarmId, habitName, body, strongMode,
+            ctx, alarmId, habitName, body, strongMode, null, tapUri,
         )
         mgr.notify(alarmId, notification)
     }

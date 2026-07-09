@@ -30,6 +30,7 @@ import 'package:doit/l10n/gen/app_localizations.dart';
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/screens/recently_deleted_screen.dart';
+import 'package:doit/screens/scheduled_messages_list.dart';
 import 'package:doit/screens/settings_restore.dart';
 import 'package:doit/screens/stats.dart';
 import 'package:doit/services/call_interceptor.dart';
@@ -150,6 +151,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const RecentlyDeletedScreen(),
+                  ),
+                );
+              },
+            ),
+            // v1.8-pr-e2 / SYS-196 / ADR-126 / WF-122.
+            // Settings tile that pushes the
+            // Scheduled-messages list screen (pending +
+            // history). Lives in the People section
+            // because the feature is a contact-nudge.
+            ListTile(
+              key: const ValueKey('settings.scheduled_messages'),
+              leading: const Icon(Icons.schedule_send_outlined),
+              title: const Text('Scheduled messages'),
+              subtitle: const Text('View and cancel pending message reminders'),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ScheduledMessagesListScreen(),
                   ),
                 );
               },

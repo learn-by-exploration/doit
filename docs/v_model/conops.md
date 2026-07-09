@@ -330,16 +330,50 @@ truthfully answer "yes" to all of the following:
 If even one of these is "no", the app has not yet earned the right to
 be the user's daily habit tool. Fix it before adding features.
 14. (v2.0 retention / PR-E1 / SYS-194 + PR-E2 / SYS-195..198)
-    The user schedules a one-shot contact message — e.g., "text Dad
-    tomorrow at 6pm". They open the person tile, tap "Send message",
-    pick "WhatsApp" as the channel, pick tomorrow 18:00 as the fire
-    time, optionally pre-fill the composer body, and Save. A row is
-    inserted into the new `scheduled_messages` Drift table with
-    `status='pending'` and `fireAtMillis` set. At fire time the
-    notification surfaces with a `channel_tag` + `channel_handle`
-    resolved at schedule time, the user taps it, and the chosen
-    channel app (WhatsApp / Signal / Telegram / dialer / SMS) opens
-    with the pre-filled composer (or just the dialer for voice).
-    `personId` is denormalized to `channel_handle` so the launch
-    still works after the source person is deleted. The lifecycle
-    values are `'pending' | 'fired' | 'dismissed' | 'cancelled'`.
+    Two affordances on the contact record.
+
+    **Call now / Message now** (PR-E2 / SYS-195): from the
+    `AddPersonScreen` in edit mode (i.e. a person + phone are
+    already saved), the user sees a row of two
+    `FilledButton.icon` CTAs — "Call" (always launches the
+    dialer via `ChannelDialer.launch()` → `tel:+15555550100`)
+    and "Message" (launches the saved `PersonChannel` with an
+    optional pre-fill body via
+    `Channel{WhatsApp|Telegram|Signal|Sms}.launch(body:)`).
+    The CTAs are hidden in add mode and hidden when no phone
+    is loaded; the existing `READ_CONTACTS` rationale is
+    unchanged.
+
+    **Schedule a message** (PR-E2 / SYS-196/197): the user
+    schedules a one-shot contact message — e.g., "text Dad
+    tomorrow at 6pm". They tap the new "Schedule message" CTA
+    on the person tile, pick a channel (one of the 5
+    `PersonChannel` variants), pick tomorrow 18:00 as the fire
+    time, optionally pre-fill the composer body, and Save. A
+    row is inserted into the new `scheduled_messages` Drift
+    table (PR-E1 / SYS-194) with `status='pending'` and
+    `fireAtMillis` set; an exact alarm is scheduled via
+    `ReminderService.scheduleScheduledMessage(...)` which
+    stores the `alarmId ↔ scheduledMessageId` mapping in
+    SharedPreferences for the boot-receiver `rescheduleAll`
+    path. At fire time the notification surfaces; the user
+    taps it, the Kotlin builder branch
+    (`buildScheduledMessageNotification` in `MainActivity.kt`)
+    routes the `PendingIntent` at the channel URI directly
+    (`ACTION_VIEW` for `https://wa.me/...` /
+    `https://t.me/...` / `https://signal.me/...`;
+    `ACTION_SENDTO sms:` for SMS; `ACTION_DIAL tel:` for
+    dialer) with `FLAG_ACTIVITY_NEW_TASK`, and the chosen
+    channel app opens with the pre-filled composer (or just
+    the dialer for voice). `personId` is denormalized to
+    `channel_handle` so the launch still works after the
+    source person is deleted. The lifecycle values are
+    `'pending' | 'fired' | 'cancelled'` (the v1 draft's
+    speculative `'dismissed'` was dropped — the user
+    dismissing the notification leaves the row in
+    `'pending'` so a re-tap still works; only explicit user
+    action via the schedule list moves it to `'cancelled'`).
+    A separate `ScheduledMessagesListScreen` (Settings →
+    Scheduled messages) lists pending rows with a per-row
+    cancel `AppIconButton`; cancelled + fired rows appear in
+    a History section when at least one exists.

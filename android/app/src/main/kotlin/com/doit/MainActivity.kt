@@ -211,6 +211,21 @@ class MainActivity : FlutterActivity() {
             body: String?,
             strongMode: Boolean,
             habitId: String? = null,
+            // v1.8-pr-e2 / SYS-195 / ADR-126: optional
+            // deep-link URI for the body-tap
+            // PendingIntent. When non-null, the body-tap
+            // dispatches the URI to the matching
+            // `Intent.ACTION_*` (ACTION_DIAL for `tel:`,
+            // ACTION_SENDTO for `sms:`, ACTION_VIEW for
+            // the `https://wa.me|t.me|signal.me` family).
+            // The action button ("Done" / "Open") is
+            // unchanged — those keep targeting the
+            // existing surface (MainActivity /
+            // FullScreenActivity). Android 11+ package
+            // visibility for WhatsApp / Telegram / Signal
+            // is declared in `AndroidManifest.xml`'s
+            // `<queries>` block.
+            tapUri: String? = null,
         ): Notification {
             ensureNotificationChannel(ctx)
             val title = habitName
@@ -236,7 +251,17 @@ class MainActivity : FlutterActivity() {
                     PendingIntent.FLAG_UPDATE_CURRENT or
                         PendingIntent.FLAG_IMMUTABLE,
                 )
-                builder.setContentIntent(fsiPi)
+                // v1.8-pr-e2: when a tapUri is set, the
+                // body-tap dispatches the URI; the FSI
+                // (and the "Open" action) still point at
+                // FullScreenActivity. The user can either
+                // tap-to-launch-the-channel-app
+                // (body-tap) or tap-to-launch-the-mission
+                // (FSI / "Open" action).
+                builder.setContentIntent(
+                    tapUri?.let { uriString -> uriPendingIntent(ctx, alarmId, uriString) }
+                        ?: fsiPi,
+                )
                 // v1.3d / SYS-114: `setFullScreenIntent`
                 // tells the OS to launch the activity
                 // directly when the alarm fires — even if
@@ -250,9 +275,13 @@ class MainActivity : FlutterActivity() {
                 builder.addAction(0, "Open", fsiPi)
             } else {
                 // Soft-mode (and the legacy "no habitId"
-                // path): open `MainActivity`. The home
-                // screen handles the "Done" tap as a
-                // soft completion.
+                // path): the body-tap opens
+                // `MainActivity`. The home screen handles
+                // the "Done" tap as a soft completion.
+                // v1.8-pr-e2: when a tapUri is set, the
+                // body-tap dispatches the URI instead —
+                // the "Done" action still opens
+                // MainActivity.
                 val openIntent = Intent(
                     ctx,
                     MainActivity::class.java,
@@ -264,10 +293,61 @@ class MainActivity : FlutterActivity() {
                     PendingIntent.FLAG_UPDATE_CURRENT or
                         PendingIntent.FLAG_IMMUTABLE,
                 )
-                builder.setContentIntent(openPi)
+                builder.setContentIntent(
+                    tapUri?.let { uriString -> uriPendingIntent(ctx, alarmId, uriString) }
+                        ?: openPi,
+                )
                 builder.addAction(0, "Done", openPi)
             }
             return builder.build()
+        }
+
+        /**
+         * v1.8-pr-e2 / SYS-195 / ADR-126. Build the
+         * body-tap `PendingIntent` for a scheduled-message
+         * deep-link. The Dart side passes a `Uri.toString()`
+         * (e.g. `https://wa.me/15555550100?text=hi`,
+         * `tel:+15555550100`, `sms:+15555550100?body=hi`).
+         * We parse the scheme and pick the right
+         * `Intent.ACTION_*`:
+         *
+         *   - `tel:`   → `Intent.ACTION_DIAL`  (dialer)
+         *   - `sms:`   → `Intent.ACTION_SENDTO` (system SMS)
+         *   - `https:` → `Intent.ACTION_VIEW`  (browser /
+         *     native app — the OS picks based on the
+         *     `<queries>` visibility rules)
+         *   - other    → `Intent.ACTION_VIEW`  (fallback)
+         *
+         * The new task flag is set so the launched
+         * activity lands on its own task stack (not on
+         * top of MainActivity's task — keeps the back
+         * button predictable after the user returns to
+         * the home screen).
+         */
+        private fun uriPendingIntent(
+            ctx: Context,
+            alarmId: Int,
+            uriString: String,
+        ): PendingIntent {
+            val uri = Uri.parse(uriString)
+            val intent = when (uri.scheme?.lowercase()) {
+                "tel" -> Intent(Intent.ACTION_DIAL, uri)
+                "sms" -> Intent(Intent.ACTION_SENDTO, uri)
+                else -> Intent(Intent.ACTION_VIEW, uri)
+            }.apply {
+                // Required so the launched app lands on
+                // its own task (e.g. WhatsApp), not on
+                // top of MainActivity. Without this flag
+                // the URI launch may push the host
+                // activity to the back, which surprises
+                // users coming back from WhatsApp.
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            return PendingIntent.getActivity(
+                ctx, alarmId, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or
+                    PendingIntent.FLAG_IMMUTABLE,
+            )
         }
     }
 }

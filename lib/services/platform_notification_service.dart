@@ -37,6 +37,11 @@ class PlatformNotificationService implements NotificationService {
         habitName: event.habitName,
         body: event.body,
         strongMode: event.strongMode,
+        // v1.8-pr-e2 / SYS-195 / ADR-126: forward the
+        // deep-link URI when set. The Kotlin side switches
+        // on scheme (tel:/sms:/https://) to pick the right
+        // Intent.ACTION_*.
+        tapUri: event.tapUri,
       );
     } catch (e, st) {
       // Defensive: a missing platform handler must not crash

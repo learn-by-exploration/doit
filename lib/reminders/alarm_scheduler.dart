@@ -90,6 +90,31 @@ abstract class AlarmScheduler {
   /// Cancel a one-shot event reminder.
   Future<void> cancelEvent(String eventId);
 
+  /// Schedule a one-shot "message this person at this time"
+  /// reminder. The alarm id is derived from the
+  /// [scheduledMessageId] (a string UUID assigned by the
+  /// caller — typically `ScheduledMessageRepository`).
+  /// Fires once at `at`; the inbound `onFireAlarm` handler
+  /// marks the row `fired` and shows a notification whose
+  /// tap launches the channel app.
+  ///
+  /// v1.8-pr-e2 / SYS-196 / ADR-126: mirrors
+  /// [scheduleEvent]. The two paths share the same
+  /// `setExactAlarm` bridge call; the difference is the
+  /// metadata the inbound handler reads from the
+  /// `_firingEntries` mirror (`eventId` vs
+  /// `scheduledMessageId`).
+  Future<AlarmId> scheduleScheduledMessage({
+    required String scheduledMessageId,
+    required DateTime at,
+  });
+
+  /// Cancel a pending scheduled-message reminder.
+  /// Called from the "Scheduled messages" list screen's
+  /// cancel affordance AND from the inbound handler when
+  /// the user dismisses the fired notification.
+  Future<void> cancelScheduledMessage(String scheduledMessageId);
+
   /// Cancel every alarm tied to a given habit id (any
   /// occurrence). Used by the "Cancel test reminder" button.
   Future<void> cancelForHabit(String habitId);
@@ -119,12 +144,15 @@ class ScheduledAlarm {
     this.habitName,
     this.strongMode = false,
     this.eventId,
+    this.scheduledMessageId,
   });
   final AlarmId id;
 
-  /// The owning habit id, or `'event:<eventId>'` for
+  /// The owning habit id, `'event:<eventId>'` for
   /// event-scheduled alarms (mirrors the v0.2
-  /// `FakeAlarmScheduler.scheduleEvent` convention).
+  /// `FakeAlarmScheduler.scheduleEvent` convention), or
+  /// `'scheduled_message:<id>'` for scheduled-message
+  /// alarms (v1.8-pr-e2 / SYS-196 / ADR-126).
   final String habitId;
 
   /// Optional human-readable name. Populated by the
@@ -139,8 +167,15 @@ class ScheduledAlarm {
   final bool strongMode;
 
   /// The originating event id when this alarm belongs to
-  /// an event (not a habit). `null` for habits.
+  /// an event (not a habit). `null` for habits and
+  /// scheduled messages.
   final String? eventId;
+
+  /// v1.8-pr-e2 / SYS-196 / ADR-126: the originating
+  /// scheduled-message row id when this alarm belongs to
+  /// a scheduled message (not a habit, not an event).
+  /// `null` for habits and events.
+  final String? scheduledMessageId;
   final DateTime at;
 }
 
@@ -227,6 +262,30 @@ class FakeAlarmScheduler implements AlarmScheduler {
   @override
   Future<void> cancelEvent(String eventId) async {
     _scheduled.removeWhere((a) => a.habitId == 'event:$eventId');
+  }
+
+  @override
+  Future<AlarmId> scheduleScheduledMessage({
+    required String scheduledMessageId,
+    required DateTime at,
+  }) async {
+    final id = AlarmId(scheduledMessageId.hashCode & 0x7FFFFFFF);
+    _scheduled.add(
+      ScheduledAlarm(
+        id: id,
+        habitId: 'scheduled_message:$scheduledMessageId',
+        at: at,
+        scheduledMessageId: scheduledMessageId,
+      ),
+    );
+    return id;
+  }
+
+  @override
+  Future<void> cancelScheduledMessage(String scheduledMessageId) async {
+    _scheduled.removeWhere(
+      (a) => a.habitId == 'scheduled_message:$scheduledMessageId',
+    );
   }
 
   @override

@@ -94,6 +94,7 @@ class _RecordingBridge implements ReminderBridge {
     required String habitName,
     String? body,
     bool strongMode = false,
+    String? tapUri,
   }) async {}
 
   @override

@@ -29,11 +29,13 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:doit/people/cadence.dart';
 import 'package:doit/people/person.dart';
 import 'package:doit/routines/routine.dart';
 import 'package:doit/routines/routine_executor.dart';
+import 'package:doit/screens/add_scheduled_message.dart';
 import 'package:doit/services/geofence_service.dart';
 import 'package:doit/services/person_repository.dart';
 import 'package:doit/services/permission_service.dart';
@@ -198,6 +200,39 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: _pickContact,
             ),
+            // v1.8-pr-e2 / SYS-195 / ADR-126: Call + Schedule
+            // CTAs. Visible in edit mode once a phone number
+            // has been picked. The Call CTA launches the
+            // system dialer via `ChannelDialer.launch()` +
+            // `url_launcher`; the Schedule CTA navigates to
+            // the new `AddScheduledMessageScreen` with this
+            // person's id pre-filled.
+            if (_isEdit &&
+                _pickedPhone != null &&
+                _pickedPhone!.isNotEmpty) ...[
+              const SizedBox(height: Spacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: SecondaryButton(
+                      key: const ValueKey('add_person.call'),
+                      label: const Text('Call now'),
+                      icon: const Icon(Icons.call),
+                      onPressed: _callNow,
+                    ),
+                  ),
+                  const SizedBox(width: Spacing.sm),
+                  Expanded(
+                    child: SecondaryButton(
+                      key: const ValueKey('add_person.schedule_message'),
+                      label: const Text('Schedule message'),
+                      icon: const Icon(Icons.schedule_send_outlined),
+                      onPressed: _scheduleMessage,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (_error != null) ...[
               const SizedBox(height: Spacing.sm),
               Text(
@@ -312,6 +347,51 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
       // cadence log (privacy contract: lib-people.md).
       _pickedLookupKey = picked.id;
     });
+  }
+
+  // v1.8-pr-e2 / SYS-195 / ADR-126. "Call now" CTA
+  // (edit-mode only, after a phone number is picked).
+  // Builds a `ChannelDialer` from the picked phone and
+  // hands the resulting `Uri` to `url_launcher`. The
+  // system dialer opens with the number pre-filled; the
+  // user must press the call button themselves (no
+  // `CALL_PHONE` permission is requested, per the
+  // privacy contract).
+  Future<void> _callNow() async {
+    final phone = _pickedPhone;
+    if (phone == null || phone.isEmpty) return;
+    final dialerUri = ChannelDialer(phone).launch();
+    if (await canLaunchUrl(dialerUri)) {
+      await launchUrl(dialerUri);
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the dialer.')),
+      );
+    }
+  }
+
+  // v1.8-pr-e2 / SYS-196 / ADR-126 / WF-122. "Schedule
+  // message" CTA. Navigates to the new
+  // `AddScheduledMessageScreen` with this person's id
+  // pre-filled. After the schedule is saved, the screen
+  // pops with `true` and the caller refreshes the
+  // form-state (no state mutation here — the new screen
+  // owns the row + alarm).
+  Future<void> _scheduleMessage() async {
+    final personId = widget.personId;
+    if (personId == null) return;
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => AddScheduledMessageScreen(personId: personId),
+      ),
+    );
+    if (!mounted) return;
+    if (result == true) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Message scheduled.')));
+    }
   }
 
   Future<void> _save() async {

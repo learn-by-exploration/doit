@@ -14,6 +14,7 @@ import 'dart:async';
 import 'package:doit/events/event.dart';
 import 'package:doit/do/do.dart';
 import 'package:doit/do/proof_mode.dart';
+import 'package:doit/people/person.dart' as domain;
 import 'package:doit/reminders/alarm_scheduler.dart';
 import 'package:doit/reminders/anchor_detector.dart';
 import 'package:doit/reminders/full_screen_intent.dart';
@@ -21,6 +22,7 @@ import 'package:doit/reminders/notification_service.dart';
 import 'package:doit/reminders/reminder_bridge.dart';
 import 'package:doit/services/do_repository.dart';
 import 'package:doit/services/event_repository.dart';
+import 'package:doit/services/scheduled_message_repository.dart';
 import 'package:meta/meta.dart';
 
 @immutable
@@ -95,6 +97,33 @@ class ReminderService {
   Future<void> cancelEvent(String eventId) async {
     await _ready.future;
     await scheduler.cancelEvent(eventId);
+  }
+
+  /// v1.8-pr-e2 / SYS-196 / ADR-126: schedule a one-shot
+  /// "message this person at this time" reminder. The
+  /// caller has already persisted the
+  /// [ScheduledMessageRepository] row; this call only arms
+  /// the alarm. On fire (see [onFireAlarm]) the row is
+  /// marked `fired`, a notification is posted, and the
+  /// notification tap launches the channel app via the
+  /// Kotlin-side `PendingIntent` → `Intent.ACTION_*`
+  /// builder (the Kotlin side of this is PR-E2.3).
+  Future<AlarmId> scheduleScheduledMessage({
+    required String scheduledMessageId,
+    required DateTime at,
+  }) async {
+    await _ready.future;
+    return scheduler.scheduleScheduledMessage(
+      scheduledMessageId: scheduledMessageId,
+      at: at,
+    );
+  }
+
+  /// Cancel a pending scheduled-message reminder. Called
+  /// from the "Scheduled messages" list screen.
+  Future<void> cancelScheduledMessage(String scheduledMessageId) async {
+    await _ready.future;
+    await scheduler.cancelScheduledMessage(scheduledMessageId);
   }
 
   /// Cancel a scheduled reminder.
@@ -242,6 +271,65 @@ class ReminderService {
         ),
       );
       await EventRepository.instance.archive(eventId, DateTime.now());
+      return;
+    }
+
+    // v1.8-pr-e2 / SYS-196 / ADR-126: scheduled-message-
+    // fired alarms. Look up the row, mark it fired, show
+    // a notification whose tap launches the channel app.
+    // The Dart side builds the `tapUri` (Uri.toString())
+    // from the row's `channelTag` + `channelHandle` +
+    // optional `messageBody` via
+    // `PersonChannel.fromTag(...).launch(body: ...)`, then
+    // hands it to the bridge. The Kotlin
+    // `MainActivity.buildReminderNotification` builder
+    // (PR-E2.3) wraps the URI in the right
+    // `Intent.ACTION_*` based on scheme
+    // (`tel:` / `sms:` / `https://`).
+    final scheduledMessageId = entry.scheduledMessageId;
+    if (scheduledMessageId != null) {
+      final row = await ScheduledMessageRepository.instance.getById(
+        scheduledMessageId,
+      );
+      if (row == null) {
+        // The row was deleted (e.g., the user cancelled
+        // between schedule and fire, then re-deleted from
+        // history). Skip silently — the platform alarm is
+        // consumed but no notification is shown.
+        return;
+      }
+      await ScheduledMessageRepository.instance.markFired(
+        scheduledMessageId,
+        DateTime.now(),
+      );
+      // Build the deep-link URI from the row's channel.
+      // If the channel handle was cleared (data drift)
+      // or the tag is unknown, fall back to no tap-uri
+      // — the notification still fires with a "Open app"
+      // tap that lands on the MainActivity, which is a
+      // graceful degradation.
+      String? tapUri;
+      try {
+        final channel = domain.PersonChannel.fromTag(
+          row.channelTag,
+          row.channelHandle,
+        );
+        tapUri = channel.launch(body: row.messageBody).toString();
+      } on ArgumentError {
+        tapUri = null;
+      }
+      await notifications.show(
+        ReminderEvent(
+          habitId: entry.habitId,
+          // The notification title is the person's name
+          // (when the row carries a personId) or the row
+          // id (a one-off schedule without a person).
+          habitName: row.personId ?? scheduledMessageId,
+          at: entry.at,
+          alarmId: id,
+          tapUri: tapUri,
+        ),
+      );
       return;
     }
 

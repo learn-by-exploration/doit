@@ -111,6 +111,16 @@ dependencies:
   # model).
   geolocator: ^13.0.1
 
+  # v1.8-pr-e2 / SYS-195 / ADR-126: opens tel:/https://wa.me/.../
+  # https://t.me/.../https://signal.me/#eu/.../sms: URIs from a
+  # PersonChannel.launch() call. Used by the Person-tile Call/Message
+  # CTA (add_person.dart) and by the notification tap-to-launch path
+  # on ScheduledMessage fire (MainActivity.kt). Android 11+ package
+  # visibility for WhatsApp / Telegram / Signal is declared in the
+  # <queries> block of AndroidManifest.xml. No iOS scope yet — the
+  # iOS port (ADR-002) is v2.0+; url_launcher iOS support comes then.
+  url_launcher: ^6.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -121,6 +131,15 @@ dev_dependencies:
   # are added now so the scaffold is ready.
   drift_dev: ^2.20.3
   build_runner: ^2.4.13
+
+  # v1.8-pr-e2 / SYS-195 / ADR-126: used by
+  # `test/android/queries_manifest_test.dart` to parse
+  # AndroidManifest.xml and assert the <queries> block
+  # declares WhatsApp / Telegram / Signal + the sms / tel
+  # intent shapes. Transitive via `flutter_driver` etc.;
+  # declared directly so `flutter pub get` is the only
+  # step needed to make the test compile.
+  xml: ^6.5.0
 
 flutter:
   uses-material-design: true

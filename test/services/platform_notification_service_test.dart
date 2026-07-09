@@ -66,6 +66,40 @@ void main() {
       expect(call.strongMode, isTrue);
     });
 
+    test('show forwards tapUri to bridge.showNotification '
+        '(v1.8-pr-e2 / SYS-195 / ADR-126)', () async {
+      // Scheduled-message notifications carry a
+      // `tapUri` (the deep-link `Uri.toString()` for
+      // the body-tap `PendingIntent`). The
+      // `PlatformNotificationService` must pass it
+      // through to the bridge verbatim so the
+      // Kotlin side can switch on the scheme.
+      final event = ReminderEvent(
+        habitId: 'scheduled_message:sm-1',
+        habitName: 'p1',
+        at: DateTime(2026, 7, 9, 9),
+        alarmId: const AlarmId(100),
+        body: 'Message for p1',
+        tapUri: 'https://wa.me/15555550100?text=hi',
+      );
+      await service.show(event);
+      final call = bridge.showNotificationCalls.single;
+      expect(call.tapUri, 'https://wa.me/15555550100?text=hi');
+    });
+
+    test('show with no tapUri passes tapUri=null to the bridge '
+        '(soft-mode habit alarms stay on MainActivity)', () async {
+      final event = ReminderEvent(
+        habitId: 'h1',
+        habitName: 'Drink water',
+        at: DateTime(2026, 6, 20, 9),
+        alarmId: const AlarmId(42),
+      );
+      await service.show(event);
+      final call = bridge.showNotificationCalls.single;
+      expect(call.tapUri, isNull);
+    });
+
     test(
       'dismiss forwards the alarmId value to bridge.cancelNotification',
       () async {
@@ -120,6 +154,7 @@ class _ThrowingReminderBridge implements ReminderBridge {
     required String habitName,
     String? body,
     bool strongMode = false,
+    String? tapUri,
   }) async {
     throw StateError('simulated platform handler missing');
   }
