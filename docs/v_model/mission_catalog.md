@@ -320,3 +320,19 @@ The habit-save flow validates:
 
 If validation fails, the user sees a field-level error and the
 habit is not saved.
+
+## PR-E2 note (no new mission type)
+
+PR-E2 (v1.8-pr-e2 / SYS-195..198 / ADR-126 / WF-122) ships the
+calling-contact + scheduled-message feature and does **not** add
+a new mission type. The five v0.1 mission shapes (M-001..M-005)
+above remain the full set. PR-E2 is launch-only — `PersonChannel.
+launch()` opens the channel app via `url_launcher` (no chain,
+no mission, no `verify()` round-trip). The chain executor
+(`MissionChain.execute`) is untouched; the notification
+`PendingIntent` builder gains a single branch in Kotlin that
+routes to the channel URI without going through Dart's chain
+executor. A future v2.1 minor (MINOR 3 in the v2.0 plan) may
+add a "Quick-reply from notification" path that calls
+`ScheduledMessageRepository.markFired` from a notification
+action — still no new mission, just a service-layer write.

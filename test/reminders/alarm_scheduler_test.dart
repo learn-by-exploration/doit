@@ -116,6 +116,86 @@ void main() {
     });
   });
 
+  // ── v1.8-pr-e2 / SYS-196 / ADR-126 ─────────────────────
+  // Scheduled-message one-shot alarms. Mirrors the
+  // `scheduleEvent` shape (alarm id derived from the row id
+  // hash, `habitId: 'scheduled_message:<id>'`) and adds a
+  // `scheduledMessageId` slot on `ScheduledAlarm` so the
+  // inbound `onFireAlarm` handler can dispatch without a
+  // DB round-trip.
+
+  group('FakeAlarmScheduler scheduled-message (SYS-196)', () {
+    test('scheduleScheduledMessage stores the entry with the '
+        'scheduledMessageId slot populated', () async {
+      final s = FakeAlarmScheduler();
+      final at = DateTime(2026, 7, 9, 9);
+      final id = await s.scheduleScheduledMessage(
+        scheduledMessageId: 'sm-1',
+        at: at,
+      );
+      expect(s.scheduled.length, 1);
+      final entry = s.scheduled.first;
+      expect(entry.id, id);
+      expect(entry.habitId, 'scheduled_message:sm-1');
+      expect(entry.scheduledMessageId, 'sm-1');
+      expect(entry.at, at);
+      // Sanity: the eventId slot is NOT used here (events
+      // and scheduled messages share the FakeAlarmScheduler
+      // mirror but have distinct discriminator fields).
+      expect(entry.eventId, isNull);
+    });
+
+    test('lookupForFire finds the entry by the derived alarm id', () async {
+      final s = FakeAlarmScheduler();
+      final id = await s.scheduleScheduledMessage(
+        scheduledMessageId: 'sm-2',
+        at: DateTime(2026, 7, 9, 9),
+      );
+      final back = await s.lookupForFire(id);
+      expect(back, isNotNull);
+      expect(back!.scheduledMessageId, 'sm-2');
+    });
+
+    test('cancelScheduledMessage removes the entry', () async {
+      final s = FakeAlarmScheduler();
+      final id = await s.scheduleScheduledMessage(
+        scheduledMessageId: 'sm-3',
+        at: DateTime(2026, 7, 9, 9),
+      );
+      await s.cancelScheduledMessage('sm-3');
+      expect(s.scheduled, isEmpty);
+      expect(await s.lookupForFire(id), isNull);
+    });
+
+    test('cancelScheduledMessage on an unknown id is a no-op', () async {
+      final s = FakeAlarmScheduler();
+      await s.scheduleScheduledMessage(
+        scheduledMessageId: 'sm-4',
+        at: DateTime(2026, 7, 9, 9),
+      );
+      await s.cancelScheduledMessage('does-not-exist');
+      expect(s.scheduled.length, 1);
+    });
+
+    test('alarm id derivation matches the PlatformAlarmScheduler contract '
+        '(id.hashCode & 0x7FFFFFFF)', () async {
+      // The production scheduler derives the alarm id from
+      // the row id's hash (same formula as `scheduleEvent`).
+      // The FakeAlarmScheduler uses the same formula so a
+      // test that exercises both with the same input gets
+      // matching ids. Pin the formula here so a future
+      // refactor that changes it forces this test to fail.
+      const id = 'sm-hash-test';
+      final expected = id.hashCode & 0x7FFFFFFF;
+      final s = FakeAlarmScheduler();
+      final returned = await s.scheduleScheduledMessage(
+        scheduledMessageId: id,
+        at: DateTime(2026, 7, 9, 9),
+      );
+      expect(returned.value, expected);
+    });
+  });
+
   // ── v1.4-stab-E / Phase 45 / SYS-132 ─────────────────────
   // Coverage cycle: exact-alarm denied path → WorkManager
   // fallback + exact-alarm granted → primary path.

@@ -60,6 +60,7 @@ class _ScriptedBridge implements ReminderBridge {
     required String habitName,
     String? body,
     bool strongMode = false,
+    String? tapUri,
   }) async => throw UnimplementedError('showNotification');
   @override
   Future<void> cancelNotification(int alarmId) async =>

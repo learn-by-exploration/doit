@@ -66,11 +66,29 @@ abstract class ReminderBridge {
   /// `doit.reminders` channel. Strong-mode reminders add
   /// the `Open` action; soft-mode add the `Done` action.
   /// v1.2e / Phase 5.
+  ///
+  /// [tapUri] (v1.8-pr-e2 / SYS-195 / ADR-126) is the
+  /// optional `Uri.toString()` for the body-tap
+  /// `PendingIntent`. When `null`, the tap targets the
+  /// existing surface (MainActivity for soft-mode,
+  /// FullScreenActivity for strong-mode). When non-null,
+  /// the Kotlin side switches on the URI scheme and wraps
+  /// it in the right `Intent.ACTION_*`:
+  /// - `tel:` → `Intent.ACTION_DIAL`
+  /// - `sms:` → `Intent.ACTION_SENDTO`
+  /// - `https://wa.me|t.me|signal.me` → `Intent.ACTION_VIEW`
+  /// Android 11+ package visibility for the third-party
+  /// apps is declared in `AndroidManifest.xml`'s
+  /// `<queries>` block. The calling convention is the one
+  /// `PersonChannel.launch()` emits, so Dart can stay
+  /// platform-agnostic and the Kotlin side does the scheme
+  /// dispatch.
   Future<void> showNotification({
     required int alarmId,
     required String habitName,
     String? body,
     bool strongMode = false,
+    String? tapUri,
   });
 
   /// Cancel the active notification for [alarmId]. No-op if
@@ -225,12 +243,14 @@ class PlatformReminderBridge implements ReminderBridge {
     required String habitName,
     String? body,
     bool strongMode = false,
+    String? tapUri,
   }) async {
     await _channel.invokeMethod<void>('showNotification', {
       'alarmId': alarmId,
       'habitName': habitName,
       'body': body,
       'strongMode': strongMode,
+      'tapUri': tapUri,
     });
   }
 
@@ -270,9 +290,25 @@ class FakeReminderBridge implements ReminderBridge {
       <({int alarmId, int epochMs})>[];
   final List<int> cancelAlarmCalls = <int>[];
   final List<String> showFullScreenCalls = <String>[];
-  final List<({int alarmId, String habitName, String? body, bool strongMode})>
+  final List<
+    ({
+      int alarmId,
+      String habitName,
+      String? body,
+      bool strongMode,
+      String? tapUri,
+    })
+  >
   showNotificationCalls =
-      <({int alarmId, String habitName, String? body, bool strongMode})>[];
+      <
+        ({
+          int alarmId,
+          String habitName,
+          String? body,
+          bool strongMode,
+          String? tapUri,
+        })
+      >[];
   final List<int> cancelNotificationCalls = <int>[];
 
   final List<({int alarmId, int leadTimeSeconds})> schedulePreAlarmCalls =
@@ -326,12 +362,14 @@ class FakeReminderBridge implements ReminderBridge {
     required String habitName,
     String? body,
     bool strongMode = false,
+    String? tapUri,
   }) async {
     showNotificationCalls.add((
       alarmId: alarmId,
       habitName: habitName,
       body: body,
       strongMode: strongMode,
+      tapUri: tapUri,
     ));
   }
 

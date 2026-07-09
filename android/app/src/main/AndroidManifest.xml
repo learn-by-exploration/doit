@@ -351,5 +351,62 @@
         <intent>
             <action android:name="android.intent.action.ANSWER" />
         </intent>
+        <!-- v1.8-pr-e2 / SYS-195 / ADR-126: package-visibility
+             for the calling-contact feature. The Dart side
+             builds `Uri`s (`https://wa.me/<digits>?text=...`,
+             `https://t.me/<handle>?text=...`,
+             `https://signal.me/#eu/<digits>`,
+             `sms:+<E164>?body=...`, `tel:+<E164>`) and
+             hands them to the platform via
+             `Intent.ACTION_VIEW` / `Intent.ACTION_DIAL` /
+             `Intent.ACTION_SENDTO`. Android 11+ requires the
+             caller to declare the resolved packages and the
+             intent shapes so the OS grants visibility at
+             runtime. Without these entries `launchUrl` from
+             `url_launcher` resolves `false` on Android 11+
+             for any target app not on the device's
+             pre-installed-apps list. -->
+
+        <!-- WhatsApp: the wa.me universal scheme resolves
+             to the consumer WhatsApp app (com.whatsapp) or
+             the business variant (com.whatsapp.w4b). Both
+             are declared so a user on the business build
+             can still deep-link. -->
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+
+        <!-- Telegram: the only official package id. -->
+        <package android:name="org.telegram.messenger" />
+
+        <!-- Signal: the only official package id. -->
+        <package android:name="org.thoughtcrime.securesms" />
+
+        <!-- `sms:` scheme: resolved by the system Messages
+             app via `Intent.ACTION_SENDTO` with a `sms:`
+             data URI. The `<intent>` declaration covers the
+             OS-level resolver; package visibility is not
+             required because `sms:` is a system scheme. -->
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="sms" />
+        </intent>
+
+        <!-- `tel:` scheme: resolved by the system Phone /
+             Dialer app via `Intent.ACTION_DIAL`. The dialer
+             is part of the OS, so no `<package>` entry is
+             needed; only the `<intent>` shape. -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+
+        <!-- `https://` view intents: required for the wa.me /
+             t.me / signal.me schemes. The OS picks the
+             matching browser if the native app is not
+             installed (fallback). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
     </queries>
 </manifest>

@@ -26,9 +26,55 @@ typedef PersonId = String;
 
 /// A sealed channel. The 5 v0.1 channels are exhaustive; add a
 /// v0.2 channel (e.g., `ChannelEmail`) by adding a subclass.
+///
+/// v1.8-pr-e2 / SYS-195 / ADR-126: each subclass implements
+/// [launch] which returns the `Uri` the caller hands to
+/// `url_launcher` (or to the platform `Intent.ACTION_*` for the
+/// Kotlin-side notification tap-to-launch path). The body
+/// argument is URL-encoded and appended as `?text=...` (WhatsApp /
+/// Telegram / Signal) or `?body=...` (SMS); the dialer ignores it.
 @immutable
 sealed class PersonChannel {
   const PersonChannel();
+
+  /// Build the deep-link `Uri` for this channel. [body] is the
+  /// pre-fill message (optional; empty / null for channels that
+  /// do not accept a pre-fill).
+  ///
+  /// Throws [ArgumentError] if the underlying handle is empty
+  /// (the data-layer invariant is "non-empty handle"; see
+  /// `People.handle` at `lib/services/db/tables.dart:131`). The
+  /// platform side resolves the URI; if the target app is not
+  /// installed, `url_launcher` returns `false` from `launchUrl`
+  /// and the caller surfaces a fallback snackbar.
+  Uri launch({String? body});
+
+  /// String tag used in the `People.channel` column to
+  /// discriminate the 5 variants. Matches the `_channelTagAndHandle`
+  /// mapping at `lib/services/person_repository.dart:90-98`.
+  String get tag;
+
+  /// Reverse-mapping of [tag] → [PersonChannel] subclass. Used
+  /// by `ScheduledMessageRepository` callers that need to
+  /// re-build a channel from the stored `channelTag` +
+  /// `channelHandle` columns (e.g., `ReminderService.onFireAlarm`
+  /// computes the notification `tapUri` from a fired
+  /// `ScheduledMessage` row).
+  ///
+  /// Throws [ArgumentError] for an unknown tag (the data-layer
+  /// invariant is "tag is one of the 5 well-known values"; see
+  /// `ScheduledMessageRepository.insert` at
+  /// `lib/services/scheduled_message_repository.dart:172-200`).
+  factory PersonChannel.fromTag(String tag, String handle) {
+    return switch (tag) {
+      'dialer' => ChannelDialer(handle),
+      'whatsapp' => ChannelWhatsApp(handle),
+      'telegram' => ChannelTelegram(handle),
+      'signal' => ChannelSignal(handle),
+      'sms' => ChannelSms(handle),
+      _ => throw ArgumentError.value(tag, 'tag', 'unknown channel tag'),
+    };
+  }
 }
 
 /// Open the system dialer with the contact's number. No
@@ -37,6 +83,25 @@ sealed class PersonChannel {
 final class ChannelDialer extends PersonChannel {
   const ChannelDialer(this.phoneNumber);
   final String phoneNumber;
+
+  @override
+  String get tag => 'dialer';
+
+  /// `tel:+15555550100` — the `tel:` scheme is system-resolvable
+  /// without an explicit `<queries>` entry. The body argument is
+  /// accepted for API uniformity but is not appended to the URI
+  /// (the dialer does not pre-fill a message).
+  @override
+  Uri launch({String? body}) {
+    if (phoneNumber.isEmpty) {
+      throw ArgumentError.value(
+        phoneNumber,
+        'phoneNumber',
+        'dialer handle is empty',
+      );
+    }
+    return Uri(scheme: 'tel', path: phoneNumber);
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -52,6 +117,29 @@ final class ChannelWhatsApp extends PersonChannel {
   final String phoneNumber;
 
   @override
+  String get tag => 'whatsapp';
+
+  /// `https://wa.me/<E164>?text=<urlencoded body>` — the universal
+  /// wa.me scheme that resolves to the WhatsApp app on every
+  /// platform that ships it. The number is passed as-is (the wa.me
+  /// scheme is E.164-tolerant of leading `+` and stripped `+`).
+  @override
+  Uri launch({String? body}) {
+    if (phoneNumber.isEmpty) {
+      throw ArgumentError.value(
+        phoneNumber,
+        'phoneNumber',
+        'whatsapp handle is empty',
+      );
+    }
+    // wa.me normalizes the leading '+' away; pass digits-only.
+    final digits = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    final base = Uri.parse('https://wa.me/$digits');
+    if (body == null || body.isEmpty) return base;
+    return base.replace(queryParameters: {'text': body});
+  }
+
+  @override
   bool operator ==(Object other) =>
       other is ChannelWhatsApp && other.phoneNumber == phoneNumber;
 
@@ -63,6 +151,26 @@ final class ChannelWhatsApp extends PersonChannel {
 final class ChannelTelegram extends PersonChannel {
   const ChannelTelegram(this.username);
   final String username;
+
+  @override
+  String get tag => 'telegram';
+
+  /// `https://t.me/<handle>?text=<urlencoded body>` — strips a
+  /// leading `@` so the user can paste a typed-style handle.
+  @override
+  Uri launch({String? body}) {
+    if (username.isEmpty) {
+      throw ArgumentError.value(
+        username,
+        'username',
+        'telegram handle is empty',
+      );
+    }
+    final handle = username.startsWith('@') ? username.substring(1) : username;
+    final base = Uri.parse('https://t.me/$handle');
+    if (body == null || body.isEmpty) return base;
+    return base.replace(queryParameters: {'text': body});
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -78,6 +186,27 @@ final class ChannelSignal extends PersonChannel {
   final String phoneNumber;
 
   @override
+  String get tag => 'signal';
+
+  /// `https://signal.me/#eu/<E164>` — the universal signal.me
+  /// scheme (EU region parameter; the official Signal deep-link
+  /// spec from signal.org). Body is not pre-fillable on Signal
+  /// (the conversation opens; the user pastes manually).
+  @override
+  Uri launch({String? body}) {
+    if (phoneNumber.isEmpty) {
+      throw ArgumentError.value(
+        phoneNumber,
+        'phoneNumber',
+        'signal handle is empty',
+      );
+    }
+    // signal.me normalizes the leading '+' away; pass digits-only.
+    final digits = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    return Uri.parse('https://signal.me/#eu/$digits');
+  }
+
+  @override
   bool operator ==(Object other) =>
       other is ChannelSignal && other.phoneNumber == phoneNumber;
 
@@ -90,6 +219,27 @@ final class ChannelSignal extends PersonChannel {
 final class ChannelSms extends PersonChannel {
   const ChannelSms(this.phoneNumber);
   final String phoneNumber;
+
+  @override
+  String get tag => 'sms';
+
+  /// `sms:+<E164>?body=<urlencoded body>` — the standard
+  /// `ACTION_SENDTO` / `smsto:` scheme. Note: `sms:` requires an
+  /// explicit `<intent>` entry in the manifest `<queries>` block
+  /// on Android 11+ (added in this same PR).
+  @override
+  Uri launch({String? body}) {
+    if (phoneNumber.isEmpty) {
+      throw ArgumentError.value(
+        phoneNumber,
+        'phoneNumber',
+        'sms handle is empty',
+      );
+    }
+    final base = Uri(scheme: 'sms', path: phoneNumber);
+    if (body == null || body.isEmpty) return base;
+    return base.replace(queryParameters: {'body': body});
+  }
 
   @override
   bool operator ==(Object other) =>

@@ -219,6 +219,43 @@ class PlatformAlarmScheduler implements AlarmScheduler {
   }
 
   @override
+  Future<AlarmId> scheduleScheduledMessage({
+    required String scheduledMessageId,
+    required DateTime at,
+  }) async {
+    // Mirror [scheduleEvent]'s id derivation — a stable
+    // 31-bit positive integer derived from the row id's
+    // hash. The inbound [onFireAlarm] handler uses
+    // [_firingEntries] to look up the row by alarmId
+    // without a DB round-trip, so the derivation MUST
+    // match `FakeAlarmScheduler.scheduleScheduledMessage`
+    // exactly (the production + test parity is the
+    // contract; see `test/reminders/alarm_scheduler_scheduled_message_test.dart`).
+    final AlarmId id = AlarmId(scheduledMessageId.hashCode & 0x7FFFFFFF);
+    final int returned = await _bridge.setExactAlarm(
+      alarmId: id.value,
+      epochMs: at.millisecondsSinceEpoch,
+    );
+    final AlarmId effective = returned == id.value ? id : AlarmId(returned);
+    _scheduled[effective] = at;
+    _firingEntries[effective] = ScheduledAlarm(
+      id: effective,
+      habitId: 'scheduled_message:$scheduledMessageId',
+      at: at,
+      scheduledMessageId: scheduledMessageId,
+    );
+    return effective;
+  }
+
+  @override
+  Future<void> cancelScheduledMessage(String scheduledMessageId) async {
+    final AlarmId id = AlarmId(scheduledMessageId.hashCode & 0x7FFFFFFF);
+    _scheduled.remove(id);
+    _firingEntries.remove(id);
+    await _bridge.cancelAlarm(id.value);
+  }
+
+  @override
   Future<ScheduledAlarm?> lookupForFire(AlarmId id) async {
     return _firingEntries[id];
   }
