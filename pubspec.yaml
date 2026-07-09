@@ -132,6 +132,15 @@ dev_dependencies:
   drift_dev: ^2.20.3
   build_runner: ^2.4.13
 
+  # v1.8-pr-e2 / SYS-195 / ADR-126: used by
+  # `test/android/queries_manifest_test.dart` to parse
+  # AndroidManifest.xml and assert the <queries> block
+  # declares WhatsApp / Telegram / Signal + the sms / tel
+  # intent shapes. Transitive via `flutter_driver` etc.;
+  # declared directly so `flutter pub get` is the only
+  # step needed to make the test compile.
+  xml: ^6.5.0
+
 flutter:
   uses-material-design: true
   # v1.1h / ADR-031 / SYS-087: turn on `gen-l10n`. The
