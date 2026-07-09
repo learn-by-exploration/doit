@@ -21,72 +21,75 @@ import 'package:path/path.dart' as p;
 import 'package:xml/xml.dart';
 
 void main() {
-  test('AndroidManifest declares the WhatsApp / Telegram / Signal packages + sms/tel intents under <queries>', () {
-    // The manifest is at android/app/src/main/AndroidManifest.xml
-    // relative to the package root. The Flutter test runner
-    // runs from the package root, so a relative path works.
-    final manifestPath = p.join(
-      'android',
-      'app',
-      'src',
-      'main',
-      'AndroidManifest.xml',
-    );
-    final file = File(manifestPath);
-    expect(
-      file.existsSync(),
-      isTrue,
-      reason: 'AndroidManifest.xml not found at $manifestPath',
-    );
+  test(
+    'AndroidManifest declares the WhatsApp / Telegram / Signal packages + sms/tel intents under <queries>',
+    () {
+      // The manifest is at android/app/src/main/AndroidManifest.xml
+      // relative to the package root. The Flutter test runner
+      // runs from the package root, so a relative path works.
+      final manifestPath = p.join(
+        'android',
+        'app',
+        'src',
+        'main',
+        'AndroidManifest.xml',
+      );
+      final file = File(manifestPath);
+      expect(
+        file.existsSync(),
+        isTrue,
+        reason: 'AndroidManifest.xml not found at $manifestPath',
+      );
 
-    final doc = XmlDocument.parse(file.readAsStringSync());
+      final doc = XmlDocument.parse(file.readAsStringSync());
 
-    // Find the top-level <queries> block.
-    final queries = doc.findAllElements('queries').toList();
-    expect(queries, hasLength(1), reason: 'expected exactly one <queries>');
+      // Find the top-level <queries> block.
+      final queries = doc.findAllElements('queries').toList();
+      expect(queries, hasLength(1), reason: 'expected exactly one <queries>');
 
-    final inner = queries.first;
+      final inner = queries.first;
 
-    // --- package visibility: WhatsApp / Telegram / Signal ---
-    final packages = inner
-        .findElements('package')
-        .map((e) => e.getAttribute('android:name'))
-        .whereType<String>()
-        .toSet();
-    expect(packages.contains('com.whatsapp'), isTrue);
-    expect(packages.contains('com.whatsapp.w4b'), isTrue);
-    expect(packages.contains('org.telegram.messenger'), isTrue);
-    expect(packages.contains('org.thoughtcrime.securesms'), isTrue);
+      // --- package visibility: WhatsApp / Telegram / Signal ---
+      final packages = inner
+          .findElements('package')
+          .map((e) => e.getAttribute('android:name'))
+          .whereType<String>()
+          .toSet();
+      expect(packages.contains('com.whatsapp'), isTrue);
+      expect(packages.contains('com.whatsapp.w4b'), isTrue);
+      expect(packages.contains('org.telegram.messenger'), isTrue);
+      expect(packages.contains('org.thoughtcrime.securesms'), isTrue);
 
-    // --- intent visibility: sms + tel ---
-    final intentEntries = inner.findElements('intent').toList();
-    expect(intentEntries, isNotEmpty);
+      // --- intent visibility: sms + tel ---
+      final intentEntries = inner.findElements('intent').toList();
+      expect(intentEntries, isNotEmpty);
 
-    String? smsAction;
-    String? smsScheme;
-    String? telAction;
-    String? telScheme;
-    for (final intent in intentEntries) {
-      final action =
-          intent.findElements('action').firstOrNull?.getAttribute('android:name');
-      final data =
-          intent.findElements('data').firstOrNull?.getAttribute('android:scheme');
-      if (action == 'android.intent.action.SENDTO' && data == 'sms') {
-        smsAction = action;
-        smsScheme = data;
+      String? smsAction;
+      String? smsScheme;
+      String? telAction;
+      String? telScheme;
+      for (final intent in intentEntries) {
+        final actionEl = intent.findElements('action');
+        final dataEl = intent.findElements('data');
+        final action = actionEl.isEmpty
+            ? null
+            : actionEl.first.getAttribute('android:name');
+        final data = dataEl.isEmpty
+            ? null
+            : dataEl.first.getAttribute('android:scheme');
+        if (action == 'android.intent.action.SENDTO' && data == 'sms') {
+          smsAction = action;
+          smsScheme = data;
+        }
+        if (action == 'android.intent.action.DIAL' && data == 'tel') {
+          telAction = action;
+          telScheme = data;
+        }
       }
-      if (action == 'android.intent.action.DIAL' && data == 'tel') {
-        telAction = action;
-        telScheme = data;
-      }
-    }
-    expect(smsAction, 'android.intent.action.SENDTO');
-    expect(smsScheme, 'sms');
-    expect(telAction, 'android.intent.action.DIAL');
-    expect(telScheme, 'tel');
-  });
-}
-
-extension _IterableFirstOrNull<E> on Iterable<E> {
-  E? get firstOrNull => isEmpty ? null : first;
+      expect(smsAction, 'android.intent.action.SENDTO');
+      expect(smsScheme, 'sms');
+      expect(telAction, 'android.intent.action.DIAL');
+      expect(telScheme, 'tel');
+    },
+  );
 }
