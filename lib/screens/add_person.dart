@@ -372,7 +372,8 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
         const SnackBar(content: Text('Could not open the dialer.')),
       );
     }
-    // dart:io unused; `uri` is just a placeholder.
+    // The `uri` is built by `ChannelDialer.launch()` and is
+    // guaranteed to have scheme == 'tel' by the model.
     assert(uri.scheme == 'tel');
   }
 
