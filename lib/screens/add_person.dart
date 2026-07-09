@@ -360,9 +360,6 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
   Future<void> _callNow() async {
     final phone = _pickedPhone;
     if (phone == null || phone.isEmpty) return;
-    final uri = const ChannelDialer('').launch(); // not used
-    // The dummy launch above is just to keep the import
-    // alive; the real call below uses the picked phone.
     final dialerUri = ChannelDialer(phone).launch();
     if (await canLaunchUrl(dialerUri)) {
       await launchUrl(dialerUri);
@@ -372,9 +369,6 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
         const SnackBar(content: Text('Could not open the dialer.')),
       );
     }
-    // The `uri` is built by `ChannelDialer.launch()` and is
-    // guaranteed to have scheme == 'tel' by the model.
-    assert(uri.scheme == 'tel');
   }
 
   // v1.8-pr-e2 / SYS-196 / ADR-126 / WF-122. "Schedule
