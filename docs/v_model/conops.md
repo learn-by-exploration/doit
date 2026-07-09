@@ -329,3 +329,17 @@ truthfully answer "yes" to all of the following:
 
 If even one of these is "no", the app has not yet earned the right to
 be the user's daily habit tool. Fix it before adding features.
+14. (v2.0 retention / PR-E1 / SYS-194 + PR-E2 / SYS-195..198)
+    The user schedules a one-shot contact message — e.g., "text Dad
+    tomorrow at 6pm". They open the person tile, tap "Send message",
+    pick "WhatsApp" as the channel, pick tomorrow 18:00 as the fire
+    time, optionally pre-fill the composer body, and Save. A row is
+    inserted into the new `scheduled_messages` Drift table with
+    `status='pending'` and `fireAtMillis` set. At fire time the
+    notification surfaces with a `channel_tag` + `channel_handle`
+    resolved at schedule time, the user taps it, and the chosen
+    channel app (WhatsApp / Signal / Telegram / dialer / SMS) opens
+    with the pre-filled composer (or just the dialer for voice).
+    `personId` is denormalized to `channel_handle` so the launch
+    still works after the source person is deleted. The lifecycle
+    values are `'pending' | 'fired' | 'dismissed' | 'cancelled'`.

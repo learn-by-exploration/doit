@@ -5918,6 +5918,595 @@ class TemplatesCompanion extends UpdateCompanion<TemplateRow> {
   }
 }
 
+class $ScheduledMessagesTable extends ScheduledMessages
+    with TableInfo<$ScheduledMessagesTable, ScheduledMessageRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ScheduledMessagesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _channelTagMeta = const VerificationMeta(
+    'channelTag',
+  );
+  @override
+  late final GeneratedColumn<String> channelTag = GeneratedColumn<String>(
+    'channel_tag',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _channelHandleMeta = const VerificationMeta(
+    'channelHandle',
+  );
+  @override
+  late final GeneratedColumn<String> channelHandle = GeneratedColumn<String>(
+    'channel_handle',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _messageBodyMeta = const VerificationMeta(
+    'messageBody',
+  );
+  @override
+  late final GeneratedColumn<String> messageBody = GeneratedColumn<String>(
+    'message_body',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _fireAtMillisMeta = const VerificationMeta(
+    'fireAtMillis',
+  );
+  @override
+  late final GeneratedColumn<int> fireAtMillis = GeneratedColumn<int>(
+    'fire_at_millis',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _createdAtMillisMeta = const VerificationMeta(
+    'createdAtMillis',
+  );
+  @override
+  late final GeneratedColumn<int> createdAtMillis = GeneratedColumn<int>(
+    'created_at_millis',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _firedAtMillisMeta = const VerificationMeta(
+    'firedAtMillis',
+  );
+  @override
+  late final GeneratedColumn<int> firedAtMillis = GeneratedColumn<int>(
+    'fired_at_millis',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    personId,
+    channelTag,
+    channelHandle,
+    messageBody,
+    fireAtMillis,
+    status,
+    createdAtMillis,
+    firedAtMillis,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'scheduled_messages';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ScheduledMessageRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    }
+    if (data.containsKey('channel_tag')) {
+      context.handle(
+        _channelTagMeta,
+        channelTag.isAcceptableOrUnknown(data['channel_tag']!, _channelTagMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_channelTagMeta);
+    }
+    if (data.containsKey('channel_handle')) {
+      context.handle(
+        _channelHandleMeta,
+        channelHandle.isAcceptableOrUnknown(
+          data['channel_handle']!,
+          _channelHandleMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_channelHandleMeta);
+    }
+    if (data.containsKey('message_body')) {
+      context.handle(
+        _messageBodyMeta,
+        messageBody.isAcceptableOrUnknown(
+          data['message_body']!,
+          _messageBodyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('fire_at_millis')) {
+      context.handle(
+        _fireAtMillisMeta,
+        fireAtMillis.isAcceptableOrUnknown(
+          data['fire_at_millis']!,
+          _fireAtMillisMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_fireAtMillisMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('created_at_millis')) {
+      context.handle(
+        _createdAtMillisMeta,
+        createdAtMillis.isAcceptableOrUnknown(
+          data['created_at_millis']!,
+          _createdAtMillisMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMillisMeta);
+    }
+    if (data.containsKey('fired_at_millis')) {
+      context.handle(
+        _firedAtMillisMeta,
+        firedAtMillis.isAcceptableOrUnknown(
+          data['fired_at_millis']!,
+          _firedAtMillisMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ScheduledMessageRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ScheduledMessageRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      ),
+      channelTag: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}channel_tag'],
+      )!,
+      channelHandle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}channel_handle'],
+      )!,
+      messageBody: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message_body'],
+      ),
+      fireAtMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}fire_at_millis'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      createdAtMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at_millis'],
+      )!,
+      firedAtMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}fired_at_millis'],
+      ),
+    );
+  }
+
+  @override
+  $ScheduledMessagesTable createAlias(String alias) {
+    return $ScheduledMessagesTable(attachedDatabase, alias);
+  }
+}
+
+class ScheduledMessageRow extends DataClass
+    implements Insertable<ScheduledMessageRow> {
+  final String id;
+  final String? personId;
+  final String channelTag;
+  final String channelHandle;
+  final String? messageBody;
+  final int fireAtMillis;
+  final String status;
+  final int createdAtMillis;
+  final int? firedAtMillis;
+  const ScheduledMessageRow({
+    required this.id,
+    this.personId,
+    required this.channelTag,
+    required this.channelHandle,
+    this.messageBody,
+    required this.fireAtMillis,
+    required this.status,
+    required this.createdAtMillis,
+    this.firedAtMillis,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || personId != null) {
+      map['person_id'] = Variable<String>(personId);
+    }
+    map['channel_tag'] = Variable<String>(channelTag);
+    map['channel_handle'] = Variable<String>(channelHandle);
+    if (!nullToAbsent || messageBody != null) {
+      map['message_body'] = Variable<String>(messageBody);
+    }
+    map['fire_at_millis'] = Variable<int>(fireAtMillis);
+    map['status'] = Variable<String>(status);
+    map['created_at_millis'] = Variable<int>(createdAtMillis);
+    if (!nullToAbsent || firedAtMillis != null) {
+      map['fired_at_millis'] = Variable<int>(firedAtMillis);
+    }
+    return map;
+  }
+
+  ScheduledMessagesCompanion toCompanion(bool nullToAbsent) {
+    return ScheduledMessagesCompanion(
+      id: Value(id),
+      personId: personId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(personId),
+      channelTag: Value(channelTag),
+      channelHandle: Value(channelHandle),
+      messageBody: messageBody == null && nullToAbsent
+          ? const Value.absent()
+          : Value(messageBody),
+      fireAtMillis: Value(fireAtMillis),
+      status: Value(status),
+      createdAtMillis: Value(createdAtMillis),
+      firedAtMillis: firedAtMillis == null && nullToAbsent
+          ? const Value.absent()
+          : Value(firedAtMillis),
+    );
+  }
+
+  factory ScheduledMessageRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ScheduledMessageRow(
+      id: serializer.fromJson<String>(json['id']),
+      personId: serializer.fromJson<String?>(json['personId']),
+      channelTag: serializer.fromJson<String>(json['channelTag']),
+      channelHandle: serializer.fromJson<String>(json['channelHandle']),
+      messageBody: serializer.fromJson<String?>(json['messageBody']),
+      fireAtMillis: serializer.fromJson<int>(json['fireAtMillis']),
+      status: serializer.fromJson<String>(json['status']),
+      createdAtMillis: serializer.fromJson<int>(json['createdAtMillis']),
+      firedAtMillis: serializer.fromJson<int?>(json['firedAtMillis']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'personId': serializer.toJson<String?>(personId),
+      'channelTag': serializer.toJson<String>(channelTag),
+      'channelHandle': serializer.toJson<String>(channelHandle),
+      'messageBody': serializer.toJson<String?>(messageBody),
+      'fireAtMillis': serializer.toJson<int>(fireAtMillis),
+      'status': serializer.toJson<String>(status),
+      'createdAtMillis': serializer.toJson<int>(createdAtMillis),
+      'firedAtMillis': serializer.toJson<int?>(firedAtMillis),
+    };
+  }
+
+  ScheduledMessageRow copyWith({
+    String? id,
+    Value<String?> personId = const Value.absent(),
+    String? channelTag,
+    String? channelHandle,
+    Value<String?> messageBody = const Value.absent(),
+    int? fireAtMillis,
+    String? status,
+    int? createdAtMillis,
+    Value<int?> firedAtMillis = const Value.absent(),
+  }) => ScheduledMessageRow(
+    id: id ?? this.id,
+    personId: personId.present ? personId.value : this.personId,
+    channelTag: channelTag ?? this.channelTag,
+    channelHandle: channelHandle ?? this.channelHandle,
+    messageBody: messageBody.present ? messageBody.value : this.messageBody,
+    fireAtMillis: fireAtMillis ?? this.fireAtMillis,
+    status: status ?? this.status,
+    createdAtMillis: createdAtMillis ?? this.createdAtMillis,
+    firedAtMillis: firedAtMillis.present
+        ? firedAtMillis.value
+        : this.firedAtMillis,
+  );
+  ScheduledMessageRow copyWithCompanion(ScheduledMessagesCompanion data) {
+    return ScheduledMessageRow(
+      id: data.id.present ? data.id.value : this.id,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      channelTag: data.channelTag.present
+          ? data.channelTag.value
+          : this.channelTag,
+      channelHandle: data.channelHandle.present
+          ? data.channelHandle.value
+          : this.channelHandle,
+      messageBody: data.messageBody.present
+          ? data.messageBody.value
+          : this.messageBody,
+      fireAtMillis: data.fireAtMillis.present
+          ? data.fireAtMillis.value
+          : this.fireAtMillis,
+      status: data.status.present ? data.status.value : this.status,
+      createdAtMillis: data.createdAtMillis.present
+          ? data.createdAtMillis.value
+          : this.createdAtMillis,
+      firedAtMillis: data.firedAtMillis.present
+          ? data.firedAtMillis.value
+          : this.firedAtMillis,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ScheduledMessageRow(')
+          ..write('id: $id, ')
+          ..write('personId: $personId, ')
+          ..write('channelTag: $channelTag, ')
+          ..write('channelHandle: $channelHandle, ')
+          ..write('messageBody: $messageBody, ')
+          ..write('fireAtMillis: $fireAtMillis, ')
+          ..write('status: $status, ')
+          ..write('createdAtMillis: $createdAtMillis, ')
+          ..write('firedAtMillis: $firedAtMillis')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    personId,
+    channelTag,
+    channelHandle,
+    messageBody,
+    fireAtMillis,
+    status,
+    createdAtMillis,
+    firedAtMillis,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ScheduledMessageRow &&
+          other.id == this.id &&
+          other.personId == this.personId &&
+          other.channelTag == this.channelTag &&
+          other.channelHandle == this.channelHandle &&
+          other.messageBody == this.messageBody &&
+          other.fireAtMillis == this.fireAtMillis &&
+          other.status == this.status &&
+          other.createdAtMillis == this.createdAtMillis &&
+          other.firedAtMillis == this.firedAtMillis);
+}
+
+class ScheduledMessagesCompanion extends UpdateCompanion<ScheduledMessageRow> {
+  final Value<String> id;
+  final Value<String?> personId;
+  final Value<String> channelTag;
+  final Value<String> channelHandle;
+  final Value<String?> messageBody;
+  final Value<int> fireAtMillis;
+  final Value<String> status;
+  final Value<int> createdAtMillis;
+  final Value<int?> firedAtMillis;
+  final Value<int> rowid;
+  const ScheduledMessagesCompanion({
+    this.id = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.channelTag = const Value.absent(),
+    this.channelHandle = const Value.absent(),
+    this.messageBody = const Value.absent(),
+    this.fireAtMillis = const Value.absent(),
+    this.status = const Value.absent(),
+    this.createdAtMillis = const Value.absent(),
+    this.firedAtMillis = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ScheduledMessagesCompanion.insert({
+    required String id,
+    this.personId = const Value.absent(),
+    required String channelTag,
+    required String channelHandle,
+    this.messageBody = const Value.absent(),
+    required int fireAtMillis,
+    this.status = const Value.absent(),
+    required int createdAtMillis,
+    this.firedAtMillis = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       channelTag = Value(channelTag),
+       channelHandle = Value(channelHandle),
+       fireAtMillis = Value(fireAtMillis),
+       createdAtMillis = Value(createdAtMillis);
+  static Insertable<ScheduledMessageRow> custom({
+    Expression<String>? id,
+    Expression<String>? personId,
+    Expression<String>? channelTag,
+    Expression<String>? channelHandle,
+    Expression<String>? messageBody,
+    Expression<int>? fireAtMillis,
+    Expression<String>? status,
+    Expression<int>? createdAtMillis,
+    Expression<int>? firedAtMillis,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (personId != null) 'person_id': personId,
+      if (channelTag != null) 'channel_tag': channelTag,
+      if (channelHandle != null) 'channel_handle': channelHandle,
+      if (messageBody != null) 'message_body': messageBody,
+      if (fireAtMillis != null) 'fire_at_millis': fireAtMillis,
+      if (status != null) 'status': status,
+      if (createdAtMillis != null) 'created_at_millis': createdAtMillis,
+      if (firedAtMillis != null) 'fired_at_millis': firedAtMillis,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ScheduledMessagesCompanion copyWith({
+    Value<String>? id,
+    Value<String?>? personId,
+    Value<String>? channelTag,
+    Value<String>? channelHandle,
+    Value<String?>? messageBody,
+    Value<int>? fireAtMillis,
+    Value<String>? status,
+    Value<int>? createdAtMillis,
+    Value<int?>? firedAtMillis,
+    Value<int>? rowid,
+  }) {
+    return ScheduledMessagesCompanion(
+      id: id ?? this.id,
+      personId: personId ?? this.personId,
+      channelTag: channelTag ?? this.channelTag,
+      channelHandle: channelHandle ?? this.channelHandle,
+      messageBody: messageBody ?? this.messageBody,
+      fireAtMillis: fireAtMillis ?? this.fireAtMillis,
+      status: status ?? this.status,
+      createdAtMillis: createdAtMillis ?? this.createdAtMillis,
+      firedAtMillis: firedAtMillis ?? this.firedAtMillis,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (channelTag.present) {
+      map['channel_tag'] = Variable<String>(channelTag.value);
+    }
+    if (channelHandle.present) {
+      map['channel_handle'] = Variable<String>(channelHandle.value);
+    }
+    if (messageBody.present) {
+      map['message_body'] = Variable<String>(messageBody.value);
+    }
+    if (fireAtMillis.present) {
+      map['fire_at_millis'] = Variable<int>(fireAtMillis.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (createdAtMillis.present) {
+      map['created_at_millis'] = Variable<int>(createdAtMillis.value);
+    }
+    if (firedAtMillis.present) {
+      map['fired_at_millis'] = Variable<int>(firedAtMillis.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ScheduledMessagesCompanion(')
+          ..write('id: $id, ')
+          ..write('personId: $personId, ')
+          ..write('channelTag: $channelTag, ')
+          ..write('channelHandle: $channelHandle, ')
+          ..write('messageBody: $messageBody, ')
+          ..write('fireAtMillis: $fireAtMillis, ')
+          ..write('status: $status, ')
+          ..write('createdAtMillis: $createdAtMillis, ')
+          ..write('firedAtMillis: $firedAtMillis, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5932,6 +6521,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PersonGroupMembersTable personGroupMembers =
       $PersonGroupMembersTable(this);
   late final $TemplatesTable templates = $TemplatesTable(this);
+  late final $ScheduledMessagesTable scheduledMessages =
+      $ScheduledMessagesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5947,6 +6538,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     personGroups,
     personGroupMembers,
     templates,
+    scheduledMessages,
   ];
 }
 
@@ -8830,6 +9422,307 @@ typedef $$TemplatesTableProcessedTableManager =
       TemplateRow,
       PrefetchHooks Function()
     >;
+typedef $$ScheduledMessagesTableCreateCompanionBuilder =
+    ScheduledMessagesCompanion Function({
+      required String id,
+      Value<String?> personId,
+      required String channelTag,
+      required String channelHandle,
+      Value<String?> messageBody,
+      required int fireAtMillis,
+      Value<String> status,
+      required int createdAtMillis,
+      Value<int?> firedAtMillis,
+      Value<int> rowid,
+    });
+typedef $$ScheduledMessagesTableUpdateCompanionBuilder =
+    ScheduledMessagesCompanion Function({
+      Value<String> id,
+      Value<String?> personId,
+      Value<String> channelTag,
+      Value<String> channelHandle,
+      Value<String?> messageBody,
+      Value<int> fireAtMillis,
+      Value<String> status,
+      Value<int> createdAtMillis,
+      Value<int?> firedAtMillis,
+      Value<int> rowid,
+    });
+
+class $$ScheduledMessagesTableFilterComposer
+    extends Composer<_$AppDatabase, $ScheduledMessagesTable> {
+  $$ScheduledMessagesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get channelTag => $composableBuilder(
+    column: $table.channelTag,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get channelHandle => $composableBuilder(
+    column: $table.channelHandle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get messageBody => $composableBuilder(
+    column: $table.messageBody,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get fireAtMillis => $composableBuilder(
+    column: $table.fireAtMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAtMillis => $composableBuilder(
+    column: $table.createdAtMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get firedAtMillis => $composableBuilder(
+    column: $table.firedAtMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ScheduledMessagesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ScheduledMessagesTable> {
+  $$ScheduledMessagesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get channelTag => $composableBuilder(
+    column: $table.channelTag,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get channelHandle => $composableBuilder(
+    column: $table.channelHandle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get messageBody => $composableBuilder(
+    column: $table.messageBody,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get fireAtMillis => $composableBuilder(
+    column: $table.fireAtMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAtMillis => $composableBuilder(
+    column: $table.createdAtMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get firedAtMillis => $composableBuilder(
+    column: $table.firedAtMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ScheduledMessagesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ScheduledMessagesTable> {
+  $$ScheduledMessagesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<String> get channelTag => $composableBuilder(
+    column: $table.channelTag,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get channelHandle => $composableBuilder(
+    column: $table.channelHandle,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get messageBody => $composableBuilder(
+    column: $table.messageBody,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get fireAtMillis => $composableBuilder(
+    column: $table.fireAtMillis,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAtMillis => $composableBuilder(
+    column: $table.createdAtMillis,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get firedAtMillis => $composableBuilder(
+    column: $table.firedAtMillis,
+    builder: (column) => column,
+  );
+}
+
+class $$ScheduledMessagesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ScheduledMessagesTable,
+          ScheduledMessageRow,
+          $$ScheduledMessagesTableFilterComposer,
+          $$ScheduledMessagesTableOrderingComposer,
+          $$ScheduledMessagesTableAnnotationComposer,
+          $$ScheduledMessagesTableCreateCompanionBuilder,
+          $$ScheduledMessagesTableUpdateCompanionBuilder,
+          (
+            ScheduledMessageRow,
+            BaseReferences<
+              _$AppDatabase,
+              $ScheduledMessagesTable,
+              ScheduledMessageRow
+            >,
+          ),
+          ScheduledMessageRow,
+          PrefetchHooks Function()
+        > {
+  $$ScheduledMessagesTableTableManager(
+    _$AppDatabase db,
+    $ScheduledMessagesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ScheduledMessagesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ScheduledMessagesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ScheduledMessagesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String?> personId = const Value.absent(),
+                Value<String> channelTag = const Value.absent(),
+                Value<String> channelHandle = const Value.absent(),
+                Value<String?> messageBody = const Value.absent(),
+                Value<int> fireAtMillis = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int> createdAtMillis = const Value.absent(),
+                Value<int?> firedAtMillis = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ScheduledMessagesCompanion(
+                id: id,
+                personId: personId,
+                channelTag: channelTag,
+                channelHandle: channelHandle,
+                messageBody: messageBody,
+                fireAtMillis: fireAtMillis,
+                status: status,
+                createdAtMillis: createdAtMillis,
+                firedAtMillis: firedAtMillis,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String?> personId = const Value.absent(),
+                required String channelTag,
+                required String channelHandle,
+                Value<String?> messageBody = const Value.absent(),
+                required int fireAtMillis,
+                Value<String> status = const Value.absent(),
+                required int createdAtMillis,
+                Value<int?> firedAtMillis = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ScheduledMessagesCompanion.insert(
+                id: id,
+                personId: personId,
+                channelTag: channelTag,
+                channelHandle: channelHandle,
+                messageBody: messageBody,
+                fireAtMillis: fireAtMillis,
+                status: status,
+                createdAtMillis: createdAtMillis,
+                firedAtMillis: firedAtMillis,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ScheduledMessagesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ScheduledMessagesTable,
+      ScheduledMessageRow,
+      $$ScheduledMessagesTableFilterComposer,
+      $$ScheduledMessagesTableOrderingComposer,
+      $$ScheduledMessagesTableAnnotationComposer,
+      $$ScheduledMessagesTableCreateCompanionBuilder,
+      $$ScheduledMessagesTableUpdateCompanionBuilder,
+      (
+        ScheduledMessageRow,
+        BaseReferences<
+          _$AppDatabase,
+          $ScheduledMessagesTable,
+          ScheduledMessageRow
+        >,
+      ),
+      ScheduledMessageRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -8854,4 +9747,6 @@ class $AppDatabaseManager {
       $$PersonGroupMembersTableTableManager(_db, _db.personGroupMembers);
   $$TemplatesTableTableManager get templates =>
       $$TemplatesTableTableManager(_db, _db.templates);
+  $$ScheduledMessagesTableTableManager get scheduledMessages =>
+      $$ScheduledMessagesTableTableManager(_db, _db.scheduledMessages);
 }
